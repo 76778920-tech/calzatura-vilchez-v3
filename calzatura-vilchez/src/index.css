@@ -2841,6 +2841,34 @@ button.dash-today-card:hover { transform: translateY(-1px); }
 .pred-error-card .btn { display: flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem; }
 .pred-disclaimer { font-size: 12px; color: var(--text-muted); text-align: center; padding: 0.5rem; }
 
+/* Recomendaciones */
+.pred-recs-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.pred-rec-item { display: flex; gap: 1rem; align-items: flex-start; padding: 1rem 1.25rem; border-radius: 10px; border-left: 4px solid transparent; }
+.pred-rec-item.pred-rec-urgente { background: rgba(239,68,68,0.07); border-color: #ef4444; }
+.pred-rec-item.pred-rec-atencion { background: rgba(245,158,11,0.07); border-color: #f59e0b; }
+.pred-rec-item.pred-rec-oportunidad { background: rgba(16,185,129,0.07); border-color: #10b981; }
+.pred-rec-item.pred-rec-tranquilo { background: var(--bg-alt); border-color: var(--border); }
+.pred-rec-icon { flex-shrink: 0; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.pred-rec-icon-urgente { background: rgba(239,68,68,0.15); color: #ef4444; }
+.pred-rec-icon-atencion { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.pred-rec-icon-oportunidad { background: rgba(16,185,129,0.15); color: #10b981; }
+.pred-rec-icon-tranquilo { background: var(--bg-alt); color: var(--text-muted); }
+.pred-rec-body { display: flex; flex-direction: column; gap: 0.2rem; }
+.pred-rec-titulo { font-size: 14px; font-weight: 700; color: var(--text-primary); margin: 0; }
+.pred-rec-detalle { font-size: 13px; color: var(--text-secondary); margin: 0; }
+.pred-rec-accion { font-size: 13px; font-weight: 600; color: var(--text-primary); margin: 0.15rem 0 0; }
+.pred-estado-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 100px; font-size: 12px; font-weight: 700; }
+.pred-estado-badge.critico { background: rgba(239,68,68,0.15); color: #dc2626; }
+.pred-estado-badge.alerta { background: rgba(245,158,11,0.15); color: #d97706; }
+.pred-estado-badge.bien { background: rgba(16,185,129,0.15); color: #059669; }
+.pred-estado-badge.bajo { background: var(--bg-alt); color: var(--text-muted); }
+.pred-kpi-sub { font-size: 11px; color: var(--text-muted); margin: 0; }
+.pred-product-code { font-size: 11px; font-weight: 700; color: var(--gold-dark); font-family: monospace; letter-spacing: 0.03em; margin: 0 0 0.15rem; }
+.pred-search-wrap { position: relative; display: flex; align-items: center; }
+.pred-search-icon { position: absolute; left: 0.6rem; color: var(--text-muted); pointer-events: none; }
+.pred-search-input { padding: 0.45rem 0.75rem 0.45rem 2rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: var(--bg-alt); color: var(--text-primary); width: 220px; outline: none; transition: border-color 0.15s; }
+.pred-search-input:focus { border-color: var(--gold); background: var(--white); }
+
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 400; display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .modal { background: var(--white); border-radius: var(--radius-lg); width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
