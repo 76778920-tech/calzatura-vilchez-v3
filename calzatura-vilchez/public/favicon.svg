@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#050505"/>
+  <g transform="translate(32 32)">
+    <ellipse cx="0" cy="-18" rx="4.2" ry="10" fill="#C9A227"/>
+    <ellipse cx="0" cy="-18" rx="4.2" ry="10" fill="#C9A227" transform="rotate(45)"/>
+    <ellipse cx="0" cy="-18" rx="4.2" ry="10" fill="#C9A227" transform="rotate(90)"/>
+    <ellipse cx="0" cy="-18" rx="4.2" ry="10" fill="#C9A227" transform="rotate(135)"/>
+    <ellipse cx="0" cy="-18" rx="4.2" ry="10" fill="#C9A227" transform="rotate(180)"/>
+    <ellipse cx="0" cy="-18" rx="4.2" ry="10" fill="#C9A227" transform="rotate(225)"/>
+    <ellipse cx="0" cy="-18" rx="4.2" ry="10" fill="#C9A227" transform="rotate(270)"/>
+    <ellipse cx="0" cy="-18" rx="4.2" ry="10" fill="#C9A227" transform="rotate(315)"/>
+    <circle r="11" fill="#3D2008"/>
+    <circle r="7.5" fill="#2D1505"/>
+    <circle cx="-3.5" cy="-2.8" r="1.2" fill="#8A5A14"/>
+    <circle cx="3.4" cy="-2" r="1.1" fill="#8A5A14"/>
+    <circle cx="-1" cy="3.8" r="1.1" fill="#8A5A14"/>
+    <circle cx="4.5" cy="4.2" r="0.9" fill="#8A5A14"/>
+  </g>
+</svg>

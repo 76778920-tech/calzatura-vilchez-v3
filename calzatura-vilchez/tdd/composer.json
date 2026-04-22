@@ -1,0 +1,25 @@
+{
+  "name": "calzatura-vilchez/tdd",
+  "description": "Suite de pruebas TDD para Calzatura Vilchez",
+  "type": "project",
+  "require-dev": {
+    "phpunit/phpunit": "^10.5"
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit",
+    "test:unit": "phpunit --testsuite Unit",
+    "test:feature": "phpunit --testsuite Feature",
+    "test:browser": "phpunit --testsuite Browser"
+  },
+  "config": {
+    "sort-packages": true
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}
+

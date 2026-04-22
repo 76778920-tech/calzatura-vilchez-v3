@@ -1,0 +1,19 @@
+{
+  "hosting": {
+    "public": "calzatura-vilchez/dist",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  },
+  "firestore": {
+    "rules": "calzatura-vilchez/firestore.rules"
+  }
+}

@@ -1,0 +1,12 @@
+node_modules
+dist
+.firebase
+.vercel
+.env
+.env.*
+vite-dev.*.log
+npm-debug.log*
+Dockerfile
+docker-compose*.yml
+README.md
+tdd/vendor

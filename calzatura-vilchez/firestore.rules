@@ -1,0 +1,355 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn()
+        && request.auth.token.email == "76778920@continental.edu.pe";
+    }
+
+    function isAdmin() {
+      return isSuperAdmin()
+        || (isSignedIn()
+          && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
+          && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == "admin");
+    }
+
+    function hasOnly(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function isNonEmptyString(value, max) {
+      return value is string && value.size() > 0 && value.size() <= max;
+    }
+
+    function isValidPeruPhone(value) {
+      return value is string
+        && value.matches("^\\+51 9\\d{2} \\d{3} \\d{3}$")
+        && value != "+51 999 999 999"
+        && value != "+51 000 000 000";
+    }
+
+    function isValidProduct(data) {
+      return hasOnly(data, [
+          "nombre", "precio", "descripcion", "imagen", "imagenes", "stock",
+          "categoria", "tipoCalzado", "tallas", "tallaStock", "colorStock", "marca", "color", "colores", "destacado"
+        ])
+        && isNonEmptyString(data.nombre, 120)
+        && data.precio is number
+        && data.precio > 0
+        && data.precio <= 10000
+        && data.stock is int
+        && data.stock >= 0
+        && data.stock <= 10000
+        && isNonEmptyString(data.categoria, 40)
+        && (!("tipoCalzado" in data) || isNonEmptyString(data.tipoCalzado, 80))
+        && data.descripcion is string
+        && data.descripcion.size() <= 2000
+        && data.imagen is string
+        && data.imagen.size() <= 1048576
+        && (!("marca" in data) || data.marca is string)
+        && (!("color" in data) || data.color is string)
+        && (!("colores" in data) || data.colores is list)
+        && (!("destacado" in data) || data.destacado is bool)
+        && (!("tallas" in data) || data.tallas is list)
+        && (!("tallaStock" in data) || data.tallaStock is map)
+        && (!("colorStock" in data) || data.colorStock is map)
+        && (!("imagenes" in data) || data.imagenes is list);
+    }
+
+    function isValidProductCode(data, productId) {
+      return hasOnly(data, ["productoId", "codigo", "actualizadoEn"])
+        && data.productoId == productId
+        && isNonEmptyString(data.codigo, 40)
+        && data.codigo.matches("^[A-Z0-9-]{3,40}$")
+        && data.actualizadoEn is string;
+    }
+
+    function isValidProductFinancial(data, productId) {
+      return hasOnly(data, [
+          "productId", "costoCompra", "margenMinimo", "margenObjetivo",
+          "margenMaximo", "precioMinimo", "precioSugerido", "precioMaximo",
+          "actualizadoEn"
+        ])
+        && data.productId == productId
+        && data.costoCompra is number
+        && data.costoCompra > 0
+        && data.costoCompra <= 10000
+        && data.margenMinimo is number
+        && data.margenObjetivo is number
+        && data.margenMaximo is number
+        && data.margenMinimo >= 0
+        && data.margenObjetivo >= data.margenMinimo
+        && data.margenMaximo >= data.margenObjetivo
+        && data.margenMaximo <= 300
+        && data.precioMinimo is number
+        && data.precioSugerido is number
+        && data.precioMaximo is number
+        && data.precioMinimo >= data.costoCompra
+        && data.precioSugerido >= data.precioMinimo
+        && data.precioMaximo >= data.precioSugerido
+        && data.actualizadoEn is string;
+    }
+
+    function isValidDailySale(data) {
+      return hasOnly(data, [
+          "productId", "codigo", "nombre", "color", "talla", "fecha", "cantidad", "precioVenta",
+          "total", "costoUnitario", "costoTotal", "ganancia",
+          "documentoTipo", "documentoNumero", "cliente", "creadoEn"
+        ])
+        && isNonEmptyString(data.productId, 120)
+        && isNonEmptyString(data.codigo, 40)
+        && isNonEmptyString(data.nombre, 120)
+        && (!("color" in data) || data.color is string)
+        && (!("talla" in data) || data.talla is string)
+        && data.fecha is string
+        && data.fecha.matches("^\\d{4}-\\d{2}-\\d{2}$")
+        && data.cantidad is int
+        && data.cantidad > 0
+        && data.cantidad <= 1000
+        && data.precioVenta is number
+        && data.precioVenta > 0
+        && data.total is number
+        && data.total > 0
+        && data.costoUnitario is number
+        && data.costoUnitario > 0
+        && data.costoTotal is number
+        && data.costoTotal > 0
+        && data.ganancia is number
+        && (!("documentoNumero" in data) || data.documentoNumero is string)
+        && isValidSaleDocument(data)
+        && data.creadoEn is string;
+    }
+
+    function isValidSaleCustomer(customer) {
+      return customer is map
+        && hasOnly(customer, ["dni", "nombres", "apellidos"])
+        && customer.dni is string
+        && customer.dni.matches("^\\d{8}$")
+        && isNonEmptyString(customer.nombres, 80)
+        && isNonEmptyString(customer.apellidos, 120);
+    }
+
+    function isValidSaleDocument(data) {
+      return (!("documentoTipo" in data) || data.documentoTipo in ["ninguno", "nota_venta", "guia_remision"])
+        && (!("cliente" in data) || isValidSaleCustomer(data.cliente))
+        && (
+          !("documentoTipo" in data)
+          || data.documentoTipo == "ninguno"
+          || ("cliente" in data && isValidSaleCustomer(data.cliente))
+        )
+        && (!("cliente" in data) || ("documentoTipo" in data && data.documentoTipo != "ninguno"));
+    }
+
+    function isValidFavorite(data, productId) {
+      return hasOnly(data, ["productId", "creadoEn"])
+        && data.productId == productId
+        && isNonEmptyString(data.productId, 120)
+        && data.creadoEn == request.time;
+    }
+
+    function isValidManufacturer(data) {
+      return hasOnly(data, [
+          "dni", "nombres", "apellidos", "marca", "telefono",
+          "ultimoIngresoFecha", "ultimoIngresoMonto", "documentos",
+          "observaciones", "activo", "creadoEn", "actualizadoEn"
+        ])
+        && data.dni is string
+        && data.dni.matches("^\\d{8}$")
+        && isNonEmptyString(data.nombres, 80)
+        && isNonEmptyString(data.apellidos, 120)
+        && isNonEmptyString(data.marca, 120)
+        && (!("telefono" in data) || data.telefono is string)
+        && (!("ultimoIngresoFecha" in data)
+          || data.ultimoIngresoFecha == ""
+          || data.ultimoIngresoFecha.matches("^\\d{4}-\\d{2}-\\d{2}$"))
+        && (!("ultimoIngresoMonto" in data)
+          || (data.ultimoIngresoMonto is number
+            && data.ultimoIngresoMonto >= 0
+            && data.ultimoIngresoMonto <= 1000000))
+        && (!("documentos" in data)
+          || (data.documentos is list
+            && data.documentos.size() <= 8))
+        && (!("observaciones" in data)
+          || (data.observaciones is string && data.observaciones.size() <= 2000))
+        && data.activo is bool
+        && data.creadoEn is string
+        && data.actualizadoEn is string;
+    }
+
+    function isValidAddress(data) {
+      return hasOnly(data, [
+          "nombre", "apellido", "direccion", "ciudad", "distrito",
+          "telefono", "referencia"
+        ])
+        && isNonEmptyString(data.nombre, 80)
+        && isNonEmptyString(data.apellido, 80)
+        && isNonEmptyString(data.direccion, 180)
+        && isNonEmptyString(data.ciudad, 80)
+        && isNonEmptyString(data.distrito, 80)
+        && isValidPeruPhone(data.telefono)
+        && (!("referencia" in data) || data.referencia is string);
+    }
+
+    function isValidOrderCreate(data) {
+      return hasOnly(data, [
+          "userId", "userEmail", "items", "subtotal", "envio", "total",
+          "estado", "direccion", "creadoEn", "metodoPago", "notas"
+        ])
+        && data.userId == request.auth.uid
+        && data.userEmail == request.auth.token.email
+        && data.items is list
+        && data.items.size() > 0
+        && data.items.size() <= 30
+        && data.subtotal is number
+        && data.subtotal >= 0
+        && data.envio is number
+        && data.envio >= 0
+        && data.total is number
+        && data.total >= data.subtotal
+        && data.estado == "pendiente"
+        && data.creadoEn == request.time
+        && data.metodoPago in ["stripe", "contraentrega"]
+        && isValidAddress(data.direccion)
+        && (!("notas" in data) || data.notas is string);
+    }
+
+    function isValidUserCreate(userId, data) {
+      return hasOnly(data, [
+          "uid", "dni", "nombres", "apellidos", "nombre", "email", "rol",
+          "creadoEn", "telefono", "direcciones"
+        ])
+        && data.uid == userId
+        && data.uid == request.auth.uid
+        && data.dni is string
+        && data.dni.matches("^\\d{8}$")
+        && isNonEmptyString(data.nombres, 80)
+        && isNonEmptyString(data.apellidos, 120)
+        && isNonEmptyString(data.nombre, 120)
+        && data.email == request.auth.token.email
+        && data.rol == "usuario"
+        && data.creadoEn is string
+        && (!("telefono" in data) || isValidPeruPhone(data.telefono))
+        && (!("direcciones" in data) || data.direcciones is list);
+    }
+
+    function isValidUserAdminWrite(userId, data) {
+      return hasOnly(data, [
+          "uid", "dni", "nombres", "apellidos", "nombre", "email", "rol",
+          "creadoEn", "telefono", "direcciones"
+        ])
+        && data.uid == userId
+        && (!("dni" in data) || (data.dni is string && data.dni.matches("^\\d{8}$")))
+        && (!("nombres" in data) || isNonEmptyString(data.nombres, 80))
+        && (!("apellidos" in data) || isNonEmptyString(data.apellidos, 120))
+        && isNonEmptyString(data.nombre, 120)
+        && isNonEmptyString(data.email, 180)
+        && data.rol in ["usuario", "cliente", "trabajador", "admin"]
+        && data.creadoEn is string
+        && (!("telefono" in data) || isValidPeruPhone(data.telefono))
+        && (!("direcciones" in data) || data.direcciones is list);
+    }
+
+    function isValidUserOwnerUpdate(userId, data) {
+      return hasOnly(data, [
+          "uid", "dni", "nombres", "apellidos", "nombre", "email", "rol",
+          "creadoEn", "telefono", "direcciones"
+        ])
+        && data.uid == userId
+        && data.uid == resource.data.uid
+        && (!("dni" in resource.data) || data.dni == resource.data.dni)
+        && (!("nombres" in resource.data) || data.nombres == resource.data.nombres)
+        && (!("apellidos" in resource.data) || data.apellidos == resource.data.apellidos)
+        && (!("nombre" in resource.data) || data.nombre == resource.data.nombre)
+        && data.email == resource.data.email
+        && data.rol == resource.data.rol
+        && data.creadoEn == resource.data.creadoEn
+        && (!("telefono" in data) || data.telefono == "" || isValidPeruPhone(data.telefono))
+        && (!("direcciones" in data) || data.direcciones is list);
+    }
+
+    // Productos: cualquiera lee, solo admin escribe
+    match /productos/{productId} {
+      allow read:  if true;
+      allow create, update: if isAdmin() && isValidProduct(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Codigos internos de productos: solo administrador
+    match /productoCodigos/{productId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin() && isValidProductCode(request.resource.data, productId);
+      allow delete: if isAdmin();
+    }
+
+    // Rentabilidad interna: solo administrador
+    match /productoFinanzas/{productId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin() && isValidProductFinancial(request.resource.data, productId);
+      allow delete: if isAdmin();
+    }
+
+    // Ventas registradas manualmente: solo administrador
+    match /ventasDiarias/{saleId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && isValidDailySale(request.resource.data);
+      allow update, delete: if isAdmin();
+    }
+
+    // Fabricantes y documentos asociados: solo administrador
+    match /fabricantes/{manufacturerId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin() && isValidManufacturer(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // Pedidos
+    match /pedidos/{orderId} {
+      allow create: if isSignedIn() && isValidOrderCreate(request.resource.data);
+      allow read:   if isOwner(resource.data.userId) || isAdmin();
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          "estado", "stripeSessionId"
+        ])
+        && request.resource.data.estado in [
+          "pendiente", "pagado", "enviado", "entregado", "cancelado"
+        ];
+      allow delete: if isAdmin();
+    }
+
+    // Usuarios: cada uno lee/escribe el suyo; admin lee todos
+    match /usuarios/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if (isOwner(userId) && isValidUserCreate(userId, request.resource.data))
+        || (isSuperAdmin() && isValidUserAdminWrite(userId, request.resource.data))
+        || (isAdmin()
+          && isValidUserAdminWrite(userId, request.resource.data)
+          && request.resource.data.rol != "admin");
+      allow update: if (isOwner(userId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            "telefono", "direcciones"
+          ])
+          && isValidUserOwnerUpdate(userId, request.resource.data))
+        || (isSuperAdmin() && isValidUserAdminWrite(userId, request.resource.data))
+        || (isAdmin()
+          && isValidUserAdminWrite(userId, request.resource.data)
+          && resource.data.rol != "admin"
+          && request.resource.data.rol != "admin");
+      allow delete: if isAdmin();
+
+      match /favoritos/{productId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId) && isValidFavorite(request.resource.data, productId);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
+    }
+  }
+}
