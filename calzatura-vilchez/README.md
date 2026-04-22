@@ -7,6 +7,18 @@ Portal web de Calzatura Vilchez desarrollado con React, TypeScript, Vite, Fireba
 Todo cambio debe alinearse con la base interna de calidad y seguridad documentada en:
 
 - [docs/quality-security-standards.md](docs/quality-security-standards.md)
+- [docs/documentacion-general-sistema.md](docs/documentacion-general-sistema.md)
+- [docs/formato-09-alcance-proyecto-software.md](docs/formato-09-alcance-proyecto-software.md)
+- [docs/procesos/catalogo-mapas-procesos.md](docs/procesos/catalogo-mapas-procesos.md)
+
+Documentos listos para entrega en Word:
+
+- [docs/Formato_09_Alcance_Calzatura_Vilchez.docx](docs/Formato_09_Alcance_Calzatura_Vilchez.docx)
+- [docs/procesos/Catalogo_30_Mapas_Procesos_Calzatura_Vilchez.docx](docs/procesos/Catalogo_30_Mapas_Procesos_Calzatura_Vilchez.docx)
+
+Modelos BPMN base para Bizagi u otra herramienta compatible:
+
+- [docs/procesos/bpmn](docs/procesos/bpmn)
 
 La base del proyecto toma como referencia ISO 9001, ISO/IEC 25000, ISO/IEC 9126 e ISO/IEC 27000, cubriendo seguridad, rendimiento, escalabilidad, usabilidad y mantenibilidad.
 

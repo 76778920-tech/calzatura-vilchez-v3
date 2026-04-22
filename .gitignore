@@ -54,6 +54,9 @@ node_modules/
 # Optional eslint cache
 .eslintcache
 
+# Local AI/editor assistant settings
+.claude/
+
 # Optional REPL history
 .node_repl_history
 
