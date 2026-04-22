@@ -136,6 +136,7 @@ def predict_demand(
                 }
 
     predictions = []
+    predicted_pids: set[str] = set()
 
     for pid, day_sales in sales_map.items():
         # Daily series aligned to date_range
@@ -209,6 +210,7 @@ def predict_demand(
         else:
             trend = "estable"
 
+        predicted_pids.add(pid)
         predictions.append({
             "productId": pid,
             "nombre": nombre,
@@ -224,10 +226,37 @@ def predict_demand(
             "tendencia": trend,
             "confianza": confidence,
             "alerta_stock": days_until_stockout < horizon_days and stock > 0,
+            "sin_historial": False,
         })
 
-    # Sort by predicted demand descending
-    predictions.sort(key=lambda p: p["prediccion_unidades"], reverse=True)
+    # Products in catalog with no sales history at all
+    for pid, product in product_map.items():
+        if pid in predicted_pids:
+            continue
+        nombre = product.get("nombre", pid)
+        categoria = product.get("categoria", "")
+        precio = float(product.get("precio", 0))
+        stock = int(product.get("stock", 0))
+        predictions.append({
+            "productId": pid,
+            "nombre": nombre,
+            "categoria": categoria,
+            "precio": precio,
+            "stock_actual": stock,
+            "prediccion_unidades": 0,
+            "prediccion_diaria": 0,
+            "prediccion_semanal": 0,
+            "total_vendido_historico": 0,
+            "promedio_diario_historico": 0,
+            "dias_hasta_agotarse": 999,
+            "tendencia": "estable",
+            "confianza": 0,
+            "alerta_stock": False,
+            "sin_historial": True,
+        })
+
+    # Sort: products with sales history first (by predicted demand), then no-history at the end
+    predictions.sort(key=lambda p: (p["sin_historial"], -p["prediccion_unidades"]))
     return predictions
 
 
