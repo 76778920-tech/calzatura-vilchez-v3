@@ -1,3 +1,4 @@
+import json
 import os
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -9,8 +10,12 @@ _app = None
 def get_db():
     global _app
     if _app is None:
-        key_path = os.getenv("FIREBASE_KEY_PATH", "serviceAccountKey.json")
-        cred = credentials.Certificate(key_path)
+        json_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+        if json_env:
+            cred = credentials.Certificate(json.loads(json_env))
+        else:
+            key_path = os.getenv("FIREBASE_KEY_PATH", "serviceAccountKey.json")
+            cred = credentials.Certificate(key_path)
         _app = firebase_admin.initialize_app(cred)
     return firestore.client()
 
