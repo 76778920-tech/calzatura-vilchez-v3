@@ -45,3 +45,9 @@ def fetch_products(db) -> list[dict]:
     """Fetch all products."""
     docs = db.collection("productos").stream()
     return [{"id": d.id, **d.to_dict()} for d in docs]
+
+
+def fetch_product_codes(db) -> dict[str, str]:
+    """Fetch productoCodigos → { productId: codigo }."""
+    docs = db.collection("productoCodigos").stream()
+    return {d.id: d.to_dict().get("codigo", "") for d in docs}

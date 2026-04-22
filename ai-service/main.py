@@ -3,7 +3,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from services.firebase_client import get_db, fetch_daily_sales, fetch_completed_orders, fetch_products
+from services.firebase_client import get_db, fetch_daily_sales, fetch_completed_orders, fetch_products, fetch_product_codes
 from models.demand import predict_demand, get_stock_alerts, get_weekly_chart
 
 load_dotenv()
@@ -46,6 +46,7 @@ def _load_data(force: bool = False):
         fetch_daily_sales(db),
         fetch_completed_orders(db),
         fetch_products(db),
+        fetch_product_codes(db),
     )
     _cache["data"] = data
     _cache["expires_at"] = now + _CACHE_TTL
@@ -71,11 +72,12 @@ def demand_prediction(
 ):
     """Predicts product demand for the next `horizon` days."""
     try:
-        daily_sales, orders, products = _load_data()
+        daily_sales, orders, products, product_codes = _load_data()
         predictions = predict_demand(
             daily_sales=daily_sales,
             completed_orders=orders,
             products=products,
+            product_codes=product_codes,
             horizon_days=horizon,
             history_days=history,
         )
@@ -95,11 +97,12 @@ def stock_alerts(
 ):
     """Returns products predicted to run out of stock within `days_threshold` days."""
     try:
-        daily_sales, orders, products = _load_data()
+        daily_sales, orders, products, product_codes = _load_data()
         predictions = predict_demand(
             daily_sales=daily_sales,
             completed_orders=orders,
             products=products,
+            product_codes=product_codes,
             horizon_days=days_threshold,
             history_days=90,
         )
@@ -119,7 +122,7 @@ def weekly_chart(
 ):
     """Returns weekly sales volume (units) for the last `weeks` weeks."""
     try:
-        daily_sales, orders, _ = _load_data()
+        daily_sales, orders, *_ = _load_data()
         chart = get_weekly_chart(daily_sales, orders, weeks=weeks)
         return {"weeks": weeks, "chart": chart}
     except Exception as e:

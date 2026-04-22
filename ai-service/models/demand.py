@@ -92,6 +92,7 @@ def predict_demand(
     daily_sales: list[dict],
     completed_orders: list[dict],
     products: list[dict],
+    product_codes: dict[str, str] | None = None,
     horizon_days: int = 30,
     history_days: int = 90,
 ) -> list[dict]:
@@ -111,8 +112,9 @@ def predict_demand(
 
     sales_map = build_daily_sales_by_product(daily_sales, completed_orders)
     product_map = {p["id"]: p for p in products}
+    codes_map: dict[str, str] = product_codes or {}
 
-    # Fallback names/prices from daily sales when product not in product_map
+    # Fallback names/prices/codes from daily sales when product not in product_map
     sale_meta: dict[str, dict] = {}
     for sale in daily_sales:
         pid = sale.get("productId", "")
@@ -121,6 +123,7 @@ def predict_demand(
                 "nombre": sale.get("nombre", pid),
                 "categoria": sale.get("categoria", ""),
                 "precio": float(sale.get("precioVenta", 0)),
+                "codigo": sale.get("codigo", ""),
             }
 
     # Fallback names from order items
@@ -180,11 +183,11 @@ def predict_demand(
         product = product_map.get(pid, {})
         meta = sale_meta.get(pid, {})
         stock = int(product.get("stock", 0))
-        # Use explicit None checks so a real value of 0 or "" is not skipped
         nombre = product.get("nombre") if product.get("nombre") else meta.get("nombre", pid)
         categoria = product.get("categoria") if product.get("categoria") else meta.get("categoria", "")
         _raw_precio = product.get("precio")
         precio = float(_raw_precio) if _raw_precio is not None else float(meta.get("precio", 0.0))
+        codigo = codes_map.get(pid) or meta.get("codigo", "")
 
         # Days until stockout
         # - stock=0 and demand>0  → already out of stock (0 days)
@@ -213,6 +216,7 @@ def predict_demand(
         predicted_pids.add(pid)
         predictions.append({
             "productId": pid,
+            "codigo": codigo,
             "nombre": nombre,
             "categoria": categoria,
             "precio": precio,
@@ -239,6 +243,7 @@ def predict_demand(
         stock = int(product.get("stock", 0))
         predictions.append({
             "productId": pid,
+            "codigo": codes_map.get(pid, ""),
             "nombre": nombre,
             "categoria": categoria,
             "precio": precio,
