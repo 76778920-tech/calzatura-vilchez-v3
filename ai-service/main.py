@@ -1,14 +1,22 @@
 import time
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
-from services.firebase_client import get_db, fetch_daily_sales, fetch_completed_orders, fetch_products, fetch_product_codes
-from models.demand import predict_demand, get_stock_alerts, get_weekly_chart
+from models.demand import get_stock_alerts, get_weekly_chart, predict_demand
+from models.revenue import forecast_revenue
+from services.firebase_client import (
+    fetch_completed_orders,
+    fetch_daily_sales,
+    fetch_product_codes,
+    fetch_products,
+    get_db,
+)
 
 load_dotenv()
 
-app = FastAPI(title="Calzatura Vilchez — AI Service", version="1.0.0")
+app = FastAPI(title="Calzatura Vilchez AI Service", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,22 +29,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─── Cache ────────────────────────────────────────────────────────────────────
-# TTL de 5 minutos: los datos se refrescan solos cada 5 min sin tocar Firestore.
-
-_CACHE_TTL = 300  # segundos
+_CACHE_TTL = 300
 
 _cache: dict = {
-    "data": None,       # (daily_sales, orders, products)
-    "expires_at": 0.0,  # timestamp Unix
+    "data": None,       # (daily_sales, orders, products, product_codes)
+    "expires_at": 0.0,
 }
 
 
 def _load_data(force: bool = False):
-    """
-    Returns (daily_sales, orders, products) from cache.
-    Fetches from Firestore only when cache is expired or force=True.
-    """
+    """Returns cached Firestore data or refreshes it when expired."""
     now = time.monotonic()
     if not force and _cache["data"] is not None and now < _cache["expires_at"]:
         return _cache["data"]
@@ -53,8 +55,6 @@ def _load_data(force: bool = False):
     return data
 
 
-# ─── Routes ───────────────────────────────────────────────────────────────────
-
 @app.get("/")
 def root():
     cached = _cache["data"] is not None and time.monotonic() < _cache["expires_at"]
@@ -67,10 +67,10 @@ def root():
 
 @app.get("/api/predict/demand")
 def demand_prediction(
-    horizon: int = Query(default=30, ge=7, le=90, description="Días a predecir (7-90)"),
-    history: int = Query(default=90, ge=14, le=365, description="Días de historial a usar"),
+    horizon: int = Query(default=30, ge=7, le=90, description="Dias a predecir (7-90)"),
+    history: int = Query(default=90, ge=14, le=365, description="Dias de historial a usar"),
 ):
-    """Predicts product demand for the next `horizon` days."""
+    """Predicts product demand for the next horizon days."""
     try:
         daily_sales, orders, products, product_codes = _load_data()
         predictions = predict_demand(
@@ -87,15 +87,15 @@ def demand_prediction(
             "total_products": len(predictions),
             "predictions": predictions,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error))
 
 
 @app.get("/api/predict/stock-alert")
 def stock_alerts(
-    days_threshold: int = Query(default=14, ge=1, le=60, description="Alertar si se agota en N días"),
+    days_threshold: int = Query(default=14, ge=1, le=60, description="Alertar si se agota en N dias"),
 ):
-    """Returns products predicted to run out of stock within `days_threshold` days."""
+    """Returns products predicted to run out of stock within the requested threshold."""
     try:
         daily_sales, orders, products, product_codes = _load_data()
         predictions = predict_demand(
@@ -112,21 +112,39 @@ def stock_alerts(
             "total_alerts": len(alerts),
             "alerts": alerts,
         }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error))
+
+
+@app.get("/api/predict/revenue")
+def revenue_prediction(
+    horizon: int = Query(default=30, ge=7, le=90, description="Dias a proyectar"),
+    history: int = Query(default=120, ge=30, le=365, description="Dias historicos a usar"),
+):
+    """Returns future revenue forecast for the next week and month."""
+    try:
+        daily_sales, orders, *_ = _load_data()
+        return forecast_revenue(
+            daily_sales=daily_sales,
+            completed_orders=orders,
+            horizon_days=horizon,
+            history_days=history,
+        )
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error))
 
 
 @app.get("/api/sales/weekly-chart")
 def weekly_chart(
-    weeks: int = Query(default=8, ge=2, le=24, description="Número de semanas"),
+    weeks: int = Query(default=8, ge=2, le=24, description="Numero de semanas"),
 ):
-    """Returns weekly sales volume (units) for the last `weeks` weeks."""
+    """Returns weekly sales volume for the last weeks."""
     try:
         daily_sales, orders, *_ = _load_data()
         chart = get_weekly_chart(daily_sales, orders, weeks=weeks)
         return {"weeks": weeks, "chart": chart}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as error:
+        raise HTTPException(status_code=500, detail=str(error))
 
 
 @app.post("/api/cache/invalidate")
