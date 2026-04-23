@@ -17,7 +17,7 @@ import type { Order, UserProfile, UserRole } from "@/types";
 
 type UserFilter = "todos" | UserRole;
 
-const ROLE_OPTIONS: UserRole[] = ["usuario", "cliente", "trabajador", "admin"];
+const ROLE_OPTIONS: UserRole[] = ["cliente", "trabajador", "admin"];
 
 function fullName(user: UserProfile) {
   const names = [user.nombres, user.apellidos].filter(Boolean).join(" ").trim();
@@ -25,10 +25,10 @@ function fullName(user: UserProfile) {
 }
 
 function normalizeRole(role?: string): UserRole {
-  if (role === "admin" || role === "cliente" || role === "trabajador" || role === "usuario") {
+  if (role === "admin" || role === "cliente" || role === "trabajador") {
     return role;
   }
-  return "usuario";
+  return "cliente";
 }
 
 function roleLabel(role: UserRole) {
@@ -36,7 +36,6 @@ function roleLabel(role: UserRole) {
     admin: "Administrador",
     cliente: "Cliente",
     trabajador: "Trabajador",
-    usuario: "Usuario",
   };
   return labels[role];
 }
@@ -67,7 +66,7 @@ export default function AdminUsers() {
         acc[role] += 1;
         return acc;
       },
-      { admin: 0, cliente: 0, trabajador: 0, usuario: 0 }
+      { admin: 0, cliente: 0, trabajador: 0 }
     );
   }, [users]);
 
@@ -139,7 +138,7 @@ export default function AdminUsers() {
           <span className="admin-page-kicker">Perfiles</span>
           <h1 className="admin-page-title">Usuarios registrados</h1>
           <p className="admin-page-subtitle">
-            Asigna roles manualmente para controlar quién es usuario, cliente,
+            Asigna roles manualmente para controlar quién es cliente,
             trabajador o administrador.
           </p>
         </div>
@@ -183,7 +182,7 @@ export default function AdminUsers() {
             <option value="admin">Administradores</option>
             <option value="cliente">Clientes</option>
             <option value="trabajador">Trabajadores</option>
-            <option value="usuario">Usuarios</option>
+
           </select>
         </div>
       </div>

@@ -235,7 +235,7 @@ service cloud.firestore {
         && isNonEmptyString(data.apellidos, 120)
         && isNonEmptyString(data.nombre, 120)
         && data.email == request.auth.token.email
-        && data.rol == "usuario"
+        && data.rol == "cliente"
         && data.creadoEn is string
         && (!("telefono" in data) || isValidPeruPhone(data.telefono))
         && (!("direcciones" in data) || data.direcciones is list);
@@ -252,7 +252,7 @@ service cloud.firestore {
         && (!("apellidos" in data) || isNonEmptyString(data.apellidos, 120))
         && isNonEmptyString(data.nombre, 120)
         && isNonEmptyString(data.email, 180)
-        && data.rol in ["usuario", "cliente", "trabajador", "admin"]
+        && data.rol in ["cliente", "trabajador", "admin"]
         && data.creadoEn is string
         && (!("telefono" in data) || isValidPeruPhone(data.telefono))
         && (!("direcciones" in data) || data.direcciones is list);

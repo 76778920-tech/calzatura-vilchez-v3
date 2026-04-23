@@ -34,7 +34,7 @@ export async function registerUser(
       apellidos,
       nombre,
       email: user.email || data.email,
-      rol: "usuario",
+      rol: "cliente",
       creadoEn: new Date().toISOString(),
     });
   } catch (error) {

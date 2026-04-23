@@ -21,9 +21,8 @@ function roleLabel(role?: UserRole) {
     admin: "Administrador",
     cliente: "Cliente",
     trabajador: "Trabajador",
-    usuario: "Usuario",
   };
-  return labels[role ?? "usuario"];
+  return labels[role ?? "cliente"];
 }
 
 export default function ProfilePage() {
@@ -34,7 +33,7 @@ export default function ProfilePage() {
   const apellidos = userProfile?.apellidos ?? fallback.apellidos;
   const [telefono, setTelefono] = useState(userProfile?.telefono ?? "");
   const [saving, setSaving] = useState(false);
-  const role = userProfile?.rol ?? "usuario";
+  const role = userProfile?.rol ?? "cliente";
 
   if (!user) return <Navigate to="/login?redirect=/perfil" replace />;
 

@@ -61,6 +61,10 @@ export default function Register() {
       toast.error("El DNI debe tener 8 digitos");
       return;
     }
+    if (!validatedDni || !nombres || !apellidos) {
+      toast.error("Primero busca tu DNI con el boton de busqueda");
+      return;
+    }
     if (password !== confirmPass) {
       toast.error("Las contrasenas no coinciden");
       return;
@@ -72,28 +76,27 @@ export default function Register() {
 
     setLoading(true);
     try {
-      const person = await lookupDni(normalizedDni);
-      setNombres(person.nombres);
-      setApellidos(person.apellidos);
-      setValidatedDni(normalizedDni);
-
       await registerUser({
-        dni: normalizedDni,
-        nombres: person.nombres,
-        apellidos: person.apellidos,
+        dni: validatedDni,
+        nombres,
+        apellidos,
         email,
         password,
       });
       toast.success("Cuenta creada exitosamente");
       navigate("/");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error al registrar";
-      if (msg.includes("email-already-in-use")) {
+      console.error("[Register] error al crear cuenta:", err);
+      const code = (err as { code?: string })?.code ?? "";
+      const msg = err instanceof Error ? err.message : "";
+      if (code.includes("email-already-in-use") || msg.includes("email-already-in-use")) {
         toast.error("Este correo ya esta registrado");
-      } else if (msg === "DNI_LOOKUP_NOT_CONFIGURED" || msg === "DNI_NOT_FOUND" || msg === "DNI_LOOKUP_FAILED") {
-        showDniLookupError(err);
+      } else if (code.includes("permission-denied") || msg.includes("insufficient permissions")) {
+        toast.error("Error de permisos — despliega las reglas de Firestore");
+      } else if (code.includes("network-request-failed") || msg.includes("Failed to fetch")) {
+        toast.error("Sin conexion. Verifica tu internet");
       } else {
-        toast.error("Error al crear la cuenta");
+        toast.error(`Error: ${code || msg || "desconocido"}`);
       }
     } finally {
       setLoading(false);

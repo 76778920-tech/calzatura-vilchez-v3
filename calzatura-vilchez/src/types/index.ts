@@ -140,4 +140,4 @@ export interface UserProfile {
   direcciones?: Address[];
 }
 
-export type UserRole = "usuario" | "cliente" | "trabajador" | "admin";
+export type UserRole = "cliente" | "trabajador" | "admin";

@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       uid: currentUser.uid,
       nombre: currentUser.displayName ?? currentUser.email?.split("@")[0] ?? "Usuario",
       email: currentUser.email ?? "",
-      rol: isSuperAdmin ? "admin" : "usuario",
+      rol: isSuperAdmin ? "admin" : "cliente",
       creadoEn: new Date().toISOString(),
     };
 
@@ -44,13 +44,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let profile = await getUserProfile(currentUser.uid);
 
       if (!profile) {
-        // Primera vez: crear documento en Firestore para cualquier usuario
-        const newProfile: UserProfile = {
-          ...memoryProfile,
-          nombre: isSuperAdmin ? "Administrador" : memoryProfile.nombre,
-        };
-        await saveUserProfile(newProfile);
-        profile = newProfile;
+        if (isSuperAdmin) {
+          // Solo crear perfil automático para superadmin (no requiere DNI)
+          const newProfile: UserProfile = { ...memoryProfile, nombre: "Administrador" };
+          await saveUserProfile(newProfile);
+          profile = newProfile;
+        } else {
+          // Usuarios normales: el registro ya crea el perfil con DNI
+          // Usar perfil en memoria como fallback hasta que Firestore confirme
+          profile = memoryProfile;
+        }
       } else if (isSuperAdmin && profile.rol !== "admin") {
         // Superadmin siempre debe tener rol admin
         const upgraded = { ...profile, rol: "admin" as const };
