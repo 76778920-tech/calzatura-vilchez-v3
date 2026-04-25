@@ -38,7 +38,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_CACHE_TTL = 300
+_CACHE_TTL = 7200  # 2 hours — conserves Firestore free-tier quota
 
 _cache: dict = {
     "data": None,       # (daily_sales, orders, products, product_codes)
@@ -128,10 +128,8 @@ def debug_firebase():
             result["json_parse"] = f"ERROR: {e}"
             return result
     try:
-        db = get_db()
-        # Quick ping — list collections without reading docs
-        list(db.collections())
-        result["firestore"] = "connected"
+        get_db()
+        result["firestore"] = "initialized (no ping — quota conservation)"
     except Exception as e:
         result["firestore"] = f"ERROR: {e}"
     return result
