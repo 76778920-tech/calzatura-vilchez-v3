@@ -17,10 +17,7 @@ function shortOrderId(orderId: string) {
 }
 
 function orderDate(order: Order) {
-  const raw = order.creadoEn;
-  if (typeof raw === "string") return new Date(raw);
-  if (raw && "toDate" in raw) return raw.toDate();
-  return new Date();
+  return order.creadoEn ? new Date(order.creadoEn) : new Date();
 }
 
 function escapeHtml(value: string | number | undefined | null) {

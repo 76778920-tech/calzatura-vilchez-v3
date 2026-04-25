@@ -20,9 +20,7 @@ function todayISO() {
 }
 
 function toDate(value: Order["creadoEn"]) {
-  if (typeof value === "string") return new Date(value);
-  if (value && typeof value.toDate === "function") return value.toDate();
-  return new Date();
+  return value ? new Date(value) : new Date();
 }
 
 function toLocalISODate(date: Date) {

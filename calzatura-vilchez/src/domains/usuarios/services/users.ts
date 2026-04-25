@@ -7,7 +7,7 @@ export async function saveUserProfile(user: UserProfile): Promise<void> {
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase.from("usuarios").select("*").eq("uid", uid).single();
+  const { data, error } = await supabase.from("usuarios").select("*").eq("uid", uid).maybeSingle();
   if (error) return null;
   return data as UserProfile;
 }

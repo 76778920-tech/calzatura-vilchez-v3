@@ -1,5 +1,3 @@
-import type { Timestamp } from "firebase/firestore";
-
 export interface Product {
   id: string;
   nombre: string;
@@ -121,7 +119,7 @@ export interface Order {
   total: number;
   estado: OrderStatus;
   direccion: Address;
-  creadoEn: Timestamp | string;
+  creadoEn: string;
   stripeSessionId?: string;
   metodoPago: string;
   notas?: string;
