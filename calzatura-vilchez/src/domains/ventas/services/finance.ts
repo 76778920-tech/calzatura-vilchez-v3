@@ -1,17 +1,4 @@
-import {
-  addDoc,
-  collection,
-  doc,
-  deleteDoc,
-  getDocs,
-  limit,
-  orderBy,
-  query,
-  setDoc,
-  updateDoc,
-  where,
-} from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { supabase } from "@/supabase/client";
 import type { DailySale, ProductFinancial } from "@/types";
 
 const FINANCIAL_COL = "productoFinanzas";
@@ -43,9 +30,10 @@ export function calculatePriceRange(
 }
 
 export async function fetchProductFinancials(): Promise<Record<string, ProductFinancial>> {
-  const snap = await getDocs(collection(db, FINANCIAL_COL));
-  return snap.docs.reduce<Record<string, ProductFinancial>>((acc, item) => {
-    acc[item.id] = { productId: item.id, ...(item.data() as Omit<ProductFinancial, "productId">) };
+  const { data, error } = await supabase.from(FINANCIAL_COL).select("*");
+  if (error) throw error;
+  return (data ?? []).reduce<Record<string, ProductFinancial>>((acc, item) => {
+    acc[item.productId] = item as ProductFinancial;
     return acc;
   }, {});
 }
@@ -54,15 +42,17 @@ export async function upsertProductFinancial(
   productId: string,
   data: Omit<ProductFinancial, "productId" | "actualizadoEn">
 ): Promise<void> {
-  await setDoc(doc(db, FINANCIAL_COL, productId), {
+  const { error } = await supabase.from(FINANCIAL_COL).upsert({
     productId,
     ...data,
     actualizadoEn: new Date().toISOString(),
-  });
+  }, { onConflict: "productId" });
+  if (error) throw error;
 }
 
 export async function deleteProductFinancial(productId: string): Promise<void> {
-  await deleteDoc(doc(db, FINANCIAL_COL, productId));
+  const { error } = await supabase.from(FINANCIAL_COL).delete().eq("productId", productId);
+  if (error) throw error;
 }
 
 function sinceISO(days: number) {
@@ -72,28 +62,31 @@ function sinceISO(days: number) {
 }
 
 export async function fetchDailySales(date?: string): Promise<DailySale[]> {
-  const base = collection(db, SALES_COL);
-  const q = date
-    ? query(base, where("fecha", "==", date))
-    : query(base, where("fecha", ">=", sinceISO(90)), orderBy("fecha", "desc"), limit(500));
-  const snap = await getDocs(q);
-  return snap.docs
-    .map((item) => ({ id: item.id, ...(item.data() as Omit<DailySale, "id">) }))
-    .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+  let query = supabase.from(SALES_COL).select("*");
+  if (date) {
+    query = query.eq("fecha", date);
+  } else {
+    query = query.gte("fecha", sinceISO(90)).order("fecha", { ascending: false }).limit(500);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data as DailySale[]).sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
 }
 
 export async function addDailySale(data: Omit<DailySale, "id" | "creadoEn">): Promise<string> {
-  const docRef = await addDoc(collection(db, SALES_COL), {
+  const { data: row, error } = await supabase.from(SALES_COL).insert({
     ...data,
     creadoEn: new Date().toISOString(),
-  });
-  return docRef.id;
+  }).select("id").single();
+  if (error) throw error;
+  return row.id;
 }
 
 export async function markSaleReturned(saleId: string, motivo: string): Promise<void> {
-  await updateDoc(doc(db, SALES_COL, saleId), {
+  const { error } = await supabase.from(SALES_COL).update({
     devuelto: true,
     motivoDevolucion: motivo,
     devueltoEn: new Date().toISOString(),
-  });
+  }).eq("id", saleId);
+  if (error) throw error;
 }

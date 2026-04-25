@@ -1,35 +1,29 @@
-import {
-  addDoc,
-  collection,
-  deleteDoc,
-  doc,
-  getDocs,
-  updateDoc,
-} from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { supabase } from "@/supabase/client";
 import type { Manufacturer } from "@/types";
 
 const COL = "fabricantes";
 
 export async function fetchManufacturers(): Promise<Manufacturer[]> {
-  const snap = await getDocs(collection(db, COL));
-  return snap.docs
-    .map((item) => ({ id: item.id, ...(item.data() as Omit<Manufacturer, "id">) }))
-    .sort((a, b) => a.marca.localeCompare(b.marca));
+  const { data, error } = await supabase.from(COL).select("*").order("marca");
+  if (error) throw error;
+  return data as Manufacturer[];
 }
 
 export async function addManufacturer(data: Omit<Manufacturer, "id">): Promise<string> {
-  const docRef = await addDoc(collection(db, COL), data);
-  return docRef.id;
+  const { data: row, error } = await supabase.from(COL).insert(data).select("id").single();
+  if (error) throw error;
+  return row.id;
 }
 
 export async function updateManufacturer(
   id: string,
   data: Partial<Omit<Manufacturer, "id" | "creadoEn">>
 ): Promise<void> {
-  await updateDoc(doc(db, COL, id), data);
+  const { error } = await supabase.from(COL).update(data).eq("id", id);
+  if (error) throw error;
 }
 
 export async function deleteManufacturer(id: string): Promise<void> {
-  await deleteDoc(doc(db, COL, id));
+  const { error } = await supabase.from(COL).delete().eq("id", id);
+  if (error) throw error;
 }

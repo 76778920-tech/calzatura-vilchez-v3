@@ -1,93 +1,84 @@
-import {
-  collection,
-  getDocs,
-  getDoc,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  query,
-  setDoc,
-  where,
-} from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { supabase } from "@/supabase/client";
 import type { Product } from "@/types";
 
 const COL = "productos";
 const CODE_COL = "productoCodigos";
 
 export async function fetchProducts(): Promise<Product[]> {
-  const snap = await getDocs(collection(db, COL));
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Product, "id">) }));
+  const { data, error } = await supabase.from(COL).select("*");
+  if (error) throw error;
+  return data as Product[];
 }
 
 export async function fetchProductById(id: string): Promise<Product | null> {
-  const snap = await getDoc(doc(db, COL, id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...(snap.data() as Omit<Product, "id">) };
+  const { data, error } = await supabase.from(COL).select("*").eq("id", id).single();
+  if (error) return null;
+  return data as Product;
 }
 
 export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
   const uniqueIds = Array.from(new Set(ids)).filter(Boolean);
-  const products = await Promise.all(uniqueIds.map((id) => fetchProductById(id)));
-  return products.filter((product): product is Product => Boolean(product));
+  if (!uniqueIds.length) return [];
+  const { data, error } = await supabase.from(COL).select("*").in("id", uniqueIds);
+  if (error) throw error;
+  return data as Product[];
 }
 
 export async function fetchProductsByCategory(categoria: string): Promise<Product[]> {
-  const q = query(collection(db, COL), where("categoria", "==", categoria));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Product, "id">) }));
+  const { data, error } = await supabase.from(COL).select("*").eq("categoria", categoria);
+  if (error) throw error;
+  return data as Product[];
 }
 
 export async function fetchFeaturedProducts(): Promise<Product[]> {
-  const q = query(collection(db, COL), where("destacado", "==", true));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Product, "id">) }));
+  const { data, error } = await supabase.from(COL).select("*").eq("destacado", true);
+  if (error) throw error;
+  return data as Product[];
 }
 
 export async function addProduct(data: Omit<Product, "id">): Promise<string> {
-  const docRef = await addDoc(collection(db, COL), data);
-  return docRef.id;
+  const { data: row, error } = await supabase.from(COL).insert(data).select("id").single();
+  if (error) throw error;
+  return row.id;
 }
 
-export async function updateProduct(
-  id: string,
-  data: Partial<Omit<Product, "id">>
-): Promise<void> {
-  await updateDoc(doc(db, COL, id), data);
+export async function updateProduct(id: string, data: Partial<Omit<Product, "id">>): Promise<void> {
+  const { error } = await supabase.from(COL).update(data).eq("id", id);
+  if (error) throw error;
 }
 
 export async function deleteProduct(id: string): Promise<void> {
-  await deleteDoc(doc(db, COL, id));
+  const { error } = await supabase.from(COL).delete().eq("id", id);
+  if (error) throw error;
 }
 
 export async function fetchProductCodes(): Promise<Record<string, string>> {
-  const snap = await getDocs(collection(db, CODE_COL));
-  return snap.docs.reduce<Record<string, string>>((acc, item) => {
-    const data = item.data() as { codigo?: string };
-    if (data.codigo) acc[item.id] = data.codigo;
+  const { data, error } = await supabase.from(CODE_COL).select("*");
+  if (error) throw error;
+  return (data ?? []).reduce<Record<string, string>>((acc, item) => {
+    if (item.codigo) acc[item.productoId] = item.codigo;
     return acc;
   }, {});
 }
 
 export async function upsertProductCode(productId: string, codigo: string): Promise<void> {
-  await setDoc(doc(db, CODE_COL, productId), {
+  const { error } = await supabase.from(CODE_COL).upsert({
     productoId: productId,
     codigo,
     actualizadoEn: new Date().toISOString(),
-  });
+  }, { onConflict: "productoId" });
+  if (error) throw error;
 }
 
 export async function deleteProductCode(productId: string): Promise<void> {
-  await deleteDoc(doc(db, CODE_COL, productId));
+  const { error } = await supabase.from(CODE_COL).delete().eq("productoId", productId);
+  if (error) throw error;
 }
 
 export async function fetchCategories(): Promise<string[]> {
-  const snap = await getDocs(collection(db, COL));
+  const { data, error } = await supabase.from(COL).select("categoria");
+  if (error) throw error;
   const cats = new Set<string>();
-  snap.docs.forEach((d) => {
-    const cat = (d.data() as Product).categoria;
-    if (cat) cats.add(cat);
-  });
+  (data ?? []).forEach((d) => { if (d.categoria) cats.add(d.categoria); });
   return Array.from(cats).sort();
 }

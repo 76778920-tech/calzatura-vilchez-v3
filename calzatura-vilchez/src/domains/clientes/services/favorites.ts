@@ -1,41 +1,30 @@
-import {
-  collection,
-  deleteDoc,
-  doc,
-  getDoc,
-  getDocs,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { supabase } from "@/supabase/client";
 
-function favoriteRef(userId: string, productId: string) {
-  return doc(db, "usuarios", userId, "favoritos", productId);
-}
-
-function favoritesCollection(userId: string) {
-  return collection(db, "usuarios", userId, "favoritos");
-}
+const COL = "favoritos";
 
 export async function fetchFavoriteProductIds(userId: string): Promise<string[]> {
-  const snap = await getDocs(favoritesCollection(userId));
-  return snap.docs.map((item) => item.id);
+  const { data, error } = await supabase.from(COL).select("productId").eq("userId", userId);
+  if (error) throw error;
+  return (data ?? []).map((d) => d.productId);
 }
 
 export async function isProductFavorite(userId: string, productId: string): Promise<boolean> {
-  const snap = await getDoc(favoriteRef(userId, productId));
-  return snap.exists();
+  const { data } = await supabase.from(COL).select("id").eq("userId", userId).eq("productId", productId).single();
+  return Boolean(data);
 }
 
 export async function addFavoriteProduct(userId: string, productId: string): Promise<void> {
-  await setDoc(favoriteRef(userId, productId), {
+  const { error } = await supabase.from(COL).insert({
+    userId,
     productId,
-    creadoEn: serverTimestamp(),
+    creadoEn: new Date().toISOString(),
   });
+  if (error) throw error;
 }
 
 export async function removeFavoriteProduct(userId: string, productId: string): Promise<void> {
-  await deleteDoc(favoriteRef(userId, productId));
+  const { error } = await supabase.from(COL).delete().eq("userId", userId).eq("productId", productId);
+  if (error) throw error;
 }
 
 export async function toggleFavoriteProduct(
@@ -47,6 +36,5 @@ export async function toggleFavoriteProduct(
     await addFavoriteProduct(userId, productId);
     return;
   }
-
   await removeFavoriteProduct(userId, productId);
 }

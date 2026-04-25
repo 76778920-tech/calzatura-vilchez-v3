@@ -1,30 +1,32 @@
-import { collection, doc, setDoc, getDoc, getDocs, updateDoc } from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { supabase } from "@/supabase/client";
 import type { UserProfile, UserRole } from "@/types";
 
 export async function saveUserProfile(user: UserProfile): Promise<void> {
-  await setDoc(doc(db, "usuarios", user.uid), user);
+  const { error } = await supabase.from("usuarios").upsert(user, { onConflict: "uid" });
+  if (error) throw error;
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const snap = await getDoc(doc(db, "usuarios", uid));
-  if (!snap.exists()) return null;
-  return snap.data() as UserProfile;
+  const { data, error } = await supabase.from("usuarios").select("*").eq("uid", uid).single();
+  if (error) return null;
+  return data as UserProfile;
 }
 
 export async function fetchAllUsers(): Promise<UserProfile[]> {
-  const snap = await getDocs(collection(db, "usuarios"));
-  return snap.docs.map((item) => item.data() as UserProfile);
+  const { data, error } = await supabase.from("usuarios").select("*");
+  if (error) throw error;
+  return data as UserProfile[];
 }
 
-// setDoc con merge: funciona tanto si el documento existe como si no
 export async function updateUserProfile(
   uid: string,
   data: Partial<Pick<UserProfile, "telefono" | "direcciones">>
 ): Promise<void> {
-  await setDoc(doc(db, "usuarios", uid), data, { merge: true });
+  const { error } = await supabase.from("usuarios").update(data).eq("uid", uid);
+  if (error) throw error;
 }
 
 export async function updateUserRole(uid: string, rol: UserRole): Promise<void> {
-  await updateDoc(doc(db, "usuarios", uid), { rol });
+  const { error } = await supabase.from("usuarios").update({ rol }).eq("uid", uid);
+  if (error) throw error;
 }

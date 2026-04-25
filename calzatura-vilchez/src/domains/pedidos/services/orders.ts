@@ -1,16 +1,4 @@
-import {
-  collection,
-  addDoc,
-  getDocs,
-  getDoc,
-  updateDoc,
-  doc,
-  query,
-  where,
-  orderBy,
-  serverTimestamp,
-} from "firebase/firestore";
-import { db } from "@/firebase/config";
+import { supabase } from "@/supabase/client";
 import type { Order, OrderStatus, CartItem, Address } from "@/types";
 
 const COL = "pedidos";
@@ -26,38 +14,43 @@ export async function createOrder(data: {
   metodoPago: string;
   notas?: string;
 }): Promise<string> {
-  const docRef = await addDoc(collection(db, COL), {
+  const { data: row, error } = await supabase.from(COL).insert({
     ...data,
     estado: "pendiente",
-    creadoEn: serverTimestamp(),
-  });
-  return docRef.id;
+    creadoEn: new Date().toISOString(),
+  }).select("id").single();
+  if (error) throw error;
+  return row.id;
 }
 
 export async function fetchOrdersByUser(userId: string): Promise<Order[]> {
-  const q = query(
-    collection(db, COL),
-    where("userId", "==", userId),
-    orderBy("creadoEn", "desc")
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Order, "id">) }));
+  const { data, error } = await supabase
+    .from(COL)
+    .select("*")
+    .eq("userId", userId)
+    .order("creadoEn", { ascending: false });
+  if (error) throw error;
+  return data as Order[];
 }
 
 export async function fetchAllOrders(): Promise<Order[]> {
-  const q = query(collection(db, COL), orderBy("creadoEn", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Order, "id">) }));
+  const { data, error } = await supabase
+    .from(COL)
+    .select("*")
+    .order("creadoEn", { ascending: false });
+  if (error) throw error;
+  return data as Order[];
 }
 
 export async function fetchOrderById(id: string): Promise<Order | null> {
-  const snap = await getDoc(doc(db, COL, id));
-  if (!snap.exists()) return null;
-  return { id: snap.id, ...(snap.data() as Omit<Order, "id">) };
+  const { data, error } = await supabase.from(COL).select("*").eq("id", id).single();
+  if (error) return null;
+  return data as Order;
 }
 
 export async function updateOrderStatus(id: string, estado: OrderStatus): Promise<void> {
-  await updateDoc(doc(db, COL, id), { estado });
+  const { error } = await supabase.from(COL).update({ estado }).eq("id", id);
+  if (error) throw error;
 }
 
 export async function updateOrderStripeSession(
@@ -65,5 +58,6 @@ export async function updateOrderStripeSession(
   stripeSessionId: string,
   estado: OrderStatus = "pagado"
 ): Promise<void> {
-  await updateDoc(doc(db, COL, id), { stripeSessionId, estado });
+  const { error } = await supabase.from(COL).update({ stripeSessionId, estado }).eq("id", id);
+  if (error) throw error;
 }
