@@ -18,6 +18,7 @@ const AdminSales = lazy(() => import("@/domains/ventas/pages/AdminSales"));
 const AdminUsers = lazy(() => import("@/domains/usuarios/pages/AdminUsers"));
 const AdminManufacturers = lazy(() => import("@/domains/fabricantes/pages/AdminManufacturers"));
 const AdminPredictions = lazy(() => import("@/domains/administradores/pages/AdminPredictions"));
+const AdminData = lazy(() => import("@/domains/administradores/pages/AdminData"));
 
 const HomePage = lazy(() => import("@/domains/publico/pages/HomePage"));
 const ProductsPage = lazy(() => import("@/domains/productos/pages/ProductsPage"));
@@ -31,6 +32,7 @@ const StoresPage = lazy(() => import("@/domains/publico/pages/StoresPage"));
 const FavoritesPage = lazy(() => import("@/domains/clientes/pages/FavoritesPage"));
 const Login = lazy(() => import("@/domains/publico/pages/Login"));
 const Register = lazy(() => import("@/domains/publico/pages/Register"));
+const VerifyEmail = lazy(() => import("@/domains/publico/pages/VerifyEmail"));
 
 function Storefront() {
   const { loading } = useAuth();
@@ -50,6 +52,7 @@ function Storefront() {
             <Route path={PUBLIC_ROUTES.cart} element={<CartPage />} />
             <Route path={PUBLIC_ROUTES.login} element={<Login />} />
             <Route path={PUBLIC_ROUTES.register} element={<Register />} />
+            <Route path={PUBLIC_ROUTES.verifyEmail} element={<VerifyEmail />} />
 
             <Route
               path={CLIENT_ROUTES.checkout}
@@ -105,6 +108,7 @@ export default function App() {
               <Route path="usuarios" element={<AdminUsers />} />
               <Route path="fabricantes" element={<AdminManufacturers />} />
               <Route path="predicciones" element={<AdminPredictions />} />
+              <Route path="datos" element={<AdminData />} />
             </Route>
             <Route path="/*" element={<Storefront />} />
           </Routes>

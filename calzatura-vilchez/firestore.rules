@@ -37,10 +37,18 @@ service cloud.firestore {
         && value != "+51 000 000 000";
     }
 
+    function isValidImportMetadata(data) {
+      return (!("esDePrueba" in data) || data.esDePrueba is bool)
+        && (!("importadoEn" in data) || data.importadoEn is string)
+        && (!("loteImportacion" in data) || data.loteImportacion is string)
+        && (!("escenario" in data) || data.escenario is string);
+    }
+
     function isValidProduct(data) {
       return hasOnly(data, [
           "nombre", "precio", "descripcion", "imagen", "imagenes", "stock",
-          "categoria", "tipoCalzado", "tallas", "tallaStock", "colorStock", "marca", "color", "colores", "destacado"
+          "categoria", "tipoCalzado", "tallas", "tallaStock", "colorStock", "marca", "color", "colores", "destacado",
+          "esDePrueba", "importadoEn", "loteImportacion", "escenario"
         ])
         && isNonEmptyString(data.nombre, 120)
         && data.precio is number
@@ -62,7 +70,8 @@ service cloud.firestore {
         && (!("tallas" in data) || data.tallas is list)
         && (!("tallaStock" in data) || data.tallaStock is map)
         && (!("colorStock" in data) || data.colorStock is map)
-        && (!("imagenes" in data) || data.imagenes is list);
+        && (!("imagenes" in data) || data.imagenes is list)
+        && isValidImportMetadata(data);
     }
 
     function isValidProductCode(data, productId) {
@@ -103,7 +112,8 @@ service cloud.firestore {
       return hasOnly(data, [
           "productId", "codigo", "nombre", "color", "talla", "fecha", "cantidad", "precioVenta",
           "total", "costoUnitario", "costoTotal", "ganancia",
-          "documentoTipo", "documentoNumero", "cliente", "creadoEn"
+          "documentoTipo", "documentoNumero", "cliente", "creadoEn", "devuelto",
+          "esDePrueba", "importadoEn", "loteImportacion", "escenario"
         ])
         && isNonEmptyString(data.productId, 120)
         && isNonEmptyString(data.codigo, 40)
@@ -124,9 +134,11 @@ service cloud.firestore {
         && data.costoTotal is number
         && data.costoTotal > 0
         && data.ganancia is number
+        && (!("devuelto" in data) || data.devuelto is bool)
         && (!("documentoNumero" in data) || data.documentoNumero is string)
         && isValidSaleDocument(data)
-        && data.creadoEn is string;
+        && data.creadoEn is string
+        && isValidImportMetadata(data);
     }
 
     function isValidSaleCustomer(customer) {
@@ -160,7 +172,8 @@ service cloud.firestore {
       return hasOnly(data, [
           "dni", "nombres", "apellidos", "marca", "telefono",
           "ultimoIngresoFecha", "ultimoIngresoMonto", "documentos",
-          "observaciones", "activo", "creadoEn", "actualizadoEn"
+          "observaciones", "activo", "creadoEn", "actualizadoEn",
+          "esDePrueba", "importadoEn", "loteImportacion", "escenario"
         ])
         && data.dni is string
         && data.dni.matches("^\\d{8}$")
@@ -182,7 +195,8 @@ service cloud.firestore {
           || (data.observaciones is string && data.observaciones.size() <= 2000))
         && data.activo is bool
         && data.creadoEn is string
-        && data.actualizadoEn is string;
+        && data.actualizadoEn is string
+        && isValidImportMetadata(data);
     }
 
     function isValidAddress(data) {

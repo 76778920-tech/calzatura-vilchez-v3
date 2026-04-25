@@ -6,6 +6,7 @@ export const PUBLIC_ROUTES = {
   cart: "/carrito",
   login: "/login",
   register: "/registro",
+  verifyEmail: "/verificar-correo",
 } as const;
 
 export const CLIENT_ROUTES = {
@@ -25,6 +26,7 @@ export const ADMIN_ROUTES = {
   users: "/admin/usuarios",
   manufacturers: "/admin/fabricantes",
   predictions: "/admin/predicciones",
+  data: "/admin/datos",
 } as const;
 
 export const ROUTE_GROUPS = {

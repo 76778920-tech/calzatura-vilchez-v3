@@ -1,4 +1,5 @@
 import { supabase } from "@/supabase/client";
+import { logAudit } from "@/services/audit";
 import type { UserProfile, UserRole } from "@/types";
 
 export async function saveUserProfile(user: UserProfile): Promise<void> {
@@ -29,4 +30,5 @@ export async function updateUserProfile(
 export async function updateUserRole(uid: string, rol: UserRole): Promise<void> {
   const { error } = await supabase.from("usuarios").update({ rol }).eq("uid", uid);
   if (error) throw error;
+  void logAudit("cambiar_estado", "usuario", uid, uid, { rol });
 }

@@ -3,6 +3,8 @@ import { read, utils, writeFile } from "xlsx";
 import { AlertTriangle, CheckCircle, Download, FileSpreadsheet, Loader, Trash2, Upload } from "lucide-react";
 import toast from "react-hot-toast";
 import { supabase } from "@/supabase/client";
+import { logAudit } from "@/services/audit";
+import { calculatePriceRange } from "@/domains/ventas/services/finance";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -39,6 +41,7 @@ interface CollectionConfig {
   importTransform: (row: Row, context: ImportContext) => Row;
   importValidate: (row: Row) => string | null;
   importDocId?: (row: Row) => string | null;
+  upsertOnConflict?: string;
 }
 
 const AI_BASE = import.meta.env.VITE_AI_SERVICE_URL ?? "http://localhost:8000";
@@ -80,6 +83,69 @@ function scenarioLabel(key: string | null | undefined) {
   return SCENARIO_OPTIONS.find((item) => item.key === key)?.label ?? "General";
 }
 
+function normalizeImportId(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .replace(/[\\/]/g, "-")
+    .replace(/\s+/g, "-")
+    .slice(0, 120);
+}
+
+function deriveProductImportId(row: Row): string | null {
+  const explicitId = normalizeImportId(row.id);
+  if (explicitId) return explicitId;
+  const fromProductId = normalizeImportId(row.productId);
+  if (fromProductId) return fromProductId;
+  const fromCode = normalizeImportId(row.codigo);
+  return fromCode || null;
+}
+
+function parseBooleanCell(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return ["true", "1", "si", "sí", "yes"].includes(normalized);
+}
+
+function parseJsonCell<T>(value: unknown, fallback: T): T {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "object") return value as T;
+  try {
+    return JSON.parse(String(value)) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function parseStringArrayCell(value: unknown): string[] {
+  const parsed = parseJsonCell<unknown>(value, []);
+  if (Array.isArray(parsed)) {
+    return parsed.map((item) => String(item ?? "").trim()).filter(Boolean);
+  }
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseNumberMapCell(value: unknown): Record<string, number> {
+  const parsed = parseJsonCell<Record<string, unknown>>(value, {});
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  return Object.fromEntries(
+    Object.entries(parsed).map(([key, amount]) => [String(key).trim(), Number(amount ?? 0)])
+  );
+}
+
+function parseNestedNumberMapCell(value: unknown): Record<string, Record<string, number>> {
+  const parsed = parseJsonCell<Record<string, unknown>>(value, {});
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  return Object.fromEntries(
+    Object.entries(parsed).map(([outerKey, innerValue]) => [
+      String(outerKey).trim(),
+      parseNumberMapCell(innerValue),
+    ])
+  );
+}
+
 async function invalidateAICache(): Promise<void> {
   try {
     await fetch(`${AI_BASE}/api/cache/invalidate`, { method: "POST" });
@@ -96,16 +162,25 @@ const COLLECTIONS: CollectionConfig[] = [
     label: "Productos",
     description: "Catálogo completo de calzado",
     canImport: true,
-    templateHeaders: ["codigo", "nombre", "precio", "stock", "categoria", "descripcion", "marca", "color", "destacado"],
+    templateHeaders: [
+      "id", "codigo", "nombre", "precio", "stock", "categoria", "tipoCalzado",
+      "descripcion", "marca", "color", "colores", "tallas", "tallaStock", "colorStock", "destacado",
+    ],
     templateExample: {
+      id: "PRUEBA_CV001",
       codigo: "CV-001",
       nombre: "Zapatilla Deportiva",
       precio: 89.90,
       stock: 10,
       categoria: "Deportivo",
+      tipoCalzado: "Zapatillas",
       descripcion: "Descripcion del producto (opcional)",
       marca: "Nike",
       color: "Negro",
+      colores: "[\"Negro\",\"Blanco\"]",
+      tallas: "[\"39\",\"40\",\"41\"]",
+      tallaStock: "{\"39\":3,\"40\":4,\"41\":3}",
+      colorStock: "{\"Negro\":{\"39\":1,\"40\":2,\"41\":1},\"Blanco\":{\"39\":2,\"40\":2,\"41\":2}}",
       destacado: false,
     },
     extraData: async () => {
@@ -117,14 +192,19 @@ const COLLECTIONS: CollectionConfig[] = [
     },
     exportTransform: (d, extra) => ({
       id: d.id ?? "",
-      codigo: (extra as Record<string, string> | undefined)?.[String(d.id)] ?? "",
+      codigo: (extra as Record<string, string> | undefined)?.[String(d.id ?? "")] ?? "",
       nombre: d.nombre ?? "",
       precio: d.precio ?? 0,
       stock: d.stock ?? 0,
       categoria: d.categoria ?? "",
+      tipoCalzado: d.tipoCalzado ?? "",
       descripcion: d.descripcion ?? "",
       marca: d.marca ?? "",
       color: d.color ?? "",
+      colores: JSON.stringify(d.colores ?? []),
+      tallas: JSON.stringify(d.tallas ?? []),
+      tallaStock: JSON.stringify(d.tallaStock ?? {}),
+      colorStock: JSON.stringify(d.colorStock ?? {}),
       destacado: d.destacado ?? false,
     }),
     importTransform: (row, context) => ({
@@ -132,10 +212,15 @@ const COLLECTIONS: CollectionConfig[] = [
       precio: Number(row.precio ?? 0),
       stock: Number(row.stock ?? 0),
       categoria: String(row.categoria ?? "").trim(),
+      tipoCalzado: String(row.tipoCalzado ?? "").trim(),
       descripcion: String(row.descripcion ?? "").trim(),
       marca: String(row.marca ?? "").trim(),
       color: String(row.color ?? "").trim(),
-      destacado: String(row.destacado).toLowerCase() === "true",
+      colores: parseStringArrayCell(row.colores),
+      tallas: parseStringArrayCell(row.tallas),
+      tallaStock: parseNumberMapCell(row.tallaStock),
+      colorStock: parseNestedNumberMapCell(row.colorStock),
+      destacado: parseBooleanCell(row.destacado),
       imagen: "",
       imagenes: [],
       esDePrueba: true,
@@ -144,13 +229,63 @@ const COLLECTIONS: CollectionConfig[] = [
       escenario: context.escenario,
     }),
     importValidate: (row) => {
+      if (!deriveProductImportId(row)) return "Debes incluir 'id' o 'codigo' para identificar el producto";
       if (!row.nombre) return "Falta el campo 'nombre'";
       if (row.precio === undefined || isNaN(Number(row.precio))) return "El campo 'precio' debe ser un número";
       if (row.stock === undefined || isNaN(Number(row.stock))) return "El campo 'stock' debe ser un número";
       if (!row.categoria) return "Falta el campo 'categoria'";
       return null;
     },
-    importDocId: (row) => (typeof row.id === "string" && row.id ? row.id : null),
+    importDocId: deriveProductImportId,
+  },
+  {
+    id: "productoFinanzas",
+    label: "Finanzas de Producto",
+    description: "Costos y márgenes para reportes y pruebas",
+    canImport: true,
+    templateHeaders: [
+      "productId", "costoCompra", "margenMinimo", "margenObjetivo", "margenMaximo",
+      "precioMinimo", "precioSugerido", "precioMaximo",
+    ],
+    templateExample: {
+      productId: "PRUEBA_CV001",
+      costoCompra: 72,
+      margenMinimo: 20,
+      margenObjetivo: 35,
+      margenMaximo: 55,
+      precioMinimo: 86.4,
+      precioSugerido: 97.2,
+      precioMaximo: 111.6,
+    },
+    exportTransform: (d) => ({
+      productId: d.productId ?? "",
+      costoCompra: d.costoCompra ?? 0,
+      margenMinimo: d.margenMinimo ?? 0,
+      margenObjetivo: d.margenObjetivo ?? 0,
+      margenMaximo: d.margenMaximo ?? 0,
+      precioMinimo: d.precioMinimo ?? 0,
+      precioSugerido: d.precioSugerido ?? 0,
+      precioMaximo: d.precioMaximo ?? 0,
+      actualizadoEn: d.actualizadoEn ?? "",
+    }),
+    importTransform: (row, context) => ({
+      productId: String(row.productId ?? "").trim(),
+      costoCompra: Number(row.costoCompra ?? 0),
+      margenMinimo: Number(row.margenMinimo ?? 0),
+      margenObjetivo: Number(row.margenObjetivo ?? 0),
+      margenMaximo: Number(row.margenMaximo ?? 0),
+      precioMinimo: Number(row.precioMinimo ?? 0),
+      precioSugerido: Number(row.precioSugerido ?? 0),
+      precioMaximo: Number(row.precioMaximo ?? 0),
+      actualizadoEn: context.importadoEn,
+    }),
+    importValidate: (row) => {
+      if (!row.productId) return "Falta el campo 'productId'";
+      if (row.costoCompra === undefined || isNaN(Number(row.costoCompra))) return "El campo 'costoCompra' debe ser un número";
+      if (row.margenObjetivo === undefined || isNaN(Number(row.margenObjetivo))) return "El campo 'margenObjetivo' debe ser un número";
+      return null;
+    },
+    upsertOnConflict: "productId",
   },
   {
     id: "fabricantes",
@@ -359,11 +494,26 @@ async function importRows(
 ): Promise<{ ok: number; errors: string[] }> {
   const errors: string[] = [];
   const validRows: { data: Row; docId: string | null; source: Row }[] = [];
+  let validProductIds: Set<string> | null = null;
+
+  if (config.id === "ventasDiarias" || config.id === "productoFinanzas") {
+    const { data, error } = await supabase.from("productos").select("id");
+    if (error) throw error;
+    validProductIds = new Set((data ?? []).map((item) => String(item.id ?? "").trim()).filter(Boolean));
+  }
 
   rows.forEach((row, i) => {
     const err = config.importValidate(row);
+    const productId = config.id === "ventasDiarias" ? String(row.productId ?? "").trim() : "";
+    const productExists =
+      config.id !== "ventasDiarias"
+      || !productId
+      || (validProductIds?.has(productId) ?? false);
+
     if (err) {
       errors.push(`Fila ${i + 2}: ${err}`);
+    } else if (!productExists) {
+      errors.push(`Fila ${i + 2}: El productId '${productId}' no existe en la tabla productos`);
     } else {
       const docId = config.importDocId ? config.importDocId(row) : null;
       validRows.push({ data: config.importTransform(row, context), docId, source: row });
@@ -376,7 +526,9 @@ async function importRows(
     const rowsToInsert = chunk.map(({ data, docId }) =>
       docId ? { ...data, id: docId } : data
     );
-    const { error } = await supabase.from(config.id).upsert(rowsToInsert as object[]);
+    const { error } = await supabase
+      .from(config.id)
+      .upsert(rowsToInsert as object[], config.upsertOnConflict ? { onConflict: config.upsertOnConflict } : undefined);
     if (error) throw error;
 
     if (config.id === "productos") {
@@ -481,12 +633,12 @@ async function deleteSalesUpToDate(dateStr: string): Promise<number> {
 
 const BASE_PRODUCTS = [
   { id: "PRUEBA_CV001", nombre: "Zapatilla Running Pro",  precio: 119.90, costo: 75.00,  cat: "Deportivo", marca: "Adidas",     color: "Azul",   talla: "40", baseProb: 0.65, minQ: 1, maxQ: 3 },
-  { id: "PRUEBA_CV002", nombre: "Bota de Cuero Casual",   precio: 159.90, costo: 95.00,  cat: "Casual",    marca: "Clarks",     color: "Marrón", talla: "42", baseProb: 0.50, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV002", nombre: "Bota de Cuero Casual",   precio: 159.90, costo: 95.00,  cat: "Casual",    marca: "Clarks",     color: "Marron", talla: "42", baseProb: 0.50, minQ: 1, maxQ: 2 },
   { id: "PRUEBA_CV003", nombre: "Sandalia Verano",        precio:  49.90, costo: 28.00,  cat: "Casual",    marca: "Crocs",      color: "Beige",  talla: "38", baseProb: 0.45, minQ: 1, maxQ: 4 },
-  { id: "PRUEBA_CV004", nombre: "Mocasín Ejecutivo",      precio: 129.90, costo: 80.00,  cat: "Formal",    marca: "Bata",       color: "Negro",  talla: "41", baseProb: 0.55, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV004", nombre: "Mocasin Ejecutivo",      precio: 129.90, costo: 80.00,  cat: "Formal",    marca: "Bata",       color: "Negro",  talla: "41", baseProb: 0.55, minQ: 1, maxQ: 2 },
   { id: "PRUEBA_CV005", nombre: "Zapatilla Escolar",      precio:  79.90, costo: 50.00,  cat: "Escolar",   marca: "Kolosh",     color: "Blanco", talla: "36", baseProb: 0.60, minQ: 1, maxQ: 3 },
   { id: "PRUEBA_CV006", nombre: "Bota Urbana Negra",      precio: 189.90, costo: 120.00, cat: "Urbano",    marca: "Timberland", color: "Negro",  talla: "43", baseProb: 0.40, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV007", nombre: "Zapato Formal Clásico",  precio: 149.90, costo: 90.00,  cat: "Formal",    marca: "Bata",       color: "Café",   talla: "40", baseProb: 0.45, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV007", nombre: "Zapato Formal Clasico",  precio: 149.90, costo: 90.00,  cat: "Formal",    marca: "Bata",       color: "Cafe",   talla: "40", baseProb: 0.45, minQ: 1, maxQ: 2 },
   { id: "PRUEBA_CV008", nombre: "Chancleta Playera",      precio:  29.90, costo: 15.00,  cat: "Playa",     marca: "Rider",      color: "Verde",  talla: "39", baseProb: 0.55, minQ: 1, maxQ: 5 },
 ] as const;
 
@@ -499,45 +651,87 @@ interface ScenarioCfg {
   probMult: number;
   qtyMult: number;
   priceDiscount: number;
+  trendStartMult: number;
+  trendEndMult: number;
+  recentShockDays?: number;
+  recentShockMult?: number;
   stocks: readonly number[];
 }
 
+function uniqueSortedSizes(sizes: string[]) {
+  return Array.from(new Set(sizes.map((size) => String(size)))).sort((a, b) => Number(a) - Number(b));
+}
+
+function buildScenarioColorStock(baseSize: string, stock: number, color: string) {
+  const base = Number(baseSize);
+  const sizes = uniqueSortedSizes([String(base - 1), String(base), String(base + 1)]);
+  const weights = [0.3, 0.4, 0.3];
+  const tallaStock: Record<string, number> = {};
+  let assigned = 0;
+
+  sizes.forEach((size, index) => {
+    const qty = index === sizes.length - 1
+      ? Math.max(0, stock - assigned)
+      : Math.max(0, Math.round(stock * weights[index]));
+    tallaStock[size] = qty;
+    assigned += qty;
+  });
+
+  const colorStock = { [color]: tallaStock };
+  return {
+    tallas: sizes,
+    tallaStock,
+    colorStock,
+    colores: [color],
+  };
+}
+
 // Stock por producto: CV001..CV008
-// Crisis → mucho stock acumulado (no se vende)
-// Normal → stock moderado
-// Buenas ventas → stock casi agotado (alta demanda)
+// Crisis -> mucho stock acumulado (no se vende)
+// Normal -> stock moderado
+// Buenas ventas -> stock casi agotado (alta demanda)
 const SCENARIOS: ScenarioCfg[] = [
   {
     key: "crisis",
     label: "Crisis",
     color: "#ef4444",
-    detail: "180 días · ventas bajas · precios con 10% descuento · ~500 filas",
+    detail: "180 dias · ventas bajas · precios con 10% descuento · ~500 filas",
     days: 180,
-    probMult: 0.70,
-    qtyMult: 0.7,
-    priceDiscount: 0.10,
-    stocks: [85, 62, 94, 47, 71, 53, 39, 110],
+    probMult: 0.42,
+    qtyMult: 0.6,
+    priceDiscount: 0.15,
+    trendStartMult: 0.95,
+    trendEndMult: 0.4,
+    recentShockDays: 30,
+    recentShockMult: 0.62,
+    stocks: [98, 74, 108, 58, 86, 66, 52, 124],
   },
   {
     key: "normal",
     label: "Normal",
     color: "#f59e0b",
-    detail: "90 días · ventas regulares · precios normales · ~500 filas",
+    detail: "90 dias · ventas regulares · precios normales · ~500 filas",
     days: 90,
-    probMult: 1.35,
+    probMult: 1.1,
     qtyMult: 1.0,
     priceDiscount: 0,
+    trendStartMult: 0.98,
+    trendEndMult: 1.05,
     stocks: [22, 15, 30, 18, 28, 25, 16, 40],
   },
   {
     key: "buenas",
     label: "Buenas Ventas",
     color: "#10b981",
-    detail: "70 días · temporada alta · alta demanda · stock en riesgo · ~500 filas",
+    detail: "70 dias · temporada alta · alta demanda · stock en riesgo · ~500 filas",
     days: 70,
-    probMult: 2.0,
+    probMult: 1.5,
     qtyMult: 1.5,
     priceDiscount: 0,
+    trendStartMult: 1.1,
+    trendEndMult: 1.9,
+    recentShockDays: 21,
+    recentShockMult: 1.12,
     stocks: [4, 2, 8, 5, 3, 7, 1, 12],
   },
 ];
@@ -548,11 +742,11 @@ function detRand(seed: number): number {
 }
 
 function downloadScenario(sc: ScenarioCfg): void {
-  // ① Productos con stock según escenario
   const productRows = BASE_PRODUCTS.map((p, i) => {
     const precio = sc.priceDiscount > 0
       ? Math.round(p.precio * (1 - sc.priceDiscount) * 100) / 100
       : p.precio;
+    const inventory = buildScenarioColorStock(p.talla, sc.stocks[i], p.color);
     return {
       id: p.id,
       codigo: p.id.replace("PRUEBA_", ""),
@@ -560,9 +754,14 @@ function downloadScenario(sc: ScenarioCfg): void {
       precio,
       stock: sc.stocks[i],
       categoria: p.cat,
+      tipoCalzado: p.cat === "Formal" ? "Zapatos de Vestir" : p.cat === "Deportivo" ? "Zapatillas" : "Casual",
       descripcion: `Producto de prueba — escenario ${sc.label}`,
       marca: p.marca,
       color: p.color,
+      colores: JSON.stringify(inventory.colores),
+      tallas: JSON.stringify(inventory.tallas),
+      tallaStock: JSON.stringify(inventory.tallaStock),
+      colorStock: JSON.stringify(inventory.colorStock),
       destacado: false,
     };
   });
@@ -570,7 +769,28 @@ function downloadScenario(sc: ScenarioCfg): void {
   utils.book_append_sheet(wbP, utils.json_to_sheet(productRows), "Productos");
   writeFile(wbP, `productos_${sc.key}.xlsx`);
 
-  // ② Ventas diarias (~500 filas)
+  const financeRows = BASE_PRODUCTS.map((p) => {
+    const precio = sc.priceDiscount > 0
+      ? Math.round(p.precio * (1 - sc.priceDiscount) * 100) / 100
+      : p.precio;
+    const pricing = calculatePriceRange(p.costo, 20, 35, 55);
+    return {
+      productId: p.id,
+      costoCompra: p.costo,
+      margenMinimo: pricing.margenMinimo,
+      margenObjetivo: pricing.margenObjetivo,
+      margenMaximo: pricing.margenMaximo,
+      precioMinimo: pricing.precioMinimo,
+      precioSugerido: Math.round(precio * 100) / 100,
+      precioMaximo: Math.max(pricing.precioMaximo, Math.round(precio * 1.12 * 100) / 100),
+    };
+  });
+  setTimeout(() => {
+    const wbF = utils.book_new();
+    utils.book_append_sheet(wbF, utils.json_to_sheet(financeRows), "Finanzas");
+    writeFile(wbF, `finanzas_${sc.key}.xlsx`);
+  }, 250);
+
   setTimeout(() => {
     const salesRows: Row[] = [];
     const today = new Date();
@@ -583,10 +803,18 @@ function downloadScenario(sc: ScenarioCfg): void {
 
       BASE_PRODUCTS.forEach((p, pIdx) => {
         const seed = offset * 100 + pIdx;
-        const prob = Math.min(0.97, p.baseProb * sc.probMult);
+        const progress = (sc.days - offset) / Math.max(1, sc.days - 1);
+        const trendMult = sc.trendStartMult + ((sc.trendEndMult - sc.trendStartMult) * progress);
+        const shockMult =
+          sc.recentShockDays && offset <= sc.recentShockDays
+            ? (sc.recentShockMult ?? 1)
+            : 1;
+        const effectiveTrend = trendMult * shockMult;
+        const prob = Math.min(0.97, p.baseProb * sc.probMult * effectiveTrend);
         if (detRand(seed) < prob) {
           const rawQty = p.minQ + detRand(seed + 50) * (p.maxQ - p.minQ);
-          const qty = Math.max(1, Math.round(rawQty * sc.qtyMult));
+          const qtyTrend = Math.max(0.45, Math.min(1.7, 0.7 + (effectiveTrend * 0.45)));
+          const qty = Math.max(1, Math.round(rawQty * sc.qtyMult * qtyTrend));
           const precio = sc.priceDiscount > 0
             ? Math.round(p.precio * (1 - sc.priceDiscount) * 100) / 100
             : p.precio;
@@ -731,6 +959,13 @@ export default function AdminData() {
       if (ok > 0) {
         await invalidateAICache();
         await refreshTestBatches();
+        void logAudit("importar", config.id as "producto" | "fabricante" | "venta", context.loteImportacion, config.label, {
+          ok,
+          total: rows.length,
+          errores: errors.length,
+          escenario: context.escenario,
+          lote: context.loteImportacion,
+        });
       }
 
       if (errors.length === 0) {
@@ -762,7 +997,7 @@ export default function AdminData() {
   };
 
   const handleDeleteScenario = async () => {
-    if (!window.confirm(`Â¿Eliminar todos los datos de prueba del escenario ${scenarioLabel(scenarioKey)}?`)) return;
+    if (!window.confirm(`¿Eliminar todos los datos de prueba del escenario ${scenarioLabel(scenarioKey)}?`)) return;
     setScenarioDeleteLoading(true);
     try {
       const deleted = await deleteScenarioTestData(scenarioKey);
@@ -778,7 +1013,7 @@ export default function AdminData() {
   };
 
   const handleDeleteBatch = async (loteImportacion: string) => {
-    if (!window.confirm(`Â¿Eliminar el lote ${loteImportacion}? Solo se borrarÃ¡n datos marcados como prueba.`)) return;
+    if (!window.confirm(`¿Eliminar el lote ${loteImportacion}? Solo se borrarán datos marcados como prueba.`)) return;
     setDeletingBatch(loteImportacion);
     try {
       const deleted = await deleteTestBatch(loteImportacion);
@@ -894,7 +1129,7 @@ export default function AdminData() {
                     )}
                     {result?.loteImportacion && (
                       <p className="data-clean-note">
-                        Lote: <code>{result.loteImportacion}</code> â€” escenario <strong>{scenarioLabel(result.escenario)}</strong>
+                        Lote: <code>{result.loteImportacion}</code> — escenario <strong>{scenarioLabel(result.escenario)}</strong>
                       </p>
                     )}
 
@@ -928,7 +1163,7 @@ export default function AdminData() {
           <div>
             <h3 className="data-card-title">Eliminar lotes de prueba</h3>
             <p className="data-card-desc">
-              Cada importaciÃ³n nueva queda marcada con un lote. Elimina desde aquÃ­ solo lo que subiste para pruebas,
+              Cada importación nueva queda marcada con un lote. Elimina desde aquí solo lo que subiste para pruebas,
               sin tocar ventas reales.
             </p>
           </div>
@@ -937,14 +1172,14 @@ export default function AdminData() {
         {batchLoading ? (
           <p className="data-clean-note">Cargando lotes recientes...</p>
         ) : testBatches.length === 0 ? (
-          <p className="data-clean-note">TodavÃ­a no hay lotes de prueba marcados para eliminar.</p>
+          <p className="data-clean-note">Todavía no hay lotes de prueba marcados para eliminar.</p>
         ) : (
           <div style={{ display: "grid", gap: "0.85rem" }}>
             {testBatches.slice(0, 8).map((batch) => (
               <div key={batch.loteImportacion} className="data-clean-actions" style={{ alignItems: "flex-start" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p className="data-card-title" style={{ fontSize: "14px", marginBottom: "0.15rem" }}>
-                    {scenarioLabel(batch.escenario)} â€” {batch.total} registros
+                    {scenarioLabel(batch.escenario)} — {batch.total} registros
                   </p>
                   <p className="data-clean-note" style={{ marginBottom: "0.3rem" }}>
                     <code>{batch.loteImportacion}</code>
@@ -952,7 +1187,7 @@ export default function AdminData() {
                   <p className="data-clean-note">
                     {Object.entries(batch.counts)
                       .map(([colId, count]) => `${colId}: ${count}`)
-                      .join(" Â· ")}
+                      .join(" · ")}
                   </p>
                 </div>
                 <button
@@ -976,7 +1211,7 @@ export default function AdminData() {
           <div>
             <h3 className="data-card-title">Eliminar por escenario</h3>
             <p className="data-card-desc">
-              Ãštil cuando probaste un escenario completo como Crisis, Normal o Buenas Ventas y quieres limpiar todo ese conjunto.
+              Útil cuando probaste un escenario completo como Crisis, Normal o Buenas Ventas y quieres limpiar todo ese conjunto.
             </p>
           </div>
         </div>
@@ -1016,7 +1251,6 @@ export default function AdminData() {
         </p>
       </div>
 
-      {/* Eliminar ventas por fecha */}
       <div className="dash-card data-clean-card">
         <div className="data-clean-header">
           <Trash2 size={20} className="data-clean-icon" />
@@ -1024,7 +1258,7 @@ export default function AdminData() {
             <h3 className="data-card-title">Eliminar ventas hasta una fecha</h3>
             <p className="data-card-desc">
               Elimina todos los registros de Ventas Diarias con fecha igual o anterior a la seleccionada.
-              Se borran permanentemente de Firebase.
+              Se borran permanentemente de Supabase.
             </p>
           </div>
         </div>
@@ -1064,15 +1298,15 @@ export default function AdminData() {
         </p>
       </div>
 
-      {/* Escenarios de prueba descargables */}
       <div style={{ marginTop: "2rem" }}>
         <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "0.35rem" }}>
           Escenarios de prueba
         </h2>
         <p className="data-clean-note" style={{ marginBottom: "1.25rem" }}>
-          Cada escenario descarga <strong>2 archivos</strong>: productos con el stock correspondiente y
-          ventas diarias con ~500 registros. Importa primero los productos y luego las ventas.
-          Los IDs ya están enlazados.
+          Cada escenario descarga <strong>3 archivos</strong>: productos, finanzas del producto y
+          ventas diarias con ~500 registros. Importa en este orden: <strong>productos</strong>,
+          luego <strong>finanzas de producto</strong> y por último <strong>ventas diarias</strong>.
+          Los IDs ya vienen enlazados.
         </p>
 
         <div className="data-grid">

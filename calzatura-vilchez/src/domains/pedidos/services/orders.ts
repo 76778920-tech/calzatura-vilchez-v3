@@ -1,4 +1,5 @@
 import { supabase } from "@/supabase/client";
+import { logAudit } from "@/services/audit";
 import type { Order, OrderStatus, CartItem, Address } from "@/types";
 
 const COL = "pedidos";
@@ -51,6 +52,7 @@ export async function fetchOrderById(id: string): Promise<Order | null> {
 export async function updateOrderStatus(id: string, estado: OrderStatus): Promise<void> {
   const { error } = await supabase.from(COL).update({ estado }).eq("id", id);
   if (error) throw error;
+  void logAudit("cambiar_estado", "pedido", id, `#${id.slice(-8).toUpperCase()}`, { estado });
 }
 
 export async function updateOrderStripeSession(

@@ -1,11 +1,42 @@
 import {
   createUserWithEmailAndPassword,
   deleteUser,
+  reload,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
 import { auth } from "@/firebase/config";
 import { saveUserProfile } from "./users";
+import { logAudit } from "@/services/audit";
+
+export async function checkDisposableEmail(email: string): Promise<void> {
+  try {
+    const res = await fetch(
+      `https://www.disify.com/api/email/${encodeURIComponent(email)}`,
+      { signal: AbortSignal.timeout(4000) }
+    );
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.disposable === true) throw new Error("DISPOSABLE_EMAIL");
+  } catch (err) {
+    // Si la API falla por red/timeout dejamos pasar — Firebase igual exige verificación
+    if (err instanceof Error && err.message === "DISPOSABLE_EMAIL") throw err;
+  }
+}
+
+export async function resendVerificationEmail(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user) throw new Error("NO_USER");
+  await sendEmailVerification(user);
+}
+
+export async function reloadCurrentUser(): Promise<boolean> {
+  const user = auth.currentUser;
+  if (!user) return false;
+  await reload(user);
+  return user.emailVerified;
+}
 
 export async function registerUser(
   data: {
@@ -36,6 +67,13 @@ export async function registerUser(
       email: user.email || data.email,
       rol: "cliente",
       creadoEn: new Date().toISOString(),
+    });
+    await sendEmailVerification(user);
+    void logAudit("crear", "usuario", user.uid, nombre, {
+      dni: data.dni,
+      email: user.email || data.email,
+      rol: "cliente",
+      validadoPorDNI: true,
     });
   } catch (error) {
     await deleteUser(user).catch(() => undefined);

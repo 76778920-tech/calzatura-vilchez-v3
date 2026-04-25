@@ -103,6 +103,7 @@ const FOOTWEAR_TYPES_BY_CATEGORY: Record<string, string[]> = {
 const LOW_STOCK_LIMIT = 5;
 const IMAGE_SLOTS = 2;
 const COLOR_SLOTS = 5;
+const FALLBACK_PRODUCT_IMAGE = "/placeholder-product.svg";
 
 const EMPTY_FORM: ProductForm = {
   codigo: "",
@@ -522,7 +523,7 @@ export default function AdminProducts() {
       return;
     }
     if (!form.categoria || !CATEGORY_SIZES[form.categoria]) {
-      toast.error("Selecciona la categorÃ­a del producto");
+      toast.error("Selecciona la categoría del producto");
       return;
     }
     if (!form.marca?.trim()) {
@@ -546,7 +547,7 @@ export default function AdminProducts() {
       return;
     }
     if (!footwearTypesForCategory(form.categoria).includes(form.tipoCalzado.trim())) {
-      toast.error("Selecciona un tipo de calzado acorde a la categorÃ­a");
+      toast.error("Selecciona un tipo de calzado acorde a la categoría");
       return;
     }
     if (form.costoCompra <= 0) {
@@ -771,17 +772,21 @@ export default function AdminProducts() {
                       type="button"
                       className="admin-image-thumb-button"
                       onClick={() => setPreviewImage({
-                        src: product.imagen || "/placeholder.jpg",
+                        src: product.imagen || FALLBACK_PRODUCT_IMAGE,
                         title: product.nombre,
                         subtitle: "Producto",
                       })}
                       aria-label={`Abrir imagen de ${product.nombre}`}
                     >
                       <img
-                        src={product.imagen || "/placeholder.jpg"}
+                        src={product.imagen || FALLBACK_PRODUCT_IMAGE}
                         alt={product.nombre}
                         className="admin-product-img"
-                        onError={(event) => { (event.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+                        onError={(event) => {
+                          const img = event.target as HTMLImageElement;
+                          img.onerror = null;
+                          img.src = FALLBACK_PRODUCT_IMAGE;
+                        }}
                       />
                     </button>
                   </td>
@@ -971,7 +976,7 @@ export default function AdminProducts() {
                     <div className="form-group">
                       <label>Categoría</label>
                       <select value={form.categoria} onChange={(event) => updateCategory(event.target.value)} className="form-input" required>
-                        <option value="">Selecciona la categorÃ­a</option>
+                        <option value="">Selecciona la categoría</option>
                         {CATEGORIAS.map((category) => (
                           <option key={category} value={category}>{categoryLabel(category)}</option>
                         ))}

@@ -1,4 +1,5 @@
 import { supabase } from "@/supabase/client";
+import { logAudit } from "@/services/audit";
 import type { Product } from "@/types";
 
 const COL = "productos";
@@ -39,17 +40,20 @@ export async function fetchFeaturedProducts(): Promise<Product[]> {
 export async function addProduct(data: Omit<Product, "id">): Promise<string> {
   const { data: row, error } = await supabase.from(COL).insert(data).select("id").single();
   if (error) throw error;
+  void logAudit("crear", "producto", row.id, data.nombre);
   return row.id;
 }
 
 export async function updateProduct(id: string, data: Partial<Omit<Product, "id">>): Promise<void> {
   const { error } = await supabase.from(COL).update(data).eq("id", id);
   if (error) throw error;
+  void logAudit("editar", "producto", id, data.nombre ?? id, { campos: Object.keys(data) });
 }
 
 export async function deleteProduct(id: string): Promise<void> {
   const { error } = await supabase.from(COL).delete().eq("id", id);
   if (error) throw error;
+  void logAudit("eliminar", "producto", id, id);
 }
 
 export async function fetchProductCodes(): Promise<Record<string, string>> {

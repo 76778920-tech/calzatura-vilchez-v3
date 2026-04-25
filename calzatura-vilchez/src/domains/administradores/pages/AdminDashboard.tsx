@@ -9,7 +9,9 @@ import { fetchProducts } from "@/domains/productos/services/products";
 import { fetchAllOrders } from "@/domains/pedidos/services/orders";
 import { fetchDailySales, fetchProductFinancials } from "@/domains/ventas/services/finance";
 import { fetchAllUsers } from "@/domains/usuarios/services/users";
+import { fetchRecentAudit } from "@/services/audit";
 import type { Order, ProductFinancial, DailySale } from "@/types";
+import type { AuditEntry } from "@/services/audit";
 import { ADMIN_ROUTES } from "@/routes/paths";
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -237,11 +239,14 @@ export default function AdminDashboard() {
   const [chartData, setChartData] = useState<number[]>(Array(7).fill(0));
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
 
   const last7Days = getLast7Days();
 
   useEffect(() => {
     const today = todayISO();
+    void fetchRecentAudit(10).then(setAuditLog).catch(() => {});
+
     Promise.all([
       fetchProducts(),
       fetchAllOrders(),
@@ -513,6 +518,52 @@ export default function AdminDashboard() {
             <ChevronRight size={16} className="dash-action-arrow" />
           </Link>
         </div>
+      </div>
+
+      {/* Audit log */}
+      <div className="dash-card">
+        <div className="dash-card-header">
+          <div>
+            <p className="dash-card-kicker">Trazabilidad ISO 9001</p>
+            <h2 className="dash-card-title">Actividad reciente</h2>
+          </div>
+        </div>
+        {auditLog.length === 0 ? (
+          <p className="admin-empty">Sin actividad registrada aún.</p>
+        ) : (
+          <div className="admin-table-wrapper">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Acción</th>
+                  <th>Entidad</th>
+                  <th>Nombre</th>
+                  <th>Usuario</th>
+                  <th>Fecha</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLog.map((entry) => (
+                  <tr key={entry.id}>
+                    <td>
+                      <span className={`order-status-badge audit-badge-${entry.accion}`}>
+                        {entry.accion}
+                      </span>
+                    </td>
+                    <td>{entry.entidad}</td>
+                    <td className="dash-order-email">{entry.entidadNombre ?? "—"}</td>
+                    <td className="dash-order-email">{entry.usuarioEmail ?? "—"}</td>
+                    <td style={{ whiteSpace: "nowrap", fontSize: "12px", color: "var(--text-muted)" }}>
+                      {entry.realizadoEn
+                        ? new Date(entry.realizadoEn).toLocaleString("es-PE")
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Order detail modal */}

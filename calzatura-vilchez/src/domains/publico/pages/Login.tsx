@@ -5,6 +5,7 @@ import { loginUser } from "@/domains/usuarios/services/auth";
 import { isSuperAdminEmail } from "@/config/security";
 import { getPostLoginRedirect } from "@/routes/redirects";
 import { getUserProfile } from "@/domains/usuarios/services/users";
+import { PUBLIC_ROUTES } from "@/routes/paths";
 import toast from "react-hot-toast";
 
 export default function Login() {
@@ -21,17 +22,21 @@ export default function Login() {
     try {
       const loggedUser = await loginUser(email, password);
       const profile = await getUserProfile(loggedUser.uid).catch(() => null);
+      const isAdmin = isSuperAdminEmail(loggedUser.email) || profile?.rol === "admin";
+
+      if (!loggedUser.emailVerified && !isAdmin) {
+        toast("Confirma tu correo para continuar.", { icon: "✉️" });
+        navigate(PUBLIC_ROUTES.verifyEmail, { replace: true });
+        return;
+      }
+
       const redirect = getPostLoginRedirect({
         redirect: searchParams.get("redirect"),
         role: profile?.rol,
         email: loggedUser.email,
       });
 
-      toast.success(
-        isSuperAdminEmail(loggedUser.email) || profile?.rol === "admin"
-          ? "Bienvenido al panel administrativo"
-          : "Bienvenido"
-      );
+      toast.success(isAdmin ? "Bienvenido al panel administrativo" : "Bienvenido");
       navigate(redirect, { replace: true });
     } catch {
       toast.error("Correo o contraseña incorrectos");

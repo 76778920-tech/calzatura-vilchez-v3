@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { IdCard, User, Mail, Lock, Eye, EyeOff, Search } from "lucide-react";
-import { registerUser } from "@/domains/usuarios/services/auth";
+import { checkDisposableEmail, registerUser } from "@/domains/usuarios/services/auth";
+import { PUBLIC_ROUTES } from "@/routes/paths";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import toast from "react-hot-toast";
 
@@ -66,16 +67,17 @@ export default function Register() {
       return;
     }
     if (password !== confirmPass) {
-      toast.error("Las contrasenas no coinciden");
+      toast.error("Las contraseñas no coinciden");
       return;
     }
     if (password.length < 6) {
-      toast.error("La contrasena debe tener al menos 6 caracteres");
+      toast.error("La contraseña debe tener al menos 6 caracteres");
       return;
     }
 
     setLoading(true);
     try {
+      await checkDisposableEmail(email);
       await registerUser({
         dni: validatedDni,
         nombres,
@@ -83,13 +85,14 @@ export default function Register() {
         email,
         password,
       });
-      toast.success("Cuenta creada exitosamente");
-      navigate("/");
+      navigate(PUBLIC_ROUTES.verifyEmail, { replace: true });
     } catch (err: unknown) {
       console.error("[Register] error al crear cuenta:", err);
       const code = (err as { code?: string })?.code ?? "";
       const msg = err instanceof Error ? err.message : "";
-      if (code.includes("email-already-in-use") || msg.includes("email-already-in-use")) {
+      if (msg === "DISPOSABLE_EMAIL") {
+        toast.error("Este correo es temporal o desechable. Usa un correo real.");
+      } else if (code.includes("email-already-in-use") || msg.includes("email-already-in-use")) {
         toast.error("Este correo ya esta registrado");
       } else if (code.includes("permission-denied") || msg.includes("insufficient permissions")) {
         toast.error("Error de permisos — despliega las reglas de Firestore");
@@ -221,7 +224,7 @@ export default function Register() {
             </div>
 
             <div className="input-group">
-              <label>Confirmar contrasena</label>
+              <label>Confirmar contraseña</label>
               <div className="input-wrapper">
                 <Lock size={16} className="input-icon" />
                 <input
@@ -229,7 +232,7 @@ export default function Register() {
                   value={confirmPass}
                   onChange={(e) => setConfirmPass(e.target.value)}
                   required
-                  placeholder="Repite tu contrasena"
+                  placeholder="Repite tu contraseña"
                   className="form-input with-icon"
                 />
               </div>
@@ -243,7 +246,7 @@ export default function Register() {
 
         <p className="auth-footer">
           Ya tienes cuenta?{" "}
-          <Link to="/login" className="auth-link">Inicia sesion aqui</Link>
+          <Link to="/login" className="auth-link">Inicia sesión aquí</Link>
         </p>
       </div>
     </main>

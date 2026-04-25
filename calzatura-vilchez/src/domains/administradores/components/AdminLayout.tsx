@@ -1,5 +1,6 @@
+import { useState } from "react";
 import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain, FileSpreadsheet, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { ADMIN_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 import { logoutUser } from "@/domains/usuarios/services/auth";
@@ -11,6 +12,16 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useThemeMode();
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem("adminSidebarCollapsed") === "true"
+  );
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      localStorage.setItem("adminSidebarCollapsed", String(!prev));
+      return !prev;
+    });
+  };
 
   if (loading) {
     return (
@@ -21,13 +32,8 @@ export default function AdminLayout() {
     );
   }
 
-  if (!user) {
-    return <Navigate to={`/login?redirect=${location.pathname}`} replace />;
-  }
-
-  if (!isAdmin) {
-    return <Navigate to={PUBLIC_ROUTES.home} replace />;
-  }
+  if (!user) return <Navigate to={`/login?redirect=${location.pathname}`} replace />;
+  if (!isAdmin) return <Navigate to={PUBLIC_ROUTES.home} replace />;
 
   const handleLogout = async () => {
     try {
@@ -41,11 +47,11 @@ export default function AdminLayout() {
 
   return (
     <div className="admin-layout">
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar${collapsed ? " collapsed" : ""}`}>
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-brand">
             <span className="logo-icon">CV</span>
-            <span>Admin Panel</span>
+            <span className="admin-brand-name">Admin Panel</span>
           </div>
           <button
             type="button"
@@ -57,62 +63,51 @@ export default function AdminLayout() {
             {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
+
         <nav className="admin-nav">
-          <NavLink
-            to={ADMIN_ROUTES.dashboard}
-            end
-            className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}
-          >
-            <LayoutDashboard size={18} /> Dashboard
+          <NavLink to={ADMIN_ROUTES.dashboard} end className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Dashboard">
+            <LayoutDashboard size={18} /><span className="admin-nav-label">Dashboard</span>
           </NavLink>
-          <NavLink
-            to={ADMIN_ROUTES.products}
-            className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}
-          >
-            <Package size={18} /> Productos
+          <NavLink to={ADMIN_ROUTES.products} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Productos">
+            <Package size={18} /><span className="admin-nav-label">Productos</span>
           </NavLink>
-          <NavLink
-            to={ADMIN_ROUTES.orders}
-            className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}
-          >
-            <ShoppingBag size={18} /> Pedidos
+          <NavLink to={ADMIN_ROUTES.orders} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Pedidos">
+            <ShoppingBag size={18} /><span className="admin-nav-label">Pedidos</span>
           </NavLink>
-          <NavLink
-            to={ADMIN_ROUTES.sales}
-            className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}
-          >
-            <CircleDollarSign size={18} /> Ventas
+          <NavLink to={ADMIN_ROUTES.sales} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Ventas">
+            <CircleDollarSign size={18} /><span className="admin-nav-label">Ventas</span>
           </NavLink>
-          <NavLink
-            to={ADMIN_ROUTES.users}
-            className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}
-          >
-            <Users size={18} /> Usuarios
+          <NavLink to={ADMIN_ROUTES.users} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Usuarios">
+            <Users size={18} /><span className="admin-nav-label">Usuarios</span>
           </NavLink>
-          <NavLink
-            to={ADMIN_ROUTES.manufacturers}
-            className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}
-          >
-            <Factory size={18} /> Fabricantes
+          <NavLink to={ADMIN_ROUTES.manufacturers} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Fabricantes">
+            <Factory size={18} /><span className="admin-nav-label">Fabricantes</span>
           </NavLink>
-          <NavLink
-            to={ADMIN_ROUTES.predictions}
-            className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}
-          >
-            <Brain size={18} /> Predicciones IA
+          <NavLink to={ADMIN_ROUTES.predictions} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Predicciones IA">
+            <Brain size={18} /><span className="admin-nav-label">Predicciones IA</span>
+          </NavLink>
+          <NavLink to={ADMIN_ROUTES.data} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Datos Excel">
+            <FileSpreadsheet size={18} /><span className="admin-nav-label">Datos Excel</span>
           </NavLink>
         </nav>
-        <button
-          type="button"
-          className="admin-nav-item admin-back-link"
-          onClick={() => navigate(PUBLIC_ROUTES.home)}
-        >
-          <Store size={18} /> Ver tienda
+
+        <button type="button" className="admin-nav-item admin-back-link" onClick={() => navigate(PUBLIC_ROUTES.home)} title="Ver tienda">
+          <Store size={18} /><span className="admin-nav-label">Ver tienda</span>
         </button>
-        <button type="button" className="admin-nav-item admin-back-link" onClick={handleLogout}>
-          <LogOut size={18} /> Cerrar sesión
+        <button type="button" className="admin-nav-item admin-back-link" onClick={handleLogout} title="Cerrar sesión">
+          <LogOut size={18} /><span className="admin-nav-label">Cerrar sesión</span>
         </button>
       </aside>
+
+      {/* Tira de colapso entre sidebar y contenido */}
+      <button
+        type="button"
+        className="admin-sidebar-toggle"
+        onClick={toggleCollapsed}
+        title={collapsed ? "Expandir menú" : "Colapsar menú"}
+      >
+        {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+      </button>
 
       <main className="admin-main">
         <Outlet />
