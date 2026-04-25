@@ -36,5 +36,5 @@ Ninguno
 
 ## Advertencia
 
-Esta validacion solo confirma que PHP puede leer los archivos. No confirma que las pruebas se puedan ejecutar, porque falta PHPUnit local y configuracion de suite.
+Esta validación solo confirma que PHP puede leer los archivos. No confirma que las pruebas se puedan ejecutar, porque falta PHPUnit local y configuracion de suite.
 

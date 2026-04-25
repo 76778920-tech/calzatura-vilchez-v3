@@ -86,7 +86,7 @@ def _raise_http_error(error: Exception) -> None:
     if "quota exceeded" in detail.lower():
         raise HTTPException(
             status_code=503,
-            detail="Firestore quota exceeded. Reduce reads or wait for quota reset.",
+            detail="Supabase quota or backend rate limit exceeded. Retry later.",
         )
     raise HTTPException(status_code=500, detail=detail)
 
@@ -156,7 +156,7 @@ def demand_prediction(
 
 @app.get("/api/predict/stock-alert")
 def stock_alerts(
-    days_threshold: int = Query(default=14, ge=1, le=60, description="Alertar si se agota en N dias"),
+    days_threshold: int = Query(default=14, ge=1, le=60, description="Alertar si se agota en N días"),
 ):
     """Returns products predicted to run out of stock within the requested threshold."""
     try:
@@ -201,7 +201,7 @@ def revenue_prediction(
 
 @app.get("/api/sales/weekly-chart")
 def weekly_chart(
-    weeks: int = Query(default=8, ge=2, le=24, description="Numero de semanas"),
+    weeks: int = Query(default=8, ge=2, le=24, description="Número de semanas"),
 ):
     """Returns weekly sales volume for the last weeks."""
     try:

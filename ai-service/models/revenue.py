@@ -130,6 +130,7 @@ def forecast_revenue(
     forecast_values = [point["ingresos"] for point in forecast]
     next_7_days = round(sum(forecast_values[:7]), 2)
     next_30_days = round(sum(forecast_values[:30]), 2)
+    next_horizon_days = round(sum(forecast_values[:horizon_days]), 2)
     forecast_avg = sum(forecast_values) / len(forecast_values) if forecast_values else 0.0
 
     if growth_rate > 0.05:
@@ -149,9 +150,15 @@ def forecast_revenue(
     ))
 
     last_30_actual = round(sum(values[-30:]), 2) if values else 0.0
+    last_horizon_actual = round(sum(values[-horizon_days:]), 2) if values else 0.0
     growth_vs_last_30 = (
         round(((next_30_days - last_30_actual) / last_30_actual) * 100, 1)
         if last_30_actual > 0
+        else 0.0
+    )
+    growth_vs_last_horizon = (
+        round(((next_horizon_days - last_horizon_actual) / last_horizon_actual) * 100, 1)
+        if last_horizon_actual > 0
         else 0.0
     )
 
@@ -180,10 +187,13 @@ def forecast_revenue(
         "summary": {
             "proximo_7_dias": next_7_days,
             "proximo_30_dias": next_30_days,
+            "proximo_horizonte": next_horizon_days,
             "promedio_diario_historico": round(overall_avg, 2),
             "promedio_diario_proyectado": round(forecast_avg, 2),
             "ultimo_30_dias": last_30_actual,
+            "ultimo_horizonte": last_horizon_actual,
             "crecimiento_estimado_pct": growth_vs_last_30,
+            "crecimiento_estimado_horizonte_pct": growth_vs_last_horizon,
             "tendencia": trend,
             "confianza": confidence,
         },

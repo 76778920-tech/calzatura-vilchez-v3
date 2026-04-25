@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240" fill="none">
+  <rect width="240" height="240" rx="24" fill="#1E1E1E"/>
+  <rect x="18" y="18" width="204" height="204" rx="18" fill="#242424" stroke="#C9A227" stroke-opacity="0.25"/>
+  <path d="M58 141C70.5 121.5 86 109.5 104.5 105C117.2 101.9 131.9 104 145.5 108.5C153.8 111.2 162.6 115.1 171.9 118.2C178.8 120.5 182 124.2 182 130V152C182 159.7 175.7 166 168 166H84C69.6 166 58 154.4 58 140V141Z" fill="#C9A227" fill-opacity="0.16" stroke="#E8C96D" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M80 133C92 126.5 104.2 123 116.8 122.6C126.9 122.3 137.1 123.8 147 126.7" stroke="#E8C96D" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="91" cy="173" r="10" fill="#E8C96D"/>
+  <circle cx="158" cy="173" r="10" fill="#E8C96D"/>
+  <text x="120" y="207" text-anchor="middle" fill="#F4EFE5" font-family="Arial, sans-serif" font-size="18" font-weight="700">SIN IMAGEN</text>
+</svg>

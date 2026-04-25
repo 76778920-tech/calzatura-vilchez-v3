@@ -2,22 +2,22 @@
 
 ## 1. Resumen Del Sistema
 
-Calzatura Vilchez es una plataforma web para comercio, inventario, ventas, administracion y analitica de demanda. El sistema permite que los clientes consulten productos, compren, guarden favoritos y revisen pedidos. Tambien permite que los administradores gestionen catalogo, stock, ventas diarias, fabricantes, usuarios, pedidos e indicadores del negocio.
+Calzatura Vilchez es una plataforma web para comercio, inventario, ventas, administración y analítica de demanda. El sistema permite que los clientes consulten productos, compren, guarden favoritos y revisen pedidos. También permite que los administradores gestionen catálogo, stock, ventas diarias, fabricantes, usuarios, pedidos e indicadores del negocio.
 
-La solucion esta compuesta por:
+La solución esta compuesta por:
 
 - Frontend web en React, TypeScript y Vite.
 - Base de datos Cloud Firestore.
-- Autenticacion Firebase Auth.
+- Autenticación Firebase Auth.
 - Reglas de seguridad Firestore Rules.
 - Cloud Functions para operaciones sensibles asociadas a Stripe.
-- Cloudinary para carga y entrega de imagenes.
-- Servicio IA en Python FastAPI para prediccion de demanda y alertas de stock.
+- Cloudinary para carga y entrega de imágenes.
+- Servicio IA en Python FastAPI para predicción de demanda y alertas de stock.
 - Docker Compose para levantar frontend y servicio IA en desarrollo.
 
 ## 2. Objetivo Del Proyecto
 
-Centralizar la gestion comercial y operativa de Calzatura Vilchez mediante una aplicacion web que reduzca errores de inventario, mejore la trazabilidad de ventas y pedidos, facilite la administracion del catalogo y entregue indicadores utiles para la toma de decisiones.
+Centralizar la gestión comercial y operativa de Calzatura Vilchez mediante una aplicación web que reduzca errores de inventario, mejore la trazabilidad de ventas y pedidos, facilite la administración del catálogo y entregue indicadores útiles para la toma de decisiones.
 
 ## 3. Tecnologias Utilizadas
 
@@ -29,10 +29,10 @@ Centralizar la gestion comercial y operativa de Calzatura Vilchez mediante una a
 | Iconos | lucide-react |
 | Notificaciones | react-hot-toast |
 | Base de datos | Cloud Firestore |
-| Autenticacion | Firebase Auth |
+| Autenticación | Firebase Auth |
 | Backend serverless | Firebase Functions |
 | Pagos | Stripe |
-| Imagenes | Cloudinary |
+| Imágenes | Cloudinary |
 | IA | Python, FastAPI, pandas, numpy, scikit-learn |
 | Contenedores | Docker, Docker Compose |
 
@@ -65,84 +65,84 @@ Cazatura Vilchez V3/
   DOCKER.md
 ```
 
-## 5. Modulos Funcionales
+## 5. Módulos Funcionales
 
-### 5.1 Modulo Publico
+### 5.1 Módulo Público
 
-Ubicacion: `src/domains/publico`
+Ubicacion: `src/domains/público`
 
-Incluye la pagina de inicio, tiendas, login y registro. Permite que visitantes y clientes naveguen por la experiencia publica del sistema.
+Incluye la página de inicio, tiendas, login y registro. Permite que visitantes y clientes naveguen por la experiencia pública del sistema.
 
-### 5.2 Modulo Productos
+### 5.2 Módulo Productos
 
 Ubicacion: `src/domains/productos`
 
-Gestiona catalogo, detalle de producto y administracion de productos. Permite manejar nombre, precio, descripcion, imagenes, marca, categoria, tipo de calzado, colores, tallas, stock por talla y stock por color.
+Gestiona catálogo, detalle de producto y administración de productos. Permite manejar nombre, precio, descripción, imágenes, marca, categoría, tipo de calzado, colores, tallas, stock por talla y stock por color.
 
-### 5.3 Modulo Carrito
+### 5.3 Módulo Carrito
 
 Ubicacion: `src/domains/carrito`
 
-Gestiona carrito de compras, cantidades, seleccion de talla/color y checkout. La informacion del carrito se maneja en contexto React para la experiencia del usuario.
+Gestiona carrito de compras, cantidades, seleccion de talla/color y checkout. La información del carrito se maneja en contexto React para la experiencia del usuario.
 
-### 5.4 Modulo Clientes
+### 5.4 Módulo Clientes
 
 Ubicacion: `src/domains/clientes`
 
 Gestiona favoritos y vistas privadas del cliente. Los favoritos se almacenan como subcoleccion del usuario en Firestore.
 
-### 5.5 Modulo Pedidos
+### 5.5 Módulo Pedidos
 
 Ubicacion: `src/domains/pedidos`
 
-Gestiona creacion de pedidos, historial del cliente, confirmacion de pedido exitoso y administracion de pedidos desde el panel.
+Gestiona creación de pedidos, historial del cliente, confirmación de pedido exitoso y administración de pedidos desde el panel.
 
-### 5.6 Modulo Ventas
+### 5.6 Módulo Ventas
 
 Ubicacion: `src/domains/ventas`
 
 Permite registrar ventas diarias manuales, calcular rentabilidad, generar documentos de venta y procesar devoluciones con reposicion de stock.
 
-### 5.7 Modulo Fabricantes
+### 5.7 Módulo Fabricantes
 
 Ubicacion: `src/domains/fabricantes`
 
-Permite registrar fabricantes, datos de contacto, marca, ultimos ingresos, documentos y observaciones.
+Permite registrar fabricantes, datos de contacto, marca, últimos ingresos, documentos y observaciones.
 
-### 5.8 Modulo Usuarios
+### 5.8 Módulo Usuarios
 
 Ubicacion: `src/domains/usuarios`
 
-Gestiona registro, autenticacion, perfil, roles y administracion de usuarios.
+Gestiona registro, autenticación, perfil, roles y administración de usuarios.
 
-### 5.9 Modulo Administradores
+### 5.9 Módulo Administradores
 
 Ubicacion: `src/domains/administradores`
 
-Incluye layout administrativo, dashboard, predicciones, vista previa de imagenes y servicios auxiliares como Cloudinary.
+Incluye layout administrativo, dashboard, predicciones, vista previa de imágenes y servicios auxiliares como Cloudinary.
 
 ### 5.10 Servicio IA
 
 Ubicacion: `ai-service`
 
-Expone endpoints para prediccion de demanda, alertas de stock y grafico semanal. Lee datos de Firestore con Firebase Admin y mantiene cache temporal para reducir lecturas.
+Expone endpoints para predicción de demanda, alertas de stock y gráfico semanal. Lee datos de Firestore con Firebase Admin y mantiene cache temporal para reducir lecturas.
 
 ## 6. Colecciones Firestore
 
-| Coleccion | Uso |
+| Colección | Uso |
 |---|---|
-| `productos` | Catalogo publico, stock, imagenes y atributos comerciales. |
-| `productoCodigos` | Codigos internos por producto. |
+| `productos` | Catálogo público, stock, imágenes y atributos comerciales. |
+| `productoCodigos` | Códigos internos por producto. |
 | `productoFinanzas` | Costos, margenes y precios sugeridos. |
 | `pedidos` | Pedidos de clientes y estados. |
 | `usuarios` | Perfiles, datos personales y roles. |
 | `usuarios/{uid}/favoritos` | Productos favoritos por usuario. |
 | `ventasDiarias` | Ventas manuales, documentos, ganancias y devoluciones. |
-| `fabricantes` | Informacion de fabricantes y documentos asociados. |
+| `fabricantes` | Información de fabricantes y documentos asociados. |
 
 ## 7. Roles Y Seguridad
 
-El sistema distingue usuarios publicos, clientes, administradores y superadministrador.
+El sistema distingue usuarios públicos, clientes, administradores y superadministrador.
 
 La proteccion se aplica en varias capas:
 
@@ -162,42 +162,42 @@ ai-service/serviceAccountKey.json
 
 ### Compra Online
 
-1. Cliente consulta catalogo.
+1. Cliente consulta catálogo.
 2. Cliente abre detalle de producto.
 3. Selecciona talla/color/cantidad.
 4. Agrega al carrito.
 5. Ingresa a checkout.
-6. Registra direccion y metodo de pago.
+6. Registra dirección y método de pago.
 7. Se crea pedido en Firestore.
-8. Si paga con Stripe, se genera sesion de pago.
+8. Si paga con Stripe, se genera sesión de pago.
 9. Webhook confirma pago y actualiza estado.
 
 ### Registro De Venta Manual
 
 1. Administrador ingresa a ventas.
-2. Selecciona producto por marca/codigo.
+2. Selecciona producto por marca/código.
 3. Define talla, color, cantidad y precio.
 4. Registra venta.
 5. El sistema descuenta stock.
 6. Calcula ganancia.
 7. Opcionalmente genera nota de venta o guia.
 
-### Gestion De Producto
+### Gestión De Producto
 
 1. Administrador abre panel de productos.
 2. Crea o edita producto.
 3. Sube imagen a Cloudinary.
-4. Define categoria, tipo, marca, colores, tallas y stock.
+4. Define categoría, tipo, marca, colores, tallas y stock.
 5. Registra costo y margenes.
-6. Guarda producto, codigo interno y finanzas.
+6. Guarda producto, código interno y finanzas.
 
-### Prediccion De Demanda
+### Predicción De Demanda
 
 1. Administrador ingresa a predicciones.
 2. Frontend consulta el servicio IA.
 3. FastAPI lee ventas, pedidos completados y productos desde Firestore.
 4. El modelo calcula demanda estimada.
-5. La pantalla muestra predicciones, alertas y grafico semanal.
+5. La pantalla muestra predicciones, alertas y gráfico semanal.
 
 ## 9. Instalacion Local
 
@@ -242,7 +242,7 @@ Servicios:
 - Frontend: `http://localhost:5173`
 - Servicio IA: `http://localhost:8000`
 
-## 11. Validacion Del Proyecto
+## 11. Validación Del Proyecto
 
 Desde `calzatura-vilchez`:
 
@@ -266,19 +266,19 @@ El servicio IA no queda activo si se ejecuta solo con `run.bat` en una computado
 
 ## 13. Mantenibilidad
 
-La arquitectura por dominios permite ubicar cada funcionalidad en su area:
+La arquitectura por dominios permite ubicar cada funcionalidad en su área:
 
-- Cambios de catalogo: `src/domains/productos`.
+- Cambios de catálogo: `src/domains/productos`.
 - Cambios de pedidos: `src/domains/pedidos`.
 - Cambios de ventas: `src/domains/ventas`.
-- Cambios de administracion: `src/domains/administradores`.
+- Cambios de administración: `src/domains/administradores`.
 - Cambios de IA: `ai-service`.
 
 Cada nueva funcionalidad debe considerar:
 
 - Ruta en `src/routes/paths.ts`.
-- Permisos en `AreaRoute` si no es publica.
+- Permisos en `AreaRoute` si no es pública.
 - Reglas Firestore si escribe o lee datos sensibles.
-- Validacion de entrada.
+- Validación de entrada.
 - Documentacion del flujo si modifica procesos del negocio.
 

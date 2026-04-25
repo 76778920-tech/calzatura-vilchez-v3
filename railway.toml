@@ -1,0 +1,4 @@
+[deploy]
+startCommand = "hypercorn main:app --bind [::]:$PORT"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 300

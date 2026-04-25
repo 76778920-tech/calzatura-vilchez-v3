@@ -85,7 +85,7 @@ El frontend crea documentos en `pedidos` directamente. Las reglas validan dueño
 
 Riesgo:
 
-- Un cliente técnico podría intentar manipular `items`, `subtotal`, `envio` o `total`.
+- Un cliente técnico podría intentar manipular `items`, `subtotal`, `envío` o `total`.
 - Stripe mitiga parte del riesgo porque `createCheckoutSession` recalcula totales.
 - Pago contra entrega queda con mayor exposición si no se valida en backend.
 

@@ -64,7 +64,7 @@ OK (7 tests, 7 assertions)
 
 ## Observacion Importante
 
-Las pruebas actuales son pruebas base o placeholders. Verifican que la estructura y PHPUnit funcionan, pero todavia no prueban reglas reales del negocio.
+Las pruebas actuales son pruebas base o placeholders. Verifican que la estructura y PHPUnit funcionan, pero todavía no prueban reglas reales del negocio.
 
 El siguiente paso tecnico es reemplazar gradualmente los `assertTrue(true)` por pruebas reales del proyecto.
 

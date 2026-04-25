@@ -2,7 +2,7 @@
 
 ## 1. Objetivo
 
-Validar manualmente las funcionalidades principales del sistema Calzatura Vilchez, verificando que los usuarios puedan navegar, registrarse, iniciar sesion, comprar productos, gestionar pedidos y que el administrador pueda administrar productos y pedidos.
+Validar manualmente las funcionalidades principales del sistema Calzatura Vilchez, verificando que los usuarios puedan navegar, registrarse, iniciar sesión, comprar productos, gestionar pedidos y que el administrador pueda administrar productos y pedidos.
 
 Este documento corresponde a pruebas manuales, no automatizadas.
 
@@ -10,37 +10,37 @@ Este documento corresponde a pruebas manuales, no automatizadas.
 
 Las pruebas manuales cubren:
 
-- Pagina principal.
-- Catalogo de productos.
+- Página principal.
+- Catálogo de productos.
 - Detalle de producto.
 - Carrito de compras.
 - Registro de usuario.
-- Inicio de sesion.
+- Inicio de sesión.
 - Checkout.
 - Pedido exitoso.
 - Historial de pedidos.
 - Perfil de usuario.
 - Panel administrador.
-- Gestion de productos.
-- Gestion de pedidos.
+- Gestión de productos.
+- Gestión de pedidos.
 - Validaciones basicas de seguridad.
 
 ## 3. Tipos De Prueba
 
-| Tipo | Descripcion |
+| Tipo | Descripción |
 | --- | --- |
-| Funcional | Verifica que cada modulo cumpla lo esperado |
-| Usabilidad | Revisa claridad, navegacion y facilidad de uso |
-| Validacion | Verifica campos obligatorios y mensajes de error |
+| Funcional | Verifica que cada módulo cumpla lo esperado |
+| Usabilidad | Revisa claridad, navegación y facilidad de uso |
+| Validación | Verifica campos obligatorios y mensajes de error |
 | Seguridad basica | Revisa accesos no permitidos |
 | Compatibilidad | Revisa funcionamiento en navegador y resoluciones distintas |
-| Regresion | Repite flujos criticos luego de cambios |
+| Regresion | Repite flujos críticos luego de cambios |
 
 ## 4. Roles De Prueba
 
-| Rol | Descripcion |
+| Rol | Descripción |
 | --- | --- |
-| Visitante | Usuario sin iniciar sesion |
+| Visitante | Usuario sin iniciar sesión |
 | Cliente | Usuario registrado con rol cliente |
 | Administrador | Usuario con acceso al panel admin |
 
@@ -54,14 +54,14 @@ Las pruebas manuales cubren:
 | Dispositivo desktop | Windows |
 | Dispositivo movil | Vista responsive del navegador |
 | Base de datos | Firebase Firestore |
-| Autenticacion | Firebase Auth |
+| Autenticación | Firebase Auth |
 | Hosting | Firebase Hosting |
 
 ## 6. Criterios De Entrada
 
 Antes de iniciar las pruebas:
 
-- La aplicacion debe estar desplegada o ejecutandose localmente.
+- La aplicación debe estar desplegada o ejecutandose localmente.
 - Debe existir al menos un producto con stock.
 - Debe existir al menos un producto sin stock.
 - Debe existir un usuario administrador.
@@ -80,9 +80,9 @@ Las pruebas se consideran terminadas cuando:
 
 ## 8. Severidad De Errores
 
-| Severidad | Descripcion |
+| Severidad | Descripción |
 | --- | --- |
-| Critica | Impide comprar, iniciar sesion o compromete seguridad |
+| Crítica | Impide comprar, iniciar sesión o compromete seguridad |
 | Alta | Afecta una funcion importante pero tiene alternativa |
 | Media | Error visible que no bloquea el flujo principal |
 | Baja | Detalle visual, texto o mejora menor |

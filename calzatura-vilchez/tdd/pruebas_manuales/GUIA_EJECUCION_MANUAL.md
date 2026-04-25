@@ -2,7 +2,7 @@
 
 ## 1. Preparar El Sistema
 
-1. Abrir la aplicacion local o desplegada.
+1. Abrir la aplicación local o desplegada.
 2. Confirmar que Firebase este funcionando.
 3. Crear o verificar estos usuarios:
    - Un cliente.
@@ -49,7 +49,7 @@ Actualizar:
 - Fecha.
 - Ambiente.
 - Navegador.
-- Resultado por modulo.
+- Resultado por módulo.
 - Resultado de cada caso.
 
 ## 4. Reportar Errores

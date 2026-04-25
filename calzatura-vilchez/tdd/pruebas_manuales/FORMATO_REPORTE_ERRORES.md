@@ -8,17 +8,17 @@ Usar este formato cada vez que un caso de prueba manual falle.
 | --- | --- |
 | ID del error | BUG-___ |
 | Caso relacionado | PM-___ |
-| Modulo | __________________ |
+| Módulo | __________________ |
 | Fecha | __________________ |
 | Reportado por | __________________ |
-| Severidad | Critica / Alta / Media / Baja |
+| Severidad | Crítica / Alta / Media / Baja |
 | Estado | Nuevo / En revision / Corregido / Cerrado |
 
 ## Titulo
 
-Descripcion corta del problema.
+Descripción corta del problema.
 
-## Descripcion
+## Descripción
 
 Explicar que ocurrio y por que no coincide con el resultado esperado.
 
@@ -39,7 +39,7 @@ Indicar que ocurrio realmente.
 
 ## Evidencia
 
-Agregar captura de pantalla, video, enlace o descripcion.
+Agregar captura de pantalla, video, enlace o descripción.
 
 ```text
 Ruta o nombre de evidencia:

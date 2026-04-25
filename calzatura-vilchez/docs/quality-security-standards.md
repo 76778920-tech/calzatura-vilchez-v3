@@ -62,7 +62,7 @@ Esta guía no declara certificación ISO. Define criterios internos obligatorios
 
 El proyecto queda organizado conceptualmente en:
 
-- `src/domains/publico`: inicio, login, registro y vistas sin cuenta.
+- `src/domains/público`: inicio, login, registro y vistas sin cuenta.
 - `src/domains/productos`: catálogo y detalle de productos.
 - `src/domains/carrito`: carrito y checkout.
 - `src/domains/clientes`: favoritos y datos privados del cliente.
@@ -99,7 +99,7 @@ Si se modifican reglas de Firebase:
 firebase.cmd deploy --only firestore:rules
 ```
 
-Si se publica la web:
+Si se pública la web:
 
 ```bash
 firebase.cmd deploy --only hosting,firestore:rules

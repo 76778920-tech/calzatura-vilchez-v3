@@ -22,12 +22,12 @@
 | Casos bloqueados | 0 |
 | Casos pendientes | 50 |
 
-## Resultado Por Modulo
+## Resultado Por Módulo
 
-| Modulo | Total | Aprobados | Fallidos | Bloqueados | Pendientes |
+| Módulo | Total | Aprobados | Fallidos | Bloqueados | Pendientes |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Pagina principal | 3 | 0 | 0 | 0 | 3 |
-| Catalogo de productos | 6 | 0 | 0 | 0 | 6 |
+| Página principal | 3 | 0 | 0 | 0 | 3 |
+| Catálogo de productos | 6 | 0 | 0 | 0 | 6 |
 | Detalle de producto | 5 | 0 | 0 | 0 | 5 |
 | Carrito | 5 | 0 | 0 | 0 | 5 |
 | Registro | 4 | 0 | 0 | 0 | 4 |
@@ -35,7 +35,7 @@
 | Checkout | 5 | 0 | 0 | 0 | 5 |
 | Pedido exitoso e historial | 3 | 0 | 0 | 0 | 3 |
 | Perfil | 2 | 0 | 0 | 0 | 2 |
-| Administracion | 7 | 0 | 0 | 0 | 7 |
+| Administración | 7 | 0 | 0 | 0 | 7 |
 | Seguridad basica | 3 | 0 | 0 | 0 | 3 |
 | Responsive | 4 | 0 | 0 | 0 | 4 |
 

@@ -60,5 +60,5 @@ tdd/vendor/bin/phpunit
 | Feature | `tests/Feature` |
 | Browser | `tests/Browser` |
 
-La suite `Feature` esta configurada con `suffix=".php"` para incluir tambien `Prueba.php`, ya que ese archivo no termina en `Test.php`.
+La suite `Feature` está configurada con `suffix=".php"` para incluir también `Prueba.php`, ya que ese archivo no termina en `Test.php`.
 

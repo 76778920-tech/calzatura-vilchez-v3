@@ -241,14 +241,14 @@ def predict_demand(
 
         stockout_risk = high_demand and (
             (stock == 0 and daily_demand > 0)
-            or (0 < days_until_stockout <= 14)
+            or (0 < days_until_stockout <= horizon_days)
         )
 
         prediction["alta_demanda"] = high_demand
         prediction["riesgo_agotamiento"] = stockout_risk
         prediction["nivel_riesgo"] = risk_level
         prediction["alerta_stock"] = daily_demand > 0 and (
-            stock == 0 or (0 < days_until_stockout <= min(horizon_days, 21))
+            stock == 0 or (0 < days_until_stockout <= horizon_days)
         )
         predictions.append(prediction)
 
