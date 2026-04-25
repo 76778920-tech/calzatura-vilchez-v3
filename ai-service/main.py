@@ -118,10 +118,10 @@ def debug_supabase():
         "SUPABASE_SERVICE_KEY": bool(os.getenv("SUPABASE_SERVICE_KEY")),
     }
     try:
-        sb = get_client()
-        response = sb.table("productos").select("id", count="exact").limit(1).execute()
+        from services.supabase_client import fetch_products
+        products = fetch_products()
         result["supabase"] = "connected"
-        result["productos_count"] = response.count
+        result["productos_count"] = len(products)
     except Exception as e:
         result["supabase"] = f"ERROR: {e}"
     return result
