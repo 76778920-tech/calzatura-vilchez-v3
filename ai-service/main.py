@@ -7,12 +7,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from models.demand import get_stock_alerts, get_weekly_chart, predict_demand
 from models.revenue import forecast_revenue
-from services.firebase_client import (
+from services.supabase_client import (
     fetch_completed_orders,
     fetch_daily_sales,
     fetch_product_codes,
     fetch_products,
-    get_db,
+    get_client,
 )
 
 load_dotenv()
@@ -50,14 +50,16 @@ _cache: dict = {
 @app.on_event("startup")
 def log_startup_context():
     port = os.getenv("PORT", "not-set")
-    has_json_cred = bool(os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON"))
+    has_supabase_url = bool(os.getenv("SUPABASE_URL"))
+    has_supabase_key = bool(os.getenv("SUPABASE_SERVICE_KEY"))
     print(f"[startup] cwd={os.getcwd()}")
     print(f"[startup] PORT={port}")
-    print(f"[startup] FIREBASE_SERVICE_ACCOUNT_JSON present={has_json_cred}")
+    print(f"[startup] SUPABASE_URL present={has_supabase_url}")
+    print(f"[startup] SUPABASE_SERVICE_KEY present={has_supabase_key}")
 
 
 def _load_data(force: bool = False, lookback_days: int = 180):
-    """Returns cached Firestore data or refreshes it when expired."""
+    """Returns cached Supabase data or refreshes it when expired."""
     now = time.monotonic()
     if (
         not force
@@ -67,12 +69,11 @@ def _load_data(force: bool = False, lookback_days: int = 180):
     ):
         return _cache["data"]
 
-    db = get_db()
     data = (
-        fetch_daily_sales(db, days=lookback_days),
-        fetch_completed_orders(db, days=lookback_days),
-        fetch_products(db),
-        fetch_product_codes(db),
+        fetch_daily_sales(days=lookback_days),
+        fetch_completed_orders(days=lookback_days),
+        fetch_products(),
+        fetch_product_codes(),
     )
     _cache["data"] = data
     _cache["expires_at"] = now + _CACHE_TTL
@@ -109,29 +110,20 @@ def health():
     }
 
 
-@app.get("/api/debug/firebase")
-def debug_firebase():
-    """Diagnose Firebase connection — use only to troubleshoot, not in production."""
-    import json as _json
-    result: dict = {}
-    json_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
-    result["env_var_present"] = bool(json_env)
-    result["env_var_length"] = len(json_env) if json_env else 0
-    if json_env:
-        try:
-            parsed = _json.loads(json_env)
-            result["json_parse"] = "ok"
-            result["project_id"] = parsed.get("project_id", "missing")
-            result["has_private_key"] = "private_key" in parsed
-            result["client_email"] = parsed.get("client_email", "missing")
-        except Exception as e:
-            result["json_parse"] = f"ERROR: {e}"
-            return result
+@app.get("/api/debug/supabase")
+def debug_supabase():
+    """Diagnose Supabase connection — use only to troubleshoot."""
+    result: dict = {
+        "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
+        "SUPABASE_SERVICE_KEY": bool(os.getenv("SUPABASE_SERVICE_KEY")),
+    }
     try:
-        get_db()
-        result["firestore"] = "initialized (no ping — quota conservation)"
+        sb = get_client()
+        response = sb.table("productos").select("id", count="exact").limit(1).execute()
+        result["supabase"] = "connected"
+        result["productos_count"] = response.count
     except Exception as e:
-        result["firestore"] = f"ERROR: {e}"
+        result["supabase"] = f"ERROR: {e}"
     return result
 
 
