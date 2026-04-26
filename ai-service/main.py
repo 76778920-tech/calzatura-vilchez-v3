@@ -2,7 +2,7 @@ import time
 import os
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from models.demand import get_stock_alerts, get_weekly_chart, predict_demand
@@ -45,6 +45,31 @@ _cache: dict = {
     "expires_at": 0.0,
     "lookback_days": 0,
 }
+
+_AI_SERVICE_BEARER_TOKEN = os.getenv("AI_SERVICE_BEARER_TOKEN", "").strip()
+
+
+def _request_context(request: Request) -> dict:
+    return {
+        "method": request.method,
+        "path": request.url.path,
+        "host": request.client.host if request.client else None,
+        "origin": request.headers.get("origin"),
+        "has_auth_header": bool(request.headers.get("authorization")),
+    }
+
+
+def _require_service_auth(request: Request, location: str) -> None:
+    auth_header = request.headers.get("authorization") or ""
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    token = auth_header.split(" ", 1)[1].strip()
+    if not _AI_SERVICE_BEARER_TOKEN:
+        raise HTTPException(status_code=503, detail="Auth not configured")
+
+    if token != _AI_SERVICE_BEARER_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 @app.on_event("startup")
@@ -111,8 +136,9 @@ def health():
 
 
 @app.get("/api/debug/supabase")
-def debug_supabase():
+def debug_supabase(request: Request):
     """Diagnose Supabase connection — use only to troubleshoot."""
+    _require_service_auth(request, "ai-service/main.py:debug_supabase")
     result: dict = {
         "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
         "SUPABASE_SERVICE_KEY": bool(os.getenv("SUPABASE_SERVICE_KEY")),
@@ -129,11 +155,13 @@ def debug_supabase():
 
 @app.get("/api/predict/demand")
 def demand_prediction(
+    request: Request,
     horizon: int = Query(default=30, ge=7, le=90, description="Dias a predecir (7-90)"),
     history: int = Query(default=90, ge=14, le=365, description="Dias de historial a usar"),
 ):
     """Predicts product demand for the next horizon days."""
     try:
+        _require_service_auth(request, "ai-service/main.py:demand_prediction")
         lookback_days = max(history, 120)
         daily_sales, orders, products, product_codes = _load_data(lookback_days=lookback_days)
         predictions = predict_demand(
@@ -156,10 +184,12 @@ def demand_prediction(
 
 @app.get("/api/predict/stock-alert")
 def stock_alerts(
+    request: Request,
     days_threshold: int = Query(default=14, ge=1, le=60, description="Alertar si se agota en N días"),
 ):
     """Returns products predicted to run out of stock within the requested threshold."""
     try:
+        _require_service_auth(request, "ai-service/main.py:stock_alerts")
         lookback_days = max(days_threshold, 90)
         daily_sales, orders, products, product_codes = _load_data(lookback_days=lookback_days)
         predictions = predict_demand(
@@ -182,11 +212,19 @@ def stock_alerts(
 
 @app.get("/api/predict/revenue")
 def revenue_prediction(
+    request: Request,
     horizon: int = Query(default=30, ge=7, le=90, description="Dias a proyectar"),
     history: int = Query(default=120, ge=30, le=365, description="Dias historicos a usar"),
 ):
     """Returns future revenue forecast for the next week and month."""
     try:
+        _require_service_auth(request, "ai-service/main.py:revenue_prediction")
+        _debug_log(
+            hypothesis_id="H1-H4",
+            location="ai-service/main.py:revenue_prediction",
+            message="predict revenue accessed",
+            data={**_request_context(request), "horizon": horizon, "history": history},
+        )
         lookback_days = max(history, 120)
         daily_sales, orders, *_ = _load_data(lookback_days=lookback_days)
         return forecast_revenue(
@@ -201,10 +239,12 @@ def revenue_prediction(
 
 @app.get("/api/sales/weekly-chart")
 def weekly_chart(
+    request: Request,
     weeks: int = Query(default=8, ge=2, le=24, description="Número de semanas"),
 ):
     """Returns weekly sales volume for the last weeks."""
     try:
+        _require_service_auth(request, "ai-service/main.py:weekly_chart")
         lookback_days = max(weeks * 7, 56)
         daily_sales, orders, *_ = _load_data(lookback_days=lookback_days)
         chart = get_weekly_chart(daily_sales, orders, weeks=weeks)
@@ -214,8 +254,9 @@ def weekly_chart(
 
 
 @app.post("/api/cache/invalidate")
-def invalidate_cache():
+def invalidate_cache(request: Request):
     """Force a cache refresh on the next request."""
+    _require_service_auth(request, "ai-service/main.py:invalidate_cache")
     _cache["expires_at"] = 0.0
     _cache["lookback_days"] = 0
     return {"status": "cache invalidated"}
