@@ -17,7 +17,7 @@ from services.supabase_client import (
 
 load_dotenv()
 
-app = FastAPI(title="Calzatura Vilchez AI Service", version="1.0.0")
+app = FastAPI(title="Calzatura Vilchez AI Service", version="1.1.0")
 
 _DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:5173",
@@ -107,6 +107,8 @@ def _load_data(force: bool = False, lookback_days: int = 180):
 
 
 def _raise_http_error(error: Exception) -> None:
+    if isinstance(error, HTTPException):
+        raise error
     detail = str(error)
     if "quota exceeded" in detail.lower():
         raise HTTPException(
@@ -219,12 +221,6 @@ def revenue_prediction(
     """Returns future revenue forecast for the next week and month."""
     try:
         _require_service_auth(request, "ai-service/main.py:revenue_prediction")
-        _debug_log(
-            hypothesis_id="H1-H4",
-            location="ai-service/main.py:revenue_prediction",
-            message="predict revenue accessed",
-            data={**_request_context(request), "horizon": horizon, "history": history},
-        )
         lookback_days = max(history, 120)
         daily_sales, orders, *_ = _load_data(lookback_days=lookback_days)
         return forecast_revenue(
