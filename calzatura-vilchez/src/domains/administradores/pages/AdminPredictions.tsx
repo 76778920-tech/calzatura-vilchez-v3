@@ -1950,12 +1950,6 @@ export default function AdminPredictions() {
           </div>
         )}
 
-        {messages.length === 0 && false && (
-          <p style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "0.875rem" }}>
-            Pregunta sobre el inventario, las predicciones de demanda o la proyección de ingresos.
-          </p>
-        )}
-
         <PromptInputBox
           onSend={handleSend}
           isLoading={aiLoading}

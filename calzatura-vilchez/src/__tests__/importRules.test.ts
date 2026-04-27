@@ -111,7 +111,7 @@ describe("validateProducto", () => {
   });
 
   it("rechaza fila sin identificador", () => {
-    const { id, ...sinId } = base;
+    const { id: _, ...sinId } = base; // eslint-disable-line @typescript-eslint/no-unused-vars
     expect(validateProducto(sinId)).toMatch(/id.*codigo/i);
   });
 

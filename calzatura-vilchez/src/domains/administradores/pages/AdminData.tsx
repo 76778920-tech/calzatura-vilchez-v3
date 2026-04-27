@@ -884,6 +884,7 @@ export default function AdminData() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refreshTestBatches();
   }, [refreshTestBatches]);
 
