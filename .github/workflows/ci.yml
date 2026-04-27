@@ -46,7 +46,3 @@ jobs:
           VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
           VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
           VITE_AI_SERVICE_BEARER_TOKEN: ${{ secrets.VITE_AI_SERVICE_BEARER_TOKEN }}
-
-      - name: Desplegar en Firebase Hosting
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: npx firebase-tools@latest deploy --only hosting --project calzaturavilchez-ab17f --token ${{ secrets.FIREBASE_TOKEN }} --non-interactive
