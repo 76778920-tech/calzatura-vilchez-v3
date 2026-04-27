@@ -53,6 +53,7 @@ interface Prediction {
   dias_hasta_agotarse: number;
   tendencia: "subiendo" | "bajando" | "estable";
   confianza: number;
+  drift_score?: number;
   alta_demanda: boolean;
   riesgo_agotamiento: boolean;
   nivel_riesgo: "critico" | "atencion" | "vigilancia" | "estable" | "sin_historial";
@@ -92,6 +93,43 @@ interface RevenueForecast {
   summary: RevenueSummary;
   history: RevenuePoint[];
   forecast: RevenuePoint[];
+}
+
+interface FeatureImportance {
+  feature: string;
+  importance: number;
+}
+
+interface ModeloMeta {
+  n_samples: number;
+  n_products: number;
+  date_range_start: string;
+  date_range_end: string;
+  random_state: number;
+  sklearn_version: string;
+  feature_cols: string[];
+  feature_importances: FeatureImportance[];
+  feature_stats: Record<string, { mean: number; std: number }>;
+  data_hash: string;
+  model_type: string;
+  cached_at?: string;
+}
+
+interface ModelMetrics {
+  status: string;
+  n_evaluaciones: number;
+  mae_promedio?: number;
+  mape_promedio_pct?: number;
+  n_predicciones_en_cola?: number;
+  mensaje?: string;
+  evaluaciones?: Array<{
+    period_start: string;
+    period_end: string;
+    n_products: number;
+    mae: number;
+    mape_pct: number;
+    model_type: string;
+  }>;
 }
 
 type HorizonOption = 7 | 15 | 30;
@@ -1012,6 +1050,42 @@ function TendenciaCell({ t }: { t: Prediction["tendencia"] }) {
   );
 }
 
+const FEATURE_LABELS: Record<string, string> = {
+  lag_7: "Media ventas últimos 7 días",
+  lag_30: "Media ventas últimos 30 días",
+  weekday: "Día de la semana",
+  month: "Mes del año",
+  day_of_month: "Día del mes",
+  categoria: "Categoría del producto",
+};
+
+function FeatureImportanceChart({ importances }: { importances: FeatureImportance[] }) {
+  const max = Math.max(...importances.map((fi) => fi.importance), 0.001);
+  return (
+    <div className="pred-feature-chart">
+      {importances.map((fi) => (
+        <div key={fi.feature} className="pred-feature-row">
+          <span className="pred-feature-label">{FEATURE_LABELS[fi.feature] ?? fi.feature}</span>
+          <div className="pred-feature-bar-track">
+            <div
+              className="pred-feature-bar-fill"
+              style={{ width: `${(fi.importance / max) * 100}%` }}
+            />
+          </div>
+          <span className="pred-feature-pct">{(fi.importance * 100).toFixed(1)}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DriftBadge({ score }: { score: number | undefined }) {
+  if (score === undefined) return null;
+  if (score < 0.35) return null;
+  if (score < 0.65) return <span className="pred-drift-badge medio" title={`Drift: ${score}`}>drift medio</span>;
+  return <span className="pred-drift-badge alto" title={`Drift: ${score}`}>drift alto</span>;
+}
+
 function WeeklyChart({ data }: { data: WeekPoint[] }) {
   const max = Math.max(...data.map((item) => item.unidades), 1);
   return (
@@ -1153,12 +1227,15 @@ export default function AdminPredictions() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [weeklyChart, setWeeklyChart] = useState<WeekPoint[]>([]);
   const [revenueForecast, setRevenueForecast] = useState<RevenueForecast | null>(null);
+  const [modeloMeta, setModeloMeta] = useState<ModeloMeta | null>(null);
+  const [modelMetrics, setModelMetrics] = useState<ModelMetrics | null>(null);
   const [horizon, setHorizon] = useState<HorizonOption>(30);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
+  const [showModelPanel, setShowModelPanel] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (selectedHorizon: HorizonOption) => {
@@ -1177,6 +1254,7 @@ export default function AdminPredictions() {
         chartRes.json(),
       ]);
       setPredictions(predData.predictions ?? []);
+      setModeloMeta(predData.modelo_meta ?? null);
       setWeeklyChart(chartData.chart ?? []);
 
       // Endpoint de ingresos opcional — no bloquea si falla
@@ -1189,6 +1267,16 @@ export default function AdminPredictions() {
         }
       } catch {
         setRevenueForecast(null);
+      }
+
+      // Métricas de monitoreo — no bloquea si falla
+      try {
+        const metricsRes = await fetch(`${AI_BASE}/api/model/metrics`, { headers: buildAIHeaders() });
+        if (metricsRes.ok) {
+          setModelMetrics(await metricsRes.json());
+        }
+      } catch {
+        setModelMetrics(null);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Error desconocido");
@@ -1841,6 +1929,7 @@ export default function AdminPredictions() {
                           {prediction.codigo && <p className="pred-product-code">{prediction.codigo}</p>}
                           <p className="pred-product-name">{prediction.nombre}</p>
                           <p className="pred-product-cat">{prediction.categoria}</p>
+                          <DriftBadge score={prediction.drift_score} />
                         </td>
                         <td>
                           {prediction.sin_historial ? (
@@ -1900,6 +1989,139 @@ export default function AdminPredictions() {
         <div className="pred-no-alerts">
           <Package size={32} />
           <p>Aún no hay productos registrados para analizar.</p>
+        </div>
+      )}
+
+      {modeloMeta && (
+        <div className="dash-card">
+          <button
+            type="button"
+            className="pred-model-panel-toggle"
+            onClick={() => setShowModelPanel((prev) => !prev)}
+          >
+            <Brain size={16} />
+            <span>Modelo IA — Reproducibilidad, Explicabilidad y Monitoreo</span>
+            <span className="pred-model-toggle-arrow">{showModelPanel ? "▲" : "▼"}</span>
+          </button>
+
+          {showModelPanel && (
+            <div className="pred-model-panel">
+              <div className="pred-model-meta-grid">
+                <div className="pred-model-meta-item">
+                  <span className="pred-sub">Tipo de modelo</span>
+                  <strong>{modeloMeta.model_type === "random_forest" ? "RandomForestRegressor" : "Promedio Móvil (fallback)"}</strong>
+                </div>
+                <div className="pred-model-meta-item">
+                  <span className="pred-sub">Muestras de entrenamiento</span>
+                  <strong>{modeloMeta.n_samples.toLocaleString()}</strong>
+                </div>
+                <div className="pred-model-meta-item">
+                  <span className="pred-sub">Productos en entrenamiento</span>
+                  <strong>{modeloMeta.n_products}</strong>
+                </div>
+                <div className="pred-model-meta-item">
+                  <span className="pred-sub">Período de datos</span>
+                  <strong>{modeloMeta.date_range_start} → {modeloMeta.date_range_end}</strong>
+                </div>
+                <div className="pred-model-meta-item">
+                  <span className="pred-sub">random_state</span>
+                  <strong>{modeloMeta.random_state}</strong>
+                </div>
+                <div className="pred-model-meta-item">
+                  <span className="pred-sub">scikit-learn</span>
+                  <strong>v{modeloMeta.sklearn_version}</strong>
+                </div>
+                <div className="pred-model-meta-item pred-model-meta-hash">
+                  <span className="pred-sub">Data fingerprint (MD5)</span>
+                  <code>{modeloMeta.data_hash}</code>
+                </div>
+              </div>
+
+              {modeloMeta.feature_importances.length > 0 && (
+                <div className="pred-model-section">
+                  <h3 className="pred-model-section-title">Importancia de variables (Feature Importance)</h3>
+                  <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
+                    Cuánto contribuye cada variable a las predicciones del modelo. Mayor porcentaje → mayor influencia.
+                  </p>
+                  <FeatureImportanceChart importances={modeloMeta.feature_importances} />
+                </div>
+              )}
+
+              {Object.keys(modeloMeta.feature_stats).length > 0 && (
+                <div className="pred-model-section">
+                  <h3 className="pred-model-section-title">Baseline de drift (distribución de entrenamiento)</h3>
+                  <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
+                    Valores medios y desviación estándar de las features de lag durante el entrenamiento. Los productos con drift alto están fuera de este rango.
+                  </p>
+                  <div className="pred-model-meta-grid">
+                    {Object.entries(modeloMeta.feature_stats).map(([feat, stats]) => (
+                      <div key={feat} className="pred-model-meta-item">
+                        <span className="pred-sub">{FEATURE_LABELS[feat] ?? feat}</span>
+                        <strong>μ = {stats.mean.toFixed(3)} · σ = {stats.std.toFixed(3)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="pred-model-section">
+                <h3 className="pred-model-section-title">Monitoreo retrospectivo (MAE / MAPE)</h3>
+                {modelMetrics === null && (
+                  <p className="pred-sub">Cargando métricas...</p>
+                )}
+                {modelMetrics?.status === "sin_datos" && (
+                  <p className="pred-sub">{modelMetrics.mensaje}</p>
+                )}
+                {modelMetrics?.status === "pendiente" && (
+                  <p className="pred-sub">
+                    {modelMetrics.mensaje} ({modelMetrics.n_predicciones_en_cola} en cola)
+                  </p>
+                )}
+                {modelMetrics?.status === "ok" && (
+                  <>
+                    <div className="pred-model-meta-grid" style={{ marginBottom: "0.75rem" }}>
+                      <div className="pred-model-meta-item">
+                        <span className="pred-sub">MAE promedio (uds./día)</span>
+                        <strong>{modelMetrics.mae_promedio?.toFixed(3)}</strong>
+                      </div>
+                      <div className="pred-model-meta-item">
+                        <span className="pred-sub">MAPE promedio</span>
+                        <strong>{modelMetrics.mape_promedio_pct?.toFixed(1)}%</strong>
+                      </div>
+                      <div className="pred-model-meta-item">
+                        <span className="pred-sub">Períodos evaluados</span>
+                        <strong>{modelMetrics.n_evaluaciones}</strong>
+                      </div>
+                    </div>
+                    {modelMetrics.evaluaciones && modelMetrics.evaluaciones.length > 0 && (
+                      <table className="admin-table" style={{ fontSize: "12px" }}>
+                        <thead>
+                          <tr>
+                            <th>Período</th>
+                            <th>Productos</th>
+                            <th>MAE</th>
+                            <th>MAPE</th>
+                            <th>Modelo</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {modelMetrics.evaluaciones.map((ev) => (
+                            <tr key={ev.period_start}>
+                              <td>{ev.period_start} → {ev.period_end}</td>
+                              <td>{ev.n_products}</td>
+                              <td>{ev.mae.toFixed(3)}</td>
+                              <td>{ev.mape_pct.toFixed(1)}%</td>
+                              <td>{ev.model_type}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

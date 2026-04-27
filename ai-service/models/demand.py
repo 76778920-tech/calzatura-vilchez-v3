@@ -9,10 +9,12 @@ there are fewer than MIN_TRAIN_ROWS training samples across all products.
 """
 from collections import defaultdict
 from datetime import date, timedelta
+import hashlib
 import math
 
 import numpy as np
 import pandas as pd
+import sklearn
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
 
@@ -53,6 +55,35 @@ def _percentile(values: list[float], quantile: float) -> float:
         return ordered[lower]
     weight = pos - lower
     return ordered[lower] * (1 - weight) + ordered[upper] * weight
+
+
+# ---------------------------------------------------------------------------
+# Reproducibility helpers
+# ---------------------------------------------------------------------------
+
+def _data_hash(sales_map: dict) -> str:
+    """Stable MD5 fingerprint of the training dataset (sorted by product + total units)."""
+    key = "|".join(
+        f"{pid}:{sum(v for v in day_sales.values()):.1f}"
+        for pid, day_sales in sorted(sales_map.items())
+    )
+    return hashlib.md5(key.encode()).hexdigest()[:16]
+
+
+def _drift_score(lag_7: float, lag_30: float, feature_stats: dict) -> float:
+    """
+    Z-score-based drift: how far current lag features are from the training
+    distribution. Returns 0.0 (no drift) … 1.0 (high drift, z ≥ 3).
+    """
+    if not feature_stats:
+        return 0.0
+    scores = []
+    for feat, val in [("lag_7", lag_7), ("lag_30", lag_30)]:
+        stats = feature_stats.get(feat, {})
+        std = stats.get("std", 1.0) or 1.0
+        z = abs(val - stats.get("mean", 0.0)) / std
+        scores.append(min(z / 3.0, 1.0))
+    return round(sum(scores) / len(scores), 2) if scores else 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -122,10 +153,14 @@ def _train_global_model(
 ) -> tuple:
     """
     Train a RandomForestRegressor on the combined historical data of all
-    products. Returns (model, label_encoder, used_ml).
+    products. Returns (model, label_encoder, used_ml, training_meta).
     used_ml=False when data is insufficient; model is None in that case.
+    training_meta always contains reproducibility and explainability fields.
     """
     today = date.today()
+    date_range_start = (today - timedelta(days=history_days - 1)).isoformat()
+    date_range_end = today.isoformat()
+    data_hash = _data_hash(sales_map)
 
     categories = list({(sale_meta.get(pid, {}).get("categoria") or "") for pid in sales_map})
     le = LabelEncoder()
@@ -146,8 +181,24 @@ def _train_global_model(
             feat["y"] = day_sales.get(fecha, 0.0)
             rows.append(feat)
 
+    base_meta = {
+        "n_samples": len(rows),
+        "n_products": len(sales_map),
+        "date_range_start": date_range_start,
+        "date_range_end": date_range_end,
+        "random_state": 42,
+        "sklearn_version": sklearn.__version__,
+        "feature_cols": FEATURE_COLS,
+        "data_hash": data_hash,
+    }
+
     if len(rows) < MIN_TRAIN_ROWS:
-        return None, le, False
+        return None, le, False, {
+            **base_meta,
+            "model_type": "promedio_movil",
+            "feature_importances": [],
+            "feature_stats": {},
+        }
 
     df = pd.DataFrame(rows)
     X = df[FEATURE_COLS].values.astype(float)
@@ -161,7 +212,32 @@ def _train_global_model(
         n_jobs=-1,
     )
     model.fit(X, y)
-    return model, le, True
+
+    # Explainability: feature importances sorted descending
+    importances = sorted(
+        [
+            {"feature": feat, "importance": round(float(imp), 4)}
+            for feat, imp in zip(FEATURE_COLS, model.feature_importances_)
+        ],
+        key=lambda x: x["importance"],
+        reverse=True,
+    )
+
+    # Drift baseline: mean/std of lag features across training set
+    feature_stats = {
+        col: {
+            "mean": round(float(df[col].mean()), 4),
+            "std": round(float(df[col].std() or 1.0), 4),
+        }
+        for col in ["lag_7", "lag_30"]
+    }
+
+    return model, le, True, {
+        **base_meta,
+        "model_type": "random_forest",
+        "feature_importances": importances,
+        "feature_stats": feature_stats,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +299,7 @@ def predict_demand(
     product_codes: dict[str, str] | None = None,
     horizon_days: int = 30,
     history_days: int = 90,
-) -> list[dict]:
+) -> tuple[list[dict], dict]:
     """
     Predict demand for each product over the next horizon_days.
 
@@ -232,6 +308,11 @@ def predict_demand(
     (history_days) training rows with temporal and lag features.
 
     Fallback: weighted moving average when total training data < MIN_TRAIN_ROWS.
+
+    Returns (predictions, training_meta) where training_meta contains
+    reproducibility fields (data_hash, random_state, sklearn_version),
+    explainability fields (feature_importances), and drift baseline
+    (feature_stats) for production monitoring.
     """
     today = date.today()
     history_start = today - timedelta(days=history_days)
@@ -266,7 +347,8 @@ def predict_demand(
                 }
 
     # Train global ML model once for all products
-    ml_model, label_enc, used_ml = _train_global_model(sales_map, sale_meta, history_days)
+    ml_model, label_enc, used_ml, training_meta = _train_global_model(sales_map, sale_meta, history_days)
+    feature_stats = training_meta.get("feature_stats", {})
 
     window_7 = min(7, history_days)
     window_30 = min(30, history_days)
@@ -337,6 +419,8 @@ def predict_demand(
         else:
             trend = "estable"
 
+        drift = _drift_score(avg_7, avg_30, feature_stats)
+
         predicted_pids.add(pid)
         recent_predictions.append({
             "productId": pid,
@@ -359,6 +443,7 @@ def predict_demand(
             "tendencia": trend,
             "confianza": confidence,
             "modelo": "random_forest" if used_ml else "promedio_movil",
+            "drift_score": drift,
             "alta_demanda": False,
             "riesgo_agotamiento": False,
             "nivel_riesgo": "estable",
@@ -461,7 +546,7 @@ def predict_demand(
             -item["prediccion_unidades"],
         )
     )
-    return predictions
+    return predictions, training_meta
 
 
 # ---------------------------------------------------------------------------
