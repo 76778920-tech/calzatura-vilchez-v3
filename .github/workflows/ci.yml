@@ -49,4 +49,4 @@ jobs:
 
       - name: Desplegar en Firebase Hosting
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-        run: npx firebase-tools@latest deploy --only hosting --token ${{ secrets.FIREBASE_TOKEN }} --non-interactive
+        run: npx firebase-tools@latest deploy --only hosting --project calzaturavilchez-ab17f --token ${{ secrets.FIREBASE_TOKEN }} --non-interactive
