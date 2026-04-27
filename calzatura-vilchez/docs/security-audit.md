@@ -1,6 +1,6 @@
 # Auditoría de seguridad del portal
 
-Fecha: 2026-04-20
+Fecha: 2026-04-27 (actualizado — revisión inicial: 2026-04-20)
 
 Alcance revisado:
 
@@ -77,24 +77,57 @@ Corrección:
 - Tamaño original máximo: 10 MB.
 - Tamaño máximo de subida: 4 MB.
 
+### S2 - Superadmin por email hardcoded
+
+Antes el superadministrador se identificaba por email en frontend (`VITE_SUPERADMIN_EMAILS`) y en reglas de Firestore.
+
+Corrección:
+
+- Las reglas de Firestore y Storage ahora usan `request.auth.token.superadmin == true` (custom claim).
+- El frontend mantiene `VITE_SUPERADMIN_EMAILS` solo como barrera de UI, no como control de acceso real.
+- La autorización real recae en Firestore Rules y Cloud Functions, no en el bundle frontend.
+
+### S1 - Pago contra entrega sin validación server-side
+
+El flujo COD confirmaba el pedido en frontend sin verificar precios ni stock reales.
+
+Corrección:
+
+- Se agregó la Cloud Function `confirmCodOrder` que verifica token Firebase, re-fetcha precios y stock reales desde Firestore, valida que `subtotal` y `total` coincidan (tolerancia ±0.01), y solo entonces actualiza el estado a `confirmado`.
+- El frontend llama obligatoriamente a esta función antes de navegar a la página de éxito.
+
+### S1 - Instrumentación de debug con telemetría externa
+
+Múltiples archivos contenían `fetch` a `127.0.0.1:7932` (endpoint de debug de sesión) en funciones de producción: `security.ts`, `auth.ts`, `Register.tsx`, `CheckoutPage.tsx`, `orders.ts`, `AdminPredictions.tsx`.
+
+Corrección:
+
+- Todos los bloques de instrumentación temporal eliminados del código de producción.
+
+### S2 - Rate limiting ausente en AI service
+
+El servicio de IA en Render no tenía límites de solicitudes por IP.
+
+Corrección:
+
+- Agregado `slowapi` con límite de 20 req/min en endpoints de predicción y 5 req/min en invalidate cache.
+
 ## Riesgos pendientes
 
-### S1 - Creación de pedidos desde frontend
+### S1 - Creación de pedidos desde frontend (parcialmente mitigado)
 
-El frontend crea documentos en `pedidos` directamente. Las reglas validan dueño, estado, dirección y campos básicos, pero no pueden verificar de forma robusta cada precio, stock y subtotal contra los productos reales.
+El frontend crea documentos en `pedidos` directamente con totales calculados en cliente.
 
-Riesgo:
+Estado actual:
 
-- Un cliente técnico podría intentar manipular `items`, `subtotal`, `envío` o `total`.
-- Stripe mitiga parte del riesgo porque `createCheckoutSession` recalcula totales.
-- Pago contra entrega queda con mayor exposición si no se valida en backend.
+- Stripe: mitigado completamente — `createCheckoutSession` recalcula totales desde Firestore y rechaza con 409 si no coinciden.
+- Contra entrega: mitigado — `confirmCodOrder` valida server-side antes de confirmar el pedido.
+- Riesgo residual: el documento en `pedidos` se crea con datos del cliente antes de la validación. Si la validación falla, queda un registro `pendiente` con datos potencialmente incorrectos (no avanza, pero genera ruido de datos).
 
-Recomendación obligatoria:
+Recomendación pendiente:
 
-- Mover creación de pedidos a una Cloud Function `createOrder`.
-- La función debe recibir solo `productId`, `quantity`, `talla`, dirección y método de pago.
-- La función debe recalcular precio, stock, subtotal, envío y total desde Firestore.
-- Firestore debe bloquear `allow create` directo en `pedidos` para clientes cuando exista la función.
+- Mover la creación del pedido a una Cloud Function `createOrder` que reciba solo `items[]` (productId, quantity, talla), dirección y método de pago, y construya el documento desde Firestore.
+- Bloquear `allow create` directo en `pedidos` para clientes en Firestore Rules.
 
 ### S1 - Cloudinary unsigned upload preset expuesto
 
@@ -109,19 +142,6 @@ Recomendación obligatoria:
 - Configurar el preset en Cloudinary con restricciones de formato, tamaño, carpeta y moderación si está disponible.
 - Migrar a subida firmada mediante Cloud Function admin-only.
 - No usar Cloudinary API secret en frontend.
-
-### S2 - Superadmin por email hardcoded
-
-El superadministrador está definido por email en frontend y reglas.
-
-Riesgo:
-
-- Requiere cambio de código/reglas si cambia el responsable.
-
-Recomendación:
-
-- Mantenerlo como control temporal.
-- En una fase posterior, usar custom claims administrados por backend.
 
 ### S2 - Falta App Check
 
@@ -150,11 +170,10 @@ Recomendación:
 
 ## Prioridad siguiente
 
-1. Refactor de creación de pedidos a Cloud Function.
+1. Refactor de creación de pedidos a Cloud Function `createOrder` (elimina riesgo residual de datos COD incorrectos).
 2. Subida firmada a Cloudinary desde Function admin-only.
 3. App Check.
 4. CSP en modo reporte.
-5. Custom claims para roles.
 
 ## Arquitectura de rutas aplicada
 
