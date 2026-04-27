@@ -10,13 +10,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
-    function isSuperAdmin() {
-      return isSignedIn()
-        && request.auth.token.email == "76778920@continental.edu.pe";
+    function hasSuperAdminClaim() {
+      return isSignedIn() && request.auth.token.superadmin == true;
     }
 
     function isAdmin() {
-      return isSuperAdmin()
+      return hasSuperAdminClaim()
+        || (isSignedIn() && request.auth.token.admin == true)
         || (isSignedIn()
           && exists(/databases/$(database)/documents/usuarios/$(request.auth.uid))
           && get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.rol == "admin");
@@ -343,7 +343,7 @@ service cloud.firestore {
     match /usuarios/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if (isOwner(userId) && isValidUserCreate(userId, request.resource.data))
-        || (isSuperAdmin() && isValidUserAdminWrite(userId, request.resource.data))
+        || (hasSuperAdminClaim() && isValidUserAdminWrite(userId, request.resource.data))
         || (isAdmin()
           && isValidUserAdminWrite(userId, request.resource.data)
           && request.resource.data.rol != "admin");
@@ -352,7 +352,7 @@ service cloud.firestore {
             "telefono", "direcciones"
           ])
           && isValidUserOwnerUpdate(userId, request.resource.data))
-        || (isSuperAdmin() && isValidUserAdminWrite(userId, request.resource.data))
+        || (hasSuperAdminClaim() && isValidUserAdminWrite(userId, request.resource.data))
         || (isAdmin()
           && isValidUserAdminWrite(userId, request.resource.data)
           && resource.data.rol != "admin"

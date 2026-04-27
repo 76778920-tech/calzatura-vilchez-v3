@@ -7,7 +7,8 @@ service firebase.storage {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == "76778920@continental.edu.pe"
+        request.auth.token.superadmin == true
+        || request.auth.token.admin == true
         || (firestore.exists(/databases/(default)/documents/usuarios/$(request.auth.uid))
             && firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data.rol == "admin")
       );
