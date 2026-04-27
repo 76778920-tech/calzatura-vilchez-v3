@@ -1,5 +1,11 @@
-export const SUPERADMIN_EMAIL = "76778920@continental.edu.pe";
+const SUPERADMIN_EMAILS = (import.meta.env.VITE_SUPERADMIN_EMAILS as string | undefined)
+  ?.split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean) ?? [];
 
 export function isSuperAdminEmail(email?: string | null) {
-  return email === SUPERADMIN_EMAIL;
+  const normalizedEmail = (email ?? "").trim().toLowerCase();
+  const isMatch = SUPERADMIN_EMAILS.includes(normalizedEmail);
+
+  return isMatch;
 }

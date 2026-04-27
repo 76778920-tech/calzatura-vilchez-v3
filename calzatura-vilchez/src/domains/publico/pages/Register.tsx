@@ -6,6 +6,8 @@ import { PUBLIC_ROUTES } from "@/routes/paths";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import toast from "react-hot-toast";
 
+const MIN_PASSWORD_LENGTH = 8;
+
 export default function Register() {
   const navigate = useNavigate();
   const [dni, setDni] = useState("");
@@ -56,7 +58,6 @@ export default function Register() {
 
   const handleRegister = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-
     const normalizedDni = normalizeDni(dni);
     if (!isValidDni(normalizedDni)) {
       toast.error("El DNI debe tener 8 digitos");
@@ -70,8 +71,8 @@ export default function Register() {
       toast.error("Las contraseñas no coinciden");
       return;
     }
-    if (password.length < 6) {
-      toast.error("La contraseña debe tener al menos 6 caracteres");
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      toast.error(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
       return;
     }
 
@@ -92,6 +93,8 @@ export default function Register() {
       const msg = err instanceof Error ? err.message : "";
       if (msg === "DISPOSABLE_EMAIL") {
         toast.error("Este correo es temporal o desechable. Usa un correo real.");
+      } else if (msg === "PASSWORD_TOO_SHORT") {
+        toast.error(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
       } else if (code.includes("email-already-in-use") || msg.includes("email-already-in-use")) {
         toast.error("Este correo ya esta registrado");
       } else if (code.includes("permission-denied") || msg.includes("insufficient permissions")) {
@@ -214,7 +217,7 @@ export default function Register() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  placeholder="Minimo 6 caracteres"
+                  placeholder="Minimo 8 caracteres"
                   className="form-input with-icon"
                 />
                 <button type="button" onClick={() => setShowPass(!showPass)} className="input-toggle">

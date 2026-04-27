@@ -22,41 +22,11 @@ function buildAIHeaders(): Record<string, string> {
   return { Authorization: `Bearer ${AI_BEARER_TOKEN}` };
 }
 
-function sendAIDebugLog(payload: {
-  runId: string;
-  hypothesisId: string;
-  location: string;
-  message: string;
-  data: Record<string, unknown>;
-}) {
-  // #region agent log
-  fetch("http://127.0.0.1:7932/ingest/c7060944-0f53-4778-9d5a-3f26a1f0eed1", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Debug-Session-Id": "ad6457",
-    },
-    body: JSON.stringify({
-      sessionId: "ad6457",
-      ...payload,
-      timestamp: Date.now(),
-    }),
-  }).catch(() => {});
-  // #endregion
-}
-
 async function invalidateAICache() {
   try {
-    const response = await fetch(`${AI_BASE}/api/cache/invalidate`, {
+    await fetch(`${AI_BASE}/api/cache/invalidate`, {
       method: "POST",
       headers: buildAIHeaders(),
-    });
-    sendAIDebugLog({
-      runId: "post-fix-4",
-      hypothesisId: "H1-fix",
-      location: "AdminPredictions.tsx:invalidateAICache",
-      message: "cache invalidate called",
-      data: { ok: response.ok, status: response.status, hasBearer: Boolean(AI_BEARER_TOKEN) },
     });
   } catch {
     // El panel puede seguir consultando aúnque el cache no se invalide.
@@ -1195,29 +1165,10 @@ export default function AdminPredictions() {
     setLoading(true);
     setError(null);
     try {
-      sendAIDebugLog({
-        runId: "post-fix-4",
-        hypothesisId: "H1-H2",
-        location: "AdminPredictions.tsx:load:start",
-        message: "loading AI dashboard data",
-        data: { selectedHorizon, hasBearer: Boolean(AI_BEARER_TOKEN), aiBase: AI_BASE },
-      });
       const [predRes, chartRes] = await Promise.all([
         fetch(`${AI_BASE}/api/predict/demand?horizon=${selectedHorizon}`, { headers: buildAIHeaders() }),
         fetch(`${AI_BASE}/api/sales/weekly-chart?weeks=8`, { headers: buildAIHeaders() }),
       ]);
-      sendAIDebugLog({
-        runId: "post-fix-4",
-        hypothesisId: "H1-H2",
-        location: "AdminPredictions.tsx:load:responses",
-        message: "received AI responses",
-        data: {
-          predOk: predRes.ok,
-          predStatus: predRes.status,
-          chartOk: chartRes.ok,
-          chartStatus: chartRes.status,
-        },
-      });
       if (!predRes.ok || !chartRes.ok) {
         throw new Error("Error al conectar con el servicio de IA.");
       }
@@ -1232,13 +1183,6 @@ export default function AdminPredictions() {
       try {
         const revenueRes = await fetch(`${AI_BASE}/api/predict/revenue?horizon=${selectedHorizon}&history=120`, {
           headers: buildAIHeaders(),
-        });
-        sendAIDebugLog({
-          runId: "post-fix-4",
-          hypothesisId: "H3",
-          location: "AdminPredictions.tsx:load:revenue",
-          message: "revenue endpoint response",
-          data: { ok: revenueRes.ok, status: revenueRes.status },
         });
         if (revenueRes.ok) {
           setRevenueForecast(await revenueRes.json());

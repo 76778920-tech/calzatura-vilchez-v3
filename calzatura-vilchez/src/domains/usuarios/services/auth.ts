@@ -10,6 +10,8 @@ import { auth } from "@/firebase/config";
 import { saveUserProfile } from "./users";
 import { logAudit } from "@/services/audit";
 
+const MIN_PASSWORD_LENGTH = 8;
+
 export async function checkDisposableEmail(email: string): Promise<void> {
   try {
     const res = await fetch(
@@ -47,6 +49,10 @@ export async function registerUser(
     password: string;
   }
 ) {
+  if (data.password.length < MIN_PASSWORD_LENGTH) {
+    throw new Error("PASSWORD_TOO_SHORT");
+  }
+
   const userCredential = await createUserWithEmailAndPassword(
     auth,
     data.email,

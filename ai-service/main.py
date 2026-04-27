@@ -4,6 +4,9 @@ import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from models.demand import get_stock_alerts, get_weekly_chart, predict_demand
 from models.revenue import forecast_revenue
@@ -17,7 +20,10 @@ from services.supabase_client import (
 
 load_dotenv()
 
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Calzatura Vilchez AI Service", version="1.1.0")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 _DEFAULT_ALLOWED_ORIGINS = [
     "http://localhost:5173",
@@ -156,6 +162,7 @@ def debug_supabase(request: Request):
 
 
 @app.get("/api/predict/demand")
+@limiter.limit("20/minute")
 def demand_prediction(
     request: Request,
     horizon: int = Query(default=30, ge=7, le=90, description="Dias a predecir (7-90)"),
@@ -185,6 +192,7 @@ def demand_prediction(
 
 
 @app.get("/api/predict/stock-alert")
+@limiter.limit("20/minute")
 def stock_alerts(
     request: Request,
     days_threshold: int = Query(default=14, ge=1, le=60, description="Alertar si se agota en N días"),
@@ -213,6 +221,7 @@ def stock_alerts(
 
 
 @app.get("/api/predict/revenue")
+@limiter.limit("20/minute")
 def revenue_prediction(
     request: Request,
     horizon: int = Query(default=30, ge=7, le=90, description="Dias a proyectar"),
@@ -234,6 +243,7 @@ def revenue_prediction(
 
 
 @app.get("/api/sales/weekly-chart")
+@limiter.limit("20/minute")
 def weekly_chart(
     request: Request,
     weeks: int = Query(default=8, ge=2, le=24, description="Número de semanas"),
@@ -250,6 +260,7 @@ def weekly_chart(
 
 
 @app.post("/api/cache/invalidate")
+@limiter.limit("5/minute")
 def invalidate_cache(request: Request):
     """Force a cache refresh on the next request."""
     _require_service_auth(request, "ai-service/main.py:invalidate_cache")
