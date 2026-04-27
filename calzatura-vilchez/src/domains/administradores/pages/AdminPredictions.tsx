@@ -18,9 +18,8 @@ const AI_BASE = import.meta.env.VITE_AI_SERVICE_URL ?? "http://localhost:8000";
 const AI_BEARER_TOKEN = (import.meta.env.VITE_AI_SERVICE_BEARER_TOKEN as string | undefined)?.trim();
 
 function buildAIHeaders(): Record<string, string> {
-  return AI_BEARER_TOKEN
-    ? { Authorization: `Bearer ${AI_BEARER_TOKEN}` }
-    : {};
+  if (!AI_BEARER_TOKEN) return {};
+  return { Authorization: `Bearer ${AI_BEARER_TOKEN}` };
 }
 
 function sendAIDebugLog(payload: {
