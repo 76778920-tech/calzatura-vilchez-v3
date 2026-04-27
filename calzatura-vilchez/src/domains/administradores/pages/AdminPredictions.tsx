@@ -15,10 +15,50 @@ import {
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 
 const AI_BASE = import.meta.env.VITE_AI_SERVICE_URL ?? "http://localhost:8000";
+const AI_BEARER_TOKEN = (import.meta.env.VITE_AI_SERVICE_BEARER_TOKEN as string | undefined)?.trim();
+
+function buildAIHeaders() {
+  return AI_BEARER_TOKEN
+    ? { Authorization: `Bearer ${AI_BEARER_TOKEN}` }
+    : {};
+}
+
+function sendAIDebugLog(payload: {
+  runId: string;
+  hypothesisId: string;
+  location: string;
+  message: string;
+  data: Record<string, unknown>;
+}) {
+  // #region agent log
+  fetch("http://127.0.0.1:7932/ingest/c7060944-0f53-4778-9d5a-3f26a1f0eed1", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Debug-Session-Id": "ad6457",
+    },
+    body: JSON.stringify({
+      sessionId: "ad6457",
+      ...payload,
+      timestamp: Date.now(),
+    }),
+  }).catch(() => {});
+  // #endregion
+}
 
 async function invalidateAICache() {
   try {
-    await fetch(`${AI_BASE}/api/cache/invalidate`, { method: "POST" });
+    const response = await fetch(`${AI_BASE}/api/cache/invalidate`, {
+      method: "POST",
+      headers: buildAIHeaders(),
+    });
+    sendAIDebugLog({
+      runId: "post-fix-4",
+      hypothesisId: "H1-fix",
+      location: "AdminPredictions.tsx:invalidateAICache",
+      message: "cache invalidate called",
+      data: { ok: response.ok, status: response.status, hasBearer: Boolean(AI_BEARER_TOKEN) },
+    });
   } catch {
     // El panel puede seguir consultando aúnque el cache no se invalide.
   }
@@ -114,11 +154,13 @@ function formatUnits(value: number) {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-function formatCurrency(value: number) {
+function formatCurrency(value: number | undefined | null) {
+  if (value == null || !Number.isFinite(value)) return "S/ 0.00";
   return `S/ ${value.toFixed(2)}`;
 }
 
-function formatPercent(value: number) {
+function formatPercent(value: number | undefined | null) {
+  if (value == null || !Number.isFinite(value)) return "0.0%";
   const sign = value > 0 ? "+" : "";
   return `${sign}${value.toFixed(1)}%`;
 }
@@ -371,7 +413,7 @@ function generateAIResponse(
     if (revenueForecast) {
       const s = revenueForecast.summary;
       lines.push(`\nTendencia de ingresos: ${s.tendencia.toUpperCase()}`);
-      lines.push(`Los ingresos proyectados para el próximo mes son S/ ${s.proximo_30_dias.toFixed(2)}, con una variación de ${s.crecimiento_estimado_pct >= 0 ? "+" : ""}${s.crecimiento_estimado_pct.toFixed(1)}% respecto a los últimos 30 días.`);
+      lines.push(`Los ingresos proyectados para el próximo mes son ${formatCurrency(s.proximo_30_dias)}, con una variación de ${formatPercent(s.crecimiento_estimado_pct)} respecto a los últimos 30 días.`);
     }
     return lines.join("\n");
   }
@@ -395,9 +437,9 @@ function generateAIResponse(
     ];
     if (s) {
       lines.push(`\nPROYECCIÓN FINANCIERA:`);
-      lines.push(`  • Ingreso estimado próxima semana: S/ ${s.proximo_7_dias.toFixed(2)}`);
-      lines.push(`  • Ingreso estimado próximo mes: S/ ${s.proximo_30_dias.toFixed(2)}`);
-      lines.push(`  • Variación vs últimos 30 días: ${s.crecimiento_estimado_pct >= 0 ? "+" : ""}${s.crecimiento_estimado_pct.toFixed(1)}%`);
+      lines.push(`  • Ingreso estimado próxima semana: ${formatCurrency(s.proximo_7_dias)}`);
+      lines.push(`  • Ingreso estimado próximo mes: ${formatCurrency(s.proximo_30_dias)}`);
+      lines.push(`  • Variación vs últimos 30 días: ${formatPercent(s.crecimiento_estimado_pct)}`);
       lines.push(`  • Tendencia de ingresos: ${s.tendencia}`);
     }
     if (outOfStock.length > 0 || criticos.length > 0) {
@@ -738,7 +780,7 @@ function generateAIResponseV2(
 
     const s = revenueForecast.summary;
     const horizonLabel = revenueForecast.horizon_days;
-    const change = `${s.crecimiento_estimado_horizonte_pct >= 0 ? "+" : ""}${s.crecimiento_estimado_horizonte_pct.toFixed(1)}%`;
+    const change = formatPercent(s.crecimiento_estimado_horizonte_pct);
     const directionSentence =
       s.crecimiento_estimado_horizonte_pct >= 5
         ? `Eso apunta a un periodo de ${horizonLabel} días mejor que el anterior.`
@@ -1154,10 +1196,29 @@ export default function AdminPredictions() {
     setLoading(true);
     setError(null);
     try {
+      sendAIDebugLog({
+        runId: "post-fix-4",
+        hypothesisId: "H1-H2",
+        location: "AdminPredictions.tsx:load:start",
+        message: "loading AI dashboard data",
+        data: { selectedHorizon, hasBearer: Boolean(AI_BEARER_TOKEN), aiBase: AI_BASE },
+      });
       const [predRes, chartRes] = await Promise.all([
-        fetch(`${AI_BASE}/api/predict/demand?horizon=${selectedHorizon}`),
-        fetch(`${AI_BASE}/api/sales/weekly-chart?weeks=8`),
+        fetch(`${AI_BASE}/api/predict/demand?horizon=${selectedHorizon}`, { headers: buildAIHeaders() }),
+        fetch(`${AI_BASE}/api/sales/weekly-chart?weeks=8`, { headers: buildAIHeaders() }),
       ]);
+      sendAIDebugLog({
+        runId: "post-fix-4",
+        hypothesisId: "H1-H2",
+        location: "AdminPredictions.tsx:load:responses",
+        message: "received AI responses",
+        data: {
+          predOk: predRes.ok,
+          predStatus: predRes.status,
+          chartOk: chartRes.ok,
+          chartStatus: chartRes.status,
+        },
+      });
       if (!predRes.ok || !chartRes.ok) {
         throw new Error("Error al conectar con el servicio de IA.");
       }
@@ -1170,7 +1231,16 @@ export default function AdminPredictions() {
 
       // Endpoint de ingresos opcional — no bloquea si falla
       try {
-        const revenueRes = await fetch(`${AI_BASE}/api/predict/revenue?horizon=${selectedHorizon}&history=120`);
+        const revenueRes = await fetch(`${AI_BASE}/api/predict/revenue?horizon=${selectedHorizon}&history=120`, {
+          headers: buildAIHeaders(),
+        });
+        sendAIDebugLog({
+          runId: "post-fix-4",
+          hypothesisId: "H3",
+          location: "AdminPredictions.tsx:load:revenue",
+          message: "revenue endpoint response",
+          data: { ok: revenueRes.ok, status: revenueRes.status },
+        });
         if (revenueRes.ok) {
           setRevenueForecast(await revenueRes.json());
         }

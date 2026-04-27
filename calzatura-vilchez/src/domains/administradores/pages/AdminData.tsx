@@ -45,6 +45,7 @@ interface CollectionConfig {
 }
 
 const AI_BASE = import.meta.env.VITE_AI_SERVICE_URL ?? "http://localhost:8000";
+const AI_BEARER_TOKEN = (import.meta.env.VITE_AI_SERVICE_BEARER_TOKEN as string | undefined)?.trim();
 const SCENARIO_OPTIONS: { key: ScenarioKey; label: string }[] = [
   { key: "crisis", label: "Crisis" },
   { key: "normal", label: "Normal" },
@@ -148,7 +149,10 @@ function parseNestedNumberMapCell(value: unknown): Record<string, Record<string,
 
 async function invalidateAICache(): Promise<void> {
   try {
-    await fetch(`${AI_BASE}/api/cache/invalidate`, { method: "POST" });
+    await fetch(`${AI_BASE}/api/cache/invalidate`, {
+      method: "POST",
+      headers: AI_BEARER_TOKEN ? { Authorization: `Bearer ${AI_BEARER_TOKEN}` } : {},
+    });
   } catch {
     // El panel puede seguir funcionando aunque el refresco del cache falle.
   }
