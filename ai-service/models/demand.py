@@ -1,11 +1,29 @@
 """
 Demand prediction model.
-Uses simple business rules based on recent consumption velocity.
+Uses a RandomForestRegressor (scikit-learn) trained on all products' aggregated
+historical daily sales. Features: weekday, month, day-of-month, 7-day lag
+average, 30-day lag average, category (label-encoded).
+
+Falls back to weighted moving average (70 % last-7d + 30 % last-30d) only when
+there are fewer than MIN_TRAIN_ROWS training samples across all products.
 """
 from collections import defaultdict
 from datetime import date, timedelta
 import math
 
+import numpy as np
+import pandas as pd
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import LabelEncoder
+
+# Minimum training rows (product × day pairs) to use the ML model.
+MIN_TRAIN_ROWS = 30
+FEATURE_COLS = ["weekday", "month", "day_of_month", "lag_7", "lag_30", "categoria"]
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _safe_float(value) -> float:
     try:
@@ -15,7 +33,6 @@ def _safe_float(value) -> float:
 
 
 def _iso_date(value) -> str | None:
-    """Normalize a Firestore date field to YYYY-MM-DD string."""
     if isinstance(value, str) and len(value) >= 10:
         return value[:10]
     if hasattr(value, "date"):
@@ -38,18 +55,17 @@ def _percentile(values: list[float], quantile: float) -> float:
     return ordered[lower] * (1 - weight) + ordered[upper] * weight
 
 
+# ---------------------------------------------------------------------------
+# Sales aggregation
+# ---------------------------------------------------------------------------
+
 def build_daily_sales_by_product(
     daily_sales: list[dict],
     completed_orders: list[dict],
 ) -> dict[str, dict[str, float]]:
-    """
-    Returns { productId: { "YYYY-MM-DD": units_sold } }
-    combining manual sales and completed orders.
-    """
+    """Returns {productId: {"YYYY-MM-DD": units_sold}} from all sales sources."""
     result: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
 
-    # Manual sales from ventasDiarias.
-    # Returned sales should not count as demand.
     for sale in daily_sales:
         pid = sale.get("productId", "")
         fecha = sale.get("fecha", "")
@@ -57,7 +73,6 @@ def build_daily_sales_by_product(
         if pid and fecha and qty > 0 and not sale.get("devuelto", False):
             result[pid][fecha] += qty
 
-    # Sales from completed orders
     for order in completed_orders:
         fecha = _iso_date(order.get("creadoEn"))
         if not fecha:
@@ -72,6 +87,135 @@ def build_daily_sales_by_product(
     return {k: dict(v) for k, v in result.items()}
 
 
+# ---------------------------------------------------------------------------
+# Feature engineering
+# ---------------------------------------------------------------------------
+
+def _lag_features(current_date: date, day_sales: dict, cat_enc: int) -> dict:
+    """Compute temporal and lag features for a single date."""
+    lag_7 = sum(
+        day_sales.get((current_date - timedelta(days=d)).isoformat(), 0.0)
+        for d in range(1, 8)
+    ) / 7.0
+    lag_30 = sum(
+        day_sales.get((current_date - timedelta(days=d)).isoformat(), 0.0)
+        for d in range(1, 31)
+    ) / 30.0
+    return {
+        "weekday": current_date.weekday(),       # 0=Mon … 6=Sun
+        "month": current_date.month,
+        "day_of_month": current_date.day,
+        "lag_7": lag_7,                          # mean daily units last 7 days
+        "lag_30": lag_30,                        # mean daily units last 30 days
+        "categoria": cat_enc,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Model training
+# ---------------------------------------------------------------------------
+
+def _train_global_model(
+    sales_map: dict[str, dict[str, float]],
+    sale_meta: dict[str, dict],
+    history_days: int,
+) -> tuple:
+    """
+    Train a RandomForestRegressor on the combined historical data of all
+    products. Returns (model, label_encoder, used_ml).
+    used_ml=False when data is insufficient; model is None in that case.
+    """
+    today = date.today()
+
+    categories = list({(sale_meta.get(pid, {}).get("categoria") or "") for pid in sales_map})
+    le = LabelEncoder()
+    le.fit(categories + [""])
+
+    rows = []
+    for pid, day_sales in sales_map.items():
+        cat_raw = sale_meta.get(pid, {}).get("categoria") or ""
+        try:
+            cat_enc = int(le.transform([cat_raw])[0])
+        except ValueError:
+            cat_enc = 0
+
+        for i in range(history_days):
+            current_date = today - timedelta(days=history_days - 1 - i)
+            fecha = current_date.isoformat()
+            feat = _lag_features(current_date, day_sales, cat_enc)
+            feat["y"] = day_sales.get(fecha, 0.0)
+            rows.append(feat)
+
+    if len(rows) < MIN_TRAIN_ROWS:
+        return None, le, False
+
+    df = pd.DataFrame(rows)
+    X = df[FEATURE_COLS].values.astype(float)
+    y = df["y"].values.astype(float)
+
+    model = RandomForestRegressor(
+        n_estimators=50,
+        max_depth=8,
+        min_samples_leaf=3,
+        random_state=42,
+        n_jobs=-1,
+    )
+    model.fit(X, y)
+    return model, le, True
+
+
+# ---------------------------------------------------------------------------
+# Prediction helpers
+# ---------------------------------------------------------------------------
+
+def _ml_predict_horizon(
+    model: RandomForestRegressor,
+    le: LabelEncoder,
+    day_sales: dict[str, float],
+    cat_raw: str,
+    horizon_days: int,
+) -> tuple[float, float]:
+    """
+    Use the trained model to predict daily demand for the next horizon_days.
+    Returns (estimated_daily_avg, total_predicted_units).
+    """
+    today = date.today()
+    try:
+        cat_enc = int(le.transform([cat_raw or ""])[0])
+    except ValueError:
+        cat_enc = 0
+
+    preds = []
+    for step in range(1, horizon_days + 1):
+        future_date = today + timedelta(days=step)
+        feat = _lag_features(future_date, day_sales, cat_enc)
+        X = np.array([[feat[c] for c in FEATURE_COLS]], dtype=float)
+        pred = max(0.0, float(model.predict(X)[0]))
+        preds.append(pred)
+
+    total = round(sum(preds), 1)
+    avg_daily = round(total / horizon_days, 2) if horizon_days else 0.0
+    return avg_daily, total
+
+
+def _heuristic_predict(
+    series: list[float],
+    window_7: int,
+    window_30: int,
+    horizon_days: int,
+) -> tuple[float, float]:
+    """Weighted moving average fallback: 70 % last-7d + 30 % last-30d."""
+    avg_7 = sum(series[-window_7:]) / window_7 if window_7 else 0.0
+    avg_30 = sum(series[-window_30:]) / window_30 if window_30 else 0.0
+    estimated_daily = round((avg_7 * 0.7) + (avg_30 * 0.3), 2)
+    predicted_units = round(estimated_daily * horizon_days, 1)
+    return estimated_daily, predicted_units
+
+
+# ---------------------------------------------------------------------------
+# Main prediction entry point
+# ---------------------------------------------------------------------------
+
 def predict_demand(
     daily_sales: list[dict],
     completed_orders: list[dict],
@@ -81,12 +225,13 @@ def predict_demand(
     history_days: int = 90,
 ) -> list[dict]:
     """
-    Predicts demand for each product for the next `horizon_days`.
+    Predict demand for each product over the next horizon_days.
 
-    Forecast model:
-    - avg last 7 days
-    - avg last 30 days
-    - weighted blend: 70% recent + 30% monthly
+    Primary model: RandomForestRegressor trained on all products' combined
+    historical daily sales (cross-product model). Each product contributes
+    (history_days) training rows with temporal and lag features.
+
+    Fallback: weighted moving average when total training data < MIN_TRAIN_ROWS.
     """
     today = date.today()
     history_start = today - timedelta(days=history_days)
@@ -109,7 +254,6 @@ def predict_demand(
                 "precio": _safe_float(sale.get("precioVenta", 0)),
                 "codigo": sale.get("codigo", ""),
             }
-
     for order in completed_orders:
         for item in order.get("items", []):
             product = item.get("product", {})
@@ -121,10 +265,14 @@ def predict_demand(
                     "precio": _safe_float(product.get("precio", 0)),
                 }
 
-    recent_predictions = []
-    predicted_pids: set[str] = set()
+    # Train global ML model once for all products
+    ml_model, label_enc, used_ml = _train_global_model(sales_map, sale_meta, history_days)
+
     window_7 = min(7, history_days)
     window_30 = min(30, history_days)
+
+    recent_predictions = []
+    predicted_pids: set[str] = set()
 
     for pid, day_sales in sales_map.items():
         series = [day_sales.get(d, 0.0) for d in date_range]
@@ -132,15 +280,24 @@ def predict_demand(
         if total_sold <= 0:
             continue
 
+        # Choose prediction method
+        if used_ml:
+            cat_raw = sale_meta.get(pid, {}).get("categoria") or ""
+            estimated_daily, predicted_units = _ml_predict_horizon(
+                ml_model, label_enc, day_sales, cat_raw, horizon_days
+            )
+        else:
+            estimated_daily, predicted_units = _heuristic_predict(
+                series, window_7, window_30, horizon_days
+            )
+
+        weekly = round(estimated_daily * 7, 1)
         sales_7 = round(sum(series[-window_7:]), 1) if window_7 else 0.0
         sales_30 = round(sum(series[-window_30:]), 1) if window_30 else 0.0
         avg_7 = sales_7 / window_7 if window_7 else 0.0
         avg_30 = sales_30 / window_30 if window_30 else 0.0
-        estimated_daily = round((avg_7 * 0.7) + (avg_30 * 0.3), 2)
-        predicted_units = round(estimated_daily * horizon_days, 1)
-        weekly = round(estimated_daily * 7, 1)
         avg_daily_hist = total_sold / history_days
-        active_days = sum(1 for value in series if value > 0)
+        active_days = sum(1 for v in series if v > 0)
 
         product = product_map.get(pid, {})
         meta = sale_meta.get(pid, {})
@@ -148,7 +305,11 @@ def predict_demand(
         nombre = product.get("nombre") or meta.get("nombre", pid)
         categoria = product.get("categoria") or meta.get("categoria", "")
         raw_precio = product.get("precio")
-        precio = _safe_float(raw_precio) if raw_precio is not None else _safe_float(meta.get("precio", 0.0))
+        precio = (
+            _safe_float(raw_precio)
+            if raw_precio is not None
+            else _safe_float(meta.get("precio", 0.0))
+        )
         codigo = codes_map.get(pid) or meta.get("codigo", "")
 
         if stock == 0 and estimated_daily > 0:
@@ -158,12 +319,14 @@ def predict_demand(
         else:
             days_until_stockout = 999
 
+        # Confidence: ML model starts at 60, heuristic at 35; both scale with data
+        base_conf = 60 if used_ml else 35
         confidence = min(
             100,
             round(
-                35
-                + (min(active_days, 30) / 30) * 30
-                + (min(total_sold, 60) / 60) * 35
+                base_conf
+                + (min(active_days, 30) / 30) * 25
+                + (min(total_sold, 60) / 60) * 15
             ),
         )
 
@@ -195,6 +358,7 @@ def predict_demand(
             "dias_hasta_agotarse": min(days_until_stockout, 999),
             "tendencia": trend,
             "confianza": confidence,
+            "modelo": "random_forest" if used_ml else "promedio_movil",
             "alta_demanda": False,
             "riesgo_agotamiento": False,
             "nivel_riesgo": "estable",
@@ -202,6 +366,9 @@ def predict_demand(
             "sin_historial": False,
         })
 
+    # ---------------------------------------------------------------------------
+    # Risk classification (unchanged)
+    # ---------------------------------------------------------------------------
     demand_values = [
         p["consumo_estimado_diario"]
         for p in recent_predictions
@@ -252,6 +419,7 @@ def predict_demand(
         )
         predictions.append(prediction)
 
+    # Products with no sales history
     for pid, product in product_map.items():
         if pid in predicted_pids:
             continue
@@ -275,6 +443,7 @@ def predict_demand(
             "dias_hasta_agotarse": 999,
             "tendencia": "estable",
             "confianza": 0,
+            "modelo": "sin_datos",
             "alta_demanda": False,
             "riesgo_agotamiento": False,
             "nivel_riesgo": "sin_historial",
@@ -282,13 +451,7 @@ def predict_demand(
             "sin_historial": True,
         })
 
-    risk_order = {
-        "critico": 0,
-        "atencion": 1,
-        "vigilancia": 2,
-        "estable": 3,
-        "sin_historial": 4,
-    }
+    risk_order = {"critico": 0, "atencion": 1, "vigilancia": 2, "estable": 3, "sin_historial": 4}
     predictions.sort(
         key=lambda item: (
             item["sin_historial"],
@@ -300,6 +463,10 @@ def predict_demand(
     )
     return predictions
 
+
+# ---------------------------------------------------------------------------
+# Auxiliary endpoints
+# ---------------------------------------------------------------------------
 
 def get_stock_alerts(predictions: list[dict], days_threshold: int = 14) -> list[dict]:
     """Returns products in real stockout risk: high demand + low coverage."""
@@ -318,7 +485,7 @@ def get_weekly_chart(
     completed_orders: list[dict],
     weeks: int = 8,
 ) -> list[dict]:
-    """Returns total sales per week for the last `weeks` weeks."""
+    """Returns total units sold per week for the last `weeks` weeks."""
     today = date.today()
     sales_map = build_daily_sales_by_product(daily_sales, completed_orders)
 
@@ -330,13 +497,11 @@ def get_weekly_chart(
     chart = []
     for w in range(weeks - 1, -1, -1):
         week_start = today - timedelta(days=(w + 1) * 7 - 1)
-        week_end = today - timedelta(days=w * 7)
         week_dates = [
             (week_start + timedelta(days=i)).isoformat()
             for i in range(7)
         ]
-        total = sum(date_totals.get(current_date, 0.0) for current_date in week_dates)
-        label = f"Sem {week_start.strftime('%d/%m')}"
-        chart.append({"semana": label, "unidades": round(total, 1)})
+        total = sum(date_totals.get(d, 0.0) for d in week_dates)
+        chart.append({"semana": f"Sem {week_start.strftime('%d/%m')}", "unidades": round(total, 1)})
 
     return chart
