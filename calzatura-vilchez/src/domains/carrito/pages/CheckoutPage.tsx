@@ -110,7 +110,23 @@ export default function CheckoutPage() {
         const { error } = await checkout.redirectToCheckout({ sessionId: payload.sessionId });
         if (error) throw error;
       } else {
-        // Pago contra entrega
+        // Pago contra entrega — validar totales server-side antes de confirmar
+        const idToken = await user.getIdToken();
+        const res = await fetch(
+          "https://us-central1-calzaturavilchez-ab17f.cloudfunctions.net/confirmCodOrder",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ orderId }),
+          }
+        );
+        const payload = await res.json();
+        if (!res.ok) {
+          throw new Error(payload.error || "No se pudo confirmar el pedido");
+        }
         clearCart();
         navigate(`/pedido-exitoso/${orderId}`);
       }
@@ -307,10 +323,14 @@ export default function CheckoutPage() {
             {items.map((item) => (
               <div key={`${item.product.id}-${item.color}-${item.talla}`} className="checkout-item">
                 <img
-                  src={item.product.imagen || "/placeholder.jpg"}
+                  src={item.product.imagen || "/placeholder-product.svg"}
                   alt={item.product.nombre}
                   className="checkout-item-img"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+                  onError={(e) => {
+                    const image = e.target as HTMLImageElement;
+                    image.onerror = null;
+                    image.src = "/placeholder-product.svg";
+                  }}
                 />
                 <div className="checkout-item-info">
                   <p>{item.product.nombre}</p>

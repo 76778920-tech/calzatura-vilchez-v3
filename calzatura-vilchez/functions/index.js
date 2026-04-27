@@ -257,3 +257,78 @@ exports.stripeWebhook = onRequest(
     res.json({ received: true });
   }
 );
+
+exports.confirmCodOrder = onRequest(
+  {},
+  async (req, res) => {
+    cors(req, res, async () => {
+      if (req.method !== "POST") {
+        return res.status(405).json({ error: "Metodo no permitido" });
+      }
+      try {
+        const decodedToken = await verifyFirebaseUser(req);
+        const { orderId } = req.body;
+
+        if (!orderId || typeof orderId !== "string") {
+          return res.status(400).json({ error: "Pedido invalido" });
+        }
+
+        const db = admin.firestore();
+        const orderRef = db.collection("pedidos").doc(orderId);
+        const orderSnap = await orderRef.get();
+
+        if (!orderSnap.exists) {
+          return res.status(404).json({ error: "Pedido no encontrado" });
+        }
+
+        const order = orderSnap.data();
+        if (order.userId !== decodedToken.uid) {
+          return res.status(403).json({ error: "No puedes confirmar este pedido" });
+        }
+        if (order.estado !== "pendiente" || order.metodoPago !== "contraentrega") {
+          return res.status(409).json({ error: "El pedido no esta disponible para confirmar" });
+        }
+        if (!Array.isArray(order.items) || order.items.length === 0 || order.items.length > 30) {
+          return res.status(400).json({ error: "Pedido sin productos validos" });
+        }
+
+        let subtotal = 0;
+        for (const item of order.items) {
+          const productId = item?.product?.id;
+          const quantity = Number(item?.quantity);
+          if (!productId || !Number.isInteger(quantity) || quantity <= 0 || quantity > 100) {
+            return res.status(400).json({ error: "Producto invalido en el pedido" });
+          }
+          const productSnap = await db.collection("productos").doc(productId).get();
+          if (!productSnap.exists) {
+            return res.status(400).json({ error: "Producto no encontrado" });
+          }
+          const product = productSnap.data();
+          const talla = item?.talla;
+          const sizeStock = getSizeStock(product, talla);
+          const price = Number(product.precio || 0);
+          const stock = Number(product.stock || 0);
+          if (price <= 0 || stock < quantity || sizeStock < quantity) {
+            return res.status(409).json({ error: "Stock o precio invalido" });
+          }
+          subtotal += price * quantity;
+        }
+
+        const envio = Number(order.envio || 0);
+        const total = subtotal + envio;
+        if (
+          Math.abs(Number(order.subtotal || 0) - subtotal) > 0.01
+          || Math.abs(Number(order.total || 0) - total) > 0.01
+        ) {
+          return res.status(409).json({ error: "Los totales del pedido no coinciden" });
+        }
+
+        await orderRef.update({ estado: "confirmado" });
+        return res.status(200).json({ success: true });
+      } catch (error) {
+        console.error("COD confirm error:", error);
+        return res.status(error.status || 500).json({ error: publicError(error) });
+      }
+    });
+  }
+);
