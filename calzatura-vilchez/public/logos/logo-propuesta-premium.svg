@@ -1,0 +1,20 @@
+<svg width="640" height="180" viewBox="0 0 640 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="640" height="180" rx="20" fill="#0D0D0D"/>
+  <rect x="24" y="24" width="132" height="132" rx="18" fill="#141414" stroke="#C9A227" stroke-width="2"/>
+  <g transform="translate(90 90)">
+    <ellipse rx="7" ry="17" fill="#E8C96D" transform="rotate(0)"/>
+    <ellipse rx="7" ry="17" fill="#E8C96D" transform="rotate(30)"/>
+    <ellipse rx="7" ry="17" fill="#E8C96D" transform="rotate(60)"/>
+    <ellipse rx="7" ry="17" fill="#E8C96D" transform="rotate(90)"/>
+    <ellipse rx="7" ry="17" fill="#E8C96D" transform="rotate(120)"/>
+    <ellipse rx="7" ry="17" fill="#E8C96D" transform="rotate(150)"/>
+    <circle r="15" fill="#3C240B"/>
+    <circle r="9" fill="#2A1706"/>
+  </g>
+  <text x="178" y="82" fill="#F8F2DE" font-family="Playfair Display, Georgia, serif" font-size="47" font-weight="700" letter-spacing="1.2">
+    CALZATURA VILCHEZ
+  </text>
+  <text x="180" y="123" fill="#C9A227" font-family="Inter, Arial, sans-serif" font-size="19" font-weight="700" letter-spacing="5.5">
+    GIRASOL · CALZADO PREMIUM
+  </text>
+</svg>

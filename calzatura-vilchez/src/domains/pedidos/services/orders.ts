@@ -1,27 +1,42 @@
+import { auth } from "@/firebase/config";
 import { supabase } from "@/supabase/client";
 import { logAudit } from "@/services/audit";
 import type { Order, OrderStatus, CartItem, Address } from "@/types";
 
 const COL = "pedidos";
+const FUNCTIONS_BASE_URL = "https://us-central1-calzaturavilchez-ab17f.cloudfunctions.net";
 
 export async function createOrder(data: {
-  userId: string;
-  userEmail: string;
   items: CartItem[];
-  subtotal: number;
-  envio: number;
-  total: number;
   direccion: Address;
-  metodoPago: string;
+  metodoPago: "stripe" | "contraentrega";
   notas?: string;
 }): Promise<string> {
-  const { data: row, error } = await supabase.from(COL).insert({
-    ...data,
-    estado: "pendiente",
-    creadoEn: new Date().toISOString(),
-  }).select("id").single();
-  if (error) throw error;
-  return row.id;
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("Debes iniciar sesion para crear un pedido");
+  }
+
+  const idToken = await user.getIdToken();
+  const response = await fetch(`${FUNCTIONS_BASE_URL}/createOrder`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "No se pudo crear el pedido");
+  }
+
+  if (!payload.orderId || typeof payload.orderId !== "string") {
+    throw new Error("La respuesta del servidor no incluyo un pedido valido");
+  }
+
+  return payload.orderId;
 }
 
 export async function fetchOrdersByUser(userId: string): Promise<Order[]> {

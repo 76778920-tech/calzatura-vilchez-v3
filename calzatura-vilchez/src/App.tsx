@@ -4,7 +4,7 @@ import { Toaster } from "react-hot-toast";
 import { CartProvider } from "@/domains/carrito/context/CartContext";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
-import { ADMIN_ROUTES, CLIENT_ROUTES, PUBLIC_ROUTES } from "./routes/paths";
+import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "./routes/paths";
 import { AreaRoute, AuthenticatedRoute, PageLoader } from "./routes/RouteGuards";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 
@@ -33,6 +33,9 @@ const FavoritesPage = lazy(() => import("@/domains/clientes/pages/FavoritesPage"
 const Login = lazy(() => import("@/domains/publico/pages/Login"));
 const Register = lazy(() => import("@/domains/publico/pages/Register"));
 const VerifyEmail = lazy(() => import("@/domains/publico/pages/VerifyEmail"));
+const Logo3DPage = lazy(() => import("@/domains/publico/pages/Logo3DPage"));
+const InfoPage = lazy(() => import("@/domains/publico/pages/InfoPage"));
+const ThesisIsoPage = lazy(() => import("@/domains/publico/pages/ThesisIsoPage"));
 
 function Storefront() {
   const { loading } = useAuth();
@@ -53,6 +56,20 @@ function Storefront() {
             <Route path={PUBLIC_ROUTES.login} element={<Login />} />
             <Route path={PUBLIC_ROUTES.register} element={<Register />} />
             <Route path={PUBLIC_ROUTES.verifyEmail} element={<VerifyEmail />} />
+            <Route path="/logo-3d-preview" element={<Logo3DPage />} />
+            <Route path={INFO_ROUTES.corporativoQuienesSomos} element={<InfoPage pageKey="quienesSomos" />} />
+            <Route path={INFO_ROUTES.corporativoNuestraHistoria} element={<InfoPage pageKey="nuestraHistoria" />} />
+            <Route path={INFO_ROUTES.corporativoMundoVilchez} element={<InfoPage pageKey="mundoVilchez" />} />
+            <Route path={INFO_ROUTES.tesisIso25001} element={<ThesisIsoPage />} />
+            <Route path={INFO_ROUTES.legalTerminos} element={<InfoPage pageKey="terminos" />} />
+            <Route path={INFO_ROUTES.legalPrivacidad} element={<InfoPage pageKey="privacidad" />} />
+            <Route path={INFO_ROUTES.legalLibroReclamaciones} element={<InfoPage pageKey="libroReclamaciones" />} />
+            <Route path={INFO_ROUTES.ayudaContacto} element={<InfoPage pageKey="contactanos" />} />
+            <Route path={INFO_ROUTES.ayudaRastreoPedido} element={<InfoPage pageKey="rastreoPedido" />} />
+            <Route path={INFO_ROUTES.ayudaPreguntasFrecuentes} element={<InfoPage pageKey="preguntasFrecuentes" />} />
+            <Route path={INFO_ROUTES.ayudaCambios} element={<InfoPage pageKey="cambios" />} />
+            <Route path={INFO_ROUTES.beneficiosClubVilchez} element={<InfoPage pageKey="clubVilchez" />} />
+            <Route path={INFO_ROUTES.beneficiosCuotas} element={<InfoPage pageKey="cuotas" />} />
 
             <Route
               path={CLIENT_ROUTES.checkout}

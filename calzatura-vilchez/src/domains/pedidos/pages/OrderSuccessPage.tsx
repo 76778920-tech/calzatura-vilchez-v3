@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useSearchParams } from "react-router-dom";
 import { CheckCircle, Package, ArrowRight, Download, Eye } from "lucide-react";
-import { fetchOrderById, updateOrderStripeSession } from "@/domains/pedidos/services/orders";
+import { fetchOrderById } from "@/domains/pedidos/services/orders";
 import type { Order } from "@/types";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
@@ -22,13 +22,13 @@ export default function OrderSuccessPage() {
     if (!id) return;
 
     const sessionId = searchParams.get("session_id");
+    let pollTimer: number | null = null;
+    let active = true;
 
     const load = async () => {
       try {
-        if (sessionId) {
-          await updateOrderStripeSession(id, sessionId, "pagado");
-        }
         const o = await fetchOrderById(id);
+        if (!active) return;
         setOrder(o);
         clearCart();
         if (o && !downloadedRef.current && !localStorage.getItem(`receipt_downloaded_${o.id}`)) {
@@ -36,14 +36,24 @@ export default function OrderSuccessPage() {
           downloadReceipt(o, userProfile);
           localStorage.setItem(`receipt_downloaded_${o.id}`, "true");
         }
+
+        if (sessionId && o?.estado === "pendiente") {
+          pollTimer = window.setTimeout(() => {
+            void load();
+          }, 2000);
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+    void load();
+
+    return () => {
+      active = false;
+      if (pollTimer) window.clearTimeout(pollTimer);
+    };
+  }, [clearCart, id, searchParams, userProfile]);
 
   const handlePreviewReceipt = () => {
     if (!order) return;

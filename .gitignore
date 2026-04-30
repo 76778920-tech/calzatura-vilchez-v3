@@ -81,6 +81,8 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+ai-service/venv312/
+ai-service/evaluation_report_*.txt
 serviceAccountKey.json
 *-firebase-adminsdk-*.json
 

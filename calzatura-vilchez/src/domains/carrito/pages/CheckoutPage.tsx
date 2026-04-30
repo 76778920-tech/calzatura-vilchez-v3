@@ -71,12 +71,7 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const orderId = await createOrder({
-        userId: user.uid,
-        userEmail: user.email ?? "",
         items,
-        subtotal,
-        envio: COSTO_ENVIO,
-        total,
         direccion,
         metodoPago,
         notas: "",
@@ -111,22 +106,6 @@ export default function CheckoutPage() {
         if (error) throw error;
       } else {
         // Pago contra entrega — validar totales server-side antes de confirmar
-        const idToken = await user.getIdToken();
-        const res = await fetch(
-          "https://us-central1-calzaturavilchez-ab17f.cloudfunctions.net/confirmCodOrder",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({ orderId }),
-          }
-        );
-        const payload = await res.json();
-        if (!res.ok) {
-          throw new Error(payload.error || "No se pudo confirmar el pedido");
-        }
         clearCart();
         navigate(`/pedido-exitoso/${orderId}`);
       }

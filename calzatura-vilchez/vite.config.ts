@@ -23,8 +23,59 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,
+    chunkSizeWarningLimit: 800,
     rollupOptions: {
       output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+
+          if (id.includes('@react-three/drei')) {
+            return 'three-drei'
+          }
+
+          if (id.includes('@react-three/fiber')) {
+            return 'three-fiber'
+          }
+
+          if (id.includes('/three/')) {
+            return 'three-core'
+          }
+
+          if (id.includes('/xlsx/')) {
+            return 'xlsx'
+          }
+
+          if (id.includes('/firebase/')) {
+            return 'firebase'
+          }
+
+          if (id.includes('@supabase/')) {
+            return 'supabase'
+          }
+
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('/react-router-dom/')
+          ) {
+            return 'react-core'
+          }
+
+          if (
+            id.includes('/framer-motion/') ||
+            id.includes('/lucide-react/') ||
+            id.includes('/react-hot-toast/') ||
+            id.includes('@radix-ui/')
+          ) {
+            return 'ui-stack'
+          }
+
+          if (id.includes('/@stripe/')) {
+            return 'payments'
+          }
+
+          return 'vendor'
+        },
         chunkFileNames: 'assets/[hash].js',
         entryFileNames: 'assets/[hash].js',
         assetFileNames: 'assets/[hash].[ext]',

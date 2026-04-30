@@ -5,12 +5,62 @@ import {
   sendEmailVerification,
   signInWithEmailAndPassword,
   signOut,
+  updateProfile,
 } from "firebase/auth";
+import type { User } from "firebase/auth";
 import { auth } from "@/firebase/config";
-import { saveUserProfile } from "./users";
+import { deleteUserProfile, getUserProfile, saveUserProfile } from "./users";
 import { logAudit } from "@/services/audit";
+import { isSuperAdminEmail } from "@/config/security";
+import type { UserRole } from "@/types";
+import { clearFavoriteProductsByUser } from "@/domains/clientes/services/favorites";
 
 const MIN_PASSWORD_LENGTH = 8;
+const PENDING_PROFILE_PREFIX = "CV_PENDING";
+
+function encodePendingSegment(value: string): string {
+  return encodeURIComponent(value.trim());
+}
+
+function decodePendingSegment(value: string): string {
+  return decodeURIComponent(value);
+}
+
+function buildPendingProfileMarker(data: {
+  dni: string;
+  nombres: string;
+  apellidos: string;
+}): string {
+  return [
+    PENDING_PROFILE_PREFIX,
+    encodePendingSegment(data.dni),
+    encodePendingSegment(data.nombres),
+    encodePendingSegment(data.apellidos),
+  ].join("|");
+}
+
+function parsePendingProfileMarker(displayName: string | null): {
+  dni: string;
+  nombres: string;
+  apellidos: string;
+} | null {
+  if (!displayName?.startsWith(PENDING_PROFILE_PREFIX)) return null;
+
+  const parts = displayName.split("|");
+  if (parts.length !== 4) return null;
+
+  const [, dni, nombres, apellidos] = parts;
+
+  try {
+    return {
+      dni: decodePendingSegment(dni),
+      nombres: decodePendingSegment(nombres),
+      apellidos: decodePendingSegment(apellidos),
+    };
+  } catch {
+    return null;
+  }
+}
 
 export async function checkDisposableEmail(email: string): Promise<void> {
   try {
@@ -31,6 +81,10 @@ export async function resendVerificationEmail(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error("NO_USER");
   await sendEmailVerification(user);
+}
+
+export function getCurrentAuthUser(): User | null {
+  return auth.currentUser;
 }
 
 export async function reloadCurrentUser(): Promise<boolean> {
@@ -61,32 +115,67 @@ export async function registerUser(
   const user = userCredential.user;
   const nombres = data.nombres.trim();
   const apellidos = data.apellidos.trim();
-  const nombre = `${nombres} ${apellidos}`.trim();
 
   try {
-    await saveUserProfile({
-      uid: user.uid,
-      dni: data.dni,
-      nombres,
-      apellidos,
-      nombre,
-      email: user.email || data.email,
-      rol: "cliente",
-      creadoEn: new Date().toISOString(),
+    await updateProfile(user, {
+      displayName: buildPendingProfileMarker({
+        dni: data.dni,
+        nombres,
+        apellidos,
+      }),
     });
     await sendEmailVerification(user);
-    void logAudit("crear", "usuario", user.uid, nombre, {
-      dni: data.dni,
-      email: user.email || data.email,
-      rol: "cliente",
-      validadoPorDNI: true,
-    });
   } catch (error) {
     await deleteUser(user).catch(() => undefined);
     throw error;
   }
 
   return user;
+}
+
+export async function ensureVerifiedUserProfile(user: User) {
+  const existingProfile = await getUserProfile(user.uid);
+  if (existingProfile) return existingProfile;
+
+  const isAdmin = isSuperAdminEmail(user.email);
+  if (!user.emailVerified && !isAdmin) return null;
+  const role: UserRole = isAdmin ? "admin" : "cliente";
+
+  const pending = parsePendingProfileMarker(user.displayName);
+  const nombres = pending?.nombres?.trim();
+  const apellidos = pending?.apellidos?.trim();
+  const nombre =
+    `${nombres ?? ""} ${apellidos ?? ""}`.trim() ||
+    user.displayName?.trim() ||
+    user.email?.split("@")[0] ||
+    "Usuario";
+
+  const profile = {
+    uid: user.uid,
+    dni: pending?.dni,
+    nombres,
+    apellidos,
+    nombre,
+    email: user.email ?? "",
+    rol: role,
+    creadoEn: new Date().toISOString(),
+  };
+
+  await saveUserProfile(profile);
+
+  if (pending) {
+    await updateProfile(user, { displayName: nombre }).catch(() => undefined);
+  }
+
+  void logAudit("crear", "usuario", user.uid, nombre, {
+    dni: pending?.dni,
+    email: user.email ?? "",
+    rol: profile.rol,
+    validadoPorDNI: Boolean(pending?.dni),
+    correoVerificado: user.emailVerified,
+  });
+
+  return profile;
 }
 
 export async function loginUser(email: string, password: string) {
@@ -96,4 +185,37 @@ export async function loginUser(email: string, password: string) {
 
 export async function logoutUser() {
   await signOut(auth);
+}
+
+export async function deleteOwnAccount(): Promise<void> {
+  const user = auth.currentUser;
+  if (!user || !user.email) throw new Error("NO_USER");
+
+  const profile = await getUserProfile(user.uid).catch(() => null);
+  const entityName = profile?.nombre?.trim() || user.email;
+
+  await logAudit("eliminar", "usuario", user.uid, entityName, {
+    email: user.email,
+    selfService: true,
+  });
+
+  try {
+    await deleteUser(user);
+  } catch (error) {
+    const code = (error as { code?: string })?.code ?? "";
+    if (code.includes("requires-recent-login")) {
+      throw new Error("REQUIRES_RECENT_LOGIN");
+    }
+    throw error;
+  }
+
+  const cleanupResults = await Promise.allSettled([
+    deleteUserProfile(user.uid),
+    clearFavoriteProductsByUser(user.uid),
+  ]);
+
+  const cleanupFailed = cleanupResults.some((result) => result.status === "rejected");
+  if (cleanupFailed) {
+    throw new Error("ACCOUNT_DELETED_WITH_PARTIAL_DATA");
+  }
 }

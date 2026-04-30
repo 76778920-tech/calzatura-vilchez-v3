@@ -36,10 +36,14 @@ export default function CartSidebar() {
             items.map((item) => (
               <div key={`${item.product.id}-${item.color}-${item.talla}`} className="cart-item">
                 <img
-                  src={item.product.imagen || "/placeholder.jpg"}
+                  src={item.product.imagen || "/placeholder-product.svg"}
                   alt={item.product.nombre}
                   className="cart-item-img"
-                  onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+                  onError={(e) => {
+                    const image = e.target as HTMLImageElement;
+                    image.onerror = null;
+                    image.src = "/placeholder-product.svg";
+                  }}
                 />
                 <div className="cart-item-info">
                   <p className="cart-item-name">{item.product.nombre}</p>

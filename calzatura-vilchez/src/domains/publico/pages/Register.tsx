@@ -4,6 +4,8 @@ import { IdCard, User, Mail, Lock, Eye, EyeOff, Search } from "lucide-react";
 import { checkDisposableEmail, registerUser } from "@/domains/usuarios/services/auth";
 import { PUBLIC_ROUTES } from "@/routes/paths";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
+import { normalizeEmailInput, validateEmailFormat } from "@/utils/emailValidation";
+import { savePendingVerificationEmail } from "@/utils/pendingVerification";
 import toast from "react-hot-toast";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -75,17 +77,24 @@ export default function Register() {
       toast.error(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
       return;
     }
+    const emailErr = validateEmailFormat(email);
+    if (emailErr) {
+      toast.error(emailErr);
+      return;
+    }
+    const emailNorm = normalizeEmailInput(email);
 
     setLoading(true);
     try {
-      await checkDisposableEmail(email);
+      await checkDisposableEmail(emailNorm);
       await registerUser({
         dni: validatedDni,
         nombres,
         apellidos,
-        email,
+        email: emailNorm,
         password,
       });
+      savePendingVerificationEmail(emailNorm);
       navigate(PUBLIC_ROUTES.verifyEmail, { replace: true });
     } catch (err: unknown) {
       console.error("[Register] error al crear cuenta:", err);
@@ -198,6 +207,8 @@ export default function Register() {
               <Mail size={16} className="input-icon" />
               <input
                 type="email"
+                inputMode="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Brain,
@@ -12,7 +12,7 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
-import { PromptInputBox } from "@/components/ui/ai-prompt-box";
+import { PromptInputBox, type PromptPanelQuickAction } from "@/components/ui/ai-prompt-box";
 
 const AI_BASE = import.meta.env.VITE_AI_SERVICE_URL ?? "http://localhost:8000";
 const AI_BEARER_TOKEN = (import.meta.env.VITE_AI_SERVICE_BEARER_TOKEN as string | undefined)?.trim();
@@ -178,9 +178,13 @@ function formatTrendLabel(value: "subiendo" | "bajando" | "estable") {
   return "Estable";
 }
 
+/** Confianza de la proyección financiera (%): un solo criterio para KPI, resúmenes y asistente (RN-07). */
+const CONFIDENCE_ALTA_MIN = 70;
+const CONFIDENCE_MEDIA_MIN = 50;
+
 function formatConfidenceLabel(value: number) {
-  if (value >= 75) return "Alta";
-  if (value >= 55) return "Media";
+  if (value >= CONFIDENCE_ALTA_MIN) return "Alta";
+  if (value >= CONFIDENCE_MEDIA_MIN) return "Media";
   return "Inicial";
 }
 
@@ -332,9 +336,9 @@ function generateAIResponse(
       : s.tendencia === "bajando"
       ? "Los ingresos muestran una tendencia a la baja. Se recomienda revisar estrategias de ventas."
       : "Los ingresos se mantienen estables sin variación significativa.";
-    const confianzaTexto = s.confianza >= 70
+    const confianzaTexto = s.confianza >= CONFIDENCE_ALTA_MIN
       ? "La proyección tiene alta confiabilidad basada en el historial disponible."
-      : s.confianza >= 50
+      : s.confianza >= CONFIDENCE_MEDIA_MIN
       ? "La proyección es moderada. A mayor historial de ventas, más precisa será."
       : "La proyección es estimada. Se necesita más historial de ventas para mayor precisión.";
 
@@ -801,9 +805,9 @@ function generateAIResponseV2(
         ? "La lectura gerencial sería revisar promociones, stock y productos de mayor salida para no dejar caer las ventas."
         : "La lectura gerencial sería mantener el control actual y monitorear si aparece algún cambio importante.";
     const confidenceSentence =
-      s.confianza >= 70
+      s.confianza >= CONFIDENCE_ALTA_MIN
         ? "La estimación se ve bastante confiable con los datos que ya tiene el sistema."
-        : s.confianza >= 50
+        : s.confianza >= CONFIDENCE_MEDIA_MIN
         ? "La estimación es útil como guía, aúnque conviene mirarla con algo de cautela."
         : "La estimación aún es preliminar, así que conviene usarla solo como orientación.";
 
@@ -1011,8 +1015,8 @@ function EstadoBadge({ p }: { p: Prediction }) {
   if (p.sin_historial) return <span className="pred-estado-badge bajo">Sin historial</span>;
   if (p.stock_actual === 0) return <span className="pred-estado-badge critico">Sin stock</span>;
   if (p.alerta_stock) return <span className="pred-estado-badge critico">Riesgo alto</span>;
-  if (p.nivel_riesgo === "critico") return <span className="pred-estado-badge critico">Critico</span>;
-  if (p.nivel_riesgo === "atencion") return <span className="pred-estado-badge alerta">Atencion</span>;
+  if (p.nivel_riesgo === "critico") return <span className="pred-estado-badge critico">Crítico</span>;
+  if (p.nivel_riesgo === "atencion") return <span className="pred-estado-badge alerta">Atención</span>;
   if (p.nivel_riesgo === "vigilancia") return <span className="pred-estado-badge alerta">Vigilancia</span>;
   if (p.alta_demanda) return <span className="pred-estado-badge bien">Alta demanda</span>;
   if (p.tendencia === "bajando") return <span className="pred-estado-badge bajo">Baja demanda</span>;
@@ -1131,10 +1135,10 @@ function RevenueLineChart({ history, forecast }: { history: RevenuePoint[]; fore
   return (
     <div className="pred-revenue-chart-wrap">
       <div className="pred-revenue-legend">
-        <span><i className="pred-legend-line hist" /> Historico</span>
-        <span><i className="pred-legend-line proj" /> Proyeccion</span>
+        <span><i className="pred-legend-line hist" /> Histórico</span>
+        <span><i className="pred-legend-line proj" /> Proyección</span>
       </div>
-      <svg viewBox={`0 0 ${width} ${height}`} className="pred-revenue-chart" role="img" aria-label="Historico y proyección de ingresos">
+      <svg viewBox={`0 0 ${width} ${height}`} className="pred-revenue-chart" role="img" aria-label="Histórico y proyección de ingresos">
         <rect x="0" y="0" width={paddingLeft - 10} height={height} className="pred-revenue-label-bg" />
 
         {[0.25, 0.5, 0.75, 1].map((ratio) => {
@@ -1235,48 +1239,36 @@ export default function AdminPredictions() {
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
-  const [showModelPanel, setShowModelPanel] = useState(false);
+  const [activeTab, setActiveTab] = useState<"resumen" | "ventas" | "finanzas" | "modelo" | "asistente">("resumen");
+  const [weeklyChartFetched, setWeeklyChartFetched] = useState(false);
+  const [weeklyChartLoading, setWeeklyChartLoading] = useState(false);
+  const [modelMetricsFetched, setModelMetricsFetched] = useState(false);
+  const [modelMetricsLoading, setModelMetricsLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (selectedHorizon: HorizonOption) => {
     setLoading(true);
     setError(null);
     try {
-      const [predRes, chartRes] = await Promise.all([
-        fetch(`${AI_BASE}/api/predict/demand?horizon=${selectedHorizon}`, { headers: buildAIHeaders() }),
-        fetch(`${AI_BASE}/api/sales/weekly-chart?weeks=8`, { headers: buildAIHeaders() }),
-      ]);
-      if (!predRes.ok || !chartRes.ok) {
-        throw new Error("Error al conectar con el servicio de IA.");
-      }
-      const [predData, chartData] = await Promise.all([
-        predRes.json(),
-        chartRes.json(),
-      ]);
+      const predRes = await fetch(
+        `${AI_BASE}/api/predict/demand?horizon=${selectedHorizon}`,
+        { headers: buildAIHeaders() },
+      );
+      if (!predRes.ok) throw new Error("Error al conectar con el servicio de IA.");
+      const predData = await predRes.json();
       setPredictions(predData.predictions ?? []);
       setModeloMeta(predData.modelo_meta ?? null);
-      setWeeklyChart(chartData.chart ?? []);
 
-      // Endpoint de ingresos opcional — no bloquea si falla
+      // Proyección de ingresos — no bloquea si falla
       try {
-        const revenueRes = await fetch(`${AI_BASE}/api/predict/revenue?horizon=${selectedHorizon}&history=120`, {
-          headers: buildAIHeaders(),
-        });
-        if (revenueRes.ok) {
-          setRevenueForecast(await revenueRes.json());
-        }
+        const revenueRes = await fetch(
+          `${AI_BASE}/api/predict/revenue?horizon=${selectedHorizon}&history=120`,
+          { headers: buildAIHeaders() },
+        );
+        if (revenueRes.ok) setRevenueForecast(await revenueRes.json());
+        else setRevenueForecast(null);
       } catch {
         setRevenueForecast(null);
-      }
-
-      // Métricas de monitoreo — no bloquea si falla
-      try {
-        const metricsRes = await fetch(`${AI_BASE}/api/model/metrics`, { headers: buildAIHeaders() });
-        if (metricsRes.ok) {
-          setModelMetrics(await metricsRes.json());
-        }
-      } catch {
-        setModelMetrics(null);
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Error desconocido");
@@ -1285,12 +1277,52 @@ export default function AdminPredictions() {
     }
   }, []);
 
+  const loadWeeklyChart = useCallback(async () => {
+    setWeeklyChartLoading(true);
+    try {
+      const res = await fetch(`${AI_BASE}/api/sales/weekly-chart?weeks=8`, { headers: buildAIHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        setWeeklyChart(data.chart ?? []);
+      }
+    } catch { /* silencioso */ }
+    setWeeklyChartFetched(true);
+    setWeeklyChartLoading(false);
+  }, []);
+
+  const loadModelMetrics = useCallback(async () => {
+    setModelMetricsLoading(true);
+    try {
+      const res = await fetch(`${AI_BASE}/api/model/metrics`, { headers: buildAIHeaders() });
+      if (res.ok) setModelMetrics(await res.json());
+    } catch { /* silencioso */ }
+    setModelMetricsFetched(true);
+    setModelMetricsLoading(false);
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => void load(horizon), 0);
     return () => window.clearTimeout(timer);
   }, [horizon, load]);
 
+  useEffect(() => {
+    const timers: ReturnType<typeof window.setTimeout>[] = [];
+    if (activeTab === "ventas" && !weeklyChartFetched && !weeklyChartLoading) {
+      timers.push(window.setTimeout(() => void loadWeeklyChart(), 0));
+    }
+    if (activeTab === "modelo" && !modelMetricsFetched && !modelMetricsLoading && modeloMeta) {
+      timers.push(window.setTimeout(() => void loadModelMetrics(), 0));
+    }
+    return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+    };
+  }, [activeTab, weeklyChartFetched, weeklyChartLoading, modelMetricsFetched, modelMetricsLoading, modeloMeta, loadWeeklyChart, loadModelMetrics]);
+
   const refreshPredictions = useCallback(async () => {
+    setWeeklyChartFetched(false);
+    setModelMetricsFetched(false);
+    setWeeklyChart([]);
+    setModelMetrics(null);
     await invalidateAICache();
     await load(horizon);
   }, [horizon, load]);
@@ -1481,12 +1513,12 @@ export default function AdminPredictions() {
   const distribucionInventario = useMemo(() => {
     const items = [
       {
-        label: "Critico",
+        label: "Crítico",
         count: predictionsForView.filter((item) => !item.sin_historial && (item.stock_actual === 0 || item.nivel_riesgo === "critico")).length,
         color: "#ef4444",
       },
       {
-        label: "Atencion",
+        label: "Atención",
         count: predictionsForView.filter((item) => !item.sin_historial && item.nivel_riesgo === "atencion").length,
         color: "#f59e0b",
       },
@@ -1526,6 +1558,17 @@ export default function AdminPredictions() {
     setAiLoading(false);
   }, [predictionsForView, normalizedRevenueForecast]);
 
+  const assistantQuickActions = useMemo<PromptPanelQuickAction[]>(
+    () => [
+      { label: "Resumen gerencia", prompt: "Dame un resumen ejecutivo para gerencia con las cifras clave del panel." },
+      { label: "¿Qué reponer?", prompt: "¿Qué producto debo reponer primero según riesgo y demanda?" },
+      { label: "Ingresos vs. periodo", prompt: "Compara el próximo horizonte proyectado con el último período real de ingresos." },
+      { label: "Alertas de stock", prompt: "Lista los productos en mayor riesgo de inventario y qué harías." },
+      { label: "Mayor demanda", prompt: "¿Cuáles son los productos con más demanda ahora?" },
+    ],
+    [],
+  );
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -1554,6 +1597,8 @@ export default function AdminPredictions() {
 
   return (
     <div className="pred-root">
+
+      {/* ── Cabecera ────────────────────────────────────────── */}
       <div className="dash-header">
         <div>
           <p className="dash-greeting">Panel de decisiones</p>
@@ -1561,7 +1606,7 @@ export default function AdminPredictions() {
             <Brain size={26} /> Inteligencia Artificial
           </h1>
           <p className="pred-header-note">
-            El horizonte seleccionado cambia la proyección financiera, el riesgo de inventario y la prioridad de accion del panel.
+            El horizonte seleccionado cambia la proyección financiera, el riesgo de inventario y la prioridad de acción del panel.
           </p>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -1582,7 +1627,30 @@ export default function AdminPredictions() {
         </div>
       </div>
 
-      <div className="pred-summary-grid">
+      {/* ── Navegación por pestañas ────────────────────────── */}
+      <nav className="pred-tabs" role="tablist" aria-label="Secciones del panel">
+        <button type="button" role="tab" aria-selected={activeTab === "resumen"} className={`pred-tab ${activeTab === "resumen" ? "active" : ""}`} onClick={() => setActiveTab("resumen")}>
+          Resumen
+          {enRiesgo > 0 && <span className="pred-tab-count pred-tab-count-alert">{enRiesgo}</span>}
+        </button>
+        <button type="button" role="tab" aria-selected={activeTab === "ventas"} className={`pred-tab ${activeTab === "ventas" ? "active" : ""}`} onClick={() => setActiveTab("ventas")}>
+          Ventas e inventario
+        </button>
+        <button type="button" role="tab" aria-selected={activeTab === "finanzas"} className={`pred-tab ${activeTab === "finanzas" ? "active" : ""}`} onClick={() => setActiveTab("finanzas")}>
+          Finanzas
+        </button>
+        <button type="button" role="tab" aria-selected={activeTab === "modelo"} className={`pred-tab ${activeTab === "modelo" ? "active" : ""}`} onClick={() => setActiveTab("modelo")}>
+          Modelo IA
+        </button>
+        <button type="button" role="tab" aria-selected={activeTab === "asistente"} className={`pred-tab ${activeTab === "asistente" ? "active" : ""}`} onClick={() => setActiveTab("asistente")}>
+          Asistente
+        </button>
+      </nav>
+
+      {/* ── Pestaña: Resumen ─────────────────────────────────── */}
+      {activeTab === "resumen" && (
+        <div className="pred-tab-panel">
+          <div className="pred-summary-grid">
         <article className="pred-summary-card pred-summary-hero">
           <p className="pred-summary-kicker">Resumen ejecutivo</p>
           <h2 className="pred-summary-title">{resumenEjecutivo.titular}</h2>
@@ -1615,132 +1683,9 @@ export default function AdminPredictions() {
         </article>
       </div>
 
-      <div className={`pred-section-grid pred-section-grid-main ${!revenueSummary ? "pred-section-grid-single" : ""}`}>
-        {revenueSummary && normalizedRevenueForecast && (
-          <div className="dash-card">
-            <div className="dash-card-header">
-              <div>
-                <p className="dash-card-kicker">Planificacion financiera</p>
-                <h2 className="dash-card-title">Prediccion de ingresos futuros</h2>
-              </div>
-              <div className="pred-revenue-trend">
-                {revenueSummary.tendencia === "subiendo" && <TrendingUp size={16} className="pred-trend-up" />}
-                {revenueSummary.tendencia === "bajando" && <TrendingDown size={16} className="pred-trend-down" />}
-                {revenueSummary.tendencia === "estable" && <Minus size={16} className="pred-trend-stable" />}
-                <span>{formatTrendLabel(revenueSummary.tendencia)}</span>
-              </div>
-            </div>
 
-            <div className="pred-revenue-grid">
-              <div className="pred-revenue-card pred-revenue-primary">
-                <CircleDollarSign size={20} />
-                <div>
-                  <p className="pred-kpi-label">Proxima semana</p>
-                  <p className="pred-kpi-value">{formatCurrency(revenueSummary.proximo_7_dias)}</p>
-                  <p className="pred-kpi-sub">ingreso estimado en 7 días</p>
-                </div>
-              </div>
-              <div className="pred-revenue-card">
-                <CircleDollarSign size={20} />
-                <div>
-                  <p className="pred-kpi-label">Horizonte actual</p>
-                  <p className="pred-kpi-value">{formatCurrency(revenueSummary.proximo_horizonte)}</p>
-                  <p className="pred-kpi-sub">ingreso estimado en {normalizedRevenueForecast.horizon_days} días</p>
-                </div>
-              </div>
-              <div className={`pred-revenue-card ${revenueSummary.crecimiento_estimado_horizonte_pct >= 0 ? "pred-revenue-positive" : "pred-revenue-negative"}`}>
-                <TrendingUp size={20} />
-                <div>
-                  <p className="pred-kpi-label">Vs ultimo horizonte</p>
-                  <p className="pred-kpi-value">{formatPercent(revenueSummary.crecimiento_estimado_horizonte_pct)}</p>
-                  <p className="pred-kpi-sub">comparado con los últimos {normalizedRevenueForecast.horizon_days} días</p>
-                </div>
-              </div>
-              <div className="pred-revenue-card">
-                <Brain size={20} />
-                <div>
-                  <p className="pred-kpi-label">Confianza</p>
-                  <p className="pred-kpi-value">{revenueSummary.confianza}%</p>
-                  <p className="pred-kpi-sub">basada en historial y estabilidad</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="pred-revenue-metrics">
-              <div>
-                <span className="pred-sub">Promedio diario histórico</span>
-                <strong>{formatCurrency(revenueSummary.promedio_diario_histórico)}</strong>
-              </div>
-              <div>
-                <span className="pred-sub">Promedio diario proyectado</span>
-                <strong>{formatCurrency(revenueSummary.promedio_diario_proyectado)}</strong>
-              </div>
-              <div>
-                <span className="pred-sub">últimos {normalizedRevenueForecast.horizon_days} días</span>
-                <strong>{formatCurrency(revenueSummary.ultimo_horizonte)}</strong>
-              </div>
-            </div>
-
-            <div className="pred-explainer-grid">
-              <article className="pred-explainer-card">
-                <p className="pred-explainer-label">Qué está pasando</p>
-                <p className="pred-explainer-copy">{resumenEjecutivo.lecturaFinanciera}</p>
-              </article>
-              <article className="pred-explainer-card">
-                <p className="pred-explainer-label">Qué significa</p>
-                <p className="pred-explainer-copy">
-                  El promedio proyectado es {formatCurrency(revenueSummary.promedio_diario_proyectado)} por día y la confianza del modelo es {formatConfidenceLabel(revenueSummary.confianza).toLowerCase()}.
-                </p>
-              </article>
-              <article className="pred-explainer-card">
-                <p className="pred-explainer-label">Qué recomiendo hacer</p>
-                <p className="pred-explainer-copy">{resumenEjecutivo.recomendacion}</p>
-              </article>
-            </div>
-
-            <RevenueLineChart history={normalizedRevenueForecast.history} forecast={normalizedRevenueForecast.forecast} />
-          </div>
-        )}
-
-        <div className="dash-card pred-insight-card">
-          <div className="dash-card-header">
-            <div>
-              <p className="dash-card-kicker">Lectura gerencial</p>
-              <h2 className="dash-card-title">Interpretación del horizonte actual</h2>
-            </div>
-          </div>
-
-          <div className="pred-insight-list">
-            <article className="pred-insight-item">
-              <p className="pred-insight-label">Qué está pasando</p>
-              <p className="pred-insight-copy">{resumenEjecutivo.detalle}</p>
-            </article>
-            <article className="pred-insight-item">
-              <p className="pred-insight-label">Qué significa para el negocio</p>
-              <p className="pred-insight-copy">
-                {enRiesgo > 0
-                  ? `Hay ${enRiesgo} producto(s) que pueden afectar la venta si no se reponen dentro del horizonte actual.`
-                  : "No hay alertas fuertes de inventario en este horizonte y eso le da estabilidad a la venta proyectada."}
-              </p>
-            </article>
-            <article className="pred-insight-item">
-              <p className="pred-insight-label">Qué debería revisar la gerencia</p>
-              <p className="pred-insight-copy">
-                {revenueSummary
-                  ? `Comparar ${formatCurrency(revenueSummary.proximo_horizonte)} proyectados contra ${formatCurrency(revenueSummary.ultimo_horizonte)} reales del último tramo para validar si el ritmo esperado se está cumpliendo.`
-                  : "Revisar primero ventas, stock y productos con historial antes de sacar conclusiones financieras."}
-              </p>
-            </article>
-            <article className="pred-insight-item">
-              <p className="pred-insight-label">Qué recomiendo hacer ahora</p>
-              <p className="pred-insight-copy">{resumenEjecutivo.recomendacion}</p>
-            </article>
-          </div>
-        </div>
-      </div>
-
-      <div className="pred-kpi-row">
-        <div className={`pred-kpi-card ${enRiesgo > 0 ? "pred-kpi-alert" : ""}`}>
+          <div className="pred-kpi-row">
+            <div className={`pred-kpi-card ${enRiesgo > 0 ? "pred-kpi-alert" : ""}`}>
           <AlertTriangle size={20} />
           <div>
             <p className="pred-kpi-label">En riesgo en {horizon} días</p>
@@ -1803,7 +1748,7 @@ export default function AdminPredictions() {
           <div className="dash-card-header">
             <div>
               <p className="dash-card-kicker">Lo que debes hacer ahora</p>
-              <h2 className="dash-card-title">Recomendaciónes priorizadas</h2>
+              <h2 className="dash-card-title">Recomendaciones priorizadas</h2>
             </div>
           </div>
           {recomendaciones.length > 0 ? (
@@ -1816,7 +1761,7 @@ export default function AdminPredictions() {
                   <div className="pred-rec-body">
                     <p className="pred-rec-titulo">{recommendation.titulo}</p>
                     <p className="pred-rec-detalle">{recommendation.detalle}</p>
-                    <p className="pred-rec-accion">-&gt; {recommendation.accion}</p>
+                    <p className="pred-rec-accion">→ {recommendation.accion}</p>
                   </div>
                 </div>
               ))}
@@ -1833,44 +1778,77 @@ export default function AdminPredictions() {
         </div>
       </div>
 
-      <div className="pred-section-grid">
-        {weeklyChart.length > 0 && (
+          {/* Lectura ejecutiva condensada */}
           <div className="dash-card">
-            <div className="dash-card-header">
+            <div className="pred-reading-cols">
               <div>
-                <p className="dash-card-kicker">Ventas semanales</p>
-                <h2 className="dash-card-title">Cómo se está moviendo la venta</h2>
+                <p className="pred-summary-kicker">Situación del inventario</p>
+                <p className="pred-reading-text">{resumenEjecutivo.lecturaInventario}</p>
               </div>
-            </div>
-            <WeeklyChart data={weeklyChart} />
-          </div>
-        )}
-
-        <div className="dash-card">
-          <div className="dash-card-header">
-            <div>
-              <p className="dash-card-kicker">Lectura operativa</p>
-              <h2 className="dash-card-title">Distribucion del inventario analizado</h2>
-            </div>
-          </div>
-          <div className="dash-status-list">
-            {distribucionInventario.map((item) => (
-              <div key={item.label} className="dash-status-row">
-                <span className="dash-status-dot" style={{ background: item.color }} />
-                <span className="dash-status-name">{item.label}</span>
-                <div className="dash-status-bar-track">
-                  <div className="dash-status-bar-fill" style={{ width: item.width, background: item.color }} />
+              {revenueSummary && (
+                <div>
+                  <p className="pred-summary-kicker">Proyección financiera</p>
+                  <p className="pred-reading-text">{resumenEjecutivo.lecturaFinanciera}</p>
                 </div>
-                <span className="dash-status-count">{item.count}</span>
+              )}
+              <div>
+                <p className="pred-summary-kicker">Qué hacer ahora</p>
+                <p className="pred-reading-text">{resumenEjecutivo.recomendacion}</p>
               </div>
-            ))}
+            </div>
           </div>
-
-          <p className="pred-side-note">
-            Esta lectura ayuda a gerencia, contabilidad y junta directiva a ver cuanta presion real existe en el inventario antes de revisar producto por producto.
-          </p>
         </div>
-      </div>
+      )}
+
+      {/* ── Pestaña: Ventas e inventario ─────────────────── */}
+      {activeTab === "ventas" && (
+        <div className="pred-tab-panel">
+          <div className="pred-section-grid">
+            <div className="dash-card">
+              <div className="dash-card-header">
+                <div>
+                  <p className="dash-card-kicker">Ventas semanales</p>
+                  <h2 className="dash-card-title">Cómo se está moviendo la venta</h2>
+                </div>
+              </div>
+              {weeklyChartLoading ? (
+                <div className="pred-lazy-loading">
+                  <div className="success-spinner" />
+                  <span>Cargando historial de ventas...</span>
+                </div>
+              ) : weeklyChart.length > 0 ? (
+                <WeeklyChart data={weeklyChart} />
+              ) : (
+                <div className="pred-empty-card">
+                  <p className="pred-empty-copy">No hay datos de ventas semanales disponibles.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="dash-card">
+              <div className="dash-card-header">
+                <div>
+                  <p className="dash-card-kicker">Lectura operativa</p>
+                  <h2 className="dash-card-title">Distribución del inventario analizado</h2>
+                </div>
+              </div>
+              <div className="dash-status-list">
+                {distribucionInventario.map((item) => (
+                  <div key={item.label} className="dash-status-row">
+                    <span className="dash-status-dot" style={{ background: item.color }} />
+                    <span className="dash-status-name">{item.label}</span>
+                    <div className="dash-status-bar-track">
+                      <div className="dash-status-bar-fill" style={{ width: item.width, background: item.color }} />
+                    </div>
+                    <span className="dash-status-count">{item.count}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="pred-side-note">
+                Esta lectura ayuda a gerencia, contabilidad y junta directiva a ver cuánta presión real existe en el inventario antes de revisar producto por producto.
+              </p>
+            </div>
+          </div>
 
       {predictions.length > 0 && (
         <div className="dash-card" style={{ padding: 0, overflow: "hidden" }}>
@@ -1887,7 +1865,7 @@ export default function AdminPredictions() {
               <input
                 type="text"
                 className="pred-search-input"
-                placeholder="Buscar por codigo o nombre..."
+                placeholder="Buscar por código o nombre..."
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -1985,199 +1963,309 @@ export default function AdminPredictions() {
         </div>
       )}
 
-      {predictions.length === 0 && (
-        <div className="pred-no-alerts">
-          <Package size={32} />
-          <p>Aún no hay productos registrados para analizar.</p>
-        </div>
-      )}
-
-      {modeloMeta && (
-        <div className="dash-card">
-          <button
-            type="button"
-            className="pred-model-panel-toggle"
-            onClick={() => setShowModelPanel((prev) => !prev)}
-          >
-            <Brain size={16} />
-            <span>Modelo IA — Reproducibilidad, Explicabilidad y Monitoreo</span>
-            <span className="pred-model-toggle-arrow">{showModelPanel ? "▲" : "▼"}</span>
-          </button>
-
-          {showModelPanel && (
-            <div className="pred-model-panel">
-              <div className="pred-model-meta-grid">
-                <div className="pred-model-meta-item">
-                  <span className="pred-sub">Tipo de modelo</span>
-                  <strong>{modeloMeta.model_type === "random_forest" ? "RandomForestRegressor" : "Promedio Móvil (fallback)"}</strong>
-                </div>
-                <div className="pred-model-meta-item">
-                  <span className="pred-sub">Muestras de entrenamiento</span>
-                  <strong>{modeloMeta.n_samples.toLocaleString()}</strong>
-                </div>
-                <div className="pred-model-meta-item">
-                  <span className="pred-sub">Productos en entrenamiento</span>
-                  <strong>{modeloMeta.n_products}</strong>
-                </div>
-                <div className="pred-model-meta-item">
-                  <span className="pred-sub">Período de datos</span>
-                  <strong>{modeloMeta.date_range_start} → {modeloMeta.date_range_end}</strong>
-                </div>
-                <div className="pred-model-meta-item">
-                  <span className="pred-sub">random_state</span>
-                  <strong>{modeloMeta.random_state}</strong>
-                </div>
-                <div className="pred-model-meta-item">
-                  <span className="pred-sub">scikit-learn</span>
-                  <strong>v{modeloMeta.sklearn_version}</strong>
-                </div>
-                <div className="pred-model-meta-item pred-model-meta-hash">
-                  <span className="pred-sub">Data fingerprint (MD5)</span>
-                  <code>{modeloMeta.data_hash}</code>
-                </div>
-              </div>
-
-              {modeloMeta.feature_importances.length > 0 && (
-                <div className="pred-model-section">
-                  <h3 className="pred-model-section-title">Importancia de variables (Feature Importance)</h3>
-                  <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
-                    Cuánto contribuye cada variable a las predicciones del modelo. Mayor porcentaje → mayor influencia.
-                  </p>
-                  <FeatureImportanceChart importances={modeloMeta.feature_importances} />
-                </div>
-              )}
-
-              {Object.keys(modeloMeta.feature_stats).length > 0 && (
-                <div className="pred-model-section">
-                  <h3 className="pred-model-section-title">Baseline de drift (distribución de entrenamiento)</h3>
-                  <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
-                    Valores medios y desviación estándar de las features de lag durante el entrenamiento. Los productos con drift alto están fuera de este rango.
-                  </p>
-                  <div className="pred-model-meta-grid">
-                    {Object.entries(modeloMeta.feature_stats).map(([feat, stats]) => (
-                      <div key={feat} className="pred-model-meta-item">
-                        <span className="pred-sub">{FEATURE_LABELS[feat] ?? feat}</span>
-                        <strong>μ = {stats.mean.toFixed(3)} · σ = {stats.std.toFixed(3)}</strong>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="pred-model-section">
-                <h3 className="pred-model-section-title">Monitoreo retrospectivo (MAE / MAPE)</h3>
-                {modelMetrics === null && (
-                  <p className="pred-sub">Cargando métricas...</p>
-                )}
-                {modelMetrics?.status === "sin_datos" && (
-                  <p className="pred-sub">{modelMetrics.mensaje}</p>
-                )}
-                {modelMetrics?.status === "pendiente" && (
-                  <p className="pred-sub">
-                    {modelMetrics.mensaje} ({modelMetrics.n_predicciones_en_cola} en cola)
-                  </p>
-                )}
-                {modelMetrics?.status === "ok" && (
-                  <>
-                    <div className="pred-model-meta-grid" style={{ marginBottom: "0.75rem" }}>
-                      <div className="pred-model-meta-item">
-                        <span className="pred-sub">MAE promedio (uds./día)</span>
-                        <strong>{modelMetrics.mae_promedio?.toFixed(3)}</strong>
-                      </div>
-                      <div className="pred-model-meta-item">
-                        <span className="pred-sub">MAPE promedio</span>
-                        <strong>{modelMetrics.mape_promedio_pct?.toFixed(1)}%</strong>
-                      </div>
-                      <div className="pred-model-meta-item">
-                        <span className="pred-sub">Períodos evaluados</span>
-                        <strong>{modelMetrics.n_evaluaciones}</strong>
-                      </div>
-                    </div>
-                    {modelMetrics.evaluaciones && modelMetrics.evaluaciones.length > 0 && (
-                      <table className="admin-table" style={{ fontSize: "12px" }}>
-                        <thead>
-                          <tr>
-                            <th>Período</th>
-                            <th>Productos</th>
-                            <th>MAE</th>
-                            <th>MAPE</th>
-                            <th>Modelo</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {modelMetrics.evaluaciones.map((ev) => (
-                            <tr key={ev.period_start}>
-                              <td>{ev.period_start} → {ev.period_end}</td>
-                              <td>{ev.n_products}</td>
-                              <td>{ev.mae.toFixed(3)}</td>
-                              <td>{ev.mape_pct.toFixed(1)}%</td>
-                              <td>{ev.model_type}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )}
-                  </>
-                )}
-              </div>
+          {predictions.length === 0 && (
+            <div className="pred-no-alerts">
+              <Package size={32} />
+              <p>Aún no hay productos registrados para analizar.</p>
             </div>
           )}
         </div>
       )}
 
-      <div className="dash-card" style={{ padding: "1.25rem 1.5rem" }}>
-        <div className="dash-card-header" style={{ padding: 0, marginBottom: "1rem" }}>
-          <div>
-            <p className="dash-card-kicker">Asistente inteligente</p>
-            <h2 className="dash-card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <Brain size={20} /> Consulta a la IA
-            </h2>
-            <p className="pred-section-note">
-              Puedes pedir una explicacion para gerencia, un resumen con cifras exactas para contabilidad o una lectura ejecutiva para junta directiva.
-            </p>
-          </div>
-        </div>
-
-        {messages.length > 0 && (
-          <div className="pred-chat-stream">
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`pred-chat-row ${msg.role === "user" ? "pred-chat-row-user" : "pred-chat-row-assistant"}`}
-              >
-                <div className={`pred-chat-bubble ${msg.role === "user" ? "pred-chat-bubble-user" : "pred-chat-bubble-assistant"}`}>
-                  {msg.content}
+      {/* ── Pestaña: Finanzas ────────────────────────────── */}
+      {activeTab === "finanzas" && (
+        <div className="pred-tab-panel">
+          {revenueSummary && normalizedRevenueForecast ? (
+            <div className="dash-card">
+              <div className="dash-card-header">
+                <div>
+                  <p className="dash-card-kicker">Planificación financiera</p>
+                  <h2 className="dash-card-title">Predicción de ingresos futuros</h2>
+                </div>
+                <div className="pred-revenue-trend">
+                  {revenueSummary.tendencia === "subiendo" && <TrendingUp size={16} className="pred-trend-up" />}
+                  {revenueSummary.tendencia === "bajando" && <TrendingDown size={16} className="pred-trend-down" />}
+                  {revenueSummary.tendencia === "estable" && <Minus size={16} className="pred-trend-stable" />}
+                  <span>{formatTrendLabel(revenueSummary.tendencia)}</span>
                 </div>
               </div>
-            ))}
-            {aiLoading && (
-              <div className="pred-chat-row pred-chat-row-assistant">
-                <div className="pred-chat-loading">
-                  {[0, 1, 2].map((i) => (
-                    <span key={i} className="pred-chat-dot" style={{ animationDelay: `${i * 0.2}s` }} />
-                  ))}
+              <div className="pred-revenue-grid">
+                <div className="pred-revenue-card pred-revenue-primary">
+                  <CircleDollarSign size={20} />
+                  <div>
+                    <p className="pred-kpi-label">Próxima semana</p>
+                    <p className="pred-kpi-value">{formatCurrency(revenueSummary.proximo_7_dias)}</p>
+                    <p className="pred-kpi-sub">ingreso estimado en 7 días</p>
+                  </div>
                 </div>
+                <div className="pred-revenue-card">
+                  <CircleDollarSign size={20} />
+                  <div>
+                    <p className="pred-kpi-label">Horizonte actual</p>
+                    <p className="pred-kpi-value">{formatCurrency(revenueSummary.proximo_horizonte)}</p>
+                    <p className="pred-kpi-sub">ingreso estimado en {normalizedRevenueForecast.horizon_days} días</p>
+                  </div>
+                </div>
+                <div className={`pred-revenue-card ${revenueSummary.crecimiento_estimado_horizonte_pct >= 0 ? "pred-revenue-positive" : "pred-revenue-negative"}`}>
+                  <TrendingUp size={20} />
+                  <div>
+                    <p className="pred-kpi-label">Vs. último horizonte</p>
+                    <p className="pred-kpi-value">{formatPercent(revenueSummary.crecimiento_estimado_horizonte_pct)}</p>
+                    <p className="pred-kpi-sub">comparado con los últimos {normalizedRevenueForecast.horizon_days} días</p>
+                  </div>
+                </div>
+                <div className="pred-revenue-card">
+                  <Brain size={20} />
+                  <div>
+                    <p className="pred-kpi-label">Confianza</p>
+                    <p className="pred-kpi-value">{revenueSummary.confianza}%</p>
+                    <p className="pred-kpi-sub">basada en historial y estabilidad</p>
+                  </div>
+                </div>
+              </div>
+              <div className="pred-revenue-metrics">
+                <div>
+                  <span className="pred-sub">Promedio diario histórico</span>
+                  <strong>{formatCurrency(revenueSummary.promedio_diario_histórico)}</strong>
+                </div>
+                <div>
+                  <span className="pred-sub">Promedio diario proyectado</span>
+                  <strong>{formatCurrency(revenueSummary.promedio_diario_proyectado)}</strong>
+                </div>
+                <div>
+                  <span className="pred-sub">Últimos {normalizedRevenueForecast.horizon_days} días</span>
+                  <strong>{formatCurrency(revenueSummary.ultimo_horizonte)}</strong>
+                </div>
+              </div>
+              <div className="pred-explainer-grid">
+                <article className="pred-explainer-card">
+                  <p className="pred-explainer-label">Qué está pasando</p>
+                  <p className="pred-explainer-copy">{resumenEjecutivo.lecturaFinanciera}</p>
+                </article>
+                <article className="pred-explainer-card">
+                  <p className="pred-explainer-label">Qué significa</p>
+                  <p className="pred-explainer-copy">
+                    El promedio proyectado es {formatCurrency(revenueSummary.promedio_diario_proyectado)} por día y la confianza del modelo es {formatConfidenceLabel(revenueSummary.confianza).toLowerCase()}.
+                  </p>
+                </article>
+                <article className="pred-explainer-card">
+                  <p className="pred-explainer-label">Qué recomiendo hacer</p>
+                  <p className="pred-explainer-copy">{resumenEjecutivo.recomendacion}</p>
+                </article>
+              </div>
+              <RevenueLineChart history={normalizedRevenueForecast.history} forecast={normalizedRevenueForecast.forecast} />
+            </div>
+          ) : (
+            <div className="pred-error-card">
+              <CircleDollarSign size={32} />
+              <h3>Proyección financiera no disponible</h3>
+              <p>No hay datos de ingresos para este horizonte. El servicio de IA podría estar actualizándose o falta historial suficiente.</p>
+              <button type="button" className="btn btn-primary" onClick={() => void refreshPredictions()}>
+                <RefreshCw size={15} /> Reintentar
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Pestaña: Modelo IA ───────────────────────────── */}
+      {activeTab === "modelo" && (
+        <div className="pred-tab-panel">
+          {modeloMeta ? (
+            <div className="dash-card">
+              <div className="dash-card-header">
+                <div>
+                  <p className="dash-card-kicker">Reproducibilidad · Explicabilidad · Monitoreo</p>
+                  <h2 className="dash-card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <Brain size={20} /> Modelo IA — Detalles técnicos
+                  </h2>
+                </div>
+              </div>
+              <div className="pred-model-panel">
+                <div className="pred-model-meta-grid">
+                  <div className="pred-model-meta-item">
+                    <span className="pred-sub">Tipo de modelo</span>
+                    <strong>{modeloMeta.model_type === "random_forest" ? "RandomForestRegressor" : "Promedio Móvil (fallback)"}</strong>
+                  </div>
+                  <div className="pred-model-meta-item">
+                    <span className="pred-sub">Muestras de entrenamiento</span>
+                    <strong>{modeloMeta.n_samples.toLocaleString()}</strong>
+                  </div>
+                  <div className="pred-model-meta-item">
+                    <span className="pred-sub">Productos en entrenamiento</span>
+                    <strong>{modeloMeta.n_products}</strong>
+                  </div>
+                  <div className="pred-model-meta-item">
+                    <span className="pred-sub">Período de datos</span>
+                    <strong>{modeloMeta.date_range_start} → {modeloMeta.date_range_end}</strong>
+                  </div>
+                  <div className="pred-model-meta-item">
+                    <span className="pred-sub">random_state</span>
+                    <strong>{modeloMeta.random_state}</strong>
+                  </div>
+                  <div className="pred-model-meta-item">
+                    <span className="pred-sub">scikit-learn</span>
+                    <strong>v{modeloMeta.sklearn_version}</strong>
+                  </div>
+                  <div className="pred-model-meta-item pred-model-meta-hash">
+                    <span className="pred-sub">Data fingerprint (MD5)</span>
+                    <code>{modeloMeta.data_hash}</code>
+                  </div>
+                </div>
+                {modeloMeta.feature_importances.length > 0 && (
+                  <div className="pred-model-section">
+                    <h3 className="pred-model-section-title">Importancia de variables (Feature Importance)</h3>
+                    <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
+                      Cuánto contribuye cada variable a las predicciones del modelo. Mayor porcentaje → mayor influencia.
+                    </p>
+                    <FeatureImportanceChart importances={modeloMeta.feature_importances} />
+                  </div>
+                )}
+                {Object.keys(modeloMeta.feature_stats).length > 0 && (
+                  <div className="pred-model-section">
+                    <h3 className="pred-model-section-title">Baseline de drift (distribución de entrenamiento)</h3>
+                    <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
+                      Valores medios y desviación estándar de las features de lag durante el entrenamiento. Los productos con drift alto están fuera de este rango.
+                    </p>
+                    <div className="pred-model-meta-grid">
+                      {Object.entries(modeloMeta.feature_stats).map(([feat, stats]) => (
+                        <div key={feat} className="pred-model-meta-item">
+                          <span className="pred-sub">{FEATURE_LABELS[feat] ?? feat}</span>
+                          <strong>μ = {stats.mean.toFixed(3)} · σ = {stats.std.toFixed(3)}</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="pred-model-section">
+                  <h3 className="pred-model-section-title">Monitoreo retrospectivo (MAE / MAPE)</h3>
+                  {(!modelMetricsFetched || modelMetricsLoading) && (
+                    <div className="pred-lazy-loading">
+                      <div className="success-spinner" />
+                      <span>
+                        {modelMetricsLoading ? "Cargando métricas de evaluación…" : "Preparando métricas…"}
+                      </span>
+                    </div>
+                  )}
+                  {modelMetricsFetched && modelMetrics === null && (
+                    <p className="pred-sub">No se pudieron cargar las métricas de evaluación.</p>
+                  )}
+                  {modelMetrics?.status === "sin_datos" && (
+                    <p className="pred-sub">{modelMetrics.mensaje}</p>
+                  )}
+                  {modelMetrics?.status === "pendiente" && (
+                    <p className="pred-sub">{modelMetrics.mensaje} ({modelMetrics.n_predicciones_en_cola} en cola)</p>
+                  )}
+                  {modelMetrics?.status === "ok" && (
+                    <>
+                      <div className="pred-model-meta-grid" style={{ marginBottom: "0.75rem" }}>
+                        <div className="pred-model-meta-item">
+                          <span className="pred-sub">MAE promedio (uds./día)</span>
+                          <strong>{modelMetrics.mae_promedio?.toFixed(3)}</strong>
+                        </div>
+                        <div className="pred-model-meta-item">
+                          <span className="pred-sub">MAPE promedio</span>
+                          <strong>{modelMetrics.mape_promedio_pct?.toFixed(1)}%</strong>
+                        </div>
+                        <div className="pred-model-meta-item">
+                          <span className="pred-sub">Períodos evaluados</span>
+                          <strong>{modelMetrics.n_evaluaciones}</strong>
+                        </div>
+                      </div>
+                      {modelMetrics.evaluaciones && modelMetrics.evaluaciones.length > 0 && (
+                        <table className="admin-table" style={{ fontSize: "12px" }}>
+                          <thead>
+                            <tr>
+                              <th>Período</th>
+                              <th>Productos</th>
+                              <th>MAE</th>
+                              <th>MAPE</th>
+                              <th>Modelo</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {modelMetrics.evaluaciones.map((ev) => (
+                              <tr key={ev.period_start}>
+                                <td>{ev.period_start} → {ev.period_end}</td>
+                                <td>{ev.n_products}</td>
+                                <td>{ev.mae.toFixed(3)}</td>
+                                <td>{ev.mape_pct.toFixed(1)}%</td>
+                                <td>{ev.model_type}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="pred-error-card">
+              <Brain size={32} />
+              <h3>Modelo IA no disponible</h3>
+              <p>Los metadatos del modelo aún no están disponibles. El servicio de IA podría estar inicializándose.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Pestaña: Asistente ───────────────────────────── */}
+      {activeTab === "asistente" && (
+        <div className="pred-tab-panel">
+          <div className="dash-card" style={{ padding: "1.25rem 1.5rem" }}>
+            <div className="dash-card-header" style={{ padding: 0, marginBottom: "1rem" }}>
+              <div>
+                <p className="dash-card-kicker">Asistente inteligente</p>
+                <h2 className="dash-card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                  <Brain size={20} /> Consulta a la IA
+                </h2>
+                <p className="pred-section-note">
+                  Puedes pedir una explicación para gerencia, un resumen con cifras exactas para contabilidad o una lectura ejecutiva para junta directiva.
+                  Las respuestas se generan a partir de los datos de predicción e inventario cargados en este panel (no es búsqueda web ni un chat externo).
+                </p>
+              </div>
+            </div>
+            {messages.length > 0 && (
+              <div className="pred-chat-stream">
+                {messages.map((msg, idx) => (
+                  <div key={idx} className={`pred-chat-row ${msg.role === "user" ? "pred-chat-row-user" : "pred-chat-row-assistant"}`}>
+                    <div className={`pred-chat-bubble ${msg.role === "user" ? "pred-chat-bubble-user" : "pred-chat-bubble-assistant"}`}>
+                      {msg.content}
+                    </div>
+                  </div>
+                ))}
+                {aiLoading && (
+                  <div className="pred-chat-row pred-chat-row-assistant">
+                    <div className="pred-chat-loading">
+                      {[0, 1, 2].map((i) => (
+                        <span key={i} className="pred-chat-dot" style={{ animationDelay: `${i * 0.2}s` }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
               </div>
             )}
-            <div ref={chatEndRef} />
+            {messages.length === 0 && (
+              <div className="pred-empty-chat">
+                <p>
+                  Toca un atajo de abajo para una respuesta al instante, escribe tu propia pregunta o usa el micrófono.
+                  Inventario, ingresos y prioridades salen de lo que ya ves en las otras pestañas.
+                </p>
+              </div>
+            )}
+            <PromptInputBox
+              variant="panel"
+              quickActions={assistantQuickActions}
+              onSend={handleSend}
+              isLoading={aiLoading}
+              placeholder="Pregunta por inventario, ingresos o predicciones de este panel…"
+            />
           </div>
-        )}
-
-        {messages.length === 0 && (
-          <div className="pred-empty-chat">
-            <p>Puedes preguntar por inventario, ingresos, productos urgentes o pedir un informe más explicativo.</p>
-            <p>
-              Ejemplos: "Dame un resumen para gerencia", "Qué producto debo reponer primero", "Compara el próximo horizonte con el último periodo real".
-            </p>
-          </div>
-        )}
-
-        <PromptInputBox
-          onSend={handleSend}
-          isLoading={aiLoading}
-          placeholder="Ej: Qué producto debo reponer primero o dame un resumen para gerencia"
-        />
-      </div>
+        </div>
+      )}
     </div>
   );
 }

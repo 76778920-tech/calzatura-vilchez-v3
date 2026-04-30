@@ -116,17 +116,21 @@ export default function AdminOrders() {
                           type="button"
                           className="order-item-img-button"
                           onClick={() => setPreviewImage({
-                            src: item.product?.imagen || "/placeholder.jpg",
+                            src: item.product?.imagen || "/placeholder-product.svg",
                             title: item.product?.nombre || "Producto",
                             subtitle: `Pedido #${order.id.slice(-8).toUpperCase()}`,
                           })}
                           aria-label={`Abrir imagen de ${item.product?.nombre || "producto"}`}
                         >
                           <img
-                            src={item.product?.imagen || "/placeholder.jpg"}
+                            src={item.product?.imagen || "/placeholder-product.svg"}
                             alt={item.product?.nombre}
                             className="order-item-img"
-                            onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+                            onError={(e) => {
+                              const image = e.target as HTMLImageElement;
+                              image.onerror = null;
+                              image.src = "/placeholder-product.svg";
+                            }}
                           />
                         </button>
                         <div>

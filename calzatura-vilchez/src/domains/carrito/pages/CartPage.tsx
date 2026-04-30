@@ -33,10 +33,14 @@ export default function CartPage() {
           {items.map((item) => (
             <div key={`${item.product.id}-${item.color}-${item.talla}`} className="cart-page-item">
               <img
-                src={item.product.imagen || "/placeholder.jpg"}
+                src={item.product.imagen || "/placeholder-product.svg"}
                 alt={item.product.nombre}
                 className="cart-page-item-img"
-                onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+                onError={(e) => {
+                  const image = e.target as HTMLImageElement;
+                  image.onerror = null;
+                  image.src = "/placeholder-product.svg";
+                }}
               />
               <div className="cart-page-item-details">
                 <h3>{item.product.nombre}</h3>

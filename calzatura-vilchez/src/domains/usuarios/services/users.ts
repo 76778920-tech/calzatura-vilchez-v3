@@ -32,3 +32,8 @@ export async function updateUserRole(uid: string, rol: UserRole): Promise<void> 
   if (error) throw error;
   void logAudit("cambiar_estado", "usuario", uid, uid, { rol });
 }
+
+export async function deleteUserProfile(uid: string): Promise<void> {
+  const { error } = await supabase.from("usuarios").delete().eq("uid", uid);
+  if (error) throw error;
+}

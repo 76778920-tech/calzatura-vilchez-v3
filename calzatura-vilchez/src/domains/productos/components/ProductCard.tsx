@@ -14,6 +14,8 @@ interface Props {
   onFavoriteChange?: (productId: string, isFavorite: boolean) => void;
 }
 
+const FALLBACK_PRODUCT_IMAGE = "/placeholder-product.svg";
+
 export default function ProductCard({ product, onFavoriteChange }: Props) {
   const { user } = useAuth();
   const { addItem } = useCart();
@@ -24,21 +26,24 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
   const firstColor = colors[0] ?? "";
   const availableSizes = getAvailableSizes(product, firstColor || undefined);
   const images = (product.imagenes?.length ? product.imagenes : [product.imagen]).filter(Boolean);
-  const primaryImage = images[0] ?? "/placeholder.jpg";
-  const hoverImage = images[1] ?? primaryImage;
+  const primaryImage = images[0] ?? FALLBACK_PRODUCT_IMAGE;
+  const secondaryImage = images[1] ?? null;
+  const [failedImage, setFailedImage] = useState<string | null>(null);
+  const [failedHoverImage, setFailedHoverImage] = useState<string | null>(null);
+  const imageSrc = failedImage === primaryImage ? FALLBACK_PRODUCT_IMAGE : primaryImage;
+  const hoverImageSrc = secondaryImage
+    ? failedHoverImage === secondaryImage
+      ? imageSrc
+      : secondaryImage
+    : null;
+  const isLiked = Boolean(user) && liked;
 
   useEffect(() => {
     let active = true;
 
-    if (!user) {
-      const timer = window.setTimeout(() => {
-        if (active) setLiked(false);
-      }, 0);
-      return () => {
-        active = false;
-        window.clearTimeout(timer);
-      };
-    }
+    if (!user) return () => {
+      active = false;
+    };
 
     isProductFavorite(user.uid, product.id)
       .then((isFavorite) => {
@@ -71,7 +76,7 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
 
     if (favoriteBusy) return;
 
-    const nextLiked = !liked;
+    const nextLiked = !isLiked;
     setFavoriteBusy(true);
     setLiked(nextLiked);
 
@@ -90,19 +95,27 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
 
   return (
     <Link to={`/producto/${product.id}`} className="product-card">
-      <div className={`product-card-img-wrapper ${hoverImage !== primaryImage ? "has-hover-image" : ""}`}>
+      <div className="product-card-img-wrapper">
         <img
-          src={primaryImage}
+          src={imageSrc}
           alt={product.nombre}
           className="product-card-img product-card-img-primary"
-          onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+          onError={(event) => {
+            const image = event.target as HTMLImageElement;
+            image.onerror = null;
+            setFailedImage(primaryImage);
+          }}
         />
-        {hoverImage !== primaryImage && (
+        {hoverImageSrc && (
           <img
-            src={hoverImage}
-            alt={`${product.nombre} vista alternativa`}
+            src={hoverImageSrc}
+            alt={product.nombre}
             className="product-card-img product-card-img-hover"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            onError={(event) => {
+              const image = event.target as HTMLImageElement;
+              image.onerror = null;
+              setFailedHoverImage(secondaryImage);
+            }}
           />
         )}
         {product.stock === 0 && (
@@ -115,11 +128,11 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
           type="button"
           onClick={handleLike}
           disabled={favoriteBusy}
-          className={`like-btn ${liked ? "liked" : ""}`}
-          aria-label={liked ? "Quitar de favoritos" : "Agregar a favoritos"}
-          aria-pressed={liked}
+          className={`like-btn ${isLiked ? "liked" : ""}`}
+          aria-label={isLiked ? "Quitar de favoritos" : "Agregar a favoritos"}
+          aria-pressed={isLiked}
         >
-          <Heart size={18} fill={liked ? "currentColor" : "none"} />
+          <Heart size={18} fill={isLiked ? "currentColor" : "none"} />
         </button>
       </div>
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import type { FormEvent } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ShoppingCart,
   User,
@@ -23,42 +23,76 @@ import { useCart } from "@/domains/carrito/context/CartContext";
 import { logoutUser } from "@/domains/usuarios/services/auth";
 import { fetchProducts } from "@/domains/productos/services/products";
 import { useThemeMode } from "@/hooks/useThemeMode";
+import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 import type { Product } from "@/types";
 import CartSidebar from "@/domains/carrito/components/CartSidebar";
+import BrandLogo from "@/components/brand/BrandLogo";
+import type { BrandLogoVariant } from "@/components/brand/BrandLogo";
+import trendNuevaTemporada from "@/assets/home/trends/trend-nueva-temporada-ai.png";
+import trendPasosRadiantes from "@/assets/home/trends/trend-pasos-radiantes-ai.png";
+import trendUrbanGlow from "@/assets/home/trends/trend-urban-glow-ai.png";
+import trendSunsetChic from "@/assets/home/trends/trend-sunset-chic-ai.png";
+import cyberHombreEditorial from "@/assets/home/cyber/cyber-hombre-editorial.png";
+import cyberMujerEditorial from "@/assets/home/cyber/cyber-mujer-editorial.png";
+import cyberInfantilEditorial from "@/assets/home/cyber/cyber-infantil-editorial.png";
+import cyberZapatillasEditorial from "@/assets/home/cyber/cyber-zapatillas-editorial.png";
 import toast from "react-hot-toast";
 
 const WHATSAPP_CONTACT_URL =
   "https://wa.me/51964052530?text=Hola%20Calzatura%20Vilchez%2C%20quiero%20hacer%20una%20consulta%20sobre%20sus%20calzados.";
 
-function SunflowerIcon({ size = 32 }: { size?: number }) {
-  const petals = [0, 45, 90, 135, 180, 225, 270, 315];
-  return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      {petals.map((angle) => (
-        <ellipse
-          key={angle}
-          cx="20"
-          cy="7.5"
-          rx="3"
-          ry="6.5"
-          fill="#C9A227"
-          transform={`rotate(${angle} 20 20)`}
-        />
-      ))}
-      <circle cx="20" cy="20" r="7" fill="#3d2008" />
-      <circle cx="20" cy="20" r="5.5" fill="#2d1505" />
-    </svg>
-  );
+function normalizeRouteToken(value: string | null | undefined) {
+  return decodeURIComponent(value ?? "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\+/g, " ")
+    .trim();
 }
 
-type MegaLink = { label: string; to: string; tag?: string; accent?: boolean };
+function slugifyRouteValue(value: string) {
+  return normalizeRouteToken(value)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function buildProductsRoute(params: Record<string, string | undefined>) {
+  const search = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (!value) return;
+    search.set(key, value);
+  });
+
+  const query = search.toString();
+  return query ? `${PUBLIC_ROUTES.products}?${query}` : PUBLIC_ROUTES.products;
+}
+
+function buildBrandRoute(brand: string) {
+  return buildProductsRoute({ vista: "marcas", marcaSlug: slugifyRouteValue(brand) });
+}
+
+const HEADER_LOGO_VARIANT: BrandLogoVariant = "premium";
+
+type MegaLink = {
+  label: string;
+  to: string;
+  tag?: string;
+  accent?: boolean;
+  image?: string;
+  hoverPanel?: {
+    eyebrow: string;
+    items: MegaLink[];
+    layout?: "grid" | "list";
+  };
+};
 type MegaMenu = {
   id: string;
   label: string;
   columns: { title?: string; links: MegaLink[] }[];
   featured?: MegaLink[];
   chips?: { title: string; items: MegaLink[] };
-  promo?: { eyebrow: string; title: string; subtitle: string };
+  promo?: { eyebrow: string; title: string; subtitle: string; to?: string };
 };
 
 type MobileMenuMode = "click" | "hover" | null;
@@ -68,152 +102,423 @@ const megaMenus: MegaMenu[] = [
     id: "cyber",
     label: "CYBER WOW",
     featured: [
-      { label: "Nuevas Tendencias", to: "/productos?vista=tendencias" },
-      { label: "Calzado Mujer", to: "/productos?categoria=mujer", accent: true },
-      { label: "Accesorios", to: "/productos?buscar=accesorios" },
-      { label: "Marcas", to: "/productos?vista=marcas" },
-      { label: "Menos de S/129.90", to: "/productos?buscar=oferta" },
-      { label: "% Cyber", to: "/productos?buscar=cyber", tag: "Hasta 60% Off" },
-    ],
-    columns: [
       {
-        title: "OFERTAS",
-        links: [
-          { label: "Destacados", to: "/productos?buscar=destacado" },
-          { label: "Zapatillas en oferta", to: "/productos?buscar=zapatillas oferta" },
-          { label: "Sandalias", to: "/productos?buscar=sandalias" },
-          { label: "Ver Todo", to: "/productos" },
-        ],
+        label: "Cyber Hombre",
+        to: buildProductsRoute({ categoria: "hombre", campana: "cyber" }),
+        accent: true,
+        hoverPanel: {
+          eyebrow: "CYBER HOMBRE",
+          layout: "list",
+          items: [
+            {
+              label: "Zapatillas Cyber",
+              to: buildProductsRoute({ categoria: "hombre", campana: "cyber", tipo: "zapatillas" }),
+              image: cyberHombreEditorial,
+            },
+            {
+              label: "Zapatos Cyber",
+              to: buildProductsRoute({ categoria: "hombre", campana: "cyber", tipo: "zapatos" }),
+              image: cyberHombreEditorial,
+            },
+            {
+              label: "Botines Cyber",
+              to: buildProductsRoute({ categoria: "hombre", campana: "cyber", tipo: "botines" }),
+              image: cyberHombreEditorial,
+            },
+            { label: "Ver Todo", to: buildProductsRoute({ categoria: "hombre", campana: "cyber" }), image: cyberHombreEditorial },
+          ],
+        },
+      },
+      {
+        label: "Cyber Mujer",
+        to: buildProductsRoute({ categoria: "mujer", campana: "cyber" }),
+        hoverPanel: {
+          eyebrow: "CYBER MUJER",
+          layout: "list",
+          items: [
+            {
+              label: "Zapatillas Cyber",
+              to: buildProductsRoute({ categoria: "mujer", campana: "cyber", tipo: "zapatillas" }),
+              image: cyberMujerEditorial,
+            },
+            {
+              label: "Sandalias Cyber",
+              to: buildProductsRoute({ categoria: "mujer", campana: "cyber", tipo: "sandalias" }),
+              image: cyberMujerEditorial,
+            },
+            {
+              label: "Botines Cyber",
+              to: buildProductsRoute({ categoria: "mujer", campana: "cyber", tipo: "botines" }),
+              image: cyberMujerEditorial,
+            },
+            { label: "Ver Todo", to: buildProductsRoute({ categoria: "mujer", campana: "cyber" }), image: cyberMujerEditorial },
+          ],
+        },
+      },
+      {
+        label: "Cyber Infantil",
+        to: buildProductsRoute({ categoria: "nino", campana: "cyber", segmento: "infantil" }),
+        hoverPanel: {
+          eyebrow: "CYBER INFANTIL",
+          layout: "list",
+          items: [
+            {
+              label: "Escolar Cyber",
+              to: buildProductsRoute({ categoria: "nino", campana: "cyber", tipo: "escolar" }),
+              image: cyberInfantilEditorial,
+            },
+            {
+              label: "Juvenil Activo",
+              to: buildProductsRoute({ categoria: "nino", campana: "cyber", segmento: "juvenil" }),
+              image: cyberInfantilEditorial,
+            },
+            {
+              label: "Zapatillas Cyber",
+              to: buildProductsRoute({ categoria: "nino", campana: "cyber", tipo: "zapatillas" }),
+              image: cyberInfantilEditorial,
+            },
+            { label: "Ver Todo", to: buildProductsRoute({ categoria: "nino", campana: "cyber" }), image: cyberInfantilEditorial },
+          ],
+        },
+      },
+      {
+        label: "Cyber Zapatillas",
+        to: buildProductsRoute({ linea: "zapatillas", campana: "cyber" }),
+        hoverPanel: {
+          eyebrow: "CYBER ZAPATILLAS",
+          layout: "list",
+          items: [
+            { label: "Mujer", to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
+            { label: "Hombre", to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
+            { label: "Niños", to: buildProductsRoute({ categoria: "nino", tipo: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
+            { label: "Ver Todo", to: buildProductsRoute({ linea: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
+          ],
+        },
       },
     ],
-    promo: { eyebrow: "CYBER WOW", title: "Ofertas destacadas", subtitle: "Calzado seleccionado" },
+    columns: [],
   },
   {
     id: "mujer",
     label: "Mujer",
-    featured: [
-      { label: "Nuevas Tendencias", to: "/productos?categoria=mujer" },
-      { label: "Calzado Mujer", to: "/productos?categoria=mujer", accent: true },
-      { label: "Accesorios", to: "/productos?categoria=mujer&buscar=accesorios" },
-      { label: "Marcas", to: "/productos?vista=marcas" },
-      { label: "Menos de S/129.90", to: "/productos?categoria=mujer&buscar=oferta" },
+      featured: [
+      {
+        label: "Nuevas Tendencias",
+        to: buildProductsRoute({ categoria: "mujer", campana: "nueva-temporada" }),
+        hoverPanel: {
+          eyebrow: "NEW & TRENDING",
+          items: [
+            {
+              label: "Nueva Temporada",
+              to: buildProductsRoute({ categoria: "mujer", campana: "nueva-temporada" }),
+              image: trendNuevaTemporada,
+            },
+            {
+              label: "Pasos Radiantes",
+              to: buildProductsRoute({ categoria: "mujer", coleccion: "pasos-radiantes" }),
+              image: trendPasosRadiantes,
+            },
+            {
+              label: "Urban Glow",
+              to: buildProductsRoute({ categoria: "mujer", coleccion: "urban-glow" }),
+              image: trendUrbanGlow,
+            },
+            {
+              label: "Sunset Chic",
+              to: buildProductsRoute({ categoria: "mujer", coleccion: "sunset-chic" }),
+              image: trendSunsetChic,
+            },
+          ],
+        },
+      },
+      { label: "Calzado Mujer", to: buildProductsRoute({ categoria: "mujer" }), accent: true },
+      { label: "Marcas", to: buildProductsRoute({ vista: "marcas" }) },
     ],
     columns: [
       {
         title: "CALZADO MUJER",
         links: [
-          { label: "Zapatillas", to: "/productos?categoria=mujer&buscar=zapatillas" },
-          { label: "Sandalias", to: "/productos?categoria=mujer&buscar=sandalias" },
-          { label: "Zapatos Casuales", to: "/productos?categoria=mujer&buscar=casual" },
-          { label: "Zapatos de Vestir", to: "/productos?categoria=mujer&buscar=formal" },
-          { label: "Mocasines", to: "/productos?categoria=mujer&buscar=mocasines" },
-          { label: "Botas y Botines", to: "/productos?categoria=mujer&buscar=botas" },
-          { label: "Ballerinas", to: "/productos?categoria=mujer&buscar=ballerinas" },
-          { label: "Pantuflas", to: "/productos?categoria=mujer&buscar=pantuflas" },
-          { label: "Flip Flops", to: "/productos?categoria=mujer&buscar=flip flops" },
-          { label: "Ver Todo", to: "/productos?categoria=mujer" },
+          { label: "Zapatillas", to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas" }) },
+          { label: "Sandalias", to: buildProductsRoute({ categoria: "mujer", tipo: "sandalias" }) },
+          { label: "Zapatos Casuales", to: buildProductsRoute({ categoria: "mujer", tipo: "casual" }) },
+          { label: "Zapatos de Vestir", to: buildProductsRoute({ categoria: "mujer", tipo: "formal" }) },
+          { label: "Mocasines", to: buildProductsRoute({ categoria: "mujer", tipo: "mocasines" }) },
+          { label: "Botas y Botines", to: buildProductsRoute({ categoria: "mujer", tipo: "botas" }) },
+          { label: "Ballerinas", to: buildProductsRoute({ categoria: "mujer", tipo: "ballerinas" }) },
+          { label: "Pantuflas", to: buildProductsRoute({ categoria: "mujer", tipo: "pantuflas" }) },
+          { label: "Flip Flops", to: buildProductsRoute({ categoria: "mujer", tipo: "flip-flops" }) },
+          { label: "Ver Todo", to: buildProductsRoute({ categoria: "mujer" }) },
         ],
       },
     ],
-    promo: { eyebrow: "NEW ARRIVALS", title: "Essential Summer", subtitle: "Mujer" },
+    promo: {
+      eyebrow: "NEW ARRIVALS",
+      title: "Essential Summer",
+      subtitle: "Mujer",
+      to: buildProductsRoute({ categoria: "mujer" }),
+    },
   },
   {
     id: "hombre",
     label: "Hombre",
+    featured: [
+      {
+        label: "Nuevas Tendencias",
+        to: buildProductsRoute({ categoria: "hombre", campana: "nueva-temporada" }),
+        hoverPanel: {
+          eyebrow: "NEW & TRENDING",
+          items: [
+            { label: "Nueva Temporada", to: buildProductsRoute({ categoria: "hombre", campana: "nueva-temporada" }) },
+            { label: "Ruta Urbana", to: buildProductsRoute({ categoria: "hombre", coleccion: "ruta-urbana" }) },
+            { label: "Paso Ejecutivo", to: buildProductsRoute({ categoria: "hombre", coleccion: "paso-ejecutivo" }) },
+            { label: "Weekend Flow", to: buildProductsRoute({ categoria: "hombre", coleccion: "weekend-flow" }) },
+          ],
+        },
+      },
+      {
+        label: "Calzado Hombre",
+        to: buildProductsRoute({ categoria: "hombre" }),
+        accent: true,
+      },
+      {
+        label: "Marcas",
+        to: buildProductsRoute({ vista: "marcas" }),
+        hoverPanel: {
+          eyebrow: "MARCAS",
+          items: [
+            { label: "Calzatura Vilchez", to: buildBrandRoute("Calzatura Vilchez") },
+            { label: "Bata", to: buildBrandRoute("Bata") },
+            { label: "Clarks", to: buildBrandRoute("Clarks") },
+            { label: "Adidas", to: buildBrandRoute("Adidas") },
+          ],
+        },
+      },
+    ],
     columns: [
       {
         title: "CALZADO HOMBRE",
         links: [
-          { label: "Zapatillas", to: "/productos?categoria=hombre&buscar=zapatillas" },
-          { label: "Zapatos de Vestir", to: "/productos?categoria=hombre&buscar=formal" },
-          { label: "Zapatos Casuales", to: "/productos?categoria=hombre&buscar=casual" },
-          { label: "Sandalias", to: "/productos?categoria=hombre&buscar=sandalias" },
-          { label: "Botines", to: "/productos?categoria=hombre&buscar=botines" },
-          { label: "Zapatos de Seguridad", to: "/productos?categoria=hombre&buscar=seguridad" },
-          { label: "Pantuflas", to: "/productos?categoria=hombre&buscar=pantuflas" },
-          { label: "Ver Todo", to: "/productos?categoria=hombre" },
+          { label: "Zapatillas", to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas" }) },
+          { label: "Zapatos de Vestir", to: buildProductsRoute({ categoria: "hombre", tipo: "formal" }) },
+          { label: "Zapatos Casuales", to: buildProductsRoute({ categoria: "hombre", tipo: "casual" }) },
+          { label: "Sandalias", to: buildProductsRoute({ categoria: "hombre", tipo: "sandalias" }) },
+          { label: "Botines", to: buildProductsRoute({ categoria: "hombre", tipo: "botines" }) },
+          { label: "Zapatos de Seguridad", to: buildProductsRoute({ categoria: "hombre", tipo: "seguridad" }) },
+          { label: "Pantuflas", to: buildProductsRoute({ categoria: "hombre", tipo: "pantuflas" }) },
+          { label: "Ver Todo", to: buildProductsRoute({ categoria: "hombre" }) },
         ],
       },
     ],
-    promo: { eyebrow: "NUEVA COLECCIÓN", title: "Urban Classics", subtitle: "Hombre" },
+    promo: {
+      eyebrow: "NUEVA COLECCIÓN",
+      title: "Urban Classics",
+      subtitle: "Hombre",
+      to: buildProductsRoute({ categoria: "hombre" }),
+    },
   },
   {
     id: "infantil",
     label: "Infantil",
+    featured: [
+      {
+        label: "Nuevas Tendencias",
+        to: buildProductsRoute({ categoria: "nino", campana: "nueva-temporada" }),
+        hoverPanel: {
+          eyebrow: "NEW & TRENDING",
+          items: [
+            { label: "Nueva Temporada", to: buildProductsRoute({ categoria: "nino", campana: "nueva-temporada" }) },
+            { label: "Vuelta al Cole", to: buildProductsRoute({ categoria: "nino", coleccion: "vuelta-al-cole" }) },
+            { label: "Paso Activo", to: buildProductsRoute({ categoria: "nino", tipo: "zapatillas" }) },
+            { label: "Mini Aventuras", to: buildProductsRoute({ categoria: "nino", coleccion: "mini-aventuras" }) },
+          ],
+        },
+      },
+      {
+        label: "Niños",
+        to: buildProductsRoute({ categoria: "nino", segmento: "ninos" }),
+        accent: true,
+        hoverPanel: {
+          eyebrow: "NIÑOS",
+          layout: "list",
+          items: [
+            { label: "Infantil 1-3 Años", to: buildProductsRoute({ categoria: "nino", rangoEdad: "1-3" }) },
+            { label: "Niños 4-6 años", to: buildProductsRoute({ categoria: "nino", segmento: "ninos" }) },
+            { label: "Junior 7-10 Años", to: buildProductsRoute({ categoria: "nino", segmento: "junior" }) },
+            { label: "Accesorios", to: buildProductsRoute({ categoria: "nino", tipo: "accesorios" }) },
+            { label: "Zapatos", to: buildProductsRoute({ categoria: "nino", tipo: "zapatos" }) },
+            { label: "Ver Todo", to: buildProductsRoute({ categoria: "nino" }) },
+          ],
+        },
+      },
+      {
+        label: "Niñas",
+        to: buildProductsRoute({ categoria: "nino", segmento: "ninas" }),
+        hoverPanel: {
+          eyebrow: "NIÑAS",
+          layout: "list",
+          items: [
+            { label: "Escolar", to: buildProductsRoute({ categoria: "nino", segmento: "ninas", tipo: "escolar" }) },
+            { label: "Zapatillas", to: buildProductsRoute({ categoria: "nino", segmento: "ninas", tipo: "zapatillas" }) },
+            { label: "Ballerinas", to: buildProductsRoute({ categoria: "nino", segmento: "ninas", tipo: "ballerinas" }) },
+            { label: "Botas y Botines", to: buildProductsRoute({ categoria: "nino", segmento: "ninas", tipo: "botas" }) },
+            { label: "Sandalias", to: buildProductsRoute({ categoria: "nino", segmento: "ninas", tipo: "sandalias" }) },
+            { label: "Zapatos", to: buildProductsRoute({ categoria: "nino", segmento: "ninas", tipo: "zapatos" }) },
+            { label: "Ver Todo", to: buildProductsRoute({ categoria: "nino", segmento: "ninas" }) },
+          ],
+        },
+      },
+      {
+        label: "Marcas",
+        to: buildProductsRoute({ vista: "marcas" }),
+        hoverPanel: {
+          eyebrow: "MARCAS",
+          items: [
+            { label: "Calzatura Vilchez", to: buildBrandRoute("Calzatura Vilchez") },
+            { label: "Bata", to: buildBrandRoute("Bata") },
+            { label: "Platanitos", to: buildBrandRoute("Platanitos") },
+            { label: "Adidas", to: buildBrandRoute("Adidas") },
+          ],
+        },
+      },
+    ],
     columns: [
       {
         title: "CALZADO NIÑO",
         links: [
-          { label: "Escolar", to: "/productos?categoria=nino&buscar=escolar" },
-          { label: "Sandalias", to: "/productos?categoria=nino&buscar=sandalias" },
-          { label: "Zapatillas", to: "/productos?categoria=nino&buscar=zapatillas" },
-          { label: "Ver Todo", to: "/productos?categoria=nino" },
+          { label: "Escolar", to: buildProductsRoute({ categoria: "nino", tipo: "escolar" }) },
+          { label: "Sandalias", to: buildProductsRoute({ categoria: "nino", tipo: "sandalias" }) },
+          { label: "Zapatillas", to: buildProductsRoute({ categoria: "nino", tipo: "zapatillas" }) },
+          { label: "Ver Todo", to: buildProductsRoute({ categoria: "nino" }) },
         ],
       },
       {
         title: "NIÑO",
         links: [
-          { label: "Infantil 1-3 Años", to: "/productos?categoria=nino&buscar=infantil" },
-          { label: "Niños 4-6 años", to: "/productos?categoria=nino&buscar=ninos" },
-          { label: "Junior 7-10 Años", to: "/productos?categoria=nino&buscar=junior" },
-          { label: "Accesorios", to: "/productos?categoria=nino&buscar=accesorios" },
-          { label: "Zapatos", to: "/productos?categoria=nino&buscar=zapatos" },
-          { label: "Ver Todo", to: "/productos?categoria=nino" },
+          { label: "Infantil 1-3 Años", to: buildProductsRoute({ categoria: "nino", rangoEdad: "1-3" }) },
+          { label: "Niños 4-6 años", to: buildProductsRoute({ categoria: "nino", segmento: "ninos" }) },
+          { label: "Junior 7-10 Años", to: buildProductsRoute({ categoria: "nino", segmento: "junior" }) },
+          { label: "Accesorios", to: buildProductsRoute({ categoria: "nino", tipo: "accesorios" }) },
+          { label: "Zapatos", to: buildProductsRoute({ categoria: "nino", tipo: "zapatos" }) },
+          { label: "Ver Todo", to: buildProductsRoute({ categoria: "nino" }) },
         ],
       },
     ],
-    promo: { eyebrow: "KIDS", title: "Listos para jugar", subtitle: "Infantil" },
+    promo: {
+      eyebrow: "KIDS",
+      title: "Listos para jugar",
+      subtitle: "Infantil",
+      to: buildProductsRoute({ categoria: "nino" }),
+    },
   },
   {
     id: "zapatillas",
     label: "Zapatillas",
     featured: [
-      { label: "Zapatillas Mujer", to: "/productos?categoria=mujer&buscar=zapatillas", tag: "+ Estilos" },
-      { label: "Zapatillas Hombre", to: "/productos?categoria=hombre&buscar=zapatillas", tag: "+ Estilos" },
-      { label: "Zapatillas Blancas", to: "/productos?buscar=zapatillas blancas", tag: "+ Buscadas" },
+      {
+        label: "Zapatillas Mujer",
+        to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas" }),
+        tag: "+ Estilos",
+        hoverPanel: {
+          eyebrow: "ZAPATILLAS MUJER",
+          items: [
+            { label: "Urbanas", to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas", estilo: "urbanas" }) },
+            { label: "Deportivas", to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas", estilo: "deportivas" }) },
+            { label: "Casuales", to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas", estilo: "casuales" }) },
+            { label: "Outdoor", to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas", estilo: "outdoor" }) },
+            { label: "Ver Todo", to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas" }) },
+          ],
+        },
+      },
+      {
+        label: "Zapatillas Hombre",
+        to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas" }),
+        tag: "+ Estilos",
+        hoverPanel: {
+          eyebrow: "ZAPATILLAS HOMBRE",
+          items: [
+            { label: "Urbanas", to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas", estilo: "urbanas" }) },
+            { label: "Deportivas", to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas", estilo: "deportivas" }) },
+            { label: "Casuales", to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas", estilo: "casuales" }) },
+            { label: "Outdoor", to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas", estilo: "outdoor" }) },
+            { label: "Ver Todo", to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas" }) },
+          ],
+        },
+      },
+      {
+        label: "Zapatillas Blancas",
+        to: buildProductsRoute({ linea: "zapatillas", color: "blanco" }),
+        tag: "+ Buscadas",
+        hoverPanel: {
+          eyebrow: "ZAPATILLAS BLANCAS",
+          items: [
+            { label: "Mujer", to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas", color: "blanco" }) },
+            { label: "Hombre", to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas", color: "blanco" }) },
+            { label: "Niños", to: buildProductsRoute({ categoria: "nino", tipo: "zapatillas", color: "blanco" }) },
+            { label: "Juvenil", to: buildProductsRoute({ categoria: "nino", segmento: "juvenil", tipo: "zapatillas", color: "blanco" }) },
+          ],
+        },
+      },
     ],
     columns: [],
-    chips: {
-      title: "+ ZAPATILLAS",
-      items: [
-        { label: "Urbanas", to: "/productos?buscar=zapatillas urbanas" },
-        { label: "Deportivas", to: "/productos?categoria=deportivo&buscar=zapatillas" },
-        { label: "Casuales", to: "/productos?categoria=casual&buscar=zapatillas" },
-        { label: "Outdoor", to: "/productos?buscar=outdoor" },
-      ],
-    },
   },
   {
     id: "marcas",
     label: "Marcas",
     featured: [
-      { label: "Calzatura Vilchez", to: "/productos?vista=marcas&marca=Calzatura%20Vilchez", accent: true },
-      { label: "Nuevas Marcas", to: "/productos?vista=marcas" },
-      { label: "Más Vendidas", to: "/productos?buscar=destacado" },
+      { label: "Calzatura Vilchez", to: buildBrandRoute("Calzatura Vilchez"), accent: true },
+      { label: "Nuevas Marcas", to: buildProductsRoute({ vista: "marcas" }) },
+      { label: "Más Vendidas", to: buildProductsRoute({ promocion: "destacados" }) },
     ],
     columns: [
       {
         title: "MARCAS",
         links: [
-          { label: "Todas las marcas", to: "/productos?vista=marcas" },
-          { label: "Dama", to: "/productos?categoria=mujer" },
-          { label: "Hombre", to: "/productos?categoria=hombre" },
-          { label: "Infantil", to: "/productos?categoria=nino" },
-          { label: "Ver Todo", to: "/productos" },
+          { label: "Todas las marcas", to: buildProductsRoute({ vista: "marcas" }) },
+          { label: "Dama", to: buildProductsRoute({ categoria: "mujer" }) },
+          { label: "Hombre", to: buildProductsRoute({ categoria: "hombre" }) },
+          { label: "Infantil", to: buildProductsRoute({ categoria: "nino" }) },
+          { label: "Ver Todo", to: buildProductsRoute({}) },
         ],
       },
     ],
-    promo: { eyebrow: "BRANDS", title: "Selección premium", subtitle: "Marcas" },
+    promo: {
+      eyebrow: "BRANDS",
+      title: "Selección premium",
+      subtitle: "Marcas",
+      to: buildProductsRoute({ vista: "marcas" }),
+    },
   },
 ];
 
 function MegaMenuPanel({
   menu,
   onClose,
+  isLinkCurrent,
 }: {
   menu: MegaMenu;
   onClose: () => void;
+  isLinkCurrent: (to: string) => boolean;
 }) {
+  const preferredDefaultLabel = useMemo(() => {
+    if (menu.id === "zapatillas") return "Zapatillas Hombre";
+    if (menu.id === "cyber") return "Cyber Hombre";
+    return null;
+  }, [menu.id]);
+
+  const defaultFeaturedHoverItem = useMemo(() => {
+    if (!preferredDefaultLabel) return null;
+    const preferred = (menu.featured ?? []).find((item) => item.label === preferredDefaultLabel);
+    return preferred?.hoverPanel?.items[0] ?? null;
+  }, [menu.featured, preferredDefaultLabel]);
+
+  const defaultFeaturedHoverPanel = useMemo(() => {
+    if (!preferredDefaultLabel) return null;
+    return (menu.featured ?? []).find((item) => item.label === preferredDefaultLabel)?.hoverPanel ?? null;
+  }, [menu.featured, preferredDefaultLabel]);
+
+  const [activeHoverPanel, setActiveHoverPanel] = useState<MegaLink["hoverPanel"] | null>(() => defaultFeaturedHoverPanel);
+  const [activeHoverItem, setActiveHoverItem] = useState<MegaLink | null>(() => defaultFeaturedHoverItem);
+
   return (
     <div className="mega-menu-panel" onMouseEnter={() => undefined}>
       <button type="button" className="mega-close" onClick={onClose} aria-label="Cerrar menú">
@@ -223,55 +528,134 @@ function MegaMenuPanel({
       <div className="mega-inner">
         <div className="mega-featured">
           {(menu.featured ?? []).map((item) => (
-            <Link
+            <div
               key={`${menu.id}-${item.label}`}
-              to={item.to}
-              className={`mega-featured-link ${item.accent ? "accent" : ""}`}
-              onClick={onClose}
+              className={`mega-featured-item ${item.hoverPanel ? "has-hover-panel" : ""}`}
+              onMouseEnter={() => {
+                setActiveHoverPanel(item.hoverPanel ?? null);
+                setActiveHoverItem(item.hoverPanel?.items[0] ?? null);
+              }}
+              onFocus={() => {
+                setActiveHoverPanel(item.hoverPanel ?? null);
+                setActiveHoverItem(item.hoverPanel?.items[0] ?? null);
+              }}
             >
-              <span>{item.label}</span>
-              {item.tag && <small>{item.tag}</small>}
-            </Link>
-          ))}
-
-          <div className="mega-service-links">
-            <Link to="/tiendas" onClick={onClose}><MapPin size={18} /> Tiendas</Link>
-            <Link to="/mis-pedidos" onClick={onClose}><Box size={18} /> Localiza tu pedido</Link>
-            <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noreferrer" onClick={onClose}><Phone size={18} /> Contáctanos</a>
-            <hr />
-            <Link to="/perfil" onClick={onClose}><User size={18} /> Mi cuenta</Link>
-            <Link to="/favoritos" onClick={onClose}><Heart size={18} /> Favoritos</Link>
-          </div>
-        </div>
-
-        <div className="mega-columns">
-          {menu.columns.map((column) => (
-            <div className="mega-column" key={`${menu.id}-${column.title}`}>
-              {column.title && <p className="mega-column-title">{column.title}</p>}
-              {column.links.map((item) => (
-                <Link key={item.label} to={item.to} onClick={onClose}>
-                  {item.label}
-                </Link>
-              ))}
+              <Link
+                to={item.to}
+                className={`mega-featured-link ${item.accent ? "accent" : ""} ${isLinkCurrent(item.to) ? "is-current" : ""}`}
+                onClick={onClose}
+                aria-current={isLinkCurrent(item.to) ? "page" : undefined}
+              >
+                <span>{item.label}</span>
+                {item.tag && <small>{item.tag}</small>}
+              </Link>
             </div>
           ))}
 
-          {menu.chips && (
-            <div className="mega-chip-zone">
-              <p className="mega-column-title">{menu.chips.title}</p>
-              <div className="mega-chip-grid">
-                {menu.chips.items.map((item) => (
-                  <Link key={item.label} to={item.to} onClick={onClose}>
-                    {item.label}
+          <div className="mega-service-links">
+            <Link to={PUBLIC_ROUTES.stores} onClick={onClose}><MapPin size={18} /> Tiendas</Link>
+            <Link to={INFO_ROUTES.ayudaRastreoPedido} onClick={onClose}><Box size={18} /> Localiza tu pedido</Link>
+            <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noreferrer" onClick={onClose}><Phone size={18} /> Contáctanos</a>
+            <hr />
+            <Link to={CLIENT_ROUTES.profile} onClick={onClose}><User size={18} /> Mi cuenta</Link>
+            <Link to={CLIENT_ROUTES.favorites} onClick={onClose}><Heart size={18} /> Favoritos</Link>
+          </div>
+        </div>
+
+        <div
+          className={`mega-columns ${activeHoverPanel ? "panel-open" : ""}`}
+          onMouseEnter={() => {
+            if (activeHoverPanel) return;
+            if (!defaultFeaturedHoverPanel && !defaultFeaturedHoverItem) return;
+            setActiveHoverPanel(defaultFeaturedHoverPanel);
+            setActiveHoverItem(defaultFeaturedHoverItem);
+          }}
+        >
+          {activeHoverPanel ? (
+            <div className="mega-hover-panel" role="menu" aria-label={activeHoverPanel.eyebrow}>
+              <p className="mega-hover-panel-title">{activeHoverPanel.eyebrow}</p>
+              <div
+                className={`mega-hover-panel-${activeHoverPanel.layout === "list" ? "list" : "grid"}`}
+              >
+                {activeHoverPanel.items.map((panelItem) => (
+                  <Link
+                    key={panelItem.label}
+                    to={panelItem.to}
+                    onClick={onClose}
+                    onMouseEnter={() => setActiveHoverItem(panelItem)}
+                    onFocus={() => setActiveHoverItem(panelItem)}
+                    className={isLinkCurrent(panelItem.to) ? "is-current" : ""}
+                    aria-current={isLinkCurrent(panelItem.to) ? "page" : undefined}
+                  >
+                    {panelItem.label}
                   </Link>
                 ))}
               </div>
             </div>
+          ) : (
+            <>
+              {menu.columns.map((column) => (
+                <div className="mega-column" key={`${menu.id}-${column.title}`}>
+                  {column.title && <p className="mega-column-title">{column.title}</p>}
+                  {column.links.map((item) => (
+                    <Link
+                      key={item.label}
+                      to={item.to}
+                      onClick={onClose}
+                      className={isLinkCurrent(item.to) ? "is-current" : ""}
+                      aria-current={isLinkCurrent(item.to) ? "page" : undefined}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              ))}
+
+              {menu.chips && (
+                <div className="mega-chip-zone">
+                  <p className="mega-column-title">{menu.chips.title}</p>
+                  <div className="mega-chip-grid">
+                    {menu.chips.items.map((item) => (
+                      <Link
+                        key={item.label}
+                        to={item.to}
+                        onClick={onClose}
+                        className={isLinkCurrent(item.to) ? "is-current" : ""}
+                        aria-current={isLinkCurrent(item.to) ? "page" : undefined}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        {menu.promo && (
-          <Link to="/productos" className="mega-promo" onClick={onClose}>
+        {activeHoverItem?.image ? (
+          <Link
+            to={activeHoverItem.to}
+            className="mega-trend-preview"
+            onClick={onClose}
+          >
+            <img
+              src={activeHoverItem.image}
+              alt={activeHoverItem.label}
+              className="mega-trend-preview-image"
+            />
+            <div className="mega-trend-preview-copy">
+              <span>{activeHoverPanel?.eyebrow ?? "NEW & TRENDING"}</span>
+              <strong>{activeHoverItem.label}</strong>
+            </div>
+          </Link>
+        ) : menu.promo && (
+          <Link
+            to={menu.promo.to ?? PUBLIC_ROUTES.products}
+            className={`mega-promo ${isLinkCurrent(menu.promo.to ?? PUBLIC_ROUTES.products) ? "is-current" : ""}`}
+            onClick={onClose}
+            aria-current={isLinkCurrent(menu.promo.to ?? PUBLIC_ROUTES.products) ? "page" : undefined}
+          >
             <span>{menu.promo.eyebrow}</span>
             <strong>{menu.promo.title}</strong>
             <small>{menu.promo.subtitle}</small>
@@ -283,9 +667,10 @@ function MegaMenuPanel({
 }
 
 export default function Header() {
-  const { user, userProfile, isAdmin } = useAuth();
+  const { user, userProfile, isAdmin, hasVerifiedAccess, requiresEmailVerification } = useAuth();
   const { itemCount, setIsOpen: setCartOpen } = useCart();
   const { theme, toggleTheme } = useThemeMode();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -298,6 +683,97 @@ export default function Header() {
   const [mobileMenuMode, setMobileMenuMode] = useState<MobileMenuMode>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const activeMenu = megaMenus.find((menu) => menu.id === activeMenuId) ?? null;
+  const currentCategory = normalizeRouteToken(searchParams.get("categoria"));
+  const currentView = normalizeRouteToken(searchParams.get("vista"));
+  const currentSearch = normalizeRouteToken(searchParams.get("buscar"));
+  const currentBrand = normalizeRouteToken(searchParams.get("marca"));
+  const currentBrandSlug = normalizeRouteToken(searchParams.get("marcaSlug"));
+  const currentCampaign = normalizeRouteToken(searchParams.get("campana"));
+  const currentCollection = normalizeRouteToken(searchParams.get("coleccion"));
+  const currentStyle = normalizeRouteToken(searchParams.get("estilo"));
+  const currentType = normalizeRouteToken(searchParams.get("tipo"));
+  const currentLine = normalizeRouteToken(searchParams.get("linea"));
+  const currentSegment = normalizeRouteToken(searchParams.get("segmento"));
+  const currentColor = normalizeRouteToken(searchParams.get("color"));
+  const currentPromotion = normalizeRouteToken(searchParams.get("promocion"));
+  const hasProductFilters = Boolean(
+    currentCategory ||
+      currentView ||
+      currentSearch ||
+      currentBrand ||
+      currentBrandSlug ||
+      currentCampaign ||
+      currentCollection ||
+      currentStyle ||
+      currentType ||
+      currentLine ||
+      currentSegment ||
+      currentColor ||
+      currentPromotion
+  );
+
+  const currentRouteMenuId = useMemo(() => {
+    if (location.pathname !== PUBLIC_ROUTES.products) return null;
+    if (currentView === "marcas" || currentBrand || currentBrandSlug) return "marcas";
+    if (
+      currentCampaign === "cyber" ||
+      currentPromotion === "oferta" ||
+      currentPromotion === "destacados" ||
+      currentSearch.includes("cyber") ||
+      currentSearch.includes("oferta") ||
+      currentSearch.includes("destacado")
+    ) {
+      return "cyber";
+    }
+    if (
+      currentLine === "zapatillas" ||
+      currentType === "zapatillas" ||
+      (currentColor === "blanco" &&
+        (currentLine === "zapatillas" || currentType === "zapatillas" || currentSearch.includes("zapatillas"))) ||
+      currentSearch.includes("zapatillas")
+    ) {
+      return "zapatillas";
+    }
+    if (currentCategory === "mujer") return "mujer";
+    if (currentCategory === "hombre") return "hombre";
+    if (currentCategory === "nino") return "infantil";
+    return null;
+  }, [
+    currentBrand,
+    currentBrandSlug,
+    currentCampaign,
+    currentCategory,
+    currentColor,
+    currentLine,
+    currentPromotion,
+    currentSearch,
+    currentType,
+    currentView,
+    location.pathname,
+  ]);
+
+  const isLinkCurrent = useMemo(() => {
+    return (to: string) => {
+      const target = new URL(to, "https://calzatura.local");
+      if (target.pathname !== location.pathname) return false;
+
+      const targetParams = new URLSearchParams(target.search);
+      const entries = Array.from(targetParams.entries());
+
+      if (entries.length === 0) {
+        if (target.pathname === "/productos") return !hasProductFilters;
+        return true;
+      }
+
+      return entries.every(([key, value]) => {
+        const expected = normalizeRouteToken(value);
+        const current = normalizeRouteToken(searchParams.get(key));
+        if (!current) return false;
+        if (key === "buscar" || key === "marca") return current.includes(expected);
+        return current === expected;
+      });
+    };
+  }, [hasProductFilters, location.pathname, searchParams]);
 
   useEffect(() => {
     fetchProducts()
@@ -337,7 +813,7 @@ export default function Header() {
     closeMegaMenu();
     try {
       await logoutUser();
-      navigate("/");
+      navigate(PUBLIC_ROUTES.home);
       toast.success("Sesión cerrada");
     } catch {
       toast.error("Error al cerrar sesión");
@@ -375,10 +851,10 @@ export default function Header() {
     const query = headerSearch.trim();
     closeMegaMenu();
     if (!query) {
-      navigate("/productos");
+      navigate(PUBLIC_ROUTES.products);
       return;
     }
-    navigate(`/productos?buscar=${encodeURIComponent(query)}`);
+    navigate(`${PUBLIC_ROUTES.products}?buscar=${encodeURIComponent(query)}`);
   };
 
   const selectSuggestion = (product: Product) => {
@@ -428,11 +904,14 @@ export default function Header() {
               <button
                 key={menu.id}
                 type="button"
-                className={`nav-link mega-nav-trigger ${activeMenuId === menu.id ? "active" : ""}`}
+                className={`nav-link mega-nav-trigger ${activeMenuId === menu.id ? "active" : ""} ${
+                  currentRouteMenuId === menu.id ? "route-current" : ""
+                }`}
                 onMouseEnter={() => setActiveMenuId(menu.id)}
                 onFocus={() => setActiveMenuId(menu.id)}
                 onClick={() => setActiveMenuId((current) => current === menu.id ? null : menu.id)}
                 aria-expanded={activeMenuId === menu.id}
+                aria-current={currentRouteMenuId === menu.id ? "page" : undefined}
               >
                 {menu.label}
                 {menu.id === "cyber" && <span className="mega-fire" aria-hidden="true">🔥</span>}
@@ -441,13 +920,12 @@ export default function Header() {
           </nav>
 
           <Link to="/" className="logo" onClick={closeMegaMenu}>
-            <span className="logo-sunflower">
-              <SunflowerIcon size={34} />
-            </span>
-            <span className="logo-text-wrap">
-              <span className="logo-name">Calzatura Vilchez</span>
-              <span className="logo-sub">Calzado Premium</span>
-            </span>
+            <BrandLogo
+              className="brand-logo brand-logo--header"
+              variant={HEADER_LOGO_VARIANT}
+              mode={theme === "dark" ? "dark" : "light"}
+              layout="horizontal"
+            />
           </Link>
 
           <form className="header-search" onSubmit={handleHeaderSearch}>
@@ -530,19 +1008,33 @@ export default function Header() {
                     </div>
                     <div className="user-dropdown-items">
                       {isAdmin && (
-                        <Link to="/admin" className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
+                        <Link to={ADMIN_ROUTES.dashboard} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
                           <LayoutDashboard size={16} />
                           Panel Admin
                         </Link>
                       )}
-                      <Link to="/mis-pedidos" className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
-                        <Package size={16} />
-                        Mis Pedidos
-                      </Link>
-                      <Link to="/perfil" className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
-                        <User size={16} />
-                        Mi Perfil
-                      </Link>
+                      {hasVerifiedAccess ? (
+                        <>
+                          <Link to={CLIENT_ROUTES.orderHistory} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
+                            <Package size={16} />
+                            Mis Pedidos
+                          </Link>
+                          <Link to={CLIENT_ROUTES.profile} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
+                            <User size={16} />
+                            Mi Perfil
+                          </Link>
+                        </>
+                      ) : requiresEmailVerification ? (
+                        <Link
+                          to={PUBLIC_ROUTES.verifyEmail}
+                          className="dropdown-item"
+                          onClick={() => setUserMenuOpen(false)}
+                          role="menuitem"
+                        >
+                          <User size={16} />
+                          Verificar Correo
+                        </Link>
+                      ) : null}
                       <hr className="dropdown-divider" />
                       <button onClick={handleLogout} className="dropdown-item dropdown-logout" role="menuitem">
                         <LogOut size={16} />
@@ -554,8 +1046,8 @@ export default function Header() {
               </div>
             ) : (
               <div className="auth-btns">
-                <Link to="/login" className="btn-login" onClick={closeMegaMenu}>Iniciar Sesión</Link>
-                <Link to="/registro" className="btn-register" onClick={closeMegaMenu}>Registrarse</Link>
+                <Link to={PUBLIC_ROUTES.login} className="btn-login" onClick={closeMegaMenu}>Iniciar Sesión</Link>
+                <Link to={PUBLIC_ROUTES.register} className="btn-register" onClick={closeMegaMenu}>Registrarse</Link>
               </div>
             )}
 
@@ -572,7 +1064,7 @@ export default function Header() {
           </div>
         </div>
 
-        {activeMenu && <MegaMenuPanel menu={activeMenu} onClose={closeMegaMenu} />}
+        {activeMenu && <MegaMenuPanel key={activeMenu.id} menu={activeMenu} onClose={closeMegaMenu} isLinkCurrent={isLinkCurrent} />}
 
         {mobileOpen && (
           <nav
@@ -589,10 +1081,13 @@ export default function Header() {
               >
                 <button
                   type="button"
-                  className={`nav-mobile-link nav-mobile-trigger ${activeMobileMenuId === menu.id ? "active" : ""}`}
+                  className={`nav-mobile-link nav-mobile-trigger ${activeMobileMenuId === menu.id ? "active" : ""} ${
+                    currentRouteMenuId === menu.id ? "route-current" : ""
+                  }`}
                   onClick={() => setActiveMobileMenuId((current) => current === menu.id ? null : menu.id)}
                   onFocus={() => setActiveMobileMenuId(menu.id)}
                   aria-expanded={activeMobileMenuId === menu.id}
+                  aria-current={currentRouteMenuId === menu.id ? "page" : undefined}
                 >
                   <span>{menu.label}</span>
                   <ChevronDown size={18} className="nav-mobile-chevron" />
@@ -600,33 +1095,95 @@ export default function Header() {
 
                 {activeMobileMenuId === menu.id && (
                   <div className="nav-mobile-panel">
-                    {[...(menu.featured ?? []), ...menu.columns.flatMap((column) => column.links), ...(menu.chips?.items ?? [])].map((item) => (
-                      <Link
-                        key={`${menu.id}-${item.label}`}
-                        to={item.to}
-                        className="nav-mobile-sublink"
-                        onClick={closeMobileMenu}
-                      >
-                        <span>{item.label}</span>
-                        {item.tag && <small>{item.tag}</small>}
-                      </Link>
+                    {(menu.featured ?? []).map((item) => (
+                      <div key={`${menu.id}-featured-${item.label}`} className="nav-mobile-subgroup">
+                        <Link
+                          to={item.to}
+                          className={`nav-mobile-sublink nav-mobile-sublink--group ${item.accent ? "accent" : ""} ${isLinkCurrent(item.to) ? "is-current" : ""}`}
+                          onClick={closeMobileMenu}
+                          aria-current={isLinkCurrent(item.to) ? "page" : undefined}
+                        >
+                          <span>{item.label}</span>
+                          {item.tag && <small>{item.tag}</small>}
+                        </Link>
+
+                        {item.hoverPanel?.items?.length ? (
+                          <div className={`nav-mobile-subchildren nav-mobile-subchildren--${item.hoverPanel.layout === "grid" ? "grid" : "list"}`}>
+                            {item.hoverPanel.items.map((panelItem) => (
+                              <Link
+                                key={`${menu.id}-${item.label}-${panelItem.label}`}
+                                to={panelItem.to}
+                                className={`nav-mobile-sublink nav-mobile-sublink--child ${isLinkCurrent(panelItem.to) ? "is-current" : ""}`}
+                                onClick={closeMobileMenu}
+                                aria-current={isLinkCurrent(panelItem.to) ? "page" : undefined}
+                              >
+                                <span>{panelItem.label}</span>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                     ))}
+
+                    {menu.columns.map((column) => (
+                      <div key={`${menu.id}-column-${column.title ?? "links"}`} className="nav-mobile-subgroup">
+                        {column.title ? <p className="nav-mobile-subtitle">{column.title}</p> : null}
+                        <div className="nav-mobile-subchildren nav-mobile-subchildren--list">
+                          {column.links.map((item) => (
+                            <Link
+                              key={`${menu.id}-${column.title}-${item.label}`}
+                              to={item.to}
+                              className={`nav-mobile-sublink nav-mobile-sublink--child ${isLinkCurrent(item.to) ? "is-current" : ""}`}
+                              onClick={closeMobileMenu}
+                              aria-current={isLinkCurrent(item.to) ? "page" : undefined}
+                            >
+                              <span>{item.label}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+
+                    {menu.chips?.items?.length ? (
+                      <div className="nav-mobile-subgroup">
+                        {menu.chips.title ? <p className="nav-mobile-subtitle">{menu.chips.title}</p> : null}
+                        <div className="nav-mobile-subchildren nav-mobile-subchildren--grid">
+                          {menu.chips.items.map((item) => (
+                            <Link
+                              key={`${menu.id}-chip-${item.label}`}
+                              to={item.to}
+                              className={`nav-mobile-sublink nav-mobile-sublink--child ${isLinkCurrent(item.to) ? "is-current" : ""}`}
+                              onClick={closeMobileMenu}
+                              aria-current={isLinkCurrent(item.to) ? "page" : undefined}
+                            >
+                              <span>{item.label}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 )}
               </div>
             ))}
             <div className="nav-mobile-footer-links">
-              <Link to="/tiendas" className="nav-mobile-link" onClick={closeMobileMenu}><MapPin size={18} /> Tiendas</Link>
-              <Link to="/mis-pedidos" className="nav-mobile-link" onClick={closeMobileMenu}><Box size={18} /> Localiza tu pedido</Link>
-              <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noreferrer" className="nav-mobile-link" onClick={closeMobileMenu}><Phone size={18} /> Contactanos</a>
+              <Link to={PUBLIC_ROUTES.stores} className="nav-mobile-link" onClick={closeMobileMenu}><MapPin size={18} /> Tiendas</Link>
+              <Link to={INFO_ROUTES.ayudaRastreoPedido} className="nav-mobile-link" onClick={closeMobileMenu}><Box size={18} /> Localiza tu pedido</Link>
+              <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noreferrer" className="nav-mobile-link" onClick={closeMobileMenu}><Phone size={18} /> Contáctanos</a>
               <span className="nav-mobile-divider" aria-hidden="true" />
-              <Link to={user ? "/perfil" : "/login"} className="nav-mobile-link" onClick={closeMobileMenu}><User size={18} /> Mi cuenta</Link>
-              <Link to="/favoritos" className="nav-mobile-link" onClick={closeMobileMenu}><Heart size={18} /> Favoritos</Link>
+              <Link
+                to={user ? (hasVerifiedAccess ? CLIENT_ROUTES.profile : PUBLIC_ROUTES.verifyEmail) : PUBLIC_ROUTES.login}
+                className="nav-mobile-link"
+                onClick={closeMobileMenu}
+              >
+                <User size={18} /> {user && !hasVerifiedAccess ? "Verificar correo" : "Mi cuenta"}
+              </Link>
+              <Link to={CLIENT_ROUTES.favorites} className="nav-mobile-link" onClick={closeMobileMenu}><Heart size={18} /> Favoritos</Link>
             </div>
             {!user && (
               <>
-                <Link to="/login" className="nav-mobile-link" onClick={closeMobileMenu}>Iniciar Sesión</Link>
-                <Link to="/registro" className="nav-mobile-link" onClick={closeMobileMenu}>Registrarse</Link>
+                <Link to={PUBLIC_ROUTES.login} className="nav-mobile-link" onClick={closeMobileMenu}>Iniciar Sesión</Link>
+                <Link to={PUBLIC_ROUTES.register} className="nav-mobile-link" onClick={closeMobileMenu}>Registrarse</Link>
               </>
             )}
           </nav>

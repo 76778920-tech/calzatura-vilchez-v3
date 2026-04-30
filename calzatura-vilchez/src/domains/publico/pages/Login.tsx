@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { loginUser } from "@/domains/usuarios/services/auth";
+import { ensureVerifiedUserProfile, loginUser } from "@/domains/usuarios/services/auth";
 import { isSuperAdminEmail } from "@/config/security";
 import { getPostLoginRedirect } from "@/routes/redirects";
-import { getUserProfile } from "@/domains/usuarios/services/users";
 import { PUBLIC_ROUTES } from "@/routes/paths";
 import toast from "react-hot-toast";
+import { normalizeEmailInput, validateEmailFormat } from "@/utils/emailValidation";
+import { clearPendingVerificationEmail, savePendingVerificationEmail } from "@/utils/pendingVerification";
+import type { UserRole } from "@/types";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -18,21 +20,34 @@ export default function Login() {
 
   const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();
+
+    const emailErr = validateEmailFormat(email);
+    if (emailErr) {
+      toast.error(emailErr);
+      return;
+    }
+
+    const emailNorm = normalizeEmailInput(email);
     setLoading(true);
+
     try {
-      const loggedUser = await loginUser(email, password);
-      const profile = await getUserProfile(loggedUser.uid).catch(() => null);
+      const loggedUser = await loginUser(emailNorm, password);
+      const profile = await ensureVerifiedUserProfile(loggedUser);
       const isAdmin = isSuperAdminEmail(loggedUser.email) || profile?.rol === "admin";
 
       if (!loggedUser.emailVerified && !isAdmin) {
+        savePendingVerificationEmail(loggedUser.email ?? emailNorm);
         toast("Confirma tu correo para continuar.", { icon: "✉️" });
         navigate(PUBLIC_ROUTES.verifyEmail, { replace: true });
         return;
       }
 
+      clearPendingVerificationEmail();
+      const role: UserRole = profile?.rol ?? (isAdmin ? "admin" : "cliente");
+
       const redirect = getPostLoginRedirect({
         redirect: searchParams.get("redirect"),
-        role: profile?.rol,
+        role,
         email: loggedUser.email,
       });
 
@@ -50,7 +65,7 @@ export default function Login() {
       <div className="auth-card">
         <div className="auth-logo">
           <svg width="44" height="44" viewBox="0 0 40 40" fill="none">
-            {[0,45,90,135,180,225,270,315].map((a) => (
+            {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
               <ellipse key={a} cx="20" cy="7.5" rx="3" ry="6.5" fill="#C9A227" transform={`rotate(${a} 20 20)`} />
             ))}
             <circle cx="20" cy="20" r="7" fill="#3d2008" />
@@ -67,6 +82,8 @@ export default function Login() {
               <Mail size={16} className="input-icon" />
               <input
                 type="email"
+                inputMode="email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

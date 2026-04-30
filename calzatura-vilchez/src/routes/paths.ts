@@ -9,6 +9,22 @@ export const PUBLIC_ROUTES = {
   verifyEmail: "/verificar-correo",
 } as const;
 
+export const INFO_ROUTES = {
+  corporativoQuienesSomos: "/corporativo/quienes-somos",
+  corporativoNuestraHistoria: "/corporativo/nuestra-historia",
+  corporativoMundoVilchez: "/corporativo/mundo-vilchez",
+  tesisIso25001: "/tesis/iso-25001-calidad",
+  legalTerminos: "/legal/terminos-condiciones",
+  legalPrivacidad: "/legal/politica-privacidad",
+  legalLibroReclamaciones: "/legal/libro-reclamaciones",
+  ayudaContacto: "/ayuda/contactanos",
+  ayudaRastreoPedido: "/ayuda/rastreo-pedido",
+  ayudaPreguntasFrecuentes: "/ayuda/preguntas-frecuentes",
+  ayudaCambios: "/ayuda/cambios-devoluciones",
+  beneficiosClubVilchez: "/beneficios/club-vilchez",
+  beneficiosCuotas: "/beneficios/cuotas-sin-intereses",
+} as const;
+
 export const CLIENT_ROUTES = {
   checkout: "/checkout",
   orderSuccess: "/pedido-exitoso/:id",
@@ -31,6 +47,7 @@ export const ADMIN_ROUTES = {
 
 export const ROUTE_GROUPS = {
   publico: PUBLIC_ROUTES,
+  informacion: INFO_ROUTES,
   clientes: CLIENT_ROUTES,
   administradores: ADMIN_ROUTES,
 } as const;

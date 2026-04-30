@@ -20,6 +20,8 @@ import { getAvailableSizes, getSizeStock } from "@/utils/stock";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import toast from "react-hot-toast";
 
+const FALLBACK_PRODUCT_IMAGE = "/placeholder-product.svg";
+
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -55,9 +57,9 @@ export default function ProductDetailPage() {
   const productImages = useMemo(() => {
     if (!product) return [];
     const images = (product.imagenes?.length ? product.imagenes : [product.imagen]).filter(Boolean);
-    return images.length ? images : ["/placeholder.jpg"];
+    return images.length ? images : [FALLBACK_PRODUCT_IMAGE];
   }, [product]);
-  const activeImage = productImages[selectedImageIndex] ?? product?.imagen ?? "/placeholder.jpg";
+  const activeImage = productImages[selectedImageIndex] ?? product?.imagen ?? FALLBACK_PRODUCT_IMAGE;
 
   useEffect(() => {
     if (previewOpen) return;
@@ -166,7 +168,11 @@ export default function ProductDetailPage() {
                     src={image}
                     alt={`${product.nombre} imagen ${index + 1}`}
                     className="detail-img"
-                    onError={(event) => { (event.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+                    onError={(event) => {
+                      const currentImage = event.target as HTMLImageElement;
+                      currentImage.onerror = null;
+                      currentImage.src = FALLBACK_PRODUCT_IMAGE;
+                    }}
                   />
                 </button>
               ))}
@@ -186,7 +192,15 @@ export default function ProductDetailPage() {
                   }}
                   aria-label={`Ver imagen ${index + 1}`}
                 >
-                  <img src={image} alt="" onError={(event) => { (event.target as HTMLImageElement).src = "/placeholder.jpg"; }} />
+                  <img
+                    src={image}
+                    alt=""
+                    onError={(event) => {
+                      const currentImage = event.target as HTMLImageElement;
+                      currentImage.onerror = null;
+                      currentImage.src = FALLBACK_PRODUCT_IMAGE;
+                    }}
+                  />
                 </button>
               ))}
             </div>

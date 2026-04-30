@@ -38,3 +38,8 @@ export async function toggleFavoriteProduct(
   }
   await removeFavoriteProduct(userId, productId);
 }
+
+export async function clearFavoriteProductsByUser(userId: string): Promise<void> {
+  const { error } = await supabase.from(COL).delete().eq("userId", userId);
+  if (error) throw error;
+}

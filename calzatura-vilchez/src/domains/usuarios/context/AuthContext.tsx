@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
 import { auth } from "@/firebase/config";
+import { ensureVerifiedUserProfile } from "@/domains/usuarios/services/auth";
 import { getUserProfile, saveUserProfile } from "@/domains/usuarios/services/users";
 import type { UserProfile } from "@/types";
 import { isSuperAdminEmail } from "@/config/security";
@@ -12,6 +13,8 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   loading: boolean;
   isAdmin: boolean;
+  requiresEmailVerification: boolean;
+  hasVerifiedAccess: boolean;
   refreshProfile: () => Promise<void>;
 }
 
@@ -20,6 +23,8 @@ const AuthContext = createContext<AuthContextType>({
   userProfile: null,
   loading: true,
   isAdmin: false,
+  requiresEmailVerification: false,
+  hasVerifiedAccess: false,
   refreshProfile: async () => {},
 });
 
@@ -31,7 +36,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = async (currentUser: User) => {
     const isSuperAdmin = isSuperAdminEmail(currentUser.email);
 
-    // Perfil fallback en memoria (siempre disponible para superadmin)
+    if (!currentUser.emailVerified && !isSuperAdmin) {
+      setUserProfile(null);
+      return;
+    }
+
     const memoryProfile: UserProfile = {
       uid: currentUser.uid,
       nombre: currentUser.displayName ?? currentUser.email?.split("@")[0] ?? "Usuario",
@@ -44,27 +53,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       let profile = await getUserProfile(currentUser.uid);
 
       if (!profile) {
-        if (isSuperAdmin) {
-          // Solo crear perfil automático para superadmin (no requiere DNI)
-          const newProfile: UserProfile = { ...memoryProfile, nombre: "Administrador" };
-          await saveUserProfile(newProfile);
-          profile = newProfile;
-        } else {
-          // Usuarios normales: el registro ya crea el perfil con DNI
-          // Usar perfil en memoria como fallback hasta que Firestore confirme
-          profile = memoryProfile;
-        }
-      } else if (isSuperAdmin && profile.rol !== "admin") {
-        // Superadmin siempre debe tener rol admin
+        profile = await ensureVerifiedUserProfile(currentUser);
+      }
+
+      if (!profile && isSuperAdmin) {
+        const newProfile: UserProfile = { ...memoryProfile, nombre: "Administrador" };
+        await saveUserProfile(newProfile);
+        profile = newProfile;
+      } else if (profile && isSuperAdmin && profile.rol !== "admin") {
         const upgraded = { ...profile, rol: "admin" as const };
         await saveUserProfile(upgraded);
         profile = upgraded;
       }
 
-      setUserProfile(profile);
+      setUserProfile(profile ?? null);
     } catch {
-      // Firestore falla (reglas no desplegadas, sin red, etc.)
-      // Superadmin siempre obtiene acceso aunque Firestore falle
       setUserProfile(isSuperAdmin ? { ...memoryProfile, nombre: "Administrador" } : null);
     }
   };
@@ -75,22 +78,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      const isSuperAdmin = isSuperAdminEmail(currentUser?.email);
+
+      if (currentUser && !currentUser.emailVerified && !isSuperAdmin) {
+        setUser(null);
+        setUserProfile(null);
+        setLoading(false);
+        return;
+      }
+
       setUser(currentUser);
+
       if (currentUser) {
         await loadProfile(currentUser);
       } else {
         setUserProfile(null);
       }
+
       setLoading(false);
     });
+
     return () => unsubscribe();
   }, []);
 
   const isAdmin =
     userProfile?.rol === "admin" || isSuperAdminEmail(user?.email);
+  const requiresEmailVerification =
+    Boolean(user && !user.emailVerified && !isAdmin);
+  const hasVerifiedAccess =
+    Boolean(user && (user.emailVerified || isAdmin));
 
   return (
-    <AuthContext.Provider value={{ user, userProfile, loading, isAdmin, refreshProfile }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        userProfile,
+        loading,
+        isAdmin,
+        requiresEmailVerification,
+        hasVerifiedAccess,
+        refreshProfile,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

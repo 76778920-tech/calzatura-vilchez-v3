@@ -1,5 +1,7 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 
+const FALLBACK_PRODUCT_IMAGE = "/placeholder-product.svg";
+
 interface ImagePreviewModalProps {
   src: string;
   images?: string[];
@@ -64,7 +66,11 @@ export default function ImagePreviewModal({
                 <img
                   src={image}
                   alt={`${title} ${index + 1}`}
-                  onError={(event) => { (event.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+                  onError={(event) => {
+                    const currentImage = event.target as HTMLImageElement;
+                    currentImage.onerror = null;
+                    currentImage.src = FALLBACK_PRODUCT_IMAGE;
+                  }}
                 />
               </div>
             ))}

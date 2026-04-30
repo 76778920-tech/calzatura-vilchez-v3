@@ -3,6 +3,7 @@ import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import type { AccessArea } from "../security/accessControl";
 import { canAccessArea } from "../security/accessControl";
+import { PUBLIC_ROUTES } from "./paths";
 
 function PageLoader() {
   return (
@@ -16,11 +17,14 @@ function PageLoader() {
 }
 
 export function AuthenticatedRoute({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, requiresEmailVerification } = useAuth();
   const location = useLocation();
 
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to={`/login?redirect=${location.pathname}`} replace />;
+  if (requiresEmailVerification) {
+    return <Navigate to={PUBLIC_ROUTES.verifyEmail} replace />;
+  }
 
   return <>{children}</>;
 }
@@ -32,10 +36,13 @@ export function AreaRoute({
   area: AccessArea;
   children: ReactNode;
 }) {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, requiresEmailVerification } = useAuth();
   const location = useLocation();
 
   if (loading) return <PageLoader />;
+  if (requiresEmailVerification) {
+    return <Navigate to={PUBLIC_ROUTES.verifyEmail} replace />;
+  }
 
   const allowed = canAccessArea(area, userProfile?.rol, user?.email);
   if (!allowed && !user) {

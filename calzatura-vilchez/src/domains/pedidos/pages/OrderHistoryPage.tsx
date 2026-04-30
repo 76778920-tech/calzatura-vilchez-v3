@@ -87,10 +87,14 @@ export default function OrderHistoryPage() {
                     {order.items?.map((item, idx) => (
                       <div key={idx} className="order-item">
                         <img
-                          src={item.product?.imagen || "/placeholder.jpg"}
+                          src={item.product?.imagen || "/placeholder-product.svg"}
                           alt={item.product?.nombre}
                           className="order-item-img"
-                          onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.jpg"; }}
+                          onError={(e) => {
+                            const image = e.target as HTMLImageElement;
+                            image.onerror = null;
+                            image.src = "/placeholder-product.svg";
+                          }}
                         />
                         <div>
                           <p>{item.product?.nombre}</p>
