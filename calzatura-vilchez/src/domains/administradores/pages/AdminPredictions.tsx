@@ -12,6 +12,7 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { PromptInputBox, type PromptPanelQuickAction } from "@/components/ui/ai-prompt-box";
 
 const AI_BASE = import.meta.env.VITE_AI_SERVICE_URL ?? "http://localhost:8000";
@@ -133,11 +134,14 @@ interface ModelMetrics {
 }
 
 type HorizonOption = 7 | 15 | 30;
+type PredictionTab = "resumen" | "ventas" | "finanzas" | "modelo" | "asistente";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+const TAB_SEQUENCE: PredictionTab[] = ["resumen", "ventas", "finanzas", "modelo", "asistente"];
 
 interface Recomendación {
   tipo: "urgente" | "atencion" | "oportunidad" | "tranquilo";
@@ -498,6 +502,94 @@ function findMentionedProductsV2(message: string, predictions: Prediction[]) {
   });
 }
 
+type AssistantIntentV2 = "summary" | "recommendations" | "revenue" | "risk" | "demand" | "overstock" | "confidence" | "motor" | "noHistory" | null;
+
+const QUICK_PROMPT_INTENTS_V2: Array<{ prompt: string; intent: AssistantIntentV2 }> = [
+  { prompt: normalizeChatTextV2("Dame un resumen ejecutivo para gerencia con las cifras clave del panel."), intent: "summary" },
+  { prompt: normalizeChatTextV2("¿Qué producto debo reponer primero según riesgo y demanda?"), intent: "recommendations" },
+  { prompt: normalizeChatTextV2("Compara el próximo horizonte proyectado con el último período real de ingresos."), intent: "revenue" },
+  { prompt: normalizeChatTextV2("Lista los productos en mayor riesgo de inventario y qué harías."), intent: "risk" },
+  { prompt: normalizeChatTextV2("¿Cuáles son los productos con más demanda ahora?"), intent: "demand" },
+  { prompt: normalizeChatTextV2("¿Dónde estamos acumulando sobrestock o rotación lenta?"), intent: "overstock" },
+  { prompt: normalizeChatTextV2("Explícame qué tan confiable es la proyección y por qué."), intent: "confidence" },
+  { prompt: normalizeChatTextV2("¿Cuál es el producto motor y cómo lo defenderías?"), intent: "motor" },
+  { prompt: normalizeChatTextV2("¿Qué productos siguen sin historial suficiente y qué implica?"), intent: "noHistory" },
+];
+
+function detectQuickPromptIntentV2(normalizedMessage: string): AssistantIntentV2 {
+  return QUICK_PROMPT_INTENTS_V2.find((item) => item.prompt === normalizedMessage)?.intent ?? null;
+}
+
+interface AssistantContextV2 {
+  withHistory: Prediction[];
+  noHistory: Prediction[];
+  inRisk: Prediction[];
+  criticos: Prediction[];
+  atencion: Prediction[];
+  outOfStock: Prediction[];
+  highDemand: Prediction[];
+  subiendo: Prediction[];
+  bajando: Prediction[];
+  estables: Prediction[];
+  overstocked: Prediction[];
+  slowMoving: Prediction[];
+  recomendaciones: Recomendación[];
+  topByRisk: Prediction[];
+  urgentProducts: Prediction[];
+  topDemand: Prediction[];
+}
+
+function buildAssistantContextV2(predictions: Prediction[]): AssistantContextV2 {
+  const withHistory = predictions.filter((p) => !p.sin_historial);
+  const noHistory = predictions.filter((p) => p.sin_historial);
+  const inRisk = withHistory.filter((p) => p.alerta_stock);
+  const criticos = withHistory.filter((p) => p.nivel_riesgo === "critico");
+  const atencion = withHistory.filter((p) => p.nivel_riesgo === "atencion");
+  const outOfStock = withHistory.filter((p) => p.stock_actual === 0);
+  const highDemand = withHistory.filter((p) => p.alta_demanda);
+  const subiendo = withHistory.filter((p) => p.tendencia === "subiendo");
+  const bajando = withHistory.filter((p) => p.tendencia === "bajando");
+  const estables = withHistory.filter((p) => p.tendencia === "estable");
+  const overstocked = withHistory.filter(isOverstocked);
+  const slowMoving = withHistory.filter(isSlowMoving);
+  const recomendaciones = generarRecomendaciónes(predictions);
+
+  const topByRisk = [...withHistory]
+    .filter((p) => p.stock_actual === 0 || p.alerta_stock || p.nivel_riesgo === "critico" || p.nivel_riesgo === "atencion")
+    .sort((a, b) => {
+      if (a.stock_actual === 0 && b.stock_actual !== 0) return -1;
+      if (a.stock_actual !== 0 && b.stock_actual === 0) return 1;
+      return a.dias_hasta_agotarse - b.dias_hasta_agotarse;
+    });
+
+  const urgentProducts = [...outOfStock, ...criticos.filter((p) => p.stock_actual > 0)]
+    .sort((a, b) => a.dias_hasta_agotarse - b.dias_hasta_agotarse)
+    .slice(0, 3);
+
+  const topDemand = [...highDemand]
+    .sort((a, b) => b.consumo_estimado_diario - a.consumo_estimado_diario)
+    .slice(0, 5);
+
+  return {
+    withHistory,
+    noHistory,
+    inRisk,
+    criticos,
+    atencion,
+    outOfStock,
+    highDemand,
+    subiendo,
+    bajando,
+    estables,
+    overstocked,
+    slowMoving,
+    recomendaciones,
+    topByRisk,
+    urgentProducts,
+    topDemand,
+  };
+}
+
 function buildProductDetailResponseV2(product: Prediction) {
   const label = `${product.nombre}${product.codigo ? ` (${product.codigo})` : ""}`;
   const coverage =
@@ -559,22 +651,29 @@ function generateAIResponseV2(
   message: string,
   predictions: Prediction[],
   revenueForecast: RevenueForecast | null,
+  context: AssistantContextV2,
 ): string {
   const msg = normalizeChatTextV2(message);
+  const forcedIntent = detectQuickPromptIntentV2(msg);
   const mentionedProducts = findMentionedProductsV2(message, predictions).slice(0, 3);
-  const withHistory = predictions.filter((p) => !p.sin_historial);
-  const noHistory = predictions.filter((p) => p.sin_historial);
-  const inRisk = withHistory.filter((p) => p.alerta_stock);
-  const criticos = withHistory.filter((p) => p.nivel_riesgo === "critico");
-  const atencion = withHistory.filter((p) => p.nivel_riesgo === "atencion");
-  const outOfStock = withHistory.filter((p) => p.stock_actual === 0);
-  const highDemand = withHistory.filter((p) => p.alta_demanda);
-  const subiendo = withHistory.filter((p) => p.tendencia === "subiendo");
-  const bajando = withHistory.filter((p) => p.tendencia === "bajando");
-  const estables = withHistory.filter((p) => p.tendencia === "estable");
-  const overstocked = withHistory.filter(isOverstocked);
-  const slowMoving = withHistory.filter(isSlowMoving);
-  const recomendaciones = generarRecomendaciónes(predictions);
+  const {
+    withHistory,
+    noHistory,
+    inRisk,
+    criticos,
+    atencion,
+    outOfStock,
+    highDemand,
+    subiendo,
+    bajando,
+    estables,
+    overstocked,
+    slowMoving,
+    recomendaciones,
+    topByRisk,
+    urgentProducts,
+    topDemand,
+  } = context;
 
   const labelOf = (product: Prediction) => `${product.nombre}${product.codigo ? ` (${product.codigo})` : ""}`;
   const joinNatural = (items: string[]) => {
@@ -593,13 +692,6 @@ function generateAIResponseV2(
     if (trend === "bajando") return "a la baja";
     return "estable";
   };
-  const topByRisk = [...withHistory]
-    .filter((p) => p.stock_actual === 0 || p.alerta_stock || p.nivel_riesgo === "critico" || p.nivel_riesgo === "atencion")
-    .sort((a, b) => {
-      if (a.stock_actual === 0 && b.stock_actual !== 0) return -1;
-      if (a.stock_actual !== 0 && b.stock_actual === 0) return 1;
-      return a.dias_hasta_agotarse - b.dias_hasta_agotarse;
-    });
 
   const riskTerms = [
     "riesgo",
@@ -651,6 +743,36 @@ function generateAIResponseV2(
     "se venden",
     "alta demanda",
   ];
+  const overstockTerms = [
+    "sobrestock",
+    "sobre stock",
+    "stock acumulado",
+    "stock de sobra",
+    "rotacion lenta",
+    "lenta rotacion",
+    "poca rotacion",
+    "inmovilizado",
+  ];
+  const confidenceTerms = [
+    "confianza",
+    "confiable",
+    "precision",
+    "preciso",
+    "certeza",
+    "que tan seguro",
+    "fiable",
+    "margen de error",
+  ];
+  const motorTerms = [
+    "producto motor",
+    "producto estrella",
+    "motor",
+    "lidera",
+    "lider",
+    "empuja",
+    "sostiene la venta",
+    "defenderias",
+  ];
   const recommendationTerms = ["recomend", "consejo", "que hacer", "que debo", "accion", "pedir", "comprar", "reponer", "proveedor", "priorizar"];
   const trendTerms = ["tendencia", "trend", "sube", "subiendo", "baja", "bajando", "comportamiento", "creciendo", "cae", "caida", "como va", "como van"];
   const summaryTerms = [
@@ -674,13 +796,16 @@ function generateAIResponseV2(
 
   const intentScores = {
     product: mentionedProducts.length > 0 ? 3 + countIntentMatches(msg, [...riskTerms, ...demandTerms, ...trendTerms, ...recommendationTerms]) : 0,
-    risk: countIntentMatches(msg, riskTerms),
-    revenue: countIntentMatches(msg, revenueTerms),
-    demand: countIntentMatches(msg, demandTerms),
-    recommendations: countIntentMatches(msg, recommendationTerms),
+    risk: (forcedIntent === "risk" ? 100 : 0) + countIntentMatches(msg, riskTerms),
+    revenue: (forcedIntent === "revenue" ? 100 : 0) + countIntentMatches(msg, revenueTerms),
+    demand: (forcedIntent === "demand" ? 100 : 0) + countIntentMatches(msg, demandTerms),
+    overstock: (forcedIntent === "overstock" ? 100 : 0) + countIntentMatches(msg, overstockTerms),
+    confidence: (forcedIntent === "confidence" ? 100 : 0) + countIntentMatches(msg, confidenceTerms),
+    motor: (forcedIntent === "motor" ? 100 : 0) + countIntentMatches(msg, motorTerms),
+    recommendations: (forcedIntent === "recommendations" ? 100 : 0) + countIntentMatches(msg, recommendationTerms),
     trend: countIntentMatches(msg, trendTerms),
-    summary: countIntentMatches(msg, summaryTerms) + (msg.includes("cuantos") ? 1 : 0),
-    noHistory: countIntentMatches(msg, noHistoryTerms),
+    summary: (forcedIntent === "summary" ? 100 : 0) + countIntentMatches(msg, summaryTerms) + (msg.includes("cuantos") ? 1 : 0),
+    noHistory: (forcedIntent === "noHistory" ? 100 : 0) + countIntentMatches(msg, noHistoryTerms),
   };
 
   if (intentScores.product >= 3 && mentionedProducts.length === 1) {
@@ -743,10 +868,6 @@ function generateAIResponseV2(
         "En términos gerenciales, eso significa que hoy no se ve una perdida inmediata de ventas por falta de producto.",
       ].join("\n");
     }
-
-    const urgentProducts = [...outOfStock, ...criticos.filter((p) => p.stock_actual > 0)]
-      .sort((a, b) => a.dias_hasta_agotarse - b.dias_hasta_agotarse)
-      .slice(0, 3);
 
     const lines = [
       "Resumen ejecutivo:",
@@ -847,10 +968,6 @@ function generateAIResponseV2(
       ].join("\n");
     }
 
-    const topDemand = [...highDemand]
-      .sort((a, b) => b.consumo_estimado_diario - a.consumo_estimado_diario)
-      .slice(0, 5);
-
     const lines = [
       "Resumen ejecutivo:",
       `Los productos con mejor salida en este momento son ${joinNatural(topDemand.slice(0, 3).map((p) => labelOf(p)))}.`,
@@ -871,6 +988,112 @@ function generateAIResponseV2(
     lines.push("Recomendación:");
     lines.push("Si vas a priorizar compras, estos son los productos que más conviene vigilar.");
     return lines.join("\n");
+  }
+
+  if (intentScores.overstock > 0) {
+    if (overstocked.length === 0 && slowMoving.length === 0) {
+      return [
+        "Hoy no veo una señal fuerte de sobrestock.",
+        "",
+        "No hay productos con capital claramente inmovilizado ni con una rotación tan baja como para frenar compras por ese motivo.",
+        "",
+        "Recomendación:",
+        "Puedes seguir comprando según demanda real y vigilar solo los productos que vayan entrando a tendencia bajista.",
+      ].join("\n");
+    }
+
+    const foco = [...new Set([...overstocked, ...slowMoving])].slice(0, 5);
+    const lines = [
+      "Resumen ejecutivo:",
+      `Detecto ${overstocked.length} producto(s) con sobrestock y ${slowMoving.length} con rotación lenta.`,
+      "",
+      "Productos donde conviene poner atención:",
+    ];
+
+    foco.forEach((p, index) => {
+      lines.push(
+        `${index + 1}. ${labelOf(p)}: stock ${p.stock_actual}, ventas 30 días ${formatUnits(p.ventas_30_dias)}, tendencia ${trendText(p.tendencia)} y ${coverageText(p)}.`,
+      );
+    });
+
+    lines.push("");
+    lines.push("Interpretación:");
+    lines.push("Aquí no estás perdiendo ventas por falta de mercadería; más bien hay dinero detenido en productos que se mueven más lento de lo deseado.");
+    lines.push("");
+    lines.push("Recomendación:");
+    lines.push("Frena reposición en esos pares, mueve salida comercial con descuentos o vitrinas y prioriza compra solo en los de demanda comprobada.");
+    return lines.join("\n");
+  }
+
+  if (intentScores.confidence > 0) {
+    if (!revenueForecast) {
+      return [
+        "Aún no tengo una proyección financiera consolidada para medir confianza.",
+        "",
+        "Cuando el servicio termine de calcular ingresos para el horizonte activo, te podré decir qué tan estable es la lectura y qué tanto conviene usarla para decidir.",
+      ].join("\n");
+    }
+
+    const s = revenueForecast.summary;
+    const confidenceLabel = formatConfidenceLabel(s.confianza);
+    const confidenceMeaning =
+      s.confianza >= CONFIDENCE_ALTA_MIN
+        ? "La señal es bastante sólida: el histórico y el comportamiento reciente van en una dirección consistente."
+        : s.confianza >= CONFIDENCE_MEDIA_MIN
+        ? "La señal sirve para decidir, pero todavía conviene contrastarla con criterio comercial y reposición semanal."
+        : "La señal todavía es inicial: úsala como orientación y no como verdad cerrada.";
+
+    return [
+      "Resumen ejecutivo:",
+      `La confianza actual de la proyección es ${confidenceLabel.toLowerCase()} (${s.confianza}%).`,
+      "",
+      "Qué significa eso:",
+      confidenceMeaning,
+      "",
+      "Datos que acompañan la lectura:",
+      `- Horizonte analizado: ${revenueForecast.horizon_days} días`,
+      `- Tendencia detectada: ${trendText(s.tendencia)}`,
+      `- Promedio diario histórico: ${formatCurrency(s.promedio_diario_histórico)}`,
+      `- Promedio diario proyectado: ${formatCurrency(s.promedio_diario_proyectado)}`,
+      "",
+      "Recomendación:",
+      s.confianza >= CONFIDENCE_ALTA_MIN
+        ? "Puedes usar esta proyección como base fuerte para comité, reposición y seguimiento comercial."
+        : s.confianza >= CONFIDENCE_MEDIA_MIN
+        ? "Úsala como guía principal, pero acompáñala con revisión semanal del inventario crítico."
+        : "Úsala solo para orientar prioridades y espera más historial antes de tomar decisiones grandes.",
+    ].join("\n");
+  }
+
+  if (intentScores.motor > 0) {
+    if (!topDemand[0]) {
+      return [
+        "Todavía no puedo defender un producto motor claro.",
+        "",
+        "El historial disponible no marca un líder suficientemente fuerte en salida como para sostener una recomendación clara.",
+      ].join("\n");
+    }
+
+    const lider = topDemand[0];
+    return [
+      "Resumen ejecutivo:",
+      `${labelOf(lider)} es hoy el producto motor del panel.`,
+      "",
+      "Datos exactos:",
+      `- Consumo estimado diario: ${formatUnits(lider.consumo_estimado_diario)} unidades`,
+      `- Proyección semanal: ${formatUnits(lider.prediccion_semanal)} unidades`,
+      `- Ventas últimos 30 días: ${formatUnits(lider.ventas_30_dias)} unidades`,
+      `- Tendencia: ${trendText(lider.tendencia)}`,
+      `- Cobertura actual: ${coverageText(lider)}`,
+      "",
+      "Cómo lo defendería:",
+      "Es el par que mejor sostiene rotación y por eso conviene protegerle stock, visibilidad y margen antes que al resto.",
+      "",
+      "Recomendación:",
+      lider.stock_actual === 0 || lider.alerta_stock
+        ? "Asegura reposición inmediata porque este par no solo vende: también marca el ritmo del portafolio."
+        : "Mantén cobertura sana y evita descuentos innecesarios; es un producto que ya se defiende bien por demanda.",
+    ].join("\n");
   }
 
   if (intentScores.recommendations > 0) {
@@ -1239,12 +1462,21 @@ export default function AdminPredictions() {
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<"resumen" | "ventas" | "finanzas" | "modelo" | "asistente">("resumen");
+  const [activeTab, setActiveTab] = useState<PredictionTab>("resumen");
+  const [tabDirection, setTabDirection] = useState(1);
   const [weeklyChartFetched, setWeeklyChartFetched] = useState(false);
   const [weeklyChartLoading, setWeeklyChartLoading] = useState(false);
   const [modelMetricsFetched, setModelMetricsFetched] = useState(false);
   const [modelMetricsLoading, setModelMetricsLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const changeTab = useCallback((nextTab: PredictionTab) => {
+    if (nextTab === activeTab) return;
+    const currentIndex = TAB_SEQUENCE.indexOf(activeTab);
+    const nextIndex = TAB_SEQUENCE.indexOf(nextTab);
+    setTabDirection(nextIndex >= currentIndex ? 1 : -1);
+    setActiveTab(nextTab);
+  }, [activeTab]);
 
   const load = useCallback(async (selectedHorizon: HorizonOption) => {
     setLoading(true);
@@ -1546,17 +1778,21 @@ export default function AdminPredictions() {
     }));
   }, [predictionsForView]);
 
-  const handleSend = useCallback(async (message: string) => {
+  const assistantContext = useMemo(
+    () => buildAssistantContextV2(predictionsForView),
+    [predictionsForView],
+  );
+
+  const handleSend = useCallback((message: string) => {
     const trimmed = message.trim();
     if (!trimmed) return;
     const userMsg: ChatMessage = { role: "user", content: trimmed };
     setMessages((prev) => [...prev, userMsg]);
     setAiLoading(true);
-    await new Promise((res) => setTimeout(res, 600));
-    const reply = generateAIResponseV2(trimmed, predictionsForView, normalizedRevenueForecast);
+    const reply = generateAIResponseV2(trimmed, predictionsForView, normalizedRevenueForecast, assistantContext);
     setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
     setAiLoading(false);
-  }, [predictionsForView, normalizedRevenueForecast]);
+  }, [assistantContext, normalizedRevenueForecast, predictionsForView]);
 
   const assistantQuickActions = useMemo<PromptPanelQuickAction[]>(
     () => [
@@ -1565,6 +1801,20 @@ export default function AdminPredictions() {
       { label: "Ingresos vs. periodo", prompt: "Compara el próximo horizonte proyectado con el último período real de ingresos." },
       { label: "Alertas de stock", prompt: "Lista los productos en mayor riesgo de inventario y qué harías." },
       { label: "Mayor demanda", prompt: "¿Cuáles son los productos con más demanda ahora?" },
+      { label: "Sobrestock", prompt: "¿Dónde estamos acumulando sobrestock o rotación lenta?" },
+      { label: "Confianza del modelo", prompt: "Explícame qué tan confiable es la proyección y por qué." },
+      { label: "Producto motor", prompt: "¿Cuál es el producto motor y cómo lo defenderías?" },
+      { label: "Sin historial", prompt: "¿Qué productos siguen sin historial suficiente y qué implica?" },
+    ],
+    [],
+  );
+
+  const assistantQuestionIdeas = useMemo(
+    () => [
+      "¿Qué combinación de productos debería comprar primero para no frenar ventas?",
+      "Si mantengo este ritmo, ¿qué lectura le darías a la junta directiva?",
+      "¿Dónde estoy inmovilizando capital en inventario con poca salida?",
+      "¿Qué me preocupa más hoy: stock, ingresos o mezcla de portafolio?",
     ],
     [],
   );
@@ -1629,29 +1879,35 @@ export default function AdminPredictions() {
 
       {/* ── Navegación por pestañas ────────────────────────── */}
       <nav className="pred-tabs" role="tablist" aria-label="Secciones del panel">
-        <button type="button" role="tab" aria-selected={activeTab === "resumen"} className={`pred-tab ${activeTab === "resumen" ? "active" : ""}`} onClick={() => setActiveTab("resumen")}>
+        <button type="button" role="tab" aria-selected={activeTab === "resumen"} className={`pred-tab ${activeTab === "resumen" ? "active" : ""}`} onClick={() => changeTab("resumen")}>
           Resumen
           {enRiesgo > 0 && <span className="pred-tab-count pred-tab-count-alert">{enRiesgo}</span>}
         </button>
-        <button type="button" role="tab" aria-selected={activeTab === "ventas"} className={`pred-tab ${activeTab === "ventas" ? "active" : ""}`} onClick={() => setActiveTab("ventas")}>
+        <button type="button" role="tab" aria-selected={activeTab === "ventas"} className={`pred-tab ${activeTab === "ventas" ? "active" : ""}`} onClick={() => changeTab("ventas")}>
           Ventas e inventario
         </button>
-        <button type="button" role="tab" aria-selected={activeTab === "finanzas"} className={`pred-tab ${activeTab === "finanzas" ? "active" : ""}`} onClick={() => setActiveTab("finanzas")}>
+        <button type="button" role="tab" aria-selected={activeTab === "finanzas"} className={`pred-tab ${activeTab === "finanzas" ? "active" : ""}`} onClick={() => changeTab("finanzas")}>
           Finanzas
         </button>
-        <button type="button" role="tab" aria-selected={activeTab === "modelo"} className={`pred-tab ${activeTab === "modelo" ? "active" : ""}`} onClick={() => setActiveTab("modelo")}>
+        <button type="button" role="tab" aria-selected={activeTab === "modelo"} className={`pred-tab ${activeTab === "modelo" ? "active" : ""}`} onClick={() => changeTab("modelo")}>
           Modelo IA
         </button>
-        <button type="button" role="tab" aria-selected={activeTab === "asistente"} className={`pred-tab ${activeTab === "asistente" ? "active" : ""}`} onClick={() => setActiveTab("asistente")}>
+        <button type="button" role="tab" aria-selected={activeTab === "asistente"} className={`pred-tab ${activeTab === "asistente" ? "active" : ""}`} onClick={() => changeTab("asistente")}>
           Asistente
         </button>
       </nav>
 
       {/* ── Pestaña: Resumen ─────────────────────────────────── */}
       {activeTab === "resumen" && (
-        <div className="pred-tab-panel">
+        <motion.div
+          key="tab-resumen"
+          className="pred-tab-panel"
+          initial={{ opacity: 0, x: tabDirection >= 0 ? 54 : -54, y: 18, filter: "blur(8px)" }}
+          animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.38, ease: "easeOut" }}
+        >
           <div className="pred-summary-grid">
-        <article className="pred-summary-card pred-summary-hero">
+        <motion.article className="pred-summary-card pred-summary-hero" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.01 }}>
           <p className="pred-summary-kicker">Resumen ejecutivo</p>
           <h2 className="pred-summary-title">{resumenEjecutivo.titular}</h2>
           <p className="pred-summary-body">{resumenEjecutivo.detalle}</p>
@@ -1660,63 +1916,63 @@ export default function AdminPredictions() {
             <span className="pred-summary-badge">Con historial: {conHistorial}</span>
             <span className="pred-summary-badge">Sin historial: {sinHistorial}</span>
           </div>
-        </article>
+        </motion.article>
 
-        <article className="pred-summary-card">
+        <motion.article className="pred-summary-card" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.045, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.01 }}>
           <p className="pred-summary-label">Ingreso esperado</p>
           <strong className="pred-summary-number">
             {revenueSummary ? formatCurrency(revenueSummary.proximo_horizonte) : "Pendiente"}
           </strong>
           <p className="pred-summary-copy">{resumenEjecutivo.lecturaFinanciera}</p>
-        </article>
+        </motion.article>
 
-        <article className="pred-summary-card">
+        <motion.article className="pred-summary-card" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.09, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.01 }}>
           <p className="pred-summary-label">Foco de inventario</p>
           <strong className="pred-summary-number">{enRiesgo} en riesgo</strong>
           <p className="pred-summary-copy">{resumenEjecutivo.lecturaInventario}</p>
-        </article>
+        </motion.article>
 
-        <article className="pred-summary-card">
+        <motion.article className="pred-summary-card" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.135, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.01 }}>
           <p className="pred-summary-label">Producto motor</p>
           <strong className="pred-summary-number">{productoMotor?.codigo || productoMotor?.nombre || "Sin definir"}</strong>
           <p className="pred-summary-copy">{resumenEjecutivo.lecturaPortafolio}</p>
-        </article>
+        </motion.article>
       </div>
 
 
           <div className="pred-kpi-row">
-            <div className={`pred-kpi-card ${enRiesgo > 0 ? "pred-kpi-alert" : ""}`}>
+            <motion.div className={`pred-kpi-card ${enRiesgo > 0 ? "pred-kpi-alert" : ""}`} initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.18, ease: "easeOut" } }} whileHover={{ y: -8, scale: 1.015 }}>
           <AlertTriangle size={20} />
           <div>
             <p className="pred-kpi-label">En riesgo en {horizon} días</p>
             <p className="pred-kpi-value">{enRiesgo}</p>
             <p className="pred-kpi-sub">{enRiesgo === 0 ? "Sin alertas fuertes" : "stock corto para el horizonte actual"}</p>
           </div>
-        </div>
-        <div className={`pred-kpi-card ${sinStock > 0 ? "pred-kpi-alert" : ""}`}>
+        </motion.div>
+        <motion.div className={`pred-kpi-card ${sinStock > 0 ? "pred-kpi-alert" : ""}`} initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.225, ease: "easeOut" } }} whileHover={{ y: -8, scale: 1.015 }}>
           <Package size={20} />
           <div>
             <p className="pred-kpi-label">Productos sin stock</p>
             <p className="pred-kpi-value">{sinStock}</p>
             <p className="pred-kpi-sub">{sinStock === 0 ? "Catálogo disponible" : "ya agotados"}</p>
           </div>
-        </div>
-        <div className="pred-kpi-card pred-kpi-gold">
+        </motion.div>
+        <motion.div className="pred-kpi-card pred-kpi-gold" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.27, ease: "easeOut" } }} whileHover={{ y: -8, scale: 1.015 }}>
           <TrendingUp size={20} />
           <div>
             <p className="pred-kpi-label">Alta demanda</p>
             <p className="pred-kpi-value">{altaDemanda}</p>
             <p className="pred-kpi-sub">productos con rotación fuerte</p>
           </div>
-        </div>
-        <div className="pred-kpi-card">
+        </motion.div>
+        <motion.div className="pred-kpi-card" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.315, ease: "easeOut" } }} whileHover={{ y: -8, scale: 1.015 }}>
           <Package size={20} />
           <div>
             <p className="pred-kpi-label">Total productos</p>
             <p className="pred-kpi-value">{predictions.length}</p>
             <p className="pred-kpi-sub">analizados en catálogo</p>
           </div>
-        </div>
+        </motion.div>
       </div>
 
       <div className="pred-section-grid">
@@ -1797,12 +2053,18 @@ export default function AdminPredictions() {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* ── Pestaña: Ventas e inventario ─────────────────── */}
       {activeTab === "ventas" && (
-        <div className="pred-tab-panel">
+        <motion.div
+          key="tab-ventas"
+          className="pred-tab-panel"
+          initial={{ opacity: 0, x: tabDirection >= 0 ? 54 : -54, y: 18, filter: "blur(8px)" }}
+          animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.38, ease: "easeOut" }}
+        >
           <div className="pred-section-grid">
             <div className="dash-card">
               <div className="dash-card-header">
@@ -1962,19 +2224,24 @@ export default function AdminPredictions() {
           )}
         </div>
       )}
-
           {predictions.length === 0 && (
             <div className="pred-no-alerts">
               <Package size={32} />
               <p>Aún no hay productos registrados para analizar.</p>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* ── Pestaña: Finanzas ────────────────────────────── */}
       {activeTab === "finanzas" && (
-        <div className="pred-tab-panel">
+        <motion.div
+          key="tab-finanzas"
+          className="pred-tab-panel"
+          initial={{ opacity: 0, x: tabDirection >= 0 ? 54 : -54, y: 18, filter: "blur(8px)" }}
+          animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.38, ease: "easeOut" }}
+        >
           {revenueSummary && normalizedRevenueForecast ? (
             <div className="dash-card">
               <div className="dash-card-header">
@@ -2065,12 +2332,18 @@ export default function AdminPredictions() {
               </button>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* ── Pestaña: Modelo IA ───────────────────────────── */}
       {activeTab === "modelo" && (
-        <div className="pred-tab-panel">
+        <motion.div
+          key="tab-modelo"
+          className="pred-tab-panel"
+          initial={{ opacity: 0, x: tabDirection >= 0 ? 54 : -54, y: 18, filter: "blur(8px)" }}
+          animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.38, ease: "easeOut" }}
+        >
           {modeloMeta ? (
             <div className="dash-card">
               <div className="dash-card-header">
@@ -2208,33 +2481,111 @@ export default function AdminPredictions() {
               <p>Los metadatos del modelo aún no están disponibles. El servicio de IA podría estar inicializándose.</p>
             </div>
           )}
-        </div>
+        </motion.div>
       )}
 
       {/* ── Pestaña: Asistente ───────────────────────────── */}
       {activeTab === "asistente" && (
-        <div className="pred-tab-panel">
-          <div className="dash-card" style={{ padding: "1.25rem 1.5rem" }}>
-            <div className="dash-card-header" style={{ padding: 0, marginBottom: "1rem" }}>
-              <div>
-                <p className="dash-card-kicker">Asistente inteligente</p>
-                <h2 className="dash-card-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <Brain size={20} /> Consulta a la IA
+        <motion.div
+          key="tab-asistente"
+          className="pred-tab-panel"
+          initial={{ opacity: 0, x: tabDirection >= 0 ? 54 : -54, y: 18, filter: "blur(8px)" }}
+          animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.38, ease: "easeOut" }}
+        >
+          <div className="pred-ai-shell">
+            <section className="pred-ai-hero">
+              <div className="pred-ai-copy">
+                <p className="pred-ai-kicker">Asistente inteligente</p>
+                <h2 className="pred-ai-title">
+                  <Brain size={22} /> Inteligencia artificial guiada por el panel
                 </h2>
-                <p className="pred-section-note">
-                  Puedes pedir una explicación para gerencia, un resumen con cifras exactas para contabilidad o una lectura ejecutiva para junta directiva.
-                  Las respuestas se generan a partir de los datos de predicción e inventario cargados en este panel (no es búsqueda web ni un chat externo).
+                <p className="pred-ai-lead">
+                  Consulta inventario, ingresos y prioridades sin salir de esta vista. El asistente toma solo los datos de demanda, riesgo y finanzas que ya ves cargados aquí.
                 </p>
+                <div className="pred-ai-flags">
+                  <span className="pred-ai-flag">Sin búsqueda web</span>
+                  <span className="pred-ai-flag">Horizonte activo: {horizon} días</span>
+                  <span className="pred-ai-flag">Respuestas para gerencia y operaciones</span>
+                </div>
               </div>
-            </div>
+              <div className="pred-ai-stats">
+                <motion.article className="pred-ai-stat" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.02, rotateX: -2 }}>
+                  <span className="pred-ai-stat-label">Horizonte activo</span>
+                  <strong className="pred-ai-stat-value">{horizon} días</strong>
+                  <span className="pred-ai-stat-copy">La lectura financiera y de riesgo se ajusta a este tramo.</span>
+                </motion.article>
+                <motion.article className="pred-ai-stat" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.045, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.02, rotateX: -2 }}>
+                  <span className="pred-ai-stat-label">Atajos listos</span>
+                  <strong className="pred-ai-stat-value">{assistantQuickActions.length}</strong>
+                  <span className="pred-ai-stat-copy">Prompts rápidos para reponer, resumir y priorizar.</span>
+                </motion.article>
+                <motion.article className="pred-ai-stat" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.09, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.02, rotateX: -2 }}>
+                  <span className="pred-ai-stat-label">Sesión</span>
+                  <strong className="pred-ai-stat-value">{messages.length > 0 ? `${messages.length} mensajes` : "Lista para consultar"}</strong>
+                  <span className="pred-ai-stat-copy">
+                    {messages.length > 0
+                      ? "La conversación se mantiene dentro del contexto actual del panel."
+                      : "Empieza con una pregunta libre o usa uno de los atajos sugeridos."}
+                  </span>
+                </motion.article>
+              </div>
+            </section>
+
+            <section className="pred-ai-card">
+              <div className="pred-ai-card-head">
+                <div>
+                  <p className="pred-ai-card-kicker">Consulta al panel</p>
+                  <h3 className="pred-ai-card-title">
+                    {messages.length > 0 ? "Conversación activa" : "Haz tu primera pregunta"}
+                  </h3>
+                </div>
+                <span className="pred-ai-card-badge">
+                  {messages.length > 0 ? `${messages.length} mensajes` : "Datos listos"}
+                </span>
+              </div>
+              <p className="pred-ai-card-note">
+                Puedes pedir una explicación para gerencia, un resumen con cifras exactas para contabilidad o una lectura ejecutiva para junta directiva.
+                Las respuestas se generan a partir de los datos de predicción e inventario cargados en este panel.
+              </p>
+              <div className="pred-ai-question-board">
+                <p className="pred-ai-question-kicker">También puedes preguntar</p>
+                <div className="pred-ai-question-list">
+                  {assistantQuestionIdeas.map((question, index) => (
+                    <motion.button
+                      key={question}
+                      type="button"
+                      className="pred-ai-question-pill"
+                      initial={{ opacity: 0, y: 20, scale: 0.985 }}
+                      animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, delay: index * 0.035, ease: "easeOut" } }}
+                      whileHover={{ y: -4, scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => void handleSend(question)}
+                    >
+                      {question}
+                    </motion.button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pred-ai-chat-shell">
             {messages.length > 0 && (
               <div className="pred-chat-stream">
                 {messages.map((msg, idx) => (
-                  <div key={idx} className={`pred-chat-row ${msg.role === "user" ? "pred-chat-row-user" : "pred-chat-row-assistant"}`}>
-                    <div className={`pred-chat-bubble ${msg.role === "user" ? "pred-chat-bubble-user" : "pred-chat-bubble-assistant"}`}>
+                  <motion.div
+                    key={`${msg.role}-${idx}`}
+                    className={`pred-chat-row ${msg.role === "user" ? "pred-chat-row-user" : "pred-chat-row-assistant"}`}
+                    initial={{ opacity: 0, x: msg.role === "user" ? 32 : -32, y: 12, scale: 0.97 }}
+                    animate={{ opacity: 1, x: 0, y: 0, scale: 1 }}
+                    transition={{ duration: 0.28, ease: "easeOut" }}
+                  >
+                    <motion.div
+                      className={`pred-chat-bubble ${msg.role === "user" ? "pred-chat-bubble-user" : "pred-chat-bubble-assistant"} ${idx === messages.length - 1 ? "pred-chat-bubble-latest" : ""}`}
+                      whileHover={{ y: -2, scale: 1.01 }}
+                    >
                       {msg.content}
-                    </div>
-                  </div>
+                    </motion.div>
+                  </motion.div>
                 ))}
                 {aiLoading && (
                   <div className="pred-chat-row pred-chat-row-assistant">
@@ -2250,12 +2601,19 @@ export default function AdminPredictions() {
             )}
             {messages.length === 0 && (
               <div className="pred-empty-chat">
-                <p>
-                  Toca un atajo de abajo para una respuesta al instante, escribe tu propia pregunta o usa el micrófono.
-                  Inventario, ingresos y prioridades salen de lo que ya ves en las otras pestañas.
-                </p>
+                <div className="pred-empty-chat-mark">
+                  <Zap size={18} />
+                </div>
+                <div className="pred-empty-chat-copy">
+                  <strong className="pred-empty-chat-title">Todo listo para consultar</strong>
+                  <p>
+                    Toca un atajo de abajo para una respuesta al instante, escribe tu propia pregunta o usa el micrófono.
+                    Inventario, ingresos y prioridades salen de lo que ya ves en las otras pestañas.
+                  </p>
+                </div>
               </div>
             )}
+              </div>
             <PromptInputBox
               variant="panel"
               quickActions={assistantQuickActions}
@@ -2263,8 +2621,9 @@ export default function AdminPredictions() {
               isLoading={aiLoading}
               placeholder="Pregunta por inventario, ingresos o predicciones de este panel…"
             />
+            </section>
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   );

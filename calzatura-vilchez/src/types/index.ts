@@ -15,6 +15,7 @@ export interface Product {
   color?: string;
   colores?: string[];
   destacado?: boolean;
+  descuento?: 10 | 20 | 30;
 }
 
 export interface ProductFinancial {

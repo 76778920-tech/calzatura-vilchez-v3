@@ -121,7 +121,10 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
         {product.stock === 0 && (
           <span className="product-badge-agotado">Agotado</span>
         )}
-        {product.destacado && product.stock > 0 && (
+        {product.descuento && product.stock > 0 && (
+          <span className="product-badge-cyber">{product.descuento}% OFF</span>
+        )}
+        {product.destacado && !product.descuento && product.stock > 0 && (
           <span className="product-badge-nuevo">Destacado</span>
         )}
         <button
@@ -149,7 +152,16 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
           </div>
         )}
         <div className="product-card-footer">
-          <span className="product-card-price">S/ {product.precio.toFixed(2)}</span>
+          {product.descuento ? (
+            <div className="product-card-price-group">
+              <span className="product-card-price-original">S/ {product.precio.toFixed(2)}</span>
+              <span className="product-card-price product-card-price-cyber">
+                S/ {(product.precio * (1 - product.descuento / 100)).toFixed(2)}
+              </span>
+            </div>
+          ) : (
+            <span className="product-card-price">S/ {product.precio.toFixed(2)}</span>
+          )}
           {product.stock > 0 ? (
             <button
               onClick={handleAddToCart}

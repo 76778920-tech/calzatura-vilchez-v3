@@ -5,6 +5,7 @@ import { CartProvider } from "@/domains/carrito/context/CartContext";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
 import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "./routes/paths";
+import { CATALOG_SHELF } from "./routes/catalogRouting";
 import { AreaRoute, AuthenticatedRoute, PageLoader } from "./routes/RouteGuards";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 
@@ -36,6 +37,8 @@ const VerifyEmail = lazy(() => import("@/domains/publico/pages/VerifyEmail"));
 const Logo3DPage = lazy(() => import("@/domains/publico/pages/Logo3DPage"));
 const InfoPage = lazy(() => import("@/domains/publico/pages/InfoPage"));
 const ThesisIsoPage = lazy(() => import("@/domains/publico/pages/ThesisIsoPage"));
+const CyberWowLandingPage = lazy(() => import("@/domains/publico/pages/CyberWowLandingPage"));
+const ClubCalzadoLandingPage = lazy(() => import("@/domains/publico/pages/ClubCalzadoLandingPage"));
 
 function Storefront() {
   const { loading } = useAuth();
@@ -49,7 +52,17 @@ function Storefront() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path={PUBLIC_ROUTES.home} element={<HomePage />} />
-            <Route path={PUBLIC_ROUTES.products} element={<ProductsPage />} />
+            <Route path={CATALOG_SHELF.cyberLanding} element={<CyberWowLandingPage />} />
+            <Route path={CATALOG_SHELF.clubCalzadoLanding} element={<ClubCalzadoLandingPage />} />
+            <Route path={`${CATALOG_SHELF.products}/:categoria/:facetSlug`} element={<ProductsPage />} />
+            <Route path={`${CATALOG_SHELF.products}/:categoria`} element={<ProductsPage />} />
+            <Route path={CATALOG_SHELF.products} element={<ProductsPage />} />
+            <Route path={`${CATALOG_SHELF.outlet}/:categoria/:facetSlug`} element={<ProductsPage />} />
+            <Route path={`${CATALOG_SHELF.outlet}/:categoria`} element={<ProductsPage />} />
+            <Route path={CATALOG_SHELF.outlet} element={<ProductsPage />} />
+            <Route path={`${CATALOG_SHELF.nuevaTemporada}/:categoria/:facetSlug`} element={<ProductsPage />} />
+            <Route path={`${CATALOG_SHELF.nuevaTemporada}/:categoria`} element={<ProductsPage />} />
+            <Route path={CATALOG_SHELF.nuevaTemporada} element={<ProductsPage />} />
             <Route path={PUBLIC_ROUTES.productDetail} element={<ProductDetailPage />} />
             <Route path={PUBLIC_ROUTES.stores} element={<StoresPage />} />
             <Route path={PUBLIC_ROUTES.cart} element={<CartPage />} />

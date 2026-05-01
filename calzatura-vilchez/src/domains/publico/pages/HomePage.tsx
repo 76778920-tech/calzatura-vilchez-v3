@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   BadgeCheck,
+  ChevronLeft,
+  ChevronRight,
   PackageCheck,
   Shield,
   Truck,
@@ -11,16 +13,13 @@ import ProductCard from "@/domains/productos/components/ProductCard";
 import { fetchProducts } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import { countProductsForCategory, productMatchesAnySearch } from "@/utils/catalog";
+import { buildCatalogHref, buildCyberCatalogHref } from "@/routes/catalogRouting";
 import heroHombreBotin from "@/assets/home/hero-hombre-botin-ai.png";
 import heroFormal from "@/assets/home/hero-formal-ai.png";
 import cyberWowCampaign from "@/assets/home/cyber-wow-campaign-ai.png";
 import cyberWowCampaignMobile from "@/assets/home/cyber-wow-campaign-mobile-ai.png";
 import cyberEscolarVertical from "@/assets/home/cyber-escolar-vertical-ai.png";
 import cyberZapatillasVertical from "@/assets/home/cyber-zapatillas-vertical-ai.png";
-import featuredBoot from "@/assets/home/featured-boot-ai.png";
-import featuredLoafer from "@/assets/home/featured-loafer-ai.png";
-import featuredRunning from "@/assets/home/featured-running-ai.png";
-import featuredSandal from "@/assets/home/featured-sandal-ai.png";
 import heroMujer from "@/assets/home/hero-mujer-ai.png";
 import heroNinos from "@/assets/home/hero-ninos-ai.png";
 import heroOfertas from "@/assets/home/hero-ofertas-ai.png";
@@ -61,7 +60,7 @@ const HOME_CATEGORY_CARDS: HomeCategoryCard[] = [
   {
     label: "Hombre",
     slug: "hombre",
-    href: "/productos?categoria=hombre",
+    href: buildCatalogHref({ categoria: "hombre" }),
     image: categoryMenEditorial,
     copy: "Botines, casuales y urbanos",
     caption: "Presencia segura para cada paso",
@@ -71,7 +70,7 @@ const HOME_CATEGORY_CARDS: HomeCategoryCard[] = [
   {
     label: "Mujer",
     slug: "mujer",
-    href: "/productos?categoria=mujer",
+    href: buildCatalogHref({ categoria: "mujer" }),
     image: categoryWomenEditorial,
     copy: "Modelos cómodos con presencia",
     caption: "Estilo que acompaña tu ritmo",
@@ -81,7 +80,7 @@ const HOME_CATEGORY_CARDS: HomeCategoryCard[] = [
   {
     label: "Niños",
     slug: "nino",
-    href: "/productos?categoria=nino",
+    href: buildCatalogHref({ categoria: "nino" }),
     image: categoryChildrenEditorial,
     copy: "Resistentes para el día a día",
     caption: "Calidad para crecer jugando",
@@ -91,12 +90,12 @@ const HOME_CATEGORY_CARDS: HomeCategoryCard[] = [
   {
     label: "Zapatillas",
     slug: "zapatillas",
-    href: "/productos?buscar=zapatillas",
+    href: buildCatalogHref({ tipo: "zapatillas" }),
     image: categorySneakersEditorial,
     copy: "Urbanas, deportivas y casuales",
     caption: "Comodidad lista para moverse",
     area: "zapatillas",
-    match: { type: "search", terms: ["zapatillas", "deportivas", "urbanas"] },
+    match: { type: "search", terms: ["zapatillas"] },
   },
 ];
 
@@ -108,12 +107,12 @@ const HOME_HERO_SLIDES: HomeHeroSlide[] = [
     kicker: "Colección mujer",
     title: "Botines para caminar con estilo.",
     subtitle: "Diseños cómodos, versátiles y listos para acompañarte en cada salida.",
-    primaryLink: "/productos?categoria=mujer",
+    primaryLink: buildCatalogHref({ categoria: "mujer" }),
     primaryText: "Ver mujer",
-    secondaryLink: "/productos?buscar=botines",
+    secondaryLink: buildCatalogHref({ categoria: "mujer", tipo: "botines" }),
     secondaryText: "Botines",
     badges: ["Elegancia diaria", "Paso ligero", "Looks urbanos"],
-    spotlightTitle: "Curaduría lista para rotar todo el día.",
+    spotlightTitle: "Diseños pensados para el ritmo diario de la mujer moderna.",
     spotlightCopy: "Una selección para moverte con confianza, combinar fácil y mantener presencia sin esfuerzo.",
   },
   {
@@ -123,13 +122,13 @@ const HOME_HERO_SLIDES: HomeHeroSlide[] = [
     kicker: "Botín hombre",
     title: "Botines con carácter urbano.",
     subtitle: "Diseños resistentes para caminar seguro, combinar fácil y mantener presencia todos los días.",
-    primaryLink: "/productos?categoria=hombre",
+    primaryLink: buildCatalogHref({ categoria: "hombre" }),
     primaryText: "Ver hombre",
-    secondaryLink: "/productos?categoria=hombre&buscar=botines",
+    secondaryLink: buildCatalogHref({ categoria: "hombre", tipo: "botines" }),
     secondaryText: "Botines",
     badges: ["Textura premium", "Base firme", "Perfil sobrio"],
-    spotlightTitle: "Una silueta fuerte para ciudad, oficina y noche.",
-    spotlightCopy: "Pensado para quien quiere un par serio, adaptable y con mejor lectura visual desde la primera mirada.",
+    spotlightTitle: "Un par serio para ciudad, oficina y salidas de noche.",
+    spotlightCopy: "Construcción resistente, silueta adaptable y presencia que no necesita explicación desde la primera mirada.",
   },
   {
     id: "ninos",
@@ -138,13 +137,13 @@ const HOME_HERO_SLIDES: HomeHeroSlide[] = [
     kicker: "Infantil",
     title: "Resistencia para jugar, caminar y volver.",
     subtitle: "Tallas claras y modelos prácticos para acompañar cada día con comodidad.",
-    primaryLink: "/productos?categoria=nino",
+    primaryLink: buildCatalogHref({ categoria: "nino" }),
     primaryText: "Ver niños",
-    secondaryLink: "/productos?buscar=escolar",
+    secondaryLink: buildCatalogHref({ categoria: "nino", tipo: "escolar" }),
     secondaryText: "Escolar",
     badges: ["Más juego", "Ajuste práctico", "Uso diario"],
-    spotlightTitle: "Pares listos para el ritmo real de cada semana.",
-    spotlightCopy: "Modelos fáciles de elegir para clases, recreo y salidas, con mejor lectura de tallas y uso.",
+    spotlightTitle: "Pares listos para clases, recreo y salidas de toda la semana.",
+    spotlightCopy: "Modelos fáciles de elegir con mejor lectura de tallas, resistencia comprobada y uso real.",
   },
   {
     id: "zapatillas",
@@ -153,13 +152,13 @@ const HOME_HERO_SLIDES: HomeHeroSlide[] = [
     kicker: "Zapatillas",
     title: "Movimiento con comodidad desde el primer paso.",
     subtitle: "Encuentra zapatillas urbanas, deportivas y casuales para renovar tu rotación.",
-    primaryLink: "/productos?buscar=zapatillas",
+    primaryLink: buildCatalogHref({ tipo: "zapatillas" }),
     primaryText: "Ver zapatillas",
-    secondaryLink: "/productos?buscar=deportivas",
+    secondaryLink: buildCatalogHref({ tipo: "zapatillas", estilo: "deportivas" }),
     secondaryText: "Deportivas",
     badges: ["Ciudad activa", "Comodidad real", "Cambio de ritmo"],
-    spotlightTitle: "La vitrina más dinámica de la colección.",
-    spotlightCopy: "Una entrada más fresca para quien quiere renovar su rotación con pares fáciles de usar y combinar.",
+    spotlightTitle: "La sección más dinámica del catálogo para renovar tu rotación.",
+    spotlightCopy: "Zapatillas urbanas, deportivas y casuales con tallas visibles y precios claros en un solo lugar.",
   },
   {
     id: "formal",
@@ -168,59 +167,47 @@ const HOME_HERO_SLIDES: HomeHeroSlide[] = [
     kicker: "Calzado formal",
     title: "Presencia para oficina y eventos.",
     subtitle: "Pares pensados para verse bien sin perder comodidad durante el día.",
-    primaryLink: "/productos?buscar=formal",
+    primaryLink: buildCatalogHref({ tipo: "formal" }),
     primaryText: "Ver formales",
-    secondaryLink: "/productos?buscar=vestir",
-    secondaryText: "De vestir",
+    secondaryLink: buildCatalogHref({ categoria: "hombre", tipo: "formal" }),
+    secondaryText: "Hombre formal",
     badges: ["Línea limpia", "Impacto sobrio", "Comodidad extendida"],
-    spotlightTitle: "Un bloque visual más fino para vender mejor el par formal.",
-    spotlightCopy: "Ideal para quien busca elegancia sin ruido, con una entrada más seria, limpia y fácil de convertir.",
+    spotlightTitle: "Pares para la oficina, reuniones y eventos con presencia limpia.",
+    spotlightCopy: "Calzado formal pensado para quien quiere verse bien y estar cómodo de principio a fin del día.",
   },
   {
     id: "ofertas",
     image: heroOfertas,
-    alt: "Selección destacada del catálogo para comparar y elegir mejor.",
+    alt: "Selección destacada del catálogo con descuentos activos.",
     kicker: "Selección destacada",
-    title: "Modelos para comprar mejor.",
-    subtitle: "Explora pares destacados, compara tallas y guarda tus favoritos antes de decidir.",
-    primaryLink: "/productos?buscar=oferta",
-    primaryText: "Ver ofertas",
+    title: "Descuentos activos en calzado seleccionado.",
+    subtitle: "Pares con precio rebajado, tallas visibles y stock actualizado para decidir sin dudas.",
+    primaryLink: buildCyberCatalogHref({}),
+    primaryText: "Ver Cyber Wow",
     secondaryLink: "/favoritos",
     secondaryText: "Favoritos",
-    badges: ["Selección activa", "Compra rápida", "Mejor decisión"],
-    spotlightTitle: "Un frente más aspiracional para activar clics desde el inicio.",
-    spotlightCopy: "El objetivo es que la portada no solo informe: debe crear deseo y dirigir la mirada hacia compra inmediata.",
+    badges: ["Precios claros", "Tallas visibles", "Stock real"],
+    spotlightTitle: "Descuentos activos con stock real y tallas visibles antes de comprar.",
+    spotlightCopy: "Pares seleccionados con precio claro, stock actualizado y comparación directa en un solo vistazo.",
   },
 ];
 
-const HOME_SHOWCASE_LINKS = [
-  { label: "Nuevos ingresos", to: "/productos?buscar=nuevo" },
-  { label: "Más vendidos", to: "/productos?buscar=destacado" },
-  { label: "Compra por talla", to: "/productos" },
-];
 
 const HOME_CYBER_VERTICAL_CAMPAIGNS = [
   {
     title: "LO MEJOR EN ZAPATILLAS",
     image: cyberZapatillasVertical,
     alt: "Campaña vertical de zapatillas deportivas.",
-    to: "/productos?buscar=zapatillas",
-    cta: "Ver zapatillas",
+    to: buildCyberCatalogHref({ linea: "zapatillas", campana: "cyber" }),
+    cta: "Ver zapatillas Cyber",
   },
   {
     title: "LO MEJOR EN ZAPATO ESCOLAR",
     image: cyberEscolarVertical,
     alt: "Campaña vertical de calzado escolar para niñas.",
-    to: "/productos?categoria=nino&buscar=escolar",
-    cta: "Ver escolar",
+    to: buildCyberCatalogHref({ categoria: "nino", campana: "cyber", tipo: "escolar" }),
+    cta: "Ver escolar Cyber",
   },
-] as const;
-
-const HOME_FEATURED_EDITORIAL_IMAGES = [
-  featuredRunning,
-  featuredBoot,
-  featuredSandal,
-  featuredLoafer,
 ] as const;
 
 const HERO_ROTATION_MS = 10000;
@@ -240,6 +227,8 @@ export default function HomePage() {
   const heroDragStartXRef = useRef<number | null>(null);
   const heroDragStartYRef = useRef<number | null>(null);
   const heroSwipeSuppressClickRef = useRef(false);
+  const [categoriesVisible, setCategoriesVisible] = useState(false);
+  const categoriesGridRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -272,6 +261,25 @@ export default function HomePage() {
     return () => mediaQuery.removeEventListener("change", syncPreference);
   }, []);
 
+  useEffect(() => {
+    const grid = categoriesGridRef.current;
+    if (!grid || prefersReducedMotion) {
+      setCategoriesVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setCategoriesVisible(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.15 }
+    );
+    observer.observe(grid);
+    return () => observer.disconnect();
+  }, [prefersReducedMotion]);
+
   const heroSlides = HOME_HERO_SLIDES;
   const activeHero = heroSlides[activeHeroIndex] ?? heroSlides[0];
   const canAutoRotateHero = !prefersReducedMotion && heroSlides.length > 1;
@@ -296,17 +304,14 @@ export default function HomePage() {
   const updateHeroDrag = (clientX: number, clientY: number) => {
     const startX = heroDragStartXRef.current;
     const startY = heroDragStartYRef.current;
-    const container = heroCarouselRef.current;
-    if (startX === null || startY === null || !container) return;
+    if (startX === null || startY === null) return;
 
     const deltaX = clientX - startX;
     const deltaY = clientY - startY;
     if (Math.abs(deltaX) <= Math.abs(deltaY)) return;
 
-    const maxOffset = Math.max(72, container.getBoundingClientRect().width * 0.18);
-    const nextOffset = Math.max(-maxOffset, Math.min(maxOffset, deltaX));
     setIsHeroDragging(true);
-    setHeroDragOffset(nextOffset);
+    setHeroDragOffset(deltaX);
   };
 
   const beginHeroSwipe = (clientX: number, clientY: number) => {
@@ -419,27 +424,29 @@ export default function HomePage() {
     return "hidden";
   };
 
+  const [spotlightPage, setSpotlightPage] = useState(0);
+
   const productCount = products.length;
   const productCountLabel = error ? "--" : productCount || "Nuevo";
   const featuredProducts = useMemo(() => {
     const inStock = products.filter((product) => product.stock > 0);
     const selected = inStock.filter((product) => product.destacado);
-    return (selected.length > 0 ? selected : inStock).slice(0, 4);
+    return selected.length > 0 ? selected : inStock;
   }, [products]);
-  const featuredDisplayProducts = useMemo(
-    () =>
-      featuredProducts.map((product, index) => {
-        const editorialImage =
-          HOME_FEATURED_EDITORIAL_IMAGES[index % HOME_FEATURED_EDITORIAL_IMAGES.length];
 
-        return {
-          ...product,
-          imagen: editorialImage,
-          imagenes: [editorialImage],
-        };
-      }),
-    [featuredProducts],
-  );
+  const spotlightPages = useMemo(() => {
+    const pages: (typeof featuredProducts)[] = [];
+    for (let i = 0; i < featuredProducts.length; i += 4) {
+      pages.push(featuredProducts.slice(i, i + 4));
+    }
+    return pages;
+  }, [featuredProducts]);
+
+  const spotlightTotalPages = spotlightPages.length;
+
+  useEffect(() => {
+    setSpotlightPage(0);
+  }, [spotlightTotalPages]);
   const categoryCounts = useMemo(() => {
     return HOME_CATEGORY_CARDS.reduce<Record<string, number>>((acc, category) => {
       const match = category.match;
@@ -546,7 +553,7 @@ export default function HomePage() {
               <aside className="home-hero-showcase" aria-label="Vitrina destacada">
                 <div key={`showcase-${activeHero.id}`} className="home-showcase-shell">
                   <div className="home-showcase-copy-card">
-                    <span className="home-showcase-kicker">Curaduría central</span>
+                    <span className="home-showcase-kicker">{activeHero.kicker}</span>
                     <strong className="home-showcase-title">{activeHero.spotlightTitle}</strong>
                     <p className="home-showcase-copy">{activeHero.spotlightCopy}</p>
                   </div>
@@ -554,23 +561,16 @@ export default function HomePage() {
                   <div className="home-showcase-visual">
                     <img src={activeHero.image} alt={activeHero.alt} loading="eager" decoding="async" fetchPriority="high" />
                     <div className="home-showcase-badge home-showcase-badge-top">
-                      <span>Compra guiada</span>
-                      <strong>Stock visible</strong>
+                      <span>Disponible</span>
+                      <strong>{productCountLabel} modelos</strong>
                     </div>
                     <div className="home-showcase-badge home-showcase-badge-bottom">
-                      <span>Ruta activa</span>
+                      <span>Explorar</span>
                       <strong>{activeHero.secondaryText}</strong>
                     </div>
                   </div>
 
-                  <div className="home-showcase-rail">
-                    {HOME_SHOWCASE_LINKS.map((item) => (
-                      <Link key={item.label} to={item.to} className="home-showcase-link">
-                        <span>{item.label}</span>
-                        <ArrowRight size={14} />
-                      </Link>
-                    ))}
-                  </div>
+
                 </div>
 
               </aside>
@@ -596,10 +596,10 @@ export default function HomePage() {
 
       <section className="home-strip">
         <div className="home-strip-inner">
-          <div><Truck size={18} /> Envío coordinado</div>
-          <div><Shield size={18} /> Compra protegida</div>
-          <div><PackageCheck size={18} /> Stock visible</div>
-          <div><BadgeCheck size={18} /> Atención personalizada</div>
+          <div><Truck size={18} /> Envío a domicilio</div>
+          <div><Shield size={18} /> Pago 100% seguro</div>
+          <div><PackageCheck size={18} /> Stock en tiempo real</div>
+          <div><BadgeCheck size={18} /> Asesoría por WhatsApp</div>
         </div>
       </section>
 
@@ -609,7 +609,7 @@ export default function HomePage() {
             <source media="(max-width: 520px)" srcSet={cyberWowCampaignMobile} />
             <img
               src={cyberWowCampaign}
-              alt="Campa\u00f1a Cyber Wow con calzado premium"
+              alt="Campaña Cyber Wow con calzado premium"
               className="home-cyber-banner-image"
               loading="lazy"
               decoding="async"
@@ -621,10 +621,10 @@ export default function HomePage() {
             <h2 className="home-cyber-title">CYBER WOW</h2>
 
             <div className="home-cyber-button-row">
-              <Link to="/productos?categoria=hombre&buscar=oferta" className="home-cyber-cta home-cyber-cta-dark">
+              <Link to={buildCyberCatalogHref({ categoria: "hombre", campana: "cyber" })} className="home-cyber-cta home-cyber-cta-dark">
                 Cyber Hombre
               </Link>
-              <Link to="/productos?categoria=mujer&buscar=oferta" className="home-cyber-cta home-cyber-cta-light">
+              <Link to={buildCyberCatalogHref({ categoria: "mujer", campana: "cyber" })} className="home-cyber-cta home-cyber-cta-light">
                 Cyber Mujer
               </Link>
             </div>
@@ -662,7 +662,7 @@ export default function HomePage() {
               <span className="section-eyebrow">Más destacados</span>
               <h2 className="section-title">Lo más fuerte del catálogo, sin rodeos.</h2>
             </div>
-            <Link to="/productos?buscar=destacado" className="section-link">
+            <Link to={buildCatalogHref({ promocion: "destacados" })} className="section-link">
               Ver destacados <ArrowRight size={14} />
             </Link>
           </div>
@@ -671,14 +671,60 @@ export default function HomePage() {
             <div className="products-skeleton-grid home-spotlight-grid">
               {[...Array(4)].map((_, index) => <div key={index} className="skeleton-card" />)}
             </div>
-          ) : featuredDisplayProducts.length > 0 ? (
-            <div className="products-grid home-spotlight-grid">
-              {featuredDisplayProducts.map((product) => <ProductCard key={product.id} product={product} />)}
-            </div>
+          ) : featuredProducts.length > 0 ? (
+            spotlightTotalPages > 1 ? (
+              <div className="home-spotlight-carousel">
+                <div
+                  className="home-spotlight-track"
+                  style={{ transform: `translateX(-${spotlightPage * 100}%)` }}
+                >
+                  {spotlightPages.map((page, pi) => (
+                    <div key={pi} className="home-spotlight-page products-grid home-spotlight-grid">
+                      {page.map((product) => <ProductCard key={product.id} product={product} />)}
+                    </div>
+                  ))}
+                </div>
+                <div className="home-spotlight-nav">
+                  <button
+                    type="button"
+                    className="home-spotlight-nav-btn"
+                    onClick={() => setSpotlightPage((p) => Math.max(0, p - 1))}
+                    disabled={spotlightPage === 0}
+                    aria-label="Página anterior"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <div className="home-spotlight-dots">
+                    {spotlightPages.map((_, pi) => (
+                      <button
+                        key={pi}
+                        type="button"
+                        className={`home-spotlight-dot${pi === spotlightPage ? " is-active" : ""}`}
+                        onClick={() => setSpotlightPage(pi)}
+                        aria-label={`Página ${pi + 1}`}
+                      />
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    className="home-spotlight-nav-btn"
+                    onClick={() => setSpotlightPage((p) => Math.min(spotlightTotalPages - 1, p + 1))}
+                    disabled={spotlightPage === spotlightTotalPages - 1}
+                    aria-label="Página siguiente"
+                  >
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="products-grid home-spotlight-grid">
+                {featuredProducts.map((product) => <ProductCard key={product.id} product={product} />)}
+              </div>
+            )
           ) : (
             <div className="home-empty-catalog">
               <p>{error ?? "Estamos preparando una nueva selección de productos destacados para mostrar aquí."}</p>
-              <Link to="/productos" className="btn-primary">
+              <Link to={buildCatalogHref({})} className="btn-primary">
                 Ver catálogo
               </Link>
             </div>
@@ -692,20 +738,25 @@ export default function HomePage() {
             <span className="section-eyebrow">Explora por uso</span>
             <h2 className="section-title">Encuentra tu siguiente par</h2>
           </div>
-          <Link to="/productos" className="section-link">
-            Catalogo completo <ArrowRight size={14} />
+          <Link to={buildCatalogHref({})} className="section-link">
+            Catálogo completo <ArrowRight size={14} />
           </Link>
         </div>
 
-        <div className="home-categories-grid">
+        <div
+          ref={categoriesGridRef}
+          className={`home-categories-grid${categoriesVisible ? " is-visible" : ""}`}
+        >
           {HOME_CATEGORY_CARDS.map((category, index) => {
             const count = categoryCounts[category.slug] ?? 0;
+            const fromDir = index === 0 || index === 3 ? "left" : "right";
 
             return (
               <Link
                 key={category.slug}
                 to={category.href}
                 className={`home-category-card home-category-card-${category.area}`}
+                data-from={fromDir}
               >
                 <img
                   src={category.image}

@@ -122,6 +122,7 @@ const EMPTY_FORM: ProductForm = {
   color: "",
   colores: [],
   destacado: false,
+  descuento: undefined,
   costoCompra: 0,
   margenMinimo: 25,
   margenObjetivo: 45,
@@ -367,6 +368,7 @@ export default function AdminProducts() {
       colores: productColors,
       imagenes: normalizeImageSlots(product.imagenes, product.imagen),
       destacado: product.destacado ?? false,
+      descuento: product.descuento,
       costoCompra: product.finanzas?.costoCompra ?? 0,
       margenMinimo: product.finanzas?.margenMinimo ?? 25,
       margenObjetivo: product.finanzas?.margenObjetivo ?? 45,
@@ -597,6 +599,7 @@ export default function AdminProducts() {
         color: formatColors(colores),
         colores,
         destacado: form.destacado,
+        descuento: form.descuento,
       };
       const financialPayload = {
         costoCompra: form.costoCompra,
@@ -1105,14 +1108,32 @@ export default function AdminProducts() {
                     )}
                   </div>
 
-                  <label className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={form.destacado ?? false}
-                      onChange={(event) => setForm({ ...form, destacado: event.target.checked })}
-                    />
-                    Producto destacado
-                  </label>
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label>Descuento Cyber Wow</label>
+                      <select
+                        value={form.descuento ?? ""}
+                        onChange={(event) => {
+                          const val = event.target.value;
+                          setForm({ ...form, descuento: val ? (Number(val) as 10 | 20 | 30) : undefined });
+                        }}
+                        className="form-input"
+                      >
+                        <option value="">Sin descuento</option>
+                        <option value="10">10%</option>
+                        <option value="20">20%</option>
+                        <option value="30">30%</option>
+                      </select>
+                    </div>
+                    <label className="checkbox-label" style={{ alignSelf: "flex-end", paddingBottom: "0.5rem" }}>
+                      <input
+                        type="checkbox"
+                        checked={form.destacado ?? false}
+                        onChange={(event) => setForm({ ...form, destacado: event.target.checked })}
+                      />
+                      Producto destacado
+                    </label>
+                  </div>
 
                   <div className="form-group">
                     <label>Descripción</label>

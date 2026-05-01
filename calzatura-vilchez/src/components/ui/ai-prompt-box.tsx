@@ -505,7 +505,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
   return (
     <>
       {variant === "panel" && quickActions && quickActions.length > 0 && (
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div className="prompt-panel-quick-actions">
           {quickActions.map((action) => (
             <motion.button
               key={action.label}
@@ -514,7 +514,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => sendQuickAction(action.prompt)}
-              className="rounded-full border border-amber-400/35 bg-gradient-to-br from-amber-500/15 to-amber-600/5 px-3.5 py-1.5 text-left text-xs font-semibold text-amber-100 shadow-sm transition-colors hover:border-amber-300/55 hover:from-amber-400/25 disabled:pointer-events-none disabled:opacity-40"
+              className="prompt-panel-quick-action"
             >
               {action.label}
             </motion.button>
@@ -525,9 +525,8 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
         value={input} onValueChange={setInput} isLoading={isLoading} onSubmit={handleSubmit}
         className={cn(
           "w-full bg-[#1F2023] border-[#444444] transition-[box-shadow,border-color] duration-300",
+          variant === "panel" && "prompt-panel-box",
           isRecording && "border-red-500/70",
-          variant === "panel" &&
-            "border-amber-600/25 shadow-[0_12px_48px_-14px_rgba(201,162,39,0.28)] focus-within:border-amber-400/40 focus-within:shadow-[0_16px_56px_-12px_rgba(201,162,39,0.35)]",
           className,
         )}
         disabled={isLoading || isRecording}
@@ -553,7 +552,10 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
         )}
 
         <div className={cn("transition-all duration-300", isRecording ? "h-0 overflow-hidden opacity-0" : "opacity-100")}>
-          <PromptInputTextarea placeholder={showSearch ? "Buscar en la web..." : showThink ? "Analizar en profundidad..." : showCanvas ? "Crear en canvas..." : placeholder} />
+          <PromptInputTextarea
+            placeholder={showSearch ? "Buscar en la web..." : showThink ? "Analizar en profundidad..." : showCanvas ? "Crear en canvas..." : placeholder}
+            className={variant === "panel" ? "prompt-panel-textarea" : undefined}
+          />
         </div>
 
         {isRecording && (
@@ -567,17 +569,17 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
         <PromptInputActions className="justify-between pt-2">
           {variant === "panel" ? (
             <>
-              <p className="max-w-[min(100%,20rem)] pl-1 text-[11px] leading-snug text-gray-500">
-                {isRecording ? "Escuchando… habla con claridad." : "Enter envía · Shift+Enter nueva línea · Datos de este panel."}
+              <p className="prompt-panel-helper">
+                {isRecording ? "Escuchando... habla con claridad." : "Enter envía · Shift+Enter nueva línea · Datos de este panel."}
               </p>
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="prompt-panel-actions">
                 <PromptInputAction tooltip={isRecording ? "Parar grabación" : "Dictar (es-PE)"}>
                   <Button
                     type="button"
                     variant="outline"
                     size="icon"
                     className={cn(
-                      "h-9 w-9 rounded-full border-[#555] bg-transparent text-[#D1D5DB] hover:bg-gray-600/25",
+                      "prompt-panel-mic-btn h-9 w-9 rounded-full",
                       isRecording && "border-red-500/50 text-red-400",
                     )}
                     onClick={() => { if (isRecording) stopVoiceRecording(); else if (!isLoading) startVoiceRecording(); }}
@@ -589,8 +591,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                 <Button
                   type="button"
                   className={cn(
-                    "inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-sm font-bold transition-all",
-                    "bg-gradient-to-r from-amber-200 via-amber-300 to-amber-400 text-stone-900 shadow-md hover:brightness-105",
+                    "prompt-panel-send-btn inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-sm font-bold transition-all",
                     "disabled:pointer-events-none disabled:opacity-35",
                   )}
                   onClick={handleSubmit}

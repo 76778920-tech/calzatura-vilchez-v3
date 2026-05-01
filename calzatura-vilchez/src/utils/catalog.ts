@@ -179,5 +179,30 @@ export function productMatchesTaxonomy(product: Product, key: TaxonomyKey, value
     if (tipoValue.includes(normalized)) return true;
   }
 
+  if (key === "promocion") {
+    if (value === "destacados") return Boolean(product.destacado) && product.stock > 0;
+    if (value === "oferta") return (product.descuento ?? 0) > 0;
+  }
+
   return productMatchesAnySearch(product, getTaxonomyTerms(key, value));
+}
+
+/** Facetas que pueden codificarse como segundo segmento de URL bajo una categoría. */
+export type CatalogPathFacetKey = "tipo" | "linea" | "segmento" | "coleccion" | "estilo";
+
+const PATH_FACET_ORDER: CatalogPathFacetKey[] = ["tipo", "linea", "segmento", "coleccion", "estilo"];
+
+/**
+ * Interpreta un slug de URL (p. ej. "zapatillas", "urban-glow") como faceta de catálogo.
+ * Orden: tipo → línea → segmento → colección → estilo (primera coincidencia en taxonomía).
+ */
+export function resolvePathFacetSlug(slug: string): { key: CatalogPathFacetKey; value: string } | null {
+  const normalized = slugifyCatalogValue(slug);
+  if (!normalized) return null;
+  for (const key of PATH_FACET_ORDER) {
+    if (normalized in TAXONOMY_TERM_MAP[key]) {
+      return { key, value: normalized };
+    }
+  }
+  return null;
 }

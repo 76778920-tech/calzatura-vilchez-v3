@@ -24,6 +24,15 @@ import { logoutUser } from "@/domains/usuarios/services/auth";
 import { fetchProducts } from "@/domains/productos/services/products";
 import { useThemeMode } from "@/hooks/useThemeMode";
 import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
+import {
+  buildCatalogHref,
+  buildCyberCatalogHref,
+  catalogRouteParamsFromPathname,
+  CATALOG_SHELF,
+  getCatalogUrlKey,
+  isProductCatalogPath,
+  mergeCatalogSearchParams,
+} from "@/routes/catalogRouting";
 import type { Product } from "@/types";
 import CartSidebar from "@/domains/carrito/components/CartSidebar";
 import BrandLogo from "@/components/brand/BrandLogo";
@@ -57,15 +66,7 @@ function slugifyRouteValue(value: string) {
 }
 
 function buildProductsRoute(params: Record<string, string | undefined>) {
-  const search = new URLSearchParams();
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (!value) return;
-    search.set(key, value);
-  });
-
-  const query = search.toString();
-  return query ? `${PUBLIC_ROUTES.products}?${query}` : PUBLIC_ROUTES.products;
+  return buildCatalogHref(params);
 }
 
 function buildBrandRoute(brand: string) {
@@ -104,7 +105,7 @@ const megaMenus: MegaMenu[] = [
     featured: [
       {
         label: "Cyber Hombre",
-        to: buildProductsRoute({ categoria: "hombre", campana: "cyber" }),
+        to: buildCyberCatalogHref({ categoria: "hombre", campana: "cyber" }),
         accent: true,
         hoverPanel: {
           eyebrow: "CYBER HOMBRE",
@@ -112,86 +113,86 @@ const megaMenus: MegaMenu[] = [
           items: [
             {
               label: "Zapatillas Cyber",
-              to: buildProductsRoute({ categoria: "hombre", campana: "cyber", tipo: "zapatillas" }),
+              to: buildCyberCatalogHref({ categoria: "hombre", campana: "cyber", tipo: "zapatillas" }),
               image: cyberHombreEditorial,
             },
             {
               label: "Zapatos Cyber",
-              to: buildProductsRoute({ categoria: "hombre", campana: "cyber", tipo: "zapatos" }),
+              to: buildCyberCatalogHref({ categoria: "hombre", campana: "cyber", tipo: "zapatos" }),
               image: cyberHombreEditorial,
             },
             {
               label: "Botines Cyber",
-              to: buildProductsRoute({ categoria: "hombre", campana: "cyber", tipo: "botines" }),
+              to: buildCyberCatalogHref({ categoria: "hombre", campana: "cyber", tipo: "botines" }),
               image: cyberHombreEditorial,
             },
-            { label: "Ver Todo", to: buildProductsRoute({ categoria: "hombre", campana: "cyber" }), image: cyberHombreEditorial },
+            { label: "Ver Todo", to: buildCyberCatalogHref({ categoria: "hombre", campana: "cyber" }), image: cyberHombreEditorial },
           ],
         },
       },
       {
         label: "Cyber Mujer",
-        to: buildProductsRoute({ categoria: "mujer", campana: "cyber" }),
+        to: buildCyberCatalogHref({ categoria: "mujer", campana: "cyber" }),
         hoverPanel: {
           eyebrow: "CYBER MUJER",
           layout: "list",
           items: [
             {
               label: "Zapatillas Cyber",
-              to: buildProductsRoute({ categoria: "mujer", campana: "cyber", tipo: "zapatillas" }),
+              to: buildCyberCatalogHref({ categoria: "mujer", campana: "cyber", tipo: "zapatillas" }),
               image: cyberMujerEditorial,
             },
             {
               label: "Sandalias Cyber",
-              to: buildProductsRoute({ categoria: "mujer", campana: "cyber", tipo: "sandalias" }),
+              to: buildCyberCatalogHref({ categoria: "mujer", campana: "cyber", tipo: "sandalias" }),
               image: cyberMujerEditorial,
             },
             {
               label: "Botines Cyber",
-              to: buildProductsRoute({ categoria: "mujer", campana: "cyber", tipo: "botines" }),
+              to: buildCyberCatalogHref({ categoria: "mujer", campana: "cyber", tipo: "botines" }),
               image: cyberMujerEditorial,
             },
-            { label: "Ver Todo", to: buildProductsRoute({ categoria: "mujer", campana: "cyber" }), image: cyberMujerEditorial },
+            { label: "Ver Todo", to: buildCyberCatalogHref({ categoria: "mujer", campana: "cyber" }), image: cyberMujerEditorial },
           ],
         },
       },
       {
         label: "Cyber Infantil",
-        to: buildProductsRoute({ categoria: "nino", campana: "cyber", segmento: "infantil" }),
+        to: buildCyberCatalogHref({ categoria: "nino", campana: "cyber", segmento: "infantil" }),
         hoverPanel: {
           eyebrow: "CYBER INFANTIL",
           layout: "list",
           items: [
             {
               label: "Escolar Cyber",
-              to: buildProductsRoute({ categoria: "nino", campana: "cyber", tipo: "escolar" }),
+              to: buildCyberCatalogHref({ categoria: "nino", campana: "cyber", tipo: "escolar" }),
               image: cyberInfantilEditorial,
             },
             {
               label: "Juvenil Activo",
-              to: buildProductsRoute({ categoria: "nino", campana: "cyber", segmento: "juvenil" }),
+              to: buildCyberCatalogHref({ categoria: "nino", campana: "cyber", segmento: "juvenil" }),
               image: cyberInfantilEditorial,
             },
             {
               label: "Zapatillas Cyber",
-              to: buildProductsRoute({ categoria: "nino", campana: "cyber", tipo: "zapatillas" }),
+              to: buildCyberCatalogHref({ categoria: "nino", campana: "cyber", tipo: "zapatillas" }),
               image: cyberInfantilEditorial,
             },
-            { label: "Ver Todo", to: buildProductsRoute({ categoria: "nino", campana: "cyber" }), image: cyberInfantilEditorial },
+            { label: "Ver Todo", to: buildCyberCatalogHref({ categoria: "nino", campana: "cyber" }), image: cyberInfantilEditorial },
           ],
         },
       },
       {
         label: "Cyber Zapatillas",
-        to: buildProductsRoute({ linea: "zapatillas", campana: "cyber" }),
+        to: buildCyberCatalogHref({ linea: "zapatillas", campana: "cyber" }),
         hoverPanel: {
           eyebrow: "CYBER ZAPATILLAS",
           layout: "list",
           items: [
-            { label: "Mujer", to: buildProductsRoute({ categoria: "mujer", tipo: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
-            { label: "Hombre", to: buildProductsRoute({ categoria: "hombre", tipo: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
-            { label: "Niños", to: buildProductsRoute({ categoria: "nino", tipo: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
-            { label: "Ver Todo", to: buildProductsRoute({ linea: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
+            { label: "Mujer", to: buildCyberCatalogHref({ categoria: "mujer", tipo: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
+            { label: "Hombre", to: buildCyberCatalogHref({ categoria: "hombre", tipo: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
+            { label: "Niños", to: buildCyberCatalogHref({ categoria: "nino", tipo: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
+            { label: "Ver Todo", to: buildCyberCatalogHref({ linea: "zapatillas", campana: "cyber" }), image: cyberZapatillasEditorial },
           ],
         },
       },
@@ -683,37 +684,24 @@ export default function Header() {
   const [mobileMenuMode, setMobileMenuMode] = useState<MobileMenuMode>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const activeMenu = megaMenus.find((menu) => menu.id === activeMenuId) ?? null;
-  const currentCategory = normalizeRouteToken(searchParams.get("categoria"));
-  const currentView = normalizeRouteToken(searchParams.get("vista"));
-  const currentSearch = normalizeRouteToken(searchParams.get("buscar"));
-  const currentBrand = normalizeRouteToken(searchParams.get("marca"));
-  const currentBrandSlug = normalizeRouteToken(searchParams.get("marcaSlug"));
-  const currentCampaign = normalizeRouteToken(searchParams.get("campana"));
-  const currentCollection = normalizeRouteToken(searchParams.get("coleccion"));
-  const currentStyle = normalizeRouteToken(searchParams.get("estilo"));
-  const currentType = normalizeRouteToken(searchParams.get("tipo"));
-  const currentLine = normalizeRouteToken(searchParams.get("linea"));
-  const currentSegment = normalizeRouteToken(searchParams.get("segmento"));
-  const currentColor = normalizeRouteToken(searchParams.get("color"));
-  const currentPromotion = normalizeRouteToken(searchParams.get("promocion"));
-  const hasProductFilters = Boolean(
-    currentCategory ||
-      currentView ||
-      currentSearch ||
-      currentBrand ||
-      currentBrandSlug ||
-      currentCampaign ||
-      currentCollection ||
-      currentStyle ||
-      currentType ||
-      currentLine ||
-      currentSegment ||
-      currentColor ||
-      currentPromotion
+  const mergedCatalogParams = useMemo(
+    () => mergeCatalogSearchParams(location.pathname, catalogRouteParamsFromPathname(location.pathname), searchParams),
+    [location.pathname, searchParams]
   );
 
+  const currentCategory = normalizeRouteToken(mergedCatalogParams.get("categoria"));
+  const currentView = normalizeRouteToken(mergedCatalogParams.get("vista"));
+  const currentSearch = normalizeRouteToken(mergedCatalogParams.get("buscar"));
+  const currentBrand = normalizeRouteToken(mergedCatalogParams.get("marca"));
+  const currentBrandSlug = normalizeRouteToken(mergedCatalogParams.get("marcaSlug"));
+  const currentCampaign = normalizeRouteToken(mergedCatalogParams.get("campana"));
+  const currentType = normalizeRouteToken(mergedCatalogParams.get("tipo"));
+  const currentLine = normalizeRouteToken(mergedCatalogParams.get("linea"));
+  const currentColor = normalizeRouteToken(mergedCatalogParams.get("color"));
+  const currentPromotion = normalizeRouteToken(mergedCatalogParams.get("promocion"));
+
   const currentRouteMenuId = useMemo(() => {
-    if (location.pathname !== PUBLIC_ROUTES.products) return null;
+    if (!isProductCatalogPath(location.pathname)) return null;
     if (currentView === "marcas" || currentBrand || currentBrandSlug) return "marcas";
     if (
       currentCampaign === "cyber" ||
@@ -755,13 +743,15 @@ export default function Header() {
   const isLinkCurrent = useMemo(() => {
     return (to: string) => {
       const target = new URL(to, "https://calzatura.local");
+      if (isProductCatalogPath(target.pathname) || isProductCatalogPath(location.pathname)) {
+        return getCatalogUrlKey(location.pathname, location.search) === getCatalogUrlKey(target.pathname, target.search);
+      }
       if (target.pathname !== location.pathname) return false;
 
       const targetParams = new URLSearchParams(target.search);
       const entries = Array.from(targetParams.entries());
 
       if (entries.length === 0) {
-        if (target.pathname === "/productos") return !hasProductFilters;
         return true;
       }
 
@@ -773,7 +763,7 @@ export default function Header() {
         return current === expected;
       });
     };
-  }, [hasProductFilters, location.pathname, searchParams]);
+  }, [location.pathname, location.search, searchParams]);
 
   useEffect(() => {
     fetchProducts()
@@ -851,10 +841,10 @@ export default function Header() {
     const query = headerSearch.trim();
     closeMegaMenu();
     if (!query) {
-      navigate(PUBLIC_ROUTES.products);
+      navigate(CATALOG_SHELF.products);
       return;
     }
-    navigate(`${PUBLIC_ROUTES.products}?buscar=${encodeURIComponent(query)}`);
+    navigate(buildCatalogHref({ buscar: query }));
   };
 
   const selectSuggestion = (product: Product) => {
