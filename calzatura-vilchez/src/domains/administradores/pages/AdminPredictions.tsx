@@ -52,6 +52,7 @@ async function invalidateAICache() {
 
 interface Prediction {
   productId: string;
+  imagen?: string;
   codigo: string;
   nombre: string;
   categoria: string;
@@ -63,6 +64,7 @@ interface Prediction {
   total_vendido_historico: number;
   promedio_diario_historico: number;
   ventas_7_dias: number;
+  ventas_15_dias?: number;
   ventas_30_dias: number;
   consumo_diario_7: number;
   consumo_diario_30: number;
@@ -163,14 +165,15 @@ function loadPref<T extends number>(key: string, valid: T[], fallback: T): T {
   const v = Number(localStorage.getItem(key));
   return (valid as number[]).includes(v) ? (v as T) : fallback;
 }
-type PredictionTab = "resumen" | "ventas" | "finanzas" | "modelo" | "asistente";
+type PredictionTab = "resumen" | "ventas" | "finanzas" | "ranking" | "modelo" | "asistente";
+type RankingPeriod = 7 | 15 | 30;
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-const TAB_SEQUENCE: PredictionTab[] = ["resumen", "ventas", "finanzas", "modelo", "asistente"];
+const TAB_SEQUENCE: PredictionTab[] = ["resumen", "ventas", "finanzas", "ranking", "modelo", "asistente"];
 
 interface Recomendación {
   tipo: "urgente" | "atencion" | "oportunidad" | "tranquilo";
@@ -1573,6 +1576,7 @@ export default function AdminPredictions() {
   const [aiLoading, setAiLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<PredictionTab>("resumen");
   const [tabDirection, setTabDirection] = useState(1);
+  const [rankingPeriod, setRankingPeriod] = useState<RankingPeriod>(30);
   const [weeklyChartFetched, setWeeklyChartFetched] = useState(false);
   const [weeklyChartLoading, setWeeklyChartLoading] = useState(false);
   const [modelMetricsFetched, setModelMetricsFetched] = useState(false);
@@ -2032,6 +2036,9 @@ export default function AdminPredictions() {
         </button>
         <button type="button" role="tab" aria-selected={activeTab === "finanzas"} className={`pred-tab ${activeTab === "finanzas" ? "active" : ""}`} onClick={() => changeTab("finanzas")}>
           Finanzas
+        </button>
+        <button type="button" role="tab" aria-selected={activeTab === "ranking"} className={`pred-tab ${activeTab === "ranking" ? "active" : ""}`} onClick={() => changeTab("ranking")}>
+          Ranking
         </button>
         <button type="button" role="tab" aria-selected={activeTab === "modelo"} className={`pred-tab ${activeTab === "modelo" ? "active" : ""}`} onClick={() => changeTab("modelo")}>
           Modelo IA
@@ -2519,6 +2526,114 @@ export default function AdminPredictions() {
           )}
         </motion.div>
       )}
+
+      {/* ── Pestaña: Ranking ─────────────────────────────── */}
+      {activeTab === "ranking" && (() => {
+        const periodKey: keyof Prediction = rankingPeriod === 7 ? "ventas_7_dias" : rankingPeriod === 15 ? "ventas_15_dias" : "ventas_30_dias";
+        const periodLabel = rankingPeriod === 7 ? "7 días" : rankingPeriod === 15 ? "15 días" : "30 días";
+        const withHistory = predictions.filter(p => !p.sin_historial && (p[periodKey] as number ?? 0) > 0);
+        const top3 = [...withHistory].sort((a, b) => ((b[periodKey] as number) ?? 0) - ((a[periodKey] as number) ?? 0)).slice(0, 3);
+        const bottomPool = predictions
+          .filter(p => p.stock_actual > 0)
+          .sort((a, b) => ((a[periodKey] as number) ?? 0) - ((b[periodKey] as number) ?? 0));
+        const bottom = bottomPool.slice(0, 6);
+
+        const getRecomendacion = (p: Prediction): { texto: string; nivel: "critico" | "advertencia" | "sugerencia" } => {
+          const v = (p[periodKey] as number) ?? 0;
+          if (p.sin_historial && p.stock_actual === 0) return { texto: "Sin stock y sin ventas. Evalúa si el producto sigue vigente en el catálogo.", nivel: "sugerencia" };
+          if (p.sin_historial) return { texto: "Sin ventas registradas. Verifica visibilidad en tienda y precio competitivo.", nivel: "sugerencia" };
+          if (v === 0 && p.stock_actual > 20) return { texto: "Sin movimiento con stock alto. Aplica descuento del 20–30% o liquida antes de que pierda valor.", nivel: "critico" };
+          if (v === 0 && p.stock_actual > 0) return { texto: "Sin ventas en este período. Revisa precio, ubicación en tienda o visibilidad en web.", nivel: "advertencia" };
+          if (v < 2 && p.stock_actual > 15) return { texto: "Rotación muy baja con sobrestock. Combínalo en kit con producto estrella o reubica en zona de mayor tráfico.", nivel: "advertencia" };
+          if (p.tendencia === "bajando" && p.stock_actual > 20) return { texto: "Demanda en descenso con inventario alto. Reduce precio ahora antes de que el stock siga acumulando.", nivel: "advertencia" };
+          if (p.dias_hasta_agotarse > 90) return { texto: "Cobertura mayor a 3 meses: capital inmovilizado. Prioriza liquidar con descuento promocional.", nivel: "advertencia" };
+          return { texto: "Rotación baja pero estable. Monitorea semanalmente y considera una promoción puntual.", nivel: "sugerencia" };
+        };
+
+        const medals = ["🥇", "🥈", "🥉"];
+        const medalColors = ["ranking-gold", "ranking-silver", "ranking-bronze"];
+
+        return (
+          <motion.div key="tab-ranking" initial={{ opacity: 0, x: tabDirection * 28 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -tabDirection * 28 }} transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}>
+            {/* Selector de período */}
+            <div className="ranking-period-bar">
+              <span className="ranking-period-label">Período:</span>
+              {([7, 15, 30] as RankingPeriod[]).map(p => (
+                <button key={p} type="button" className={`ranking-period-btn${rankingPeriod === p ? " active" : ""}`} onClick={() => setRankingPeriod(p)}>
+                  {p === 7 ? "Semana" : p === 15 ? "15 días" : "Mes"}
+                </button>
+              ))}
+            </div>
+
+            {/* Pódium top 3 */}
+            <div className="ranking-section-title">
+              <TrendingUp size={16} /> Top 3 más vendidos — {periodLabel}
+            </div>
+            {top3.length === 0 ? (
+              <p className="ranking-empty">No hay datos de ventas para este período aún.</p>
+            ) : (
+              <div className="ranking-podium">
+                {top3.map((p, i) => (
+                  <div key={p.productId} className={`ranking-podium-card ${medalColors[i]}`}>
+                    <div className="ranking-medal">{medals[i]}</div>
+                    {p.imagen ? (
+                      <img src={p.imagen} alt={p.nombre} className="ranking-product-img" loading="lazy" />
+                    ) : (
+                      <div className="ranking-product-img-placeholder">
+                        <Package size={28} />
+                      </div>
+                    )}
+                    <div className="ranking-podium-name">{p.nombre}</div>
+                    <div className="ranking-podium-cat">{p.categoria}</div>
+                    <div className="ranking-podium-units">
+                      <strong>{((p[periodKey] as number) ?? 0).toFixed(0)}</strong>
+                      <span> uds</span>
+                    </div>
+                    <div className="ranking-podium-rev">
+                      S/ {((p[periodKey] as number ?? 0) * p.precio).toLocaleString("es-PE", { maximumFractionDigits: 0 })}
+                    </div>
+                    <div className={`ranking-trend-badge ${p.tendencia}`}>
+                      {p.tendencia === "subiendo" ? "↑ Subiendo" : p.tendencia === "bajando" ? "↓ Bajando" : "→ Estable"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Productos sin salida */}
+            <div className="ranking-section-title ranking-section-title-warn">
+              <AlertTriangle size={16} /> Productos de baja rotación — {periodLabel}
+            </div>
+            <p className="ranking-section-note">Productos con stock disponible y pocas o ninguna venta en el período. Se incluyen recomendaciones de acción.</p>
+            <div className="ranking-bottom-list">
+              {bottom.map((p, i) => {
+                const rec = getRecomendacion(p);
+                const ventas = (p[periodKey] as number) ?? 0;
+                return (
+                  <div key={p.productId} className={`ranking-bottom-card ranking-bottom-${rec.nivel}`}>
+                    <div className="ranking-bottom-left">
+                      <span className="ranking-bottom-pos">#{i + 1}</span>
+                      {p.imagen ? (
+                        <img src={p.imagen} alt={p.nombre} className="ranking-bottom-img" loading="lazy" />
+                      ) : (
+                        <div className="ranking-bottom-img-placeholder"><Package size={18} /></div>
+                      )}
+                      <div className="ranking-bottom-info">
+                        <div className="ranking-bottom-name">{p.nombre}</div>
+                        <div className="ranking-bottom-meta">{p.categoria} · Stock: {p.stock_actual} uds · Vendido: {ventas.toFixed(0)} uds</div>
+                      </div>
+                    </div>
+                    <div className={`ranking-rec ranking-rec-${rec.nivel}`}>
+                      <span className="ranking-rec-icon">{rec.nivel === "critico" ? "🔴" : rec.nivel === "advertencia" ? "🟡" : "🔵"}</span>
+                      <span>{rec.texto}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        );
+      })()}
 
       {/* ── Pestaña: Modelo IA ───────────────────────────── */}
       {activeTab === "modelo" && (

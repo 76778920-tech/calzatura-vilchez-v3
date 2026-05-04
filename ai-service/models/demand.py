@@ -354,6 +354,7 @@ def predict_demand(
     feature_stats = training_meta.get("feature_stats", {})
 
     window_7 = min(7, history_days)
+    window_15 = min(15, history_days)
     window_30 = min(30, history_days)
 
     recent_predictions = []
@@ -378,6 +379,7 @@ def predict_demand(
 
         weekly = round(estimated_daily * 7, 1)
         sales_7 = round(sum(series[-window_7:]), 1) if window_7 else 0.0
+        sales_15 = round(sum(series[-window_15:]), 1) if window_15 else 0.0
         sales_30 = round(sum(series[-window_30:]), 1) if window_30 else 0.0
         avg_7 = sales_7 / window_7 if window_7 else 0.0
         avg_30 = sales_30 / window_30 if window_30 else 0.0
@@ -389,6 +391,7 @@ def predict_demand(
         stock = int(product.get("stock", 0))
         nombre = product.get("nombre") or meta.get("nombre", pid)
         categoria = product.get("categoria") or meta.get("categoria", "")
+        imagen = product.get("imagen") or ""
         raw_precio = product.get("precio")
         precio = (
             _safe_float(raw_precio)
@@ -427,6 +430,7 @@ def predict_demand(
         predicted_pids.add(pid)
         recent_predictions.append({
             "productId": pid,
+            "imagen": imagen,
             "codigo": codigo,
             "nombre": nombre,
             "categoria": categoria,
@@ -438,6 +442,7 @@ def predict_demand(
             "total_vendido_historico": round(total_sold, 1),
             "promedio_diario_historico": round(avg_daily_hist, 2),
             "ventas_7_dias": sales_7,
+            "ventas_15_dias": sales_15,
             "ventas_30_dias": sales_30,
             "consumo_diario_7": round(avg_7, 2),
             "consumo_diario_30": round(avg_30, 2),
@@ -513,6 +518,7 @@ def predict_demand(
             continue
         predictions.append({
             "productId": pid,
+            "imagen": product.get("imagen") or "",
             "codigo": codes_map.get(pid, ""),
             "nombre": product.get("nombre", pid),
             "categoria": product.get("categoria", ""),
@@ -524,6 +530,7 @@ def predict_demand(
             "total_vendido_historico": 0,
             "promedio_diario_historico": 0,
             "ventas_7_dias": 0,
+            "ventas_15_dias": 0,
             "ventas_30_dias": 0,
             "consumo_diario_7": 0,
             "consumo_diario_30": 0,
