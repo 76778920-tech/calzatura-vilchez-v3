@@ -64,10 +64,7 @@ def fetch_completed_orders(days: int | None = None) -> list[dict]:
         "estado": "in.(pagado,enviado,entregado)",
     }
     if days and days > 0:
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        # OR para capturar pedidos antiguos pagados recientemente (pagadoEn >= cutoff)
-        # aunque su creadoEn esté fuera del window. NULL en pagadoEn no matchea el
-        # segundo predicado, por lo que filas sin pagadoEn solo entran por creadoEn.
+        cutoff = _cutoff_iso(days)  # date-only "YYYY-MM-DD" — avoids +00:00 in OR filter
         params["or"] = f"(creadoEn.gte.{cutoff},pagadoEn.gte.{cutoff})"
     return _query("pedidos", params)
 
