@@ -122,6 +122,11 @@ interface IreDimensiones {
   riesgo_ingresos: number;
   riesgo_demanda: number;
 }
+interface IrePesos {
+  riesgo_stock: number;
+  riesgo_ingresos: number;
+  riesgo_demanda: number;
+}
 interface IreDetalle {
   productos_criticos: number;
   productos_atencion: number;
@@ -135,6 +140,7 @@ interface IreData {
   nivel: "bajo" | "moderado" | "alto" | "critico";
   descripcion: string;
   dimensiones: IreDimensiones;
+  pesos: IrePesos;
   detalle: IreDetalle;
 }
 
@@ -196,6 +202,16 @@ interface ChatMessage {
 }
 
 const TAB_SEQUENCE: PredictionTab[] = ["resumen", "ventas", "finanzas", "ranking", "modelo", "asistente"];
+
+const IRE_NIVEL_LABELS: Record<string, string> = {
+  bajo: "Bajo", moderado: "Moderado", alto: "Alto", critico: "Crítico",
+};
+
+const IRE_DIM_CONFIG: { key: keyof IreDimensiones; label: string }[] = [
+  { key: "riesgo_stock",    label: "Stock" },
+  { key: "riesgo_ingresos", label: "Ingresos" },
+  { key: "riesgo_demanda",  label: "Demanda" },
+];
 
 interface Recomendación {
   tipo: "urgente" | "atencion" | "oportunidad" | "tranquilo";
@@ -2109,19 +2125,19 @@ export default function AdminPredictions() {
                   <span className="ire-score">{ireData.score}</span>
                   <span className="ire-score-max">/100</span>
                   <span className={`ire-nivel ire-nivel-${ireData.nivel}`}>
-                    {{ bajo: "Bajo", moderado: "Moderado", alto: "Alto", critico: "Crítico" }[ireData.nivel] ?? ireData.nivel}
+                    {IRE_NIVEL_LABELS[ireData.nivel] ?? ireData.nivel}
                   </span>
                 </div>
                 <p className="ire-desc">{ireData.descripcion}</p>
               </div>
               <div className="ire-dims">
-                {[
-                  { label: "Stock 40%", val: ireData.dimensiones.riesgo_stock },
-                  { label: "Ingresos 35%", val: ireData.dimensiones.riesgo_ingresos },
-                  { label: "Demanda 25%", val: ireData.dimensiones.riesgo_demanda },
-                ].map(({ label, val }) => (
-                  <div key={label} className="ire-dim">
-                    <div className="ire-dim-label">{label}</div>
+                {IRE_DIM_CONFIG.map(({ key, label }) => {
+                  const val = ireData.dimensiones[key];
+                  const peso = ireData.pesos[key];
+                  const pesoLabel = `${label} ${Math.round(peso * 100)}%`;
+                  return (
+                  <div key={key} className="ire-dim">
+                    <div className="ire-dim-label">{pesoLabel}</div>
                     <div className="ire-dim-bar-bg">
                       <div
                         className={`ire-dim-bar ire-dim-bar-${val >= 75 ? "critico" : val >= 50 ? "alto" : val >= 25 ? "moderado" : "bajo"}`}
@@ -2130,7 +2146,8 @@ export default function AdminPredictions() {
                     </div>
                     <div className="ire-dim-val">{val}</div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </motion.div>
           )}
