@@ -22,9 +22,11 @@ export function parseColorList(value = "") {
   return Array.from(unique.values()).slice(0, 5);
 }
 
-export function getProductColors(product: { color?: string }) {
-  const c = capitalizeWords(product.color ?? "");
-  return c ? [c] : [];
+export function getProductColors(product: { color?: string; colores?: string[] }) {
+  if (Array.isArray(product.colores) && product.colores.length > 0) {
+    return product.colores.map(capitalizeWords).filter(Boolean).slice(0, 5);
+  }
+  return parseColorList(product.color ?? "");
 }
 
 export function formatColors(colors: string[]) {
