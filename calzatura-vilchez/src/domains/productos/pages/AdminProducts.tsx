@@ -109,6 +109,7 @@ const EMPTY_FORM: ProductForm = {
   estilo: "",
   color: "",
   destacado: false,
+  activo: true,
   descuento: undefined,
   campana: undefined,
   costoCompra: 0,
@@ -446,6 +447,7 @@ export default function AdminProducts() {
       color: capitalizeWords(product.color ?? ""),
       imagenes: normalizeImageSlots(product.imagenes, product.imagen),
       destacado: product.destacado ?? false,
+      activo: product.activo ?? true,
       descuento: product.descuento,
       estilo: product.estilo ?? "",
       costoCompra: product.finanzas?.costoCompra ?? 0,
@@ -480,6 +482,7 @@ export default function AdminProducts() {
       tallas: [],
       stock: 0,
       destacado: product.destacado ?? false,
+      activo: product.activo ?? true,
       descuento: product.descuento,
       estilo: product.estilo ?? "",
       costoCompra: product.finanzas?.costoCompra ?? 0,
@@ -768,6 +771,7 @@ export default function AdminProducts() {
           color,
           familiaId,
           destacado: form.destacado,
+          activo: form.activo ?? true,
           descuento: form.descuento,
           campana: form.campana,
         };
@@ -825,6 +829,7 @@ export default function AdminProducts() {
             material: form.material,
             estilo: form.estilo,
             destacado: form.destacado,
+            activo: form.activo ?? true,
             descuento: form.descuento,
             campana: form.campana,
           },
@@ -1664,6 +1669,14 @@ export default function AdminProducts() {
                         onChange={(event) => setForm({ ...form, destacado: event.target.checked })}
                       />
                       Producto destacado
+                    </label>
+                    <label className="checkbox-label" style={{ alignSelf: "flex-end", paddingBottom: "0.5rem" }}>
+                      <input
+                        type="checkbox"
+                        checked={form.activo ?? true}
+                        onChange={(event) => setForm({ ...form, activo: event.target.checked })}
+                      />
+                      Visible en tienda
                     </label>
                   </div>
 

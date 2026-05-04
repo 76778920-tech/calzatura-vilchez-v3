@@ -20,6 +20,7 @@ type CreationBase = {
   material?: string;
   estilo?: string;
   destacado?: boolean;
+  activo?: boolean;
   descuento?: 10 | 20 | 30;
   campana?: string;
 };

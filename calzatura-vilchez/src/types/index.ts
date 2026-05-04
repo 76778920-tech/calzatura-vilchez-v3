@@ -17,6 +17,7 @@ export interface Product {
   /** Mismo valor en variantes de color del mismo modelo; si falta en datos viejos se usa `id` como clave. */
   familiaId?: string;
   destacado?: boolean;
+  activo?: boolean;
   descuento?: 10 | 20 | 30;
   campana?: string;
 }

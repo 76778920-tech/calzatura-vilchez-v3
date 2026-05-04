@@ -9,7 +9,7 @@ import {
   mergeCatalogSearchParams,
 } from "@/routes/catalogRouting";
 import { AlertTriangle, ChevronDown, ChevronRight, X } from "lucide-react";
-import { fetchProductFamilyGroupCounts, fetchProducts } from "@/domains/productos/services/products";
+import { fetchProductFamilyGroupCounts, fetchPublicProducts } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import ProductCard from "@/domains/productos/components/ProductCard";
 import { getProductColors } from "@/utils/colors";
@@ -357,7 +357,7 @@ export default function ProductsPage() {
     let isMounted = true;
 
     Promise.all([
-      fetchProducts(),
+      fetchPublicProducts(),
       fetchProductFamilyGroupCounts().catch(() => ({} as Record<string, number>)),
     ])
       .then(([nextProducts, counts]) => {

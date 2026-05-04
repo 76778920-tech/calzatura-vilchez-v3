@@ -12,6 +12,13 @@ export async function fetchProducts(): Promise<Product[]> {
   return data as Product[];
 }
 
+/** Solo productos visibles en tienda (activo = true). Usar en catálogo público. */
+export async function fetchPublicProducts(): Promise<Product[]> {
+  const { data, error } = await supabase.from(COL).select("*").eq("activo", true);
+  if (error) throw error;
+  return data as Product[];
+}
+
 export async function fetchProductById(id: string): Promise<Product | null> {
   const { data, error } = await supabase.from(COL).select("*").eq("id", id).single();
   if (error) return null;
@@ -22,7 +29,7 @@ export async function fetchProductById(id: string): Promise<Product | null> {
 export async function fetchRelatedProductsInFamily(product: Pick<Product, "id" | "familiaId">): Promise<Product[]> {
   const key = effectiveFamiliaKey(product);
   if (!key) return [];
-  const { data, error } = await supabase.from(COL).select("*").or(`id.eq.${key},familiaId.eq.${key}`);
+  const { data, error } = await supabase.from(COL).select("*").eq("activo", true).or(`id.eq.${key},familiaId.eq.${key}`);
   if (error) throw error;
   return ((data ?? []) as Product[]).filter((row) => row.id !== product.id);
 }
@@ -43,13 +50,13 @@ export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
 }
 
 export async function fetchProductsByCategory(categoria: string): Promise<Product[]> {
-  const { data, error } = await supabase.from(COL).select("*").eq("categoria", categoria);
+  const { data, error } = await supabase.from(COL).select("*").eq("categoria", categoria).eq("activo", true);
   if (error) throw error;
   return data as Product[];
 }
 
 export async function fetchFeaturedProducts(): Promise<Product[]> {
-  const { data, error } = await supabase.from(COL).select("*").eq("destacado", true);
+  const { data, error } = await supabase.from(COL).select("*").eq("destacado", true).eq("activo", true);
   if (error) throw error;
   return data as Product[];
 }
