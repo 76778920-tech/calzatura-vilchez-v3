@@ -1402,6 +1402,62 @@ function FeatureImportanceChart({ importances }: { importances: FeatureImportanc
   );
 }
 
+function DemandAccuracyChart({ predictions }: { predictions: Prediction[] }) {
+  const rows = predictions
+    .filter(p => !p.sin_historial && p.ventas_30_dias > 0)
+    .sort((a, b) => b.ventas_30_dias - a.ventas_30_dias)
+    .slice(0, 12);
+
+  if (rows.length === 0) return <p className="pred-sub">Sin datos suficientes para mostrar el gráfico.</p>;
+
+  const max = Math.max(...rows.flatMap(p => [p.ventas_30_dias, p.consumo_estimado_diario * 30]), 1);
+
+  const mape = rows.reduce((sum, p) => {
+    const est = p.consumo_estimado_diario * 30;
+    return sum + Math.abs(est - p.ventas_30_dias) / p.ventas_30_dias;
+  }, 0) / rows.length * 100;
+
+  const mapeColor = mape <= 15 ? "acc-mape-good" : mape <= 30 ? "acc-mape-warn" : "acc-mape-bad";
+
+  return (
+    <div className="acc-chart">
+      <div className="acc-chart-header">
+        <div className="acc-legend">
+          <span className="acc-legend-item acc-legend-real">Real (últimos 30 d)</span>
+          <span className="acc-legend-item acc-legend-est">Estimado modelo (×30 d)</span>
+        </div>
+        <span className={`acc-mape-badge ${mapeColor}`}>MAPE {mape.toFixed(1)}%</span>
+      </div>
+      {rows.map((p, i) => {
+        const real = p.ventas_30_dias;
+        const est  = p.consumo_estimado_diario * 30;
+        return (
+          <div key={p.productId} className="acc-row"
+            style={{ animationDelay: `${i * 0.05}s` }}>
+            <span className="acc-row-name" title={p.nombre}>{p.nombre}</span>
+            <div className="acc-bars">
+              <div className="acc-bar-wrap">
+                <div className="acc-bar-track">
+                  <div className="acc-bar-real acc-bar-fill"
+                    style={{ "--target-w": `${(real / max) * 100}%` } as React.CSSProperties} />
+                </div>
+                <span className="acc-bar-val">{real.toFixed(0)}</span>
+              </div>
+              <div className="acc-bar-wrap">
+                <div className="acc-bar-track">
+                  <div className="acc-bar-est acc-bar-fill"
+                    style={{ "--target-w": `${(est / max) * 100}%` } as React.CSSProperties} />
+                </div>
+                <span className="acc-bar-val">{est.toFixed(0)}</span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function DriftBadge({ score }: { score: number | undefined }) {
   if (score === undefined) return null;
   if (score < 0.35) return null;
@@ -2937,6 +2993,14 @@ export default function AdminPredictions() {
                     <FeatureImportanceChart importances={modeloMeta.feature_importances} />
                   </div>
                 )}
+                <div className="pred-model-section">
+                  <h3 className="pred-model-section-title">Predicción vs. ventas reales (últimos 30 días)</h3>
+                  <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
+                    Compara las unidades vendidas realmente en los últimos 30 días con la estimación diaria del modelo escalada al mismo período. El MAPE mide el error porcentual medio absoluto.
+                  </p>
+                  <DemandAccuracyChart predictions={predictionsForView} />
+                </div>
+
                 {Object.keys(modeloMeta.feature_stats).length > 0 && (
                   <div className="pred-model-section">
                     <h3 className="pred-model-section-title">Baseline de drift (distribución de entrenamiento)</h3>

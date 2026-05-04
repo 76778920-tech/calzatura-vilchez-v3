@@ -7504,6 +7504,29 @@ button.dash-today-card:hover { transform: translateY(-1px); }
 .pred-feature-bar-fill { height: 100%; background: var(--gold); border-radius: 5px; width: var(--target-w, 0%); animation: pred-fi-grow 0.7s cubic-bezier(0.16,1,0.3,1) both; }
 @keyframes pred-fi-grow { from { width: 0%; } to { width: var(--target-w, 100%); } }
 .pred-feature-pct { font-size: 12px; font-weight: 700; color: var(--gold-dark); text-align: right; }
+
+/* ── DemandAccuracyChart ──────────────────────────────────────────────── */
+.acc-chart { display: flex; flex-direction: column; gap: 0.75rem; }
+.acc-chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.25rem; flex-wrap: wrap; gap: 0.5rem; }
+.acc-legend { display: flex; gap: 1rem; align-items: center; }
+.acc-legend-item { font-size: 11.5px; font-weight: 700; display: flex; align-items: center; gap: 0.35rem; }
+.acc-legend-item::before { content: ""; display: inline-block; width: 12px; height: 7px; border-radius: 3px; }
+.acc-legend-real::before { background: #6366f1; }
+.acc-legend-est::before  { background: var(--gold); }
+.acc-mape-badge { font-size: 11.5px; font-weight: 800; padding: 3px 10px; border-radius: 100px; }
+.acc-mape-good { background: rgba(16,185,129,0.12); color: #065f46; }
+.acc-mape-warn { background: rgba(245,158,11,0.12); color: #92400e; }
+.acc-mape-bad  { background: rgba(239,68,68,0.12);  color: #991b1b; }
+.acc-row { display: grid; grid-template-columns: 160px 1fr; align-items: center; gap: 0.6rem; }
+.acc-row-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.acc-bars { display: flex; flex-direction: column; gap: 4px; }
+.acc-bar-wrap { display: flex; align-items: center; gap: 0.45rem; }
+.acc-bar-track { flex: 1; height: 8px; background: rgba(0,0,0,0.06); border-radius: 100px; overflow: hidden; }
+.acc-bar-fill { height: 100%; border-radius: 100px; width: var(--target-w, 0%); animation: pred-fi-grow 0.65s cubic-bezier(0.16,1,0.3,1) both; }
+.acc-bar-real { background: #6366f1; }
+.acc-bar-est  { background: var(--gold); }
+.acc-bar-val  { font-size: 11px; font-weight: 700; color: var(--text-muted); min-width: 30px; text-align: right; }
+@media (max-width: 680px) { .acc-row { grid-template-columns: 110px 1fr; } }
 /* Drift badges */
 .pred-drift-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 100px; margin-top: 3px; letter-spacing: 0.3px; text-transform: uppercase; }
 .pred-drift-badge.medio { background: #fef3c7; color: #92400e; }
