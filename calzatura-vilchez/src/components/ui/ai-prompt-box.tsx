@@ -558,11 +558,11 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
           />
         </div>
 
-        {isRecording && (
+        {isRecording && variant !== "panel" && (
           <VoiceRecorder isRecording={isRecording} />
         )}
 
-        {voiceError && (
+        {voiceError && variant !== "panel" && (
           <p className="text-xs text-red-400 px-1 pb-1">{voiceError}</p>
         )}
 
@@ -570,24 +570,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
           {variant === "panel" ? (
             <>
               <p className="prompt-panel-helper">
-                {isRecording ? "Escuchando... habla con claridad." : "Enter envía · Shift+Enter nueva línea · Datos de este panel."}
+                Enter envía · Shift+Enter nueva línea · Datos de este panel.
               </p>
               <div className="prompt-panel-actions">
-                <PromptInputAction tooltip={isRecording ? "Parar grabación" : "Dictar (es-PE)"}>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    className={cn(
-                      "prompt-panel-mic-btn h-9 w-9 rounded-full",
-                      isRecording && "border-red-500/50 text-red-400",
-                    )}
-                    onClick={() => { if (isRecording) stopVoiceRecording(); else if (!isLoading) startVoiceRecording(); }}
-                    disabled={isLoading && !isRecording}
-                  >
-                    {isRecording ? <StopCircle className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                  </Button>
-                </PromptInputAction>
                 <Button
                   type="button"
                   className={cn(
@@ -595,7 +580,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
                     "disabled:pointer-events-none disabled:opacity-35",
                   )}
                   onClick={handleSubmit}
-                  disabled={!hasContent || isLoading || isRecording}
+                  disabled={!hasContent || isLoading}
                 >
                   {isLoading ? (
                     <Square className="h-4 w-4 fill-stone-800 animate-pulse" />
