@@ -2109,16 +2109,16 @@ export default function AdminPredictions() {
                   <span className="ire-score">{ireData.score}</span>
                   <span className="ire-score-max">/100</span>
                   <span className={`ire-nivel ire-nivel-${ireData.nivel}`}>
-                    {ireData.nivel.charAt(0).toUpperCase() + ireData.nivel.slice(1)}
+                    {{ bajo: "Bajo", moderado: "Moderado", alto: "Alto", critico: "Crítico" }[ireData.nivel] ?? ireData.nivel}
                   </span>
                 </div>
                 <p className="ire-desc">{ireData.descripcion}</p>
               </div>
               <div className="ire-dims">
                 {[
-                  { label: "Stock", val: ireData.dimensiones.riesgo_stock },
-                  { label: "Ingresos", val: ireData.dimensiones.riesgo_ingresos },
-                  { label: "Demanda", val: ireData.dimensiones.riesgo_demanda },
+                  { label: "Stock 40%", val: ireData.dimensiones.riesgo_stock },
+                  { label: "Ingresos 35%", val: ireData.dimensiones.riesgo_ingresos },
+                  { label: "Demanda 25%", val: ireData.dimensiones.riesgo_demanda },
                 ].map(({ label, val }) => (
                   <div key={label} className="ire-dim">
                     <div className="ire-dim-label">{label}</div>
