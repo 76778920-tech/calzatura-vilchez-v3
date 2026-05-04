@@ -48,7 +48,7 @@ def fetch_daily_sales(days: int | None = None) -> list[dict]:
     #   demand.py  → productId, fecha, cantidad, devuelto, nombre, categoria, precioVenta, codigo
     #   revenue.py → fecha, total, devuelto, canal
     params = {
-        "select": "productId,fecha,cantidad,total,devuelto,nombre,categoria,precioVenta,codigo",
+        "select": "productId,fecha,cantidad,total,devuelto,nombre,precioVenta,codigo",
     }
     if days and days > 0:
         params["fecha"] = f"gte.{_cutoff_iso(days)}"
