@@ -11,8 +11,10 @@ module.exports = [
       ecmaVersion: "latest",
       sourceType: "commonjs",
       globals: {
+        AbortSignal: "readonly",
         console: "readonly",
         exports: "writable",
+        fetch: "readonly",
         module: "readonly",
         process: "readonly",
         require: "readonly",

@@ -9,7 +9,7 @@ import {
   mergeCatalogSearchParams,
 } from "@/routes/catalogRouting";
 import { AlertTriangle, ChevronDown, ChevronRight, X } from "lucide-react";
-import { fetchProducts } from "@/domains/productos/services/products";
+import { fetchProductFamilyGroupCounts, fetchProducts } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import ProductCard from "@/domains/productos/components/ProductCard";
 import { getProductColors } from "@/utils/colors";
@@ -24,6 +24,7 @@ import {
   toPublicCategorySlug,
 } from "@/utils/catalog";
 import { categoryLabel } from "@/utils/labels";
+import { effectiveFamiliaKey } from "@/utils/productFamily";
 
 type CatalogQuickFilter = {
   label: string;
@@ -61,14 +62,15 @@ type MaterialRule = {
 
 const MATERIAL_RULES: MaterialRule[] = [
   { slug: "cuero", label: "Cuero", terms: ["cuero", "leather"] },
-  { slug: "pu-nubuk", label: "Nubuk", terms: ["pu nubuk", "nubuk", "nobuk", "nobuck"] },
+  { slug: "charol", label: "Charol", terms: ["charol", "patent"] },
+  { slug: "nubuk", label: "Nubuk", terms: ["nubuk"] },
   { slug: "sintetico", label: "Sintético", terms: ["sintetico", "sintética", "synthetic"] },
   { slug: "textil", label: "Textil", terms: ["textil", "mesh", "tejido"] },
   { slug: "gamuza", label: "Gamuza", terms: ["gamuza", "suede"] },
   { slug: "lona", label: "Lona", terms: ["lona", "canvas"] },
 ];
 
-const MATERIAL_FILTER_ORDER = ["cuero", "gamuza", "pu-nubuk", "sintetico", "textil"] as const;
+const MATERIAL_FILTER_ORDER = ["cuero", "gamuza", "charol", "nubuk", "sintetico", "textil"] as const;
 
 function normalizeText(value = "") {
   return value
@@ -264,6 +266,7 @@ export default function ProductsPage() {
     navigate(`${target.pathname}${target.search}`, { replace: true });
   }, [location.pathname, location.search, routeParams, navigate]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [familyGroupCounts, setFamilyGroupCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
@@ -353,10 +356,14 @@ export default function ProductsPage() {
   useEffect(() => {
     let isMounted = true;
 
-    fetchProducts()
-      .then((nextProducts) => {
+    Promise.all([
+      fetchProducts(),
+      fetchProductFamilyGroupCounts().catch(() => ({} as Record<string, number>)),
+    ])
+      .then(([nextProducts, counts]) => {
         if (!isMounted) return;
         setProducts(nextProducts);
+        setFamilyGroupCounts(counts);
       })
       .catch(() => {
         if (!isMounted) return;
@@ -1811,15 +1818,15 @@ export default function ProductsPage() {
               width: `${materialPopoverStyle.width}px`,
             }}
           >
-            <div className="catalog-filter-menu catalog-filter-menu-price">
-              <div className="catalog-size-grid" role="group" aria-label="Materiales disponibles">
+            <div className="catalog-filter-menu catalog-filter-menu-price catalog-filter-menu-material">
+              <div className="catalog-material-grid" role="group" aria-label="Materiales disponibles">
                 {availableMaterials.length === 0 ? (
                   <p className="catalog-size-empty">No hay materiales disponibles para los filtros actuales.</p>
                 ) : (
                   availableMaterials.map((materialOption) => {
                     const checked = draftSelectedMaterials.includes(materialOption.value);
                     return (
-                      <label key={materialOption.value} className="catalog-size-item">
+                      <label key={materialOption.value} className="catalog-material-item">
                         <input
                           type="checkbox"
                           checked={checked}
@@ -1951,7 +1958,11 @@ export default function ProductsPage() {
         ) : (
           <div className="products-grid">
             {filtered.map((product) => (
-              <ProductCard key={product.id} product={product} />
+              <ProductCard
+                key={product.id}
+                product={product}
+                familyGroupSize={familyGroupCounts[effectiveFamiliaKey(product)] ?? 1}
+              />
             ))}
           </div>
         )}

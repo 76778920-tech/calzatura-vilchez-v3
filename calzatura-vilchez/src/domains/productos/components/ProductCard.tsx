@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingCart, Heart } from "lucide-react";
+import { ShoppingCart, Heart, X } from "lucide-react";
 import type { Product } from "@/types";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useCart } from "@/domains/carrito/context/CartContext";
@@ -11,20 +11,22 @@ import toast from "react-hot-toast";
 
 interface Props {
   product: Product;
+  /** Total de productos en BD que comparten la misma familia (incluye este). Solo catálogo. */
+  familyGroupSize?: number;
   onFavoriteChange?: (productId: string, isFavorite: boolean) => void;
 }
 
 const FALLBACK_PRODUCT_IMAGE = "/placeholder-product.svg";
 
-export default function ProductCard({ product, onFavoriteChange }: Props) {
+export default function ProductCard({ product, familyGroupSize = 1, onFavoriteChange }: Props) {
   const { user } = useAuth();
   const { addItem } = useCart();
   const navigate = useNavigate();
   const [liked, setLiked] = useState(false);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [showSizePicker, setShowSizePicker] = useState(false);
   const colors = getProductColors(product);
-  const firstColor = colors[0] ?? "";
-  const availableSizes = getAvailableSizes(product, firstColor || undefined);
+  const availableSizes = getAvailableSizes(product);
   const images = (product.imagenes?.length ? product.imagenes : [product.imagen]).filter(Boolean);
   const primaryImage = images[0] ?? FALLBACK_PRODUCT_IMAGE;
   const secondaryImage = images[1] ?? null;
@@ -58,10 +60,24 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
     };
   }, [product.id, user]);
 
-  const handleAddToCart = (e: React.MouseEvent) => {
+  const handleOpenSizePicker = (e: React.MouseEvent) => {
     e.preventDefault();
-    addItem(product, 1, availableSizes[0], firstColor || undefined);
-    toast.success(`${product.nombre} agregado al carrito`);
+    e.stopPropagation();
+    setShowSizePicker(true);
+  };
+
+  const handleSelectSize = (e: React.MouseEvent, size: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    addItem(product, 1, size, product.color || undefined);
+    toast.success(`${product.nombre} — talla ${size} agregado`);
+    setShowSizePicker(false);
+  };
+
+  const handleCloseSizePicker = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowSizePicker(false);
   };
 
   const handleLike = async (e: React.MouseEvent) => {
@@ -87,7 +103,7 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
     } catch (error) {
       console.error("Favorite error", error);
       setLiked(!nextLiked);
-      toast.error("No se pudo actualizar favoritos. Revisa las reglas de Firestore.");
+      toast.error("No se pudo actualizar favoritos. Inténtalo de nuevo.");
     } finally {
       setFavoriteBusy(false);
     }
@@ -127,6 +143,11 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
         {product.destacado && !product.descuento && product.stock > 0 && (
           <span className="product-badge-nuevo">Destacado</span>
         )}
+        {familyGroupSize > 1 && (
+          <span className="product-badge-familia" title={`${familyGroupSize - 1} color(es) más en catálogo`}>
+            Más colores
+          </span>
+        )}
         <button
           type="button"
           onClick={handleLike}
@@ -137,6 +158,32 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
         >
           <Heart size={18} fill={isLiked ? "currentColor" : "none"} />
         </button>
+
+        {showSizePicker && (
+          <div className="product-size-picker" onClick={handleCloseSizePicker}>
+            <button
+              type="button"
+              className="product-size-picker-close"
+              onClick={handleCloseSizePicker}
+              aria-label="Cerrar"
+            >
+              <X size={14} />
+            </button>
+            <p className="product-size-picker-label">Selecciona tu talla</p>
+            <div className="product-size-picker-grid">
+              {availableSizes.map((size) => (
+                <button
+                  key={size}
+                  type="button"
+                  className="product-size-picker-chip"
+                  onClick={(e) => handleSelectSize(e, size)}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="product-card-body">
@@ -164,9 +211,9 @@ export default function ProductCard({ product, onFavoriteChange }: Props) {
           )}
           {product.stock > 0 ? (
             <button
-              onClick={handleAddToCart}
+              onClick={handleOpenSizePicker}
               className="add-to-cart-btn"
-              aria-label="Agregar al carrito"
+              aria-label="Seleccionar talla"
             >
               <ShoppingCart size={16} />
             </button>

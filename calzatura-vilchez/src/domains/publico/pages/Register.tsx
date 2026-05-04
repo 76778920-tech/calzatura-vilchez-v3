@@ -107,7 +107,7 @@ export default function Register() {
       } else if (code.includes("email-already-in-use") || msg.includes("email-already-in-use")) {
         toast.error("Este correo ya esta registrado");
       } else if (code.includes("permission-denied") || msg.includes("insufficient permissions")) {
-        toast.error("Error de permisos — despliega las reglas de Firestore");
+        toast.error("Error de permisos. Intenta de nuevo o contacta al soporte.");
       } else if (code.includes("network-request-failed") || msg.includes("Failed to fetch")) {
         toast.error("Sin conexion. Verifica tu internet");
       } else {

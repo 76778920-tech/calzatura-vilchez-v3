@@ -1,6 +1,7 @@
 import { supabase } from "@/supabase/client";
 import { logAudit } from "@/services/audit";
 import type { Product } from "@/types";
+import { effectiveFamiliaKey, tallyFamilyGroupSizes } from "@/utils/productFamily";
 
 const COL = "productos";
 const CODE_COL = "productoCodigos";
@@ -15,6 +16,22 @@ export async function fetchProductById(id: string): Promise<Product | null> {
   const { data, error } = await supabase.from(COL).select("*").eq("id", id).single();
   if (error) return null;
   return data as Product;
+}
+
+/** Otros productos de la misma familia (otros colores), excluyendo el actual. */
+export async function fetchRelatedProductsInFamily(product: Pick<Product, "id" | "familiaId">): Promise<Product[]> {
+  const key = effectiveFamiliaKey(product);
+  if (!key) return [];
+  const { data, error } = await supabase.from(COL).select("*").or(`id.eq.${key},familiaId.eq.${key}`);
+  if (error) throw error;
+  return ((data ?? []) as Product[]).filter((row) => row.id !== product.id);
+}
+
+/** Recuento por clave de familia en todo el catálogo (para badges en listados). */
+export async function fetchProductFamilyGroupCounts(): Promise<Record<string, number>> {
+  const { data, error } = await supabase.from(COL).select("id, familiaId");
+  if (error) throw error;
+  return tallyFamilyGroupSizes((data ?? []) as Pick<Product, "id" | "familiaId">[]);
 }
 
 export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
@@ -44,10 +61,78 @@ export async function addProduct(data: Omit<Product, "id">): Promise<string> {
   return row.id;
 }
 
+type VariantAtomicInput = {
+  product: Omit<Product, "id">;
+  codigo: string;
+  finanzas: {
+    costoCompra: number;
+    margenMinimo: number;
+    margenObjetivo: number;
+    margenMaximo: number;
+    precioMinimo: number;
+    precioSugerido: number;
+    precioMaximo: number;
+  };
+};
+
+/**
+ * Crea N variantes de color en una sola transacción de BD vía RPC.
+ * Si cualquier variante falla (constraint, trigger, unicidad),
+ * toda la operación se revierte sin dejar registros huérfanos.
+ */
+export async function createProductVariantsAtomic(
+  variants: VariantAtomicInput[]
+): Promise<string[]> {
+  const payload = variants.map(({ product, codigo, finanzas }) => ({
+    ...product,
+    codigo,
+    finanzas,
+  }));
+  const { data, error } = await supabase.rpc("create_product_variants_atomic", {
+    variants: payload,
+  });
+  if (error) throw error;
+  const ids = (data as { ids: string[] }).ids;
+  ids.forEach((id, i) => {
+    void logAudit("crear", "producto", id, variants[i].product.nombre);
+  });
+  return ids;
+}
+
 export async function updateProduct(id: string, data: Partial<Omit<Product, "id">>): Promise<void> {
   const { error } = await supabase.from(COL).update(data).eq("id", id);
   if (error) throw error;
   void logAudit("editar", "producto", id, data.nombre ?? id, { campos: Object.keys(data) });
+}
+
+type ProductEditFinancials = {
+  costoCompra: number;
+  margenMinimo: number;
+  margenObjetivo: number;
+  margenMaximo: number;
+  precioMinimo: number;
+  precioSugerido: number;
+  precioMaximo: number;
+};
+
+/**
+ * Edita producto, código y finanzas en una sola transacción de BD vía RPC.
+ * Si cualquier operación falla (constraint, trigger), todo se revierte.
+ */
+export async function updateProductAtomic(
+  id: string,
+  product: Omit<Product, "id">,
+  codigo: string,
+  finanzas: ProductEditFinancials
+): Promise<void> {
+  const { error } = await supabase.rpc("update_product_atomic", {
+    p_id: id,
+    product,
+    codigo,
+    finanzas,
+  });
+  if (error) throw error;
+  void logAudit("editar", "producto", id, product.nombre, { campos: Object.keys(product) });
 }
 
 export async function deleteProduct(id: string): Promise<void> {

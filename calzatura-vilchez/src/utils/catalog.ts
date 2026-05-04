@@ -55,6 +55,7 @@ export function productMatchesSearch(product: Product, searchTerm: string) {
     product.nombre,
     product.descripcion,
     product.marca,
+    product.material,
     product.tipoCalzado,
     product.color,
     product.categoria,
@@ -84,7 +85,11 @@ type TaxonomyKey =
 const TAXONOMY_TERM_MAP: Record<TaxonomyKey, Record<string, string[]>> = {
   campana: {
     cyber: ["cyber"],
+    "cyber-wow": ["cyber"],
     "nueva-temporada": ["nueva temporada", "nuevo", "nuevos"],
+    lanzamiento: ["lanzamiento"],
+    "club-calzado": ["club calzado"],
+    outlet: ["outlet"],
   },
   coleccion: {
     "pasos-radiantes": ["pasos radiantes"],
@@ -177,6 +182,14 @@ export function productMatchesTaxonomy(product: Product, key: TaxonomyKey, value
     const normalized = slugifyCatalogValue(value);
     const tipoValue = slugifyCatalogValue(product.tipoCalzado ?? "");
     if (tipoValue.includes(normalized)) return true;
+  }
+
+  if (key === "estilo" && product.estilo) {
+    return slugifyCatalogValue(product.estilo).includes(slugifyCatalogValue(value));
+  }
+
+  if (key === "campana" && product.campana) {
+    if (slugifyCatalogValue(product.campana) === slugifyCatalogValue(value)) return true;
   }
 
   if (key === "promocion") {

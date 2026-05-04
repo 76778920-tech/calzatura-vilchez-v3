@@ -8,6 +8,7 @@ import { updateUserProfile } from "@/domains/usuarios/services/users";
 import type { UserRole } from "@/types";
 import { clearPendingVerificationEmail } from "@/utils/pendingVerification";
 import { formatPeruPhone, isValidPeruPhone, normalizePeruPhoneInput, peruPhoneError } from "@/utils/phone";
+import { profileSaveErrorToast } from "@/domains/usuarios/utils/profileSaveErrors";
 
 function splitFallbackName(name = "") {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -68,16 +69,7 @@ export default function ProfilePage() {
       await refreshProfile();
       toast.success("Perfil actualizado");
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg === "TIMEOUT") {
-        toast.error("Tiempo agotado. Ejecuta: firebase deploy --only firestore:rules");
-      } else if (msg.includes("permission-denied") || msg.includes("PERMISSION_DENIED")) {
-        toast.error("Sin permisos. Ejecuta: firebase deploy --only firestore:rules");
-      } else if (msg.includes("not-found") || msg.includes("NOT_FOUND")) {
-        toast.error("Documento no encontrado. Recarga la pagina e intenta de nuevo");
-      } else {
-        toast.error(`Error: ${msg || "no se pudo guardar"}`);
-      }
+      toast.error(profileSaveErrorToast(err));
     } finally {
       setSaving(false);
     }

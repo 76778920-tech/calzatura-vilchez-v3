@@ -1,5 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  indexedDBLocalPersistence,
+  initializeAuth,
+} from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBAnVUP4M6wujGs-x8EytdGabkIP7EJkwo",
@@ -11,6 +15,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
+// En E2E (Playwright), usar localStorage para que storageState lo capture.
+// En producción, usar IndexedDB como persistencia primaria.
+export const auth = initializeAuth(app, {
+  persistence: import.meta.env.VITE_E2E === "true"
+    ? [browserLocalPersistence]
+    : [indexedDBLocalPersistence, browserLocalPersistence],
+});
 
 export default app;

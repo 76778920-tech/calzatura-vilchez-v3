@@ -10,7 +10,7 @@ import { AreaRoute, AuthenticatedRoute, PageLoader } from "./routes/RouteGuards"
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 
 // Carga diferida por dominio. El control real de acceso está en AreaRoute,
-// AdminLayout y reglas de Firestore, no en ocultar archivos del frontend.
+// AdminLayout y datos de perfil (Supabase `usuarios` + Firebase Auth), no en ocultar archivos del bundle.
 const AdminLayout = lazy(() => import("@/domains/administradores/components/AdminLayout"));
 const AdminDashboard = lazy(() => import("@/domains/administradores/pages/AdminDashboard"));
 const AdminProducts = lazy(() => import("@/domains/productos/pages/AdminProducts"));

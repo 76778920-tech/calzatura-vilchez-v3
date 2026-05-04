@@ -5,9 +5,37 @@ Responsable: administrador del sistema
 
 ---
 
+## Opción recomendada: proxy admin (`aiAdminProxy`) — token fuera del bundle
+
+El frontend puede llamar a la Cloud Function **`aiAdminProxy`** en lugar de Render directamente:
+
+1. El navegador envía solo el **Firebase ID token** (`Authorization: Bearer <idToken>`).
+2. La función verifica el usuario y que `usuarios.rol === 'admin'`, y reenvía a Render con **`AI_SERVICE_BEARER_TOKEN`** (secreto de Functions, no visible en el JS público).
+
+**Variable en el build del hosting:** `VITE_AI_ADMIN_PROXY_URL` = URL de la función, por ejemplo:
+
+`https://us-central1-calzaturavilchez-ab17f.cloudfunctions.net/aiAdminProxy`
+
+**Secretos en Firebase (una vez por entorno):**
+
+```bash
+firebase functions:secrets:set AI_SERVICE_URL
+firebase functions:secrets:set AI_SERVICE_BEARER_TOKEN
+```
+
+Valores: misma URL base de Render y el mismo token que ya usa `AI_SERVICE_BEARER_TOKEN` en Render. Después:
+
+```bash
+firebase deploy --only functions:aiAdminProxy
+```
+
+Si `VITE_AI_ADMIN_PROXY_URL` está definida, **no hace falta** `VITE_AI_SERVICE_BEARER_TOKEN` en el bundle de producción para el panel de predicciones ni para invalidar caché desde Admin datos.
+
+---
+
 ## Dependencia crítica: token de autenticación del servicio IA
 
-El servicio de predicción de demanda (`calzatura-vilchez-v3.onrender.com`) usa autenticación por Bearer token. Este token debe mantenerse sincronizado en tres lugares simultáneamente:
+El servicio de predicción de demanda (`calzatura-vilchez-v3.onrender.com`) usa autenticación por Bearer token. Si **no** usáis el proxy, este token debe mantenerse sincronizado en tres lugares simultáneamente:
 
 | Lugar | Variable | Quién la lee |
 |---|---|---|

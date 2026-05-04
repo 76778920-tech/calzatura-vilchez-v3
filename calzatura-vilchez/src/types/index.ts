@@ -10,12 +10,15 @@ export interface Product {
   tipoCalzado?: string;
   tallas?: string[];
   tallaStock?: Record<string, number>;
-  colorStock?: Record<string, Record<string, number>>;
   marca?: string;
+  material?: string;
+  estilo?: string;
   color?: string;
-  colores?: string[];
+  /** Mismo valor en variantes de color del mismo modelo; si falta en datos viejos se usa `id` como clave. */
+  familiaId?: string;
   destacado?: boolean;
   descuento?: 10 | 20 | 30;
+  campana?: string;
 }
 
 export interface ProductFinancial {
@@ -59,6 +62,7 @@ export interface DailySale {
   motivoDevolucion?: string;
   devueltoEn?: string;
   creadoEn: string;
+  canal?: "tienda" | "web";
 }
 
 export interface ManufacturerDocument {
@@ -121,6 +125,7 @@ export interface Order {
   estado: OrderStatus;
   direccion: Address;
   creadoEn: string;
+  pagadoEn?: string;
   stripeSessionId?: string;
   metodoPago: string;
   notas?: string;

@@ -4,31 +4,47 @@ import {
   Brain,
   CheckCircle,
   CircleDollarSign,
+  Download,
   Minus,
   Package,
   RefreshCw,
   Search,
+  Store,
   TrendingDown,
   TrendingUp,
   Zap,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, animate } from "framer-motion";
 import { PromptInputBox, type PromptPanelQuickAction } from "@/components/ui/ai-prompt-box";
+import { aiAdminFetch } from "@/services/aiAdminClient";
 
-const AI_BASE = import.meta.env.VITE_AI_SERVICE_URL ?? "http://localhost:8000";
-const AI_BEARER_TOKEN = (import.meta.env.VITE_AI_SERVICE_BEARER_TOKEN as string | undefined)?.trim();
+// Render en plan gratuito puede tardar ~20-30 s en cold start.
+const AI_FETCH_TIMEOUT_MS = 45_000;
 
-function buildAIHeaders(): Record<string, string> {
-  if (!AI_BEARER_TOKEN) return {};
-  return { Authorization: `Bearer ${AI_BEARER_TOKEN}` };
+/** `pathAndQuery` p. ej. `/api/predict/combined?horizon=30&history=120` (véase `aiAdminClient`). */
+async function fetchAI(pathAndQuery: string, options?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS);
+  try {
+    return await aiAdminFetch(pathAndQuery, { ...options, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+function describeAIError(cause: unknown): string {
+  if (cause instanceof DOMException && cause.name === "AbortError") {
+    return "El servicio tardó demasiado en responder. Si es la primera carga del día, espera unos segundos y pulsa Reintentar.";
+  }
+  if (cause instanceof Error && cause.message.includes("Sesión requerida")) {
+    return "Debes iniciar sesión como administrador para usar el panel de IA.";
+  }
+  return cause instanceof Error ? cause.message : "Error desconocido al conectar con el servicio de IA.";
 }
 
 async function invalidateAICache() {
   try {
-    await fetch(`${AI_BASE}/api/cache/invalidate`, {
-      method: "POST",
-      headers: buildAIHeaders(),
-    });
+    await fetchAI("/api/cache/invalidate", { method: "POST" });
   } catch {
     // El panel puede seguir consultando aúnque el cache no se invalide.
   }
@@ -44,8 +60,8 @@ interface Prediction {
   prediccion_unidades: number;
   prediccion_diaria: number;
   prediccion_semanal: number;
-  total_vendido_histórico: number;
-  promedio_diario_histórico: number;
+  total_vendido_historico: number;
+  promedio_diario_historico: number;
   ventas_7_dias: number;
   ventas_30_dias: number;
   consumo_diario_7: number;
@@ -71,14 +87,14 @@ interface RevenuePoint {
   fecha: string;
   label: string;
   ingresos: number;
-  tipo: "histórico" | "proyectado";
+  tipo: "historico" | "proyectado";
 }
 
 interface RevenueSummary {
   proximo_7_dias: number;
   proximo_30_dias: number;
   proximo_horizonte: number;
-  promedio_diario_histórico: number;
+  promedio_diario_historico: number;
   promedio_diario_proyectado: number;
   ultimo_30_dias: number;
   ultimo_horizonte: number;
@@ -86,6 +102,8 @@ interface RevenueSummary {
   crecimiento_estimado_horizonte_pct: number;
   tendencia: "subiendo" | "bajando" | "estable";
   confianza: number;
+  total_historico_tienda?: number;
+  total_historico_web?: number;
 }
 
 interface RevenueForecast {
@@ -134,6 +152,17 @@ interface ModelMetrics {
 }
 
 type HorizonOption = 7 | 15 | 30;
+type HistoryOption = 30 | 60 | 90 | 120;
+type AlertOption  = 7 | 14 | 21 | 30;
+
+const HORIZON_OPTIONS:  HorizonOption[]  = [7, 15, 30];
+const HISTORY_OPTIONS:  HistoryOption[]  = [30, 60, 90, 120];
+const ALERT_OPTIONS:    AlertOption[]    = [7, 14, 21, 30];
+
+function loadPref<T extends number>(key: string, valid: T[], fallback: T): T {
+  const v = Number(localStorage.getItem(key));
+  return (valid as number[]).includes(v) ? (v as T) : fallback;
+}
 type PredictionTab = "resumen" | "ventas" | "finanzas" | "modelo" | "asistente";
 
 interface ChatMessage {
@@ -190,6 +219,29 @@ function formatConfidenceLabel(value: number) {
   if (value >= CONFIDENCE_ALTA_MIN) return "Alta";
   if (value >= CONFIDENCE_MEDIA_MIN) return "Media";
   return "Inicial";
+}
+
+function AnimatedKpi({
+  value,
+  format,
+  className = "pred-kpi-value",
+}: {
+  value: number;
+  format: (v: number) => string;
+  className?: string;
+}) {
+  const nodeRef = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node || !Number.isFinite(value)) return;
+    const controls = animate(0, value, {
+      duration: 0.85,
+      ease: [0.16, 1, 0.3, 1],
+      onUpdate: (v) => { node.textContent = format(v); },
+    });
+    return () => controls.stop();
+  }, [value, format]);
+  return <p className={className} ref={nodeRef}>{format(value)}</p>;
 }
 
 function isOverstocked(product: Prediction) {
@@ -346,7 +398,7 @@ function generateAIResponse(
       ? "La proyección es moderada. A mayor historial de ventas, más precisa será."
       : "La proyección es estimada. Se necesita más historial de ventas para mayor precisión.";
 
-    return `PROYECCIÓN DE INGRESOS — PRÓXIMOS 30 DÍAS\n\nResumen ejecutivo:\n  • Ingreso estimado próxima semana: S/ ${s.proximo_7_dias.toFixed(2)}\n  • Ingreso estimado próximo mes: S/ ${s.proximo_30_dias.toFixed(2)}\n  • Comparado con los últimos 30 días reales (S/ ${s.ultimo_30_dias.toFixed(2)}): ${dir}${s.crecimiento_estimado_pct.toFixed(1)}%\n\nPromedios:\n  • Ingreso diario histórico: S/ ${s.promedio_diario_histórico.toFixed(2)}\n  • Ingreso diario proyectado: S/ ${s.promedio_diario_proyectado.toFixed(2)}\n\nTendencia: ${s.tendencia.toUpperCase()}\n${tendenciaTexto}\n\nConfianza del modelo: ${s.confianza}%\n${confianzaTexto}\n\nNOTA: Esta proyección se basa en el comportamiento histórico de ventas y ajusta el ritmo según la estacionalidad por día de semana. No incluye factores externos como campañas promocionales o cambios en el mercado.`;
+    return `PROYECCIÓN DE INGRESOS — PRÓXIMOS 30 DÍAS\n\nResumen ejecutivo:\n  • Ingreso estimado próxima semana: S/ ${s.proximo_7_dias.toFixed(2)}\n  • Ingreso estimado próximo mes: S/ ${s.proximo_30_dias.toFixed(2)}\n  • Comparado con los últimos 30 días reales (S/ ${s.ultimo_30_dias.toFixed(2)}): ${dir}${s.crecimiento_estimado_pct.toFixed(1)}%\n\nPromedios:\n  • Ingreso diario histórico: S/ ${s.promedio_diario_historico.toFixed(2)}\n  • Ingreso diario proyectado: S/ ${s.promedio_diario_proyectado.toFixed(2)}\n\nTendencia: ${s.tendencia.toUpperCase()}\n${tendenciaTexto}\n\nConfianza del modelo: ${s.confianza}%\n${confianzaTexto}\n\nNOTA: Esta proyección se basa en el comportamiento histórico de ventas y ajusta el ritmo según la estacionalidad por día de semana. No incluye factores externos como campañas promocionales o cambios en el mercado.`;
   }
 
   // ── Alta demanda / mejores productos ────────────────────────────────────────
@@ -941,7 +993,7 @@ function generateAIResponseV2(
       `- Proyección horizonte actual (${horizonLabel} días): ${formatCurrency(s.proximo_horizonte)}`,
       `- últimos ${horizonLabel} días reales: ${formatCurrency(s.ultimo_horizonte)}`,
       `- Variación proyectada: ${change}`,
-      `- Promedio diario histórico: ${formatCurrency(s.promedio_diario_histórico)}`,
+      `- Promedio diario histórico: ${formatCurrency(s.promedio_diario_historico)}`,
       `- Promedio diario proyectado: ${formatCurrency(s.promedio_diario_proyectado)}`,
       `- Tendencia del ingreso: ${s.tendencia}`,
       `- Confianza del cálculo: ${s.confianza}%`,
@@ -1053,7 +1105,7 @@ function generateAIResponseV2(
       "Datos que acompañan la lectura:",
       `- Horizonte analizado: ${revenueForecast.horizon_days} días`,
       `- Tendencia detectada: ${trendText(s.tendencia)}`,
-      `- Promedio diario histórico: ${formatCurrency(s.promedio_diario_histórico)}`,
+      `- Promedio diario histórico: ${formatCurrency(s.promedio_diario_historico)}`,
       `- Promedio diario proyectado: ${formatCurrency(s.promedio_diario_proyectado)}`,
       "",
       "Recomendación:",
@@ -1290,13 +1342,16 @@ function FeatureImportanceChart({ importances }: { importances: FeatureImportanc
   const max = Math.max(...importances.map((fi) => fi.importance), 0.001);
   return (
     <div className="pred-feature-chart">
-      {importances.map((fi) => (
+      {importances.map((fi, index) => (
         <div key={fi.feature} className="pred-feature-row">
           <span className="pred-feature-label">{FEATURE_LABELS[fi.feature] ?? fi.feature}</span>
           <div className="pred-feature-bar-track">
             <div
               className="pred-feature-bar-fill"
-              style={{ width: `${(fi.importance / max) * 100}%` }}
+              style={{
+                "--target-w": `${(fi.importance / max) * 100}%`,
+                animationDelay: `${index * 0.08}s`,
+              } as React.CSSProperties}
             />
           </div>
           <span className="pred-feature-pct">{(fi.importance * 100).toFixed(1)}%</span>
@@ -1317,13 +1372,16 @@ function WeeklyChart({ data }: { data: WeekPoint[] }) {
   const max = Math.max(...data.map((item) => item.unidades), 1);
   return (
     <div className="pred-chart-bars">
-      {data.map((item) => (
+      {data.map((item, index) => (
         <div key={item.semana} className="pred-chart-col">
           <span className="pred-chart-val">{item.unidades > 0 ? item.unidades : ""}</span>
           <div className="pred-chart-track">
             <div
               className="pred-chart-fill"
-              style={{ height: `${Math.max((item.unidades / max) * 100, item.unidades > 0 ? 4 : 0)}%` }}
+              style={{
+                "--target-h": `${Math.max((item.unidades / max) * 100, item.unidades > 0 ? 4 : 0)}%`,
+                animationDelay: `${index * 0.06}s`,
+              } as React.CSSProperties}
             />
           </div>
           <span className="pred-chart-label">{item.semana}</span>
@@ -1334,6 +1392,19 @@ function WeeklyChart({ data }: { data: WeekPoint[] }) {
 }
 
 function RevenueLineChart({ history, forecast }: { history: RevenuePoint[]; forecast: RevenuePoint[] }) {
+  const histRef = useRef<SVGPolylineElement>(null);
+
+  useEffect(() => {
+    const el = histRef.current;
+    if (!el) return;
+    const len = el.getTotalLength();
+    el.style.strokeDasharray = String(len);
+    el.style.strokeDashoffset = String(len);
+    el.getBoundingClientRect(); // fuerza reflow para que el navegador registre el estado inicial
+    el.style.transition = "stroke-dashoffset 1.1s cubic-bezier(0.16,1,0.3,1)";
+    el.style.strokeDashoffset = "0";
+  }, [history, forecast]);
+
   const points = [...history, ...forecast];
   if (points.length === 0) return null;
 
@@ -1372,7 +1443,7 @@ function RevenueLineChart({ history, forecast }: { history: RevenuePoint[]; fore
         })}
 
         {history.length > 1 && (
-          <polyline points={toPolyline(history, 0)} className="pred-revenue-line pred-revenue-line-hist" />
+          <polyline ref={histRef} points={toPolyline(history, 0)} className="pred-revenue-line pred-revenue-line-hist" />
         )}
         {forecast.length > 0 && (
           <polyline points={toPolyline(forecast, splitIndex)} className="pred-revenue-line pred-revenue-line-proj" />
@@ -1405,7 +1476,7 @@ function RevenueLineChart({ history, forecast }: { history: RevenuePoint[]; fore
                 cx={xAt(index)}
                 cy={yAt(point.ingresos)}
                 r={index === points.length - 1 ? 4 : 3}
-                className={point.tipo === "histórico" ? "pred-revenue-dot-hist" : "pred-revenue-dot-proj"}
+                className={point.tipo === "historico" ? "pred-revenue-dot-hist" : "pred-revenue-dot-proj"}
               />
               {showLabel && (
                 <text x={xAt(index)} y={height - 10} className="pred-revenue-axis-label" textAnchor="middle">
@@ -1450,13 +1521,51 @@ function RiskAlertCard({ prediction }: { prediction: Prediction }) {
   );
 }
 
+function exportPredictionsCSV(predictions: Prediction[], horizon: HorizonOption) {
+  const headers = [
+    "Código", "Nombre", "Categoría", "Stock actual",
+    `Proyección (${horizon} días)`, "Por día", "Por semana",
+    "Días hasta agotarse", "Tendencia", "Nivel riesgo", "Confianza (%)",
+  ];
+  const rows = predictions
+    .filter((p) => !p.sin_historial)
+    .map((p) => [
+      p.codigo,
+      p.nombre,
+      p.categoria,
+      p.stock_actual,
+      p.prediccion_unidades,
+      p.prediccion_diaria,
+      p.prediccion_semanal,
+      p.dias_hasta_agotarse >= 999 ? "Indefinido" : p.dias_hasta_agotarse,
+      p.tendencia,
+      p.nivel_riesgo,
+      p.confianza,
+    ]);
+  const csv = [headers, ...rows]
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `predicciones-${horizon}d-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 export default function AdminPredictions() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [weeklyChart, setWeeklyChart] = useState<WeekPoint[]>([]);
   const [revenueForecast, setRevenueForecast] = useState<RevenueForecast | null>(null);
+  const [revenueLoading, setRevenueLoading] = useState(false);
   const [modeloMeta, setModeloMeta] = useState<ModeloMeta | null>(null);
   const [modelMetrics, setModelMetrics] = useState<ModelMetrics | null>(null);
-  const [horizon, setHorizon] = useState<HorizonOption>(30);
+  const [horizon,    setHorizon]    = useState<HorizonOption>(() => loadPref("pred_horizon",    HORIZON_OPTIONS, 30));
+  const [history,    setHistory]    = useState<HistoryOption>(() => loadPref("pred_history",    HISTORY_OPTIONS, 120));
+  const [alertDays,  setAlertDays]  = useState<AlertOption>(()  => loadPref("pred_alert_days", ALERT_OPTIONS,   14));
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1468,6 +1577,7 @@ export default function AdminPredictions() {
   const [weeklyChartLoading, setWeeklyChartLoading] = useState(false);
   const [modelMetricsFetched, setModelMetricsFetched] = useState(false);
   const [modelMetricsLoading, setModelMetricsLoading] = useState(false);
+  const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const changeTab = useCallback((nextTab: PredictionTab) => {
@@ -1478,46 +1588,44 @@ export default function AdminPredictions() {
     setActiveTab(nextTab);
   }, [activeTab]);
 
-  const load = useCallback(async (selectedHorizon: HorizonOption) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const predRes = await fetch(
-        `${AI_BASE}/api/predict/demand?horizon=${selectedHorizon}`,
-        { headers: buildAIHeaders() },
-      );
-      if (!predRes.ok) throw new Error("Error al conectar con el servicio de IA.");
-      const predData = await predRes.json();
-      setPredictions(predData.predictions ?? []);
-      setModeloMeta(predData.modelo_meta ?? null);
+  useEffect(() => { localStorage.setItem("pred_horizon",    String(horizon));   }, [horizon]);
+  useEffect(() => { localStorage.setItem("pred_history",    String(history));   }, [history]);
+  useEffect(() => { localStorage.setItem("pred_alert_days", String(alertDays)); }, [alertDays]);
 
-      // Proyección de ingresos — no bloquea si falla
-      try {
-        const revenueRes = await fetch(
-          `${AI_BASE}/api/predict/revenue?horizon=${selectedHorizon}&history=120`,
-          { headers: buildAIHeaders() },
-        );
-        if (revenueRes.ok) setRevenueForecast(await revenueRes.json());
-        else setRevenueForecast(null);
-      } catch {
-        setRevenueForecast(null);
-      }
+  const load = useCallback(async (selectedHorizon: HorizonOption, selectedHistory: HistoryOption) => {
+    setLoading(true);
+    setRevenueLoading(true);
+    setError(null);
+    setRevenueForecast(null);
+    setAiWarnings([]);
+    try {
+      const res = await fetchAI(`/api/predict/combined?horizon=${selectedHorizon}&history=${selectedHistory}`);
+      if (!res.ok) throw new Error("Error al conectar con el servicio de IA.");
+      const data = await res.json();
+      setPredictions(data.demand?.predictions ?? []);
+      setModeloMeta(data.demand?.modelo_meta ?? null);
+      setRevenueForecast(data.revenue ?? null);
+      setAiWarnings(Array.isArray(data.warnings) ? data.warnings : []);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Error desconocido");
+      setError(describeAIError(cause));
+      setPredictions([]);
+      setModeloMeta(null);
+      setRevenueForecast(null);
     } finally {
       setLoading(false);
+      setRevenueLoading(false);
     }
   }, []);
 
   const loadWeeklyChart = useCallback(async () => {
     setWeeklyChartLoading(true);
     try {
-      const res = await fetch(`${AI_BASE}/api/sales/weekly-chart?weeks=8`, { headers: buildAIHeaders() });
+      const res = await fetchAI("/api/sales/weekly-chart?weeks=8");
       if (res.ok) {
         const data = await res.json();
         setWeeklyChart(data.chart ?? []);
       }
-    } catch { /* silencioso */ }
+    } catch { /* silencioso — gráfico semanal es complementario */ }
     setWeeklyChartFetched(true);
     setWeeklyChartLoading(false);
   }, []);
@@ -1525,7 +1633,7 @@ export default function AdminPredictions() {
   const loadModelMetrics = useCallback(async () => {
     setModelMetricsLoading(true);
     try {
-      const res = await fetch(`${AI_BASE}/api/model/metrics`, { headers: buildAIHeaders() });
+      const res = await fetchAI("/api/model/metrics");
       if (res.ok) setModelMetrics(await res.json());
     } catch { /* silencioso */ }
     setModelMetricsFetched(true);
@@ -1533,9 +1641,9 @@ export default function AdminPredictions() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(horizon), 0);
+    const timer = window.setTimeout(() => void load(horizon, history), 0);
     return () => window.clearTimeout(timer);
-  }, [horizon, load]);
+  }, [horizon, history, load]);
 
   useEffect(() => {
     const timers: ReturnType<typeof window.setTimeout>[] = [];
@@ -1556,8 +1664,8 @@ export default function AdminPredictions() {
     setWeeklyChart([]);
     setModelMetrics(null);
     await invalidateAICache();
-    await load(horizon);
-  }, [horizon, load]);
+    await load(horizon, history);
+  }, [horizon, history, load]);
 
   const predictionsForView = useMemo(
     () =>
@@ -1566,14 +1674,14 @@ export default function AdminPredictions() {
           return { ...item, alerta_stock: false, riesgo_agotamiento: false };
         }
 
-        const withinHorizon = item.stock_actual === 0 || item.dias_hasta_agotarse <= horizon;
+        const withinThreshold = item.stock_actual === 0 || item.dias_hasta_agotarse <= alertDays;
         return {
           ...item,
-          alerta_stock: withinHorizon,
-          riesgo_agotamiento: item.alta_demanda && withinHorizon,
+          alerta_stock: withinThreshold,
+          riesgo_agotamiento: item.alta_demanda && withinThreshold,
         };
       }),
-    [predictions, horizon],
+    [predictions, alertDays],
   );
 
   const recomendaciones = useMemo(() => generarRecomendaciónes(predictionsForView), [predictionsForView]);
@@ -1634,7 +1742,7 @@ export default function AdminPredictions() {
               .reduce((total, point) => total + point.ingresos, 0)
               .toFixed(2),
           )
-        : Number((summary.promedio_diario_histórico * selectedHorizon).toFixed(2)));
+        : Number(((summary.promedio_diario_historico ?? 0) * selectedHorizon).toFixed(2)));
 
     const crecimientoHorizonte =
       summary.crecimiento_estimado_horizonte_pct
@@ -1706,8 +1814,8 @@ export default function AdminPredictions() {
       ? negocioDebil
         ? `Aúnque no haya quiebres de stock, el ritmo proyectado luce flojo: se estiman ${formatCurrency(revenueSummary.proximo_horizonte)} y el crecimiento frente al último tramo es ${formatPercent(growth)}.`
         : growth >= 0
-        ? `Si el ritmo actual se mantiene, el negocio podría cerrar el horizonte con ${formatCurrency(revenueSummary.proximo_horizonte)}, que representa ${formatPercent(growth)} frente a los últimos ${horizon} días.`
-        : `Si no se corrige el ritmo actual, el negocio podría cerrar en ${formatCurrency(revenueSummary.proximo_horizonte)}, es decir ${formatPercent(growth)} frente a los últimos ${horizon} días.`
+        ? `Si el ritmo actual se mantiene, el negocio podría cerrar el horizonte con ${formatCurrency(revenueSummary.proximo_horizonte)}, que representa ${formatPercent(growth)} frente al mismo tramo anterior.`
+        : `Si no se corrige el ritmo actual, el negocio podría cerrar en ${formatCurrency(revenueSummary.proximo_horizonte)}, es decir ${formatPercent(growth)} frente al mismo tramo anterior.`
       : "Aún no se cuenta con una lectura financiera consolidada para este horizonte.";
 
     const lecturaInventario = principalRiesgo
@@ -1716,7 +1824,7 @@ export default function AdminPredictions() {
       ? `No faltan productos, pero hay ${sobreStock} con stock acumulado y ${rotacionDebil} con rotación débil. La cobertura promedio ronda ${Math.round(promedioCobertura || 0)} días.`
       : enRiesgo === 0
       ? `No hay productos en riesgo para este horizonte. La cobertura de stock luce controlada.`
-      : `Hay ${enRiesgo} productos que necesitan seguimiento de stock dentro de los próximos ${horizon} días.`;
+      : `Hay ${enRiesgo} productos que necesitan seguimiento de stock (umbral: ${alertDays} días).`;
 
     const lecturaPortafolio = productoMotor
       ? `${productoMotor.nombre} lidera la rotación actual con un consumo estimado de ${formatUnits(productoMotor.consumo_estimado_diario)} unidades por día.`
@@ -1848,6 +1956,16 @@ export default function AdminPredictions() {
   return (
     <div className="pred-root">
 
+      {/* ── Advertencias del modelo ─────────────────────────── */}
+      {aiWarnings.length > 0 && (
+        <div className="pred-warnings-banner" role="alert">
+          <AlertTriangle size={16} aria-hidden="true" />
+          <ul className="pred-warnings-list">
+            {aiWarnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+
       {/* ── Cabecera ────────────────────────────────────────── */}
       <div className="dash-header">
         <div>
@@ -1856,24 +1974,50 @@ export default function AdminPredictions() {
             <Brain size={26} /> Inteligencia Artificial
           </h1>
           <p className="pred-header-note">
-            El horizonte seleccionado cambia la proyección financiera, el riesgo de inventario y la prioridad de acción del panel.
+            El horizonte define la proyección financiera y de demanda. El umbral de alerta controla qué productos se marcan en riesgo, independientemente del horizonte.
           </p>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Proyectar demanda:</span>
-          {([7, 15, 30] as HorizonOption[]).map((option) => (
-            <button
-              key={option}
-              type="button"
-              className={`pred-horizon-btn ${horizon === option ? "active" : ""}`}
-              onClick={() => setHorizon(option)}
-            >
-              {option} días
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.4rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <span style={{ fontSize: "13px", color: "var(--text-muted)" }}>Horizonte:</span>
+            {HORIZON_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`pred-horizon-btn ${horizon === option ? "active" : ""}`}
+                onClick={() => setHorizon(option)}
+              >
+                {option} días
+              </button>
+            ))}
+            <button type="button" className="btn btn-ghost pred-refresh" onClick={() => void refreshPredictions()}>
+              <RefreshCw size={15} />
             </button>
-          ))}
-          <button type="button" className="btn btn-ghost pred-refresh" onClick={() => void refreshPredictions()}>
-            <RefreshCw size={15} />
-          </button>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexWrap: "wrap" }}>
+            <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>Historial modelo:</span>
+            {HISTORY_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`pred-horizon-btn pred-horizon-btn-sm ${history === option ? "active" : ""}`}
+                onClick={() => setHistory(option)}
+              >
+                {option}d
+              </button>
+            ))}
+            <span style={{ fontSize: "12px", color: "var(--text-muted)", marginLeft: "0.5rem" }}>Alerta stock:</span>
+            {ALERT_OPTIONS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`pred-horizon-btn pred-horizon-btn-sm ${alertDays === option ? "active" : ""}`}
+                onClick={() => setAlertDays(option)}
+              >
+                {option}d
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -1944,9 +2088,9 @@ export default function AdminPredictions() {
             <motion.div className={`pred-kpi-card ${enRiesgo > 0 ? "pred-kpi-alert" : ""}`} initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.18, ease: "easeOut" } }} whileHover={{ y: -8, scale: 1.015 }}>
           <AlertTriangle size={20} />
           <div>
-            <p className="pred-kpi-label">En riesgo en {horizon} días</p>
+            <p className="pred-kpi-label">En riesgo (≤ {alertDays} días)</p>
             <p className="pred-kpi-value">{enRiesgo}</p>
-            <p className="pred-kpi-sub">{enRiesgo === 0 ? "Sin alertas fuertes" : "stock corto para el horizonte actual"}</p>
+            <p className="pred-kpi-sub">{enRiesgo === 0 ? "Sin alertas fuertes" : `stock corto (umbral ${alertDays} días)`}</p>
           </div>
         </motion.div>
         <motion.div className={`pred-kpi-card ${sinStock > 0 ? "pred-kpi-alert" : ""}`} initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.225, ease: "easeOut" } }} whileHover={{ y: -8, scale: 1.015 }}>
@@ -1980,21 +2124,32 @@ export default function AdminPredictions() {
           <div className="dash-card-header">
             <div>
               <p className="dash-card-kicker">Prioridad inmediata</p>
-              <h2 className="dash-card-title">Productos en riesgo en los próximos {horizon} días</h2>
+              <h2 className="dash-card-title">Productos en riesgo — umbral {alertDays} días</h2>
             </div>
           </div>
           {riskAlerts.length > 0 ? (
-            <div className="pred-alerts-grid">
-              {riskAlerts.map((prediction) => (
-                <RiskAlertCard key={prediction.productId} prediction={prediction} />
-              ))}
-            </div>
+            <>
+              <div className="pred-alerts-grid">
+                {riskAlerts.map((prediction) => (
+                  <RiskAlertCard key={prediction.productId} prediction={prediction} />
+                ))}
+              </div>
+              {enRiesgo > riskAlerts.length && (
+                <button
+                  type="button"
+                  className="pred-ver-todos-btn"
+                  onClick={() => changeTab("ventas")}
+                >
+                  Ver todos los productos en alerta ({enRiesgo}) →
+                </button>
+              )}
+            </>
           ) : (
             <div className="pred-empty-card">
               <CheckCircle size={28} className="pred-trend-up" />
               <p className="pred-empty-title">Sin alertas fuertes por ahora</p>
               <p className="pred-empty-copy">
-                No hay productos con cobertura corta dentro del horizonte actual de {horizon} días.
+                No hay productos con cobertura corta dentro del umbral de alerta de {alertDays} días.
               </p>
             </div>
           )}
@@ -2119,18 +2274,29 @@ export default function AdminPredictions() {
               <p className="dash-card-kicker">Estado del inventario</p>
               <h2 className="dash-card-title">Cómo está cada producto</h2>
               <p className="pred-section-note">
-                Esta tabla cambia con el horizonte seleccionado: en 7, 15 o 30 días cambian la proyección, el riesgo y la prioridad de seguimiento.
+                La proyección ({horizon} días) y el umbral de alerta ({alertDays} días) se configuran en la parte superior del panel.
               </p>
             </div>
-            <div className="pred-search-wrap">
-              <Search size={15} className="pred-search-icon" />
-              <input
-                type="text"
-                className="pred-search-input"
-                placeholder="Buscar por código o nombre..."
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-              />
+            <div className="pred-table-controls">
+              <div className="pred-search-wrap">
+                <Search size={15} className="pred-search-icon" />
+                <input
+                  type="text"
+                  className="pred-search-input"
+                  placeholder="Buscar por código o nombre..."
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                className="pred-export-btn"
+                onClick={() => exportPredictionsCSV(porOrden, horizon)}
+                title="Descargar tabla como CSV (compatible con Excel)"
+              >
+                <Download size={14} />
+                CSV
+              </button>
             </div>
           </div>
 
@@ -2242,7 +2408,12 @@ export default function AdminPredictions() {
           animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.38, ease: "easeOut" }}
         >
-          {revenueSummary && normalizedRevenueForecast ? (
+          {revenueLoading && !normalizedRevenueForecast ? (
+            <div className="pred-lazy-loading">
+              <div className="success-spinner" />
+              <span>Calculando proyección de ingresos...</span>
+            </div>
+          ) : revenueSummary && normalizedRevenueForecast ? (
             <div className="dash-card">
               <div className="dash-card-header">
                 <div>
@@ -2261,7 +2432,7 @@ export default function AdminPredictions() {
                   <CircleDollarSign size={20} />
                   <div>
                     <p className="pred-kpi-label">Próxima semana</p>
-                    <p className="pred-kpi-value">{formatCurrency(revenueSummary.proximo_7_dias)}</p>
+                    <AnimatedKpi value={revenueSummary.proximo_7_dias} format={formatCurrency} />
                     <p className="pred-kpi-sub">ingreso estimado en 7 días</p>
                   </div>
                 </div>
@@ -2269,7 +2440,7 @@ export default function AdminPredictions() {
                   <CircleDollarSign size={20} />
                   <div>
                     <p className="pred-kpi-label">Horizonte actual</p>
-                    <p className="pred-kpi-value">{formatCurrency(revenueSummary.proximo_horizonte)}</p>
+                    <AnimatedKpi value={revenueSummary.proximo_horizonte} format={formatCurrency} />
                     <p className="pred-kpi-sub">ingreso estimado en {normalizedRevenueForecast.horizon_days} días</p>
                   </div>
                 </div>
@@ -2277,7 +2448,7 @@ export default function AdminPredictions() {
                   <TrendingUp size={20} />
                   <div>
                     <p className="pred-kpi-label">Vs. último horizonte</p>
-                    <p className="pred-kpi-value">{formatPercent(revenueSummary.crecimiento_estimado_horizonte_pct)}</p>
+                    <AnimatedKpi value={revenueSummary.crecimiento_estimado_horizonte_pct} format={formatPercent} />
                     <p className="pred-kpi-sub">comparado con los últimos {normalizedRevenueForecast.horizon_days} días</p>
                   </div>
                 </div>
@@ -2285,7 +2456,7 @@ export default function AdminPredictions() {
                   <Brain size={20} />
                   <div>
                     <p className="pred-kpi-label">Confianza</p>
-                    <p className="pred-kpi-value">{revenueSummary.confianza}%</p>
+                    <AnimatedKpi value={revenueSummary.confianza} format={(v) => `${Math.round(v)}%`} />
                     <p className="pred-kpi-sub">basada en historial y estabilidad</p>
                   </div>
                 </div>
@@ -2293,7 +2464,7 @@ export default function AdminPredictions() {
               <div className="pred-revenue-metrics">
                 <div>
                   <span className="pred-sub">Promedio diario histórico</span>
-                  <strong>{formatCurrency(revenueSummary.promedio_diario_histórico)}</strong>
+                  <strong>{formatCurrency(revenueSummary.promedio_diario_historico)}</strong>
                 </div>
                 <div>
                   <span className="pred-sub">Promedio diario proyectado</span>
@@ -2303,6 +2474,20 @@ export default function AdminPredictions() {
                   <span className="pred-sub">Últimos {normalizedRevenueForecast.horizon_days} días</span>
                   <strong>{formatCurrency(revenueSummary.ultimo_horizonte)}</strong>
                 </div>
+                {revenueSummary.total_historico_tienda != null && (
+                  <div>
+                    <span className="pred-sub" style={{ display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                      <Store size={12} /> Tienda ({normalizedRevenueForecast.history_days} días)
+                    </span>
+                    <strong>{formatCurrency(revenueSummary.total_historico_tienda)}</strong>
+                  </div>
+                )}
+                {revenueSummary.total_historico_web != null && (
+                  <div>
+                    <span className="pred-sub">Web / Stripe ({normalizedRevenueForecast.history_days} días)</span>
+                    <strong>{formatCurrency(revenueSummary.total_historico_web)}</strong>
+                  </div>
+                )}
               </div>
               <div className="pred-explainer-grid">
                 <article className="pred-explainer-card">

@@ -825,7 +825,6 @@ export default function Header() {
           product.tipoCalzado,
           product.color,
           product.categoria,
-          ...(product.colores ?? []),
         ]
           .filter(Boolean)
           .join(" ")

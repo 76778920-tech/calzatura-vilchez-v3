@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain, FileSpreadsheet, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
@@ -16,12 +16,24 @@ export default function AdminLayout() {
     () => localStorage.getItem("adminSidebarCollapsed") === "true"
   );
 
+  const mainRef = useRef<HTMLElement | null>(null);
+
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       localStorage.setItem("adminSidebarCollapsed", String(!prev));
       return !prev;
     });
   };
+
+  // Al colapsar, si el foco estaba dentro del sidebar lo mueve al contenido
+  // principal para evitar que quede atrapado en un elemento oculto visualmente.
+  useEffect(() => {
+    if (!collapsed) return;
+    const sidebar = document.getElementById("admin-sidebar");
+    if (sidebar?.contains(document.activeElement) && mainRef.current) {
+      mainRef.current.focus();
+    }
+  }, [collapsed]);
 
   if (loading) {
     return (
@@ -47,7 +59,7 @@ export default function AdminLayout() {
 
   return (
     <div className="admin-layout">
-      <aside className={`admin-sidebar${collapsed ? " collapsed" : ""}`}>
+      <aside id="admin-sidebar" className={`admin-sidebar${collapsed ? " collapsed" : ""}`} aria-label="Menú de administración">
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-brand">
             <span className="logo-icon">CV</span>
@@ -64,7 +76,7 @@ export default function AdminLayout() {
           </button>
         </div>
 
-        <nav className="admin-nav">
+        <nav className="admin-nav" aria-label="Módulos del panel">
           <NavLink to={ADMIN_ROUTES.dashboard} end className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Dashboard">
             <LayoutDashboard size={18} /><span className="admin-nav-label">Dashboard</span>
           </NavLink>
@@ -104,12 +116,15 @@ export default function AdminLayout() {
         type="button"
         className="admin-sidebar-toggle"
         onClick={toggleCollapsed}
+        aria-expanded={!collapsed}
+        aria-controls="admin-sidebar"
+        aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
         title={collapsed ? "Expandir menú" : "Colapsar menú"}
       >
         {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
       </button>
 
-      <main className="admin-main">
+      <main ref={mainRef} tabIndex={-1} className="admin-main">
         <Outlet />
       </main>
     </div>

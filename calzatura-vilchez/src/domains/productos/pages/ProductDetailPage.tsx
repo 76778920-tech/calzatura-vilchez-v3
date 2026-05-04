@@ -12,7 +12,7 @@ import {
   ChevronRight,
   Maximize2,
 } from "lucide-react";
-import { fetchProductById } from "@/domains/productos/services/products";
+import { fetchProductById, fetchRelatedProductsInFamily } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { getProductColors } from "@/utils/colors";
@@ -28,6 +28,7 @@ export default function ProductDetailPage() {
   const { addItem } = useCart();
 
   const [product, setProduct] = useState<Product | null>(null);
+  const [familySiblings, setFamilySiblings] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [selectedTalla, setSelectedTalla] = useState<string>("");
@@ -38,22 +39,35 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (!id) return;
     fetchProductById(id)
-      .then((p) => {
+      .then(async (p) => {
         setProduct(p);
         setSelectedImageIndex(0);
         setPreviewOpen(false);
         const colors = p ? getProductColors(p) : [];
         const firstColor = colors[0] ?? "";
         setSelectedColor(firstColor);
-        const availableSizes = p ? getAvailableSizes(p, firstColor) : [];
+        const availableSizes = p ? getAvailableSizes(p) : [];
         if (availableSizes.length) setSelectedTalla(availableSizes[0]);
+        if (p) {
+          try {
+            const related = await fetchRelatedProductsInFamily(p);
+            const sorted = [...related].sort((a, b) =>
+              (a.color ?? "").localeCompare(b.color ?? "", "es", { sensitivity: "base" })
+            );
+            setFamilySiblings(sorted);
+          } catch {
+            setFamilySiblings([]);
+          }
+        } else {
+          setFamilySiblings([]);
+        }
       })
       .finally(() => setLoading(false));
   }, [id]);
 
   const availableColors = product ? getProductColors(product) : [];
-  const availableSizes = product ? getAvailableSizes(product, selectedColor || undefined) : [];
-  const selectedSizeStock = product ? getSizeStock(product, selectedTalla || undefined, selectedColor || undefined) : 0;
+  const availableSizes = product ? getAvailableSizes(product) : [];
+  const selectedSizeStock = product ? getSizeStock(product, selectedTalla || undefined) : 0;
   const productImages = useMemo(() => {
     if (!product) return [];
     const images = (product.imagenes?.length ? product.imagenes : [product.imagen]).filter(Boolean);
@@ -233,7 +247,7 @@ export default function ProductDetailPage() {
                     type="button"
                     onClick={() => {
                       setSelectedColor(color);
-                      setSelectedTalla(product ? getAvailableSizes(product, color)[0] ?? "" : "");
+                      setSelectedTalla(product ? getAvailableSizes(product)[0] ?? "" : "");
                       setQuantity(1);
                     }}
                     className={`color-chip color-chip-btn ${selectedColor === color ? "active" : ""}`}
@@ -244,6 +258,38 @@ export default function ProductDetailPage() {
               </div>
             </div>
           )}
+
+          {familySiblings.length > 0 && (
+            <div className="detail-family" aria-label="Otros colores del mismo modelo">
+              <p className="detail-section-label">También disponible en</p>
+              <ul className="detail-family-list">
+                {familySiblings.map((s) => {
+                  const thumb = (s.imagenes?.length ? s.imagenes[0] : s.imagen) || FALLBACK_PRODUCT_IMAGE;
+                  const label = s.color?.trim() || "Ver producto";
+                  return (
+                    <li key={s.id}>
+                      <Link to={`/producto/${s.id}`} className="detail-family-card">
+                        <span className="detail-family-thumb-wrap">
+                          <img
+                            src={thumb}
+                            alt=""
+                            className="detail-family-thumb"
+                            onError={(event) => {
+                              const el = event.target as HTMLImageElement;
+                              el.onerror = null;
+                              el.src = FALLBACK_PRODUCT_IMAGE;
+                            }}
+                          />
+                        </span>
+                        <span className="detail-family-label">{label}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
           <p className="detail-price">S/ {product.precio.toFixed(2)}</p>
 
           {product.stock > 0 ? (

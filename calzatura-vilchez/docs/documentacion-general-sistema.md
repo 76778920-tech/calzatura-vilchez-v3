@@ -7,9 +7,8 @@ Calzatura Vilchez es una plataforma web para comercio, inventario, ventas, admin
 La solución esta compuesta por:
 
 - Frontend web en React, TypeScript y Vite.
-- Base de datos Cloud Firestore.
+- Base de datos Supabase (PostgreSQL) con políticas RLS.
 - Autenticación Firebase Auth.
-- Reglas de seguridad Firestore Rules.
 - Cloud Functions para operaciones sensibles asociadas a Stripe.
 - Cloudinary para carga y entrega de imágenes.
 - Servicio IA en Python FastAPI para predicción de demanda y alertas de stock.
@@ -28,9 +27,9 @@ Centralizar la gestión comercial y operativa de Calzatura Vilchez mediante una 
 | Rutas | React Router |
 | Iconos | lucide-react |
 | Notificaciones | react-hot-toast |
-| Base de datos | Cloud Firestore |
+| Base de datos | Supabase (PostgreSQL) |
 | Autenticación | Firebase Auth |
-| Backend serverless | Firebase Functions |
+| Backend serverless | Firebase Functions (pagos Stripe) |
 | Pagos | Stripe |
 | Imágenes | Cloudinary |
 | IA | Python, FastAPI, pandas, numpy, scikit-learn |
@@ -125,20 +124,20 @@ Incluye layout administrativo, dashboard, predicciones, vista previa de imágene
 
 Ubicacion: `ai-service`
 
-Expone endpoints para predicción de demanda, alertas de stock y gráfico semanal. Lee datos de Firestore con Firebase Admin y mantiene cache temporal para reducir lecturas.
+Expone endpoints para predicción de demanda, alertas de stock y gráfico semanal. Lee datos de Supabase y mantiene cache temporal para reducir consultas.
 
-## 6. Colecciones Firestore
+## 6. Tablas Supabase
 
-| Colección | Uso |
+| Tabla | Uso |
 |---|---|
 | `productos` | Catálogo público, stock, imágenes y atributos comerciales. |
 | `productoCodigos` | Códigos internos por producto. |
 | `productoFinanzas` | Costos, margenes y precios sugeridos. |
 | `pedidos` | Pedidos de clientes y estados. |
 | `usuarios` | Perfiles, datos personales y roles. |
-| `usuarios/{uid}/favoritos` | Productos favoritos por usuario. |
 | `ventasDiarias` | Ventas manuales, documentos, ganancias y devoluciones. |
 | `fabricantes` | Información de fabricantes y documentos asociados. |
+| `auditoria` | Trazabilidad ISO 9001 de operaciones admin. |
 
 ## 7. Roles Y Seguridad
 
@@ -148,7 +147,7 @@ La proteccion se aplica en varias capas:
 
 - Rutas protegidas con `AreaRoute`.
 - Control de acceso en `src/security/accessControl.ts`.
-- Reglas de Firestore en `firestore.rules`.
+- Políticas RLS en Supabase para tablas de negocio.
 - Cloud Functions para operaciones sensibles de pago.
 - Validaciones de datos antes de escritura.
 
@@ -168,7 +167,7 @@ ai-service/serviceAccountKey.json
 4. Agrega al carrito.
 5. Ingresa a checkout.
 6. Registra dirección y método de pago.
-7. Se crea pedido en Firestore.
+7. Se crea pedido en Supabase.
 8. Si paga con Stripe, se genera sesión de pago.
 9. Webhook confirma pago y actualiza estado.
 
@@ -195,7 +194,7 @@ ai-service/serviceAccountKey.json
 
 1. Administrador ingresa a predicciones.
 2. Frontend consulta el servicio IA.
-3. FastAPI lee ventas, pedidos completados y productos desde Firestore.
+3. FastAPI lee ventas, pedidos completados y productos desde Supabase.
 4. El modelo calcula demanda estimada.
 5. La pantalla muestra predicciones, alertas y gráfico semanal.
 

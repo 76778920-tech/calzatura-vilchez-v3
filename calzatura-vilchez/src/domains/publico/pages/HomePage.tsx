@@ -443,10 +443,7 @@ export default function HomePage() {
   }, [featuredProducts]);
 
   const spotlightTotalPages = spotlightPages.length;
-
-  useEffect(() => {
-    setSpotlightPage(0);
-  }, [spotlightTotalPages]);
+  const effectiveSpotlightPage = Math.min(spotlightPage, Math.max(spotlightTotalPages - 1, 0));
   const categoryCounts = useMemo(() => {
     return HOME_CATEGORY_CARDS.reduce<Record<string, number>>((acc, category) => {
       const match = category.match;
@@ -676,7 +673,7 @@ export default function HomePage() {
               <div className="home-spotlight-carousel">
                 <div
                   className="home-spotlight-track"
-                  style={{ transform: `translateX(-${spotlightPage * 100}%)` }}
+                  style={{ transform: `translateX(-${effectiveSpotlightPage * 100}%)` }}
                 >
                   {spotlightPages.map((page, pi) => (
                     <div key={pi} className="home-spotlight-page products-grid home-spotlight-grid">
@@ -689,7 +686,7 @@ export default function HomePage() {
                     type="button"
                     className="home-spotlight-nav-btn"
                     onClick={() => setSpotlightPage((p) => Math.max(0, p - 1))}
-                    disabled={spotlightPage === 0}
+                    disabled={effectiveSpotlightPage === 0}
                     aria-label="Página anterior"
                   >
                     <ChevronLeft size={20} />
@@ -699,7 +696,7 @@ export default function HomePage() {
                       <button
                         key={pi}
                         type="button"
-                        className={`home-spotlight-dot${pi === spotlightPage ? " is-active" : ""}`}
+                        className={`home-spotlight-dot${pi === effectiveSpotlightPage ? " is-active" : ""}`}
                         onClick={() => setSpotlightPage(pi)}
                         aria-label={`Página ${pi + 1}`}
                       />
@@ -709,7 +706,7 @@ export default function HomePage() {
                     type="button"
                     className="home-spotlight-nav-btn"
                     onClick={() => setSpotlightPage((p) => Math.min(spotlightTotalPages - 1, p + 1))}
-                    disabled={spotlightPage === spotlightTotalPages - 1}
+                    disabled={effectiveSpotlightPage === spotlightTotalPages - 1}
                     aria-label="Página siguiente"
                   >
                     <ChevronRight size={20} />

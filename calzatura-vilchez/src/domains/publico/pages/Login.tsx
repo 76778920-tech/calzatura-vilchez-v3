@@ -77,10 +77,11 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="auth-form">
           <div className="input-group">
-            <label>Correo electrónico</label>
+            <label htmlFor="login-email">Correo electrónico</label>
             <div className="input-wrapper">
               <Mail size={16} className="input-icon" />
               <input
+                id="login-email"
                 type="email"
                 inputMode="email"
                 autoComplete="email"
@@ -94,10 +95,11 @@ export default function Login() {
           </div>
 
           <div className="input-group">
-            <label>Contraseña</label>
+            <label htmlFor="login-password">Contraseña</label>
             <div className="input-wrapper">
               <Lock size={16} className="input-icon" />
               <input
+                id="login-password"
                 type={showPass ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

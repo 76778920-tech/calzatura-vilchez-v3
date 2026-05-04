@@ -5,12 +5,13 @@ Fecha: 2026-04-27 (actualizado — revisión inicial: 2026-04-20)
 Alcance revisado:
 
 - Rutas públicas y rutas administrativas.
-- Reglas de Firestore.
+- Políticas RLS de Supabase (datos) y Firestore Rules (perfiles de usuario Firebase Auth).
 - Firebase Auth y perfiles.
 - Cloud Functions de Stripe.
 - Carga de imágenes a Cloudinary.
 - Hosting y headers HTTP.
 - Exposición de configuración en frontend.
+- Manejo de errores y degradación comunicada en módulos admin.
 
 ## Hallazgos corregidos
 
@@ -184,4 +185,19 @@ Se aplicó una separación obligatoria por dominios:
 - `src/routes/RouteGuards.tsx`: guardias de autenticación y autorización por área.
 - `src/security/accessControl.ts`: mapa de roles permitidos por área.
 
-Esta separación no sustituye Firestore Rules ni backend. Es una barrera de mantenibilidad y prevención de errores de rutas; la seguridad real de datos sigue en Firebase, Functions y endpoints serverless propios como la validación DNI en Vercel.
+Esta separación no sustituye Supabase RLS ni backend. Es una barrera de mantenibilidad y prevención de errores de rutas; la seguridad real de datos sigue en Supabase RLS (tablas de negocio), Firebase Auth (identidad) y Cloud Functions (pagos Stripe).
+
+## Hallazgos — AdminDashboard (commit 4f6ce4c, 2026-05-02)
+
+Ver detalle completo en `docs/15-modulos/AdminDashboard-auditoria.md`.
+
+| ID | Hallazgo | Severidad | Estado |
+|---|---|---|---|
+| H-01 | `Promise.all` sin `.catch`: KPIs en cero sin aviso si un fetch falla | Alta | ✅ Cerrado |
+| H-02 | `fetchRecentAudit` catch silencioso: tabla vacía sin distinción de error | Media | ✅ Cerrado |
+| H-03 | `<tr onClick>` sin `role="button"` ni teclado (accesibilidad WCAG 4.1.2) | Media | ✅ Cerrado |
+| H-04 | Ganancia estimada sin indicación visual de estimación | Baja | ✅ Cerrado |
+
+**Corrección aplicada:** `setLoadError` + `toast.error` + pantalla de error con Reintentar; `setAuditError` + mensaje visible; `role="button"` + `onKeyDown`; etiqueta `(est.)` en KPI.
+
+**Caso de prueba pendiente de automatizar:** TC-DASH-001 (mock 500 → verificar UX). Ver `docs/CU-T07-LEEME.md` (matriz canónica en `documentacion/cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv`).

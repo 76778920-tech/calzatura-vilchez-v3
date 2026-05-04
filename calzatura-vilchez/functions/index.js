@@ -26,6 +26,8 @@ const STRIPE_SECRET = defineSecret("STRIPE_SECRET_KEY");
 const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
 const SUPABASE_URL = defineSecret("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = defineSecret("SUPABASE_SERVICE_ROLE_KEY");
+const AI_SERVICE_URL = defineSecret("AI_SERVICE_URL");
+const AI_SERVICE_BEARER_TOKEN = defineSecret("AI_SERVICE_BEARER_TOKEN");
 
 const ORDER_ITEM_LIMIT = 30;
 const ORDER_QTY_LIMIT = 100;
@@ -58,6 +60,17 @@ async function verifyFirebaseUser(req) {
   return admin.auth().verifyIdToken(token);
 }
 
+async function assertAdminRole(supabase, uid) {
+  const { data, error } = await supabase.from("usuarios").select("rol").eq("uid", uid).maybeSingle();
+  if (error) {
+    throw Object.assign(new Error("No se pudo verificar el rol"), { status: 500 });
+  }
+  if (data?.rol === "admin") {
+    return;
+  }
+  throw Object.assign(new Error("Solo administradores pueden consultar el servicio de IA"), { status: 403 });
+}
+
 function toCents(amount) {
   return Math.round(Number(amount || 0) * 100);
 }
@@ -68,6 +81,25 @@ function validStripeImage(image) {
     return url.protocol === "https:" ? [image] : [];
   } catch {
     return [];
+  }
+}
+
+// Inserta en la tabla auditoria desde el contexto de Cloud Functions.
+// No lanza: un fallo de auditoría nunca interrumpe la operación principal.
+async function logAuditFn(supabase, accion, entidad, entidadId, entidadNombre, usuarioUid, usuarioEmail, detalle) {
+  try {
+    await supabase.from("auditoria").insert({
+      accion,
+      entidad,
+      entidadId,
+      entidadNombre,
+      detalle: detalle ?? null,
+      usuarioUid: usuarioUid ?? null,
+      usuarioEmail: usuarioEmail ?? null,
+      realizadoEn: new Date().toISOString(),
+    });
+  } catch {
+    // silencioso
   }
 }
 
@@ -629,12 +661,29 @@ exports.stripeWebhook = onRequest(
 
           if (order.estado !== "pagado") {
             await discountOrderStock(supabase, order);
+            await updateOrder(supabase, orderId, {
+              estado: "pagado",
+              stripeSessionId: session.id,
+              pagadoEn: new Date().toISOString(),
+            });
+            void logAuditFn(
+              supabase,
+              "cambiar_estado",
+              "pedido",
+              orderId,
+              `#${orderId.slice(-8).toUpperCase()}`,
+              session.metadata?.userId ?? null,
+              order.userEmail ?? null,
+              {
+                estado: "pagado",
+                source: "stripe_webhook",
+                stripeEventId: event.id,
+                stripeSessionId: session.id,
+              },
+            );
           }
-
-          await updateOrder(supabase, orderId, {
-            estado: "pagado",
-            stripeSessionId: session.id,
-          });
+          // Si order.estado === "pagado": Stripe está reintentando un evento ya procesado.
+          // No actualizamos ni auditamos de nuevo para evitar duplicados.
         } catch (error) {
           console.error("Stripe webhook order error:", error);
           return res.status(error.status || 500).json({ error: publicError(error) });
@@ -682,6 +731,94 @@ exports.confirmCodOrder = onRequest(
       } catch (error) {
         console.error("COD confirm error:", error);
         return res.status(error.status || 500).json({ error: publicError(error) });
+      }
+    });
+  }
+);
+
+const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
+
+exports.aiAdminProxy = onRequest(
+  {
+    secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AI_SERVICE_URL, AI_SERVICE_BEARER_TOKEN],
+    invoker: "public",
+  },
+  async (req, res) => {
+    cors(req, res, async () => {
+      if (req.method === "OPTIONS") {
+        return res.status(204).send("");
+      }
+
+      const op = typeof req.query.op === "string" ? req.query.op : "";
+
+      try {
+        const decodedToken = await verifyFirebaseUser(req);
+        const supabase = getSupabaseAdmin();
+        await assertAdminRole(supabase, decodedToken.uid);
+
+        const base = AI_SERVICE_URL.value().replace(/\/$/, "");
+        const serviceAuth = { Authorization: `Bearer ${AI_SERVICE_BEARER_TOKEN.value()}` };
+        const signal = AbortSignal.timeout(AI_PROXY_UPSTREAM_TIMEOUT_MS);
+
+        let upstreamUrl;
+        let method = "GET";
+
+        if (op === "combined") {
+          const horizon = parseInt(String(req.query.horizon ?? "30"), 10);
+          const history = parseInt(String(req.query.history ?? "120"), 10);
+          if (!Number.isFinite(horizon) || horizon < 7 || horizon > 90) {
+            return res.status(400).json({ error: "horizon invalido" });
+          }
+          if (!Number.isFinite(history) || history < 30 || history > 365) {
+            return res.status(400).json({ error: "history invalido" });
+          }
+          upstreamUrl = `${base}/api/predict/combined?horizon=${encodeURIComponent(horizon)}&history=${encodeURIComponent(history)}`;
+        } else if (op === "weeklyChart") {
+          const weeks = parseInt(String(req.query.weeks ?? "8"), 10);
+          if (!Number.isFinite(weeks) || weeks < 2 || weeks > 24) {
+            return res.status(400).json({ error: "weeks invalido" });
+          }
+          upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
+        } else if (op === "modelMetrics") {
+          upstreamUrl = `${base}/api/model/metrics`;
+        } else if (op === "cacheInvalidate") {
+          if (req.method !== "POST") {
+            return res.status(405).json({ error: "Metodo no permitido" });
+          }
+          upstreamUrl = `${base}/api/cache/invalidate`;
+          method = "POST";
+        } else {
+          return res.status(400).json({ error: "op invalido" });
+        }
+
+        const upstream = await fetch(upstreamUrl, { method, headers: serviceAuth, signal });
+        const text = await upstream.text();
+        const ct = upstream.headers.get("content-type") || "application/json; charset=utf-8";
+
+        if (ct.includes("application/json")) {
+          try {
+            return res.status(upstream.status).type("application/json").send(JSON.parse(text));
+          } catch {
+            return res.status(upstream.status).type("text/plain").send(text);
+          }
+        }
+
+        return res.status(upstream.status).type(ct).send(text);
+      } catch (error) {
+        console.error("aiAdminProxy error:", error);
+        let status = typeof error.status === "number" ? error.status : 500;
+        if (status === 500 && error.code && String(error.code).startsWith("auth/")) {
+          status = 401;
+        }
+        let message;
+        if (status === 401) {
+          message = "Sesion invalida o expirada. Vuelve a iniciar sesion.";
+        } else if (status < 500 && error.message) {
+          message = error.message;
+        } else {
+          message = publicError(error);
+        }
+        return res.status(status).json({ error: message });
       }
     });
   }

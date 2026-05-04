@@ -14,7 +14,7 @@
 
 Calzatura Vilchez requiere una plataforma web que permita publicar productos de calzado, gestionar inventario, registrar ventas, administrar pedidos, controlar fabricantes, manejar usuarios y consultar indicadores de negocio desde un panel administrativo. La organización necesita reducir registros manuales dispersos, centralizar información comercial y disponer de una base para tomar decisiones sobre stock, ventas y demanda.
 
-El sistema se implementa como una aplicación web desarrollada con React, TypeScript y Vite. La persistencia principal se realiza en Firebase Firestore, la autenticación se gestiona con Firebase Auth, las reglas de seguridad se definen con Firestore Rules, las imágenes de producto se administran mediante Cloudinary y la predicción de demanda se apoya en un servicio Python FastAPI conectado a Firestore.
+El sistema se implementa como una aplicación web desarrollada con React, TypeScript y Vite. La persistencia principal se realiza en Supabase (PostgreSQL) con políticas RLS, la autenticación se gestiona con Firebase Auth, las imágenes de producto se administran mediante Cloudinary y la predicción de demanda se apoya en un servicio Python FastAPI conectado a Supabase.
 
 ### Problema Que Se Busca Resolver
 
@@ -36,7 +36,7 @@ Desarrollar una plataforma web que permita gestionar el comercio digital de Calz
 
 ### Entorno De Uso
 
-El sistema se usa en navegador web, tanto en computadoras como dispositivos moviles. El frontend puede desplegarse en Firebase Hosting u otra plataforma compatible con Vite. Los datos se almacenan en Firebase Firestore. El servicio de IA se ejecuta localmente durante desarrollo o puede desplegarse en un servicio cloud para disponibilidad continua.
+El sistema se usa en navegador web, tanto en computadoras como dispositivos moviles. El frontend puede desplegarse en Firebase Hosting u otra plataforma compatible con Vite. Los datos se almacenan en Supabase (PostgreSQL). El servicio de IA se ejecuta localmente durante desarrollo o puede desplegarse en un servicio cloud para disponibilidad continua.
 
 ## Objetivos Del Sistema
 
@@ -72,7 +72,7 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 | IN-07 | Perfil de usuario | Permite consultar y actualizar teléfono y direcciones. | RF clientes |
 | IN-08 | Favoritos | Permite guardar y quitar productos favoritos por usuario. | RF clientes |
 | IN-09 | Checkout | Captura dirección, método de pago y notas del pedido. | RF pedidos |
-| IN-10 | Creación de pedido | Registra pedidos en Firestore con estado pendiente. | RF pedidos |
+| IN-10 | Creación de pedido | Registra pedidos en Supabase (`pedidos`) con estado inicial según flujo (p. ej. pendiente). | RF pedidos |
 | IN-11 | Pago con Stripe | Genera sesión de pago y procesa confirmación mediante Cloud Functions. | RF pagos |
 | IN-12 | Pedido contraentrega | Permite registrar pedido con método de pago contraentrega. | RF pedidos |
 | IN-13 | Historial de pedidos | Permite al cliente revisar sus pedidos. | RF pedidos |
@@ -90,7 +90,7 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 | IN-25 | Gestión de fabricantes | Registra datos de fabricantes, documentos y últimos ingresos. | RF fabricantes |
 | IN-26 | Predicción de demanda | Consulta servicio IA para estimar demanda futura por producto. | RF analítica |
 | IN-27 | Alertas de stock | Identifica productos con riesgo de agotarse. | RF analítica, RF inventario |
-| IN-28 | Reglas de seguridad | Firestore Rules validan lectura, escritura, roles y formatos de datos. | RNF seguridad |
+| IN-28 | Reglas de seguridad | Supabase RLS sobre tablas de datos; Firestore Rules donde apliquen perfiles vinculados a Firebase Auth; validaciones en RPC/triggers. | RNF seguridad |
 | IN-29 | Despliegue web | Permite publicar frontend en Firebase Hosting. | RNF disponibilidad |
 | IN-30 | Docker para desarrollo | Permite levantar frontend y servicio IA con Docker Compose. | RNF mantenibilidad |
 
@@ -119,7 +119,7 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 | ACT-02 | Administrador | Gestiona catálogo, ventas, pedidos, usuarios, fabricantes e indicadores. |
 | ACT-03 | Superadministrador | Controla asignacion de roles administrativos. |
 | ACT-04 | Firebase Auth | Servicio de autenticación de usuarios. |
-| ACT-05 | Cloud Firestore | Base de datos principal del sistema. |
+| ACT-05 | Supabase (PostgreSQL) | Base de datos principal del sistema. |
 | ACT-06 | Cloudinary | Servicio externo de almacenamiento y entrega de imágenes. |
 | ACT-07 | Stripe | Servicio externo para pagos con tarjeta. |
 | ACT-08 | API DNI | Servicio para consulta y validación de datos por DNI. |
@@ -143,7 +143,7 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 | E-11 | Datos de fabricante | Administrador |
 | E-12 | Cambios de rol | Administrador / Superadministrador |
 | E-13 | Eventos de pago | Stripe |
-| E-14 | Datos historicos de ventas y pedidos | Firestore |
+| E-14 | Datos historicos de ventas y pedidos | Supabase |
 
 ### Salidas Del Sistema
 
@@ -152,7 +152,7 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 | S-01 | Catálogo de productos | Visitante / Cliente |
 | S-02 | Confirmación de registro o login | Usuario |
 | S-03 | Carrito actualizado | Cliente |
-| S-04 | Pedido creado | Cliente / Firestore |
+| S-04 | Pedido creado | Cliente / Supabase |
 | S-05 | Sesión de pago Stripe | Cliente / Stripe |
 | S-06 | Estado de pedido | Cliente / Administrador |
 | S-07 | Dashboard de indicadores | Administrador |
@@ -162,14 +162,14 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 | S-11 | Listado de fabricantes | Administrador |
 | S-12 | Predicciones de demanda | Administrador |
 | S-13 | Alertas de stock | Administrador |
-| S-14 | Reglas de acceso aplicadas | Firestore / Usuario |
+| S-14 | Políticas de acceso aplicadas | Supabase RLS / Usuario |
 
 ## Restricciones Y Supuestos
 
 ### Restricciones Tecnologicas
 
 - El frontend se desarrolla con React, TypeScript y Vite.
-- La base de datos principal es Firebase Firestore.
+- La base de datos principal es Supabase (PostgreSQL).
 - La autenticación depende de Firebase Auth.
 - Las imágenes de productos se almacenan en Cloudinary.
 - El pago con tarjeta se procesa mediante Stripe.
@@ -179,7 +179,7 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 ### Restricciones Operativas
 
 - El panel administrativo requiere usuario autenticado con rol autorizado.
-- Las operaciones sensibles dependen de reglas de Firestore y Cloud Functions.
+- Las operaciones sensibles dependen de políticas Supabase (RLS), reglas Firestore cuando apliquen a datos de perfil, y Cloud Functions para pagos Stripe.
 - El servicio de IA local solo funciona mientras la computadora o servidor este encendido.
 - Para disponibilidad continua del servicio IA se requiere despliegue cloud.
 - La carga masiva de productos debe considerar paginación e índices para evitar exceso de lecturas.
@@ -205,7 +205,7 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 - Las funcionalidades incluidas y excluidas se encuentran diferenciadas de forma clara.
 - Los limites del sistema identifican actores, entradas, salidas e integraciones externas.
 - Las restricciones tecnologicas, operativas y legales estan documentadas.
-- El proyecto es viable para desarrollo web con Firebase y servicio IA complementario.
+- El proyecto es viable para desarrollo web con Supabase (datos), Firebase Auth/Hosting, Cloud Functions (Stripe) y servicio IA complementario.
 - No existen ambiguedades sobre lo que corresponde a la version actual y lo que queda para futuras versiones.
 - La documentacion puede ser revisada por el docente y utilizada como base para planificacion posterior.
 

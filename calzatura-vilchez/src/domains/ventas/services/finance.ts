@@ -76,6 +76,7 @@ export async function fetchDailySales(date?: string): Promise<DailySale[]> {
 export async function addDailySale(data: Omit<DailySale, "id" | "creadoEn">): Promise<string> {
   const { data: row, error } = await supabase.from(SALES_COL).insert({
     ...data,
+    canal: "tienda",
     creadoEn: new Date().toISOString(),
   }).select("id").single();
   if (error) throw error;
@@ -88,5 +89,29 @@ export async function markSaleReturned(saleId: string, motivo: string): Promise<
     motivoDevolucion: motivo,
     devueltoEn: new Date().toISOString(),
   }).eq("id", saleId);
+  if (error) throw error;
+}
+
+export async function decrementProductStock(
+  productId: string,
+  lines: { talla: string | null; cantidad: number }[]
+): Promise<void> {
+  const { error } = await supabase.rpc("decrement_product_stock", {
+    p_product_id: productId,
+    p_lines: lines,
+  });
+  if (error) throw error;
+}
+
+export async function restoreProductStock(
+  productId: string,
+  talla: string | null,
+  cantidad: number
+): Promise<void> {
+  const { error } = await supabase.rpc("restore_product_stock", {
+    p_product_id: productId,
+    p_talla: talla ?? null,
+    p_cantidad: cantidad,
+  });
   if (error) throw error;
 }

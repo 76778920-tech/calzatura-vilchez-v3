@@ -111,9 +111,11 @@ export default function AdminUsers() {
       );
       toast.success(`Rol actualizado a ${roleLabel(nextRole)}`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("permission-denied") || msg.includes("PERMISSION_DENIED")) {
-        toast.error("Sin permisos. Sube las reglas de Firestore actualizadas.");
+      const msg = err instanceof Error ? err.message : (typeof err === "object" && err && "message" in err ? String((err as { message: unknown }).message) : "");
+      const code = typeof err === "object" && err && "code" in err ? String((err as { code: unknown }).code) : "";
+      const isPermissionError = code === "42501" || msg.toLowerCase().includes("row-level security");
+      if (isPermissionError) {
+        toast.error("Sin permisos para realizar esta operación.");
       } else {
         toast.error("No se pudo actualizar el rol");
       }

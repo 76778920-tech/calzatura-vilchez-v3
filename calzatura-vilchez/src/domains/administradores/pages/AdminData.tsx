@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle, Download, FileSpreadsheet, Loader, Trash2, 
 import toast from "react-hot-toast";
 import { supabase } from "@/supabase/client";
 import { logAudit } from "@/services/audit";
+import { aiAdminFetch } from "@/services/aiAdminClient";
 import { calculatePriceRange } from "@/domains/ventas/services/finance";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -44,8 +45,6 @@ interface CollectionConfig {
   upsertOnConflict?: string;
 }
 
-const AI_BASE = import.meta.env.VITE_AI_SERVICE_URL ?? "http://localhost:8000";
-const AI_BEARER_TOKEN = (import.meta.env.VITE_AI_SERVICE_BEARER_TOKEN as string | undefined)?.trim();
 const SCENARIO_OPTIONS: { key: ScenarioKey; label: string }[] = [
   { key: "crisis", label: "Crisis" },
   { key: "normal", label: "Normal" },
@@ -136,23 +135,10 @@ function parseNumberMapCell(value: unknown): Record<string, number> {
   );
 }
 
-function parseNestedNumberMapCell(value: unknown): Record<string, Record<string, number>> {
-  const parsed = parseJsonCell<Record<string, unknown>>(value, {});
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-  return Object.fromEntries(
-    Object.entries(parsed).map(([outerKey, innerValue]) => [
-      String(outerKey).trim(),
-      parseNumberMapCell(innerValue),
-    ])
-  );
-}
 
 async function invalidateAICache(): Promise<void> {
   try {
-    await fetch(`${AI_BASE}/api/cache/invalidate`, {
-      method: "POST",
-      headers: AI_BEARER_TOKEN ? { Authorization: `Bearer ${AI_BEARER_TOKEN}` } : {},
-    });
+    await aiAdminFetch("/api/cache/invalidate", { method: "POST" });
   } catch {
     // El panel puede seguir funcionando aunque el refresco del cache falle.
   }
@@ -168,7 +154,7 @@ const COLLECTIONS: CollectionConfig[] = [
     canImport: true,
     templateHeaders: [
       "id", "codigo", "nombre", "precio", "stock", "categoria", "tipoCalzado",
-      "descripcion", "marca", "color", "colores", "tallas", "tallaStock", "colorStock", "destacado",
+      "descripcion", "marca", "color", "familiaId", "tallas", "tallaStock", "destacado",
     ],
     templateExample: {
       id: "PRUEBA_CV001",
@@ -181,10 +167,9 @@ const COLLECTIONS: CollectionConfig[] = [
       descripcion: "Descripcion del producto (opcional)",
       marca: "Nike",
       color: "Negro",
-      colores: "[\"Negro\",\"Blanco\"]",
+      familiaId: "",
       tallas: "[\"39\",\"40\",\"41\"]",
       tallaStock: "{\"39\":3,\"40\":4,\"41\":3}",
-      colorStock: "{\"Negro\":{\"39\":1,\"40\":2,\"41\":1},\"Blanco\":{\"39\":2,\"40\":2,\"41\":2}}",
       destacado: false,
     },
     extraData: async () => {
@@ -205,10 +190,9 @@ const COLLECTIONS: CollectionConfig[] = [
       descripcion: d.descripcion ?? "",
       marca: d.marca ?? "",
       color: d.color ?? "",
-      colores: JSON.stringify(d.colores ?? []),
+      familiaId: d.familiaId ?? "",
       tallas: JSON.stringify(d.tallas ?? []),
       tallaStock: JSON.stringify(d.tallaStock ?? {}),
-      colorStock: JSON.stringify(d.colorStock ?? {}),
       destacado: d.destacado ?? false,
     }),
     importTransform: (row, context) => ({
@@ -220,10 +204,9 @@ const COLLECTIONS: CollectionConfig[] = [
       descripcion: String(row.descripcion ?? "").trim(),
       marca: String(row.marca ?? "").trim(),
       color: String(row.color ?? "").trim(),
-      colores: parseStringArrayCell(row.colores),
+      familiaId: String(row.familiaId ?? "").trim() || undefined,
       tallas: parseStringArrayCell(row.tallas),
       tallaStock: parseNumberMapCell(row.tallaStock),
-      colorStock: parseNestedNumberMapCell(row.colorStock),
       destacado: parseBooleanCell(row.destacado),
       imagen: "",
       imagenes: [],
@@ -282,6 +265,10 @@ const COLLECTIONS: CollectionConfig[] = [
       precioSugerido: Number(row.precioSugerido ?? 0),
       precioMaximo: Number(row.precioMaximo ?? 0),
       actualizadoEn: context.importadoEn,
+      esDePrueba: true,
+      importadoEn: context.importadoEn,
+      loteImportacion: context.loteImportacion,
+      escenario: context.escenario,
     }),
     importValidate: (row) => {
       if (!row.productId) return "Falta el campo 'productId'";
@@ -352,7 +339,7 @@ const COLLECTIONS: CollectionConfig[] = [
       "documentoTipo", "documentoNumero",
     ],
     templateExample: {
-      productId: "ID_PRODUCTO_FIRESTORE",
+      productId: "ID_PRODUCTO",
       codigo: "CV-001",
       nombre: "Zapatilla Deportiva",
       color: "Negro",
@@ -666,7 +653,7 @@ function uniqueSortedSizes(sizes: string[]) {
   return Array.from(new Set(sizes.map((size) => String(size)))).sort((a, b) => Number(a) - Number(b));
 }
 
-function buildScenarioColorStock(baseSize: string, stock: number, color: string) {
+function buildScenarioColorStock(baseSize: string, stock: number) {
   const base = Number(baseSize);
   const sizes = uniqueSortedSizes([String(base - 1), String(base), String(base + 1)]);
   const weights = [0.3, 0.4, 0.3];
@@ -681,12 +668,9 @@ function buildScenarioColorStock(baseSize: string, stock: number, color: string)
     assigned += qty;
   });
 
-  const colorStock = { [color]: tallaStock };
   return {
     tallas: sizes,
     tallaStock,
-    colorStock,
-    colores: [color],
   };
 }
 
@@ -750,7 +734,7 @@ function downloadScenario(sc: ScenarioCfg): void {
     const precio = sc.priceDiscount > 0
       ? Math.round(p.precio * (1 - sc.priceDiscount) * 100) / 100
       : p.precio;
-    const inventory = buildScenarioColorStock(p.talla, sc.stocks[i], p.color);
+    const inventory = buildScenarioColorStock(p.talla, sc.stocks[i]);
     return {
       id: p.id,
       codigo: p.id.replace("PRUEBA_", ""),
@@ -762,10 +746,8 @@ function downloadScenario(sc: ScenarioCfg): void {
       descripcion: `Producto de prueba — escenario ${sc.label}`,
       marca: p.marca,
       color: p.color,
-      colores: JSON.stringify(inventory.colores),
       tallas: JSON.stringify(inventory.tallas),
       tallaStock: JSON.stringify(inventory.tallaStock),
-      colorStock: JSON.stringify(inventory.colorStock),
       destacado: false,
     };
   });

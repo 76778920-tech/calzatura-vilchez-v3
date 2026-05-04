@@ -13,6 +13,7 @@ import { fetchRecentAudit } from "@/services/audit";
 import type { Order, ProductFinancial, DailySale } from "@/types";
 import type { AuditEntry } from "@/services/audit";
 import { ADMIN_ROUTES } from "@/routes/paths";
+import toast from "react-hot-toast";
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
@@ -81,6 +82,14 @@ const STATUS_LABEL: Record<string, string> = {
 // ─── Order Detail Modal ─────────────────────────────────────────────────────
 
 function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal dash-order-modal" onClick={(e) => e.stopPropagation()}>
@@ -239,13 +248,15 @@ export default function AdminDashboard() {
   const [chartData, setChartData] = useState<number[]>(Array(7).fill(0));
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [auditError, setAuditError] = useState(false);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
 
   const last7Days = getLast7Days();
 
   useEffect(() => {
     const today = todayISO();
-    void fetchRecentAudit(10).then(setAuditLog).catch(() => {});
+    void fetchRecentAudit(10).then(setAuditLog).catch(() => setAuditError(true));
 
     Promise.all([
       fetchProducts(),
@@ -287,6 +298,9 @@ export default function AdminDashboard() {
       setRecentOrders(orders.slice(0, 6));
       setAllOrders(orders);
       setChartData(chart);
+    }).catch(() => {
+      setLoadError(true);
+      toast.error("No se pudieron cargar los datos del dashboard. Verifica tu conexión.");
     }).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -296,6 +310,23 @@ export default function AdminDashboard() {
       <div className="admin-loading">
         <div className="success-spinner" />
         <p>Cargando dashboard...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="admin-loading">
+        <AlertCircle size={40} style={{ color: "var(--danger, #ef4444)" }} />
+        <p>No se pudieron cargar los datos del dashboard.</p>
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ marginTop: "0.75rem" }}
+          onClick={() => window.location.reload()}
+        >
+          Reintentar
+        </button>
       </div>
     );
   }
@@ -367,7 +398,7 @@ export default function AdminDashboard() {
         <div className="dash-today-card dash-today-gold">
           <BarChart2 size={20} />
           <div>
-            <p className="dash-today-label">Ganancia estimada hoy</p>
+            <p className="dash-today-label">Ganancia estimada hoy <span style={{ fontSize: "10px", opacity: 0.6, fontWeight: 400 }}>(est.)</span></p>
             <p className="dash-today-value">{formatCurrency(stats.gananciaHoy)}</p>
           </div>
         </div>
@@ -430,7 +461,15 @@ export default function AdminDashboard() {
                     <tr
                       key={o.id}
                       className="dash-order-row"
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedOrder(o)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setSelectedOrder(o);
+                        }
+                      }}
                       title="Ver detalle"
                     >
                       <td className="order-id-cell">#{o.id.slice(-8).toUpperCase()}</td>
@@ -528,7 +567,9 @@ export default function AdminDashboard() {
             <h2 className="dash-card-title">Actividad reciente</h2>
           </div>
         </div>
-        {auditLog.length === 0 ? (
+        {auditError ? (
+          <p className="admin-empty">No se pudo cargar el historial de actividad.</p>
+        ) : auditLog.length === 0 ? (
           <p className="admin-empty">Sin actividad registrada aún.</p>
         ) : (
           <div className="admin-table-wrapper">

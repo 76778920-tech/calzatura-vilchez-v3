@@ -28,6 +28,35 @@ La base del proyecto toma como referencia ISO 9001, ISO/IEC 25000, ISO/IEC 9126 
 npm.cmd run quality
 ```
 
+Pruebas E2E (Playwright; levantan el Vite dev server solas la primera vez puede tardar):
+
+```bash
+npx playwright install chromium
+npm.cmd run test:e2e
+```
+
+Tests E2E de admin (para evitar `skipped`) requieren variables de entorno:
+
+```bash
+$env:E2E_ADMIN_EMAIL="admin@tu-dominio.com"
+$env:E2E_ADMIN_PASSWORD="tu-clave-admin"
+npm.cmd run test:e2e
+```
+
+Suites útiles para admin:
+
+```bash
+npm.cmd run test:e2e:admin
+npm.cmd run test:e2e:admin:codes
+```
+
+`test:e2e:admin:codes` incluye las validaciones de códigos duplicados:
+- bloqueo por código existente en formulario
+- bloqueo por colisión de código generado en variantes (`BASE-1`)
+- mensaje claro cuando la BD responde error de unicidad
+
+`npm run quality` no incluye E2E por tiempo; ejecutar `test:e2e` en CI o antes de releases.
+
 En este entorno de Windows, si el build falla con `spawn EPERM` por el binario nativo de Tailwind/Rolldown, ejecutar el build con permisos elevados.
 
 ## Deploy Firebase

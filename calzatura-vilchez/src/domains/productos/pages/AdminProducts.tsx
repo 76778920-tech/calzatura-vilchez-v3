@@ -3,6 +3,8 @@ import type { ChangeEvent } from "react";
 import {
   AlertTriangle,
   Boxes,
+  ChevronDown,
+  Copy,
   Link as LinkIcon,
   PackageCheck,
   Pencil,
@@ -14,30 +16,38 @@ import {
   X,
 } from "lucide-react";
 import {
-  addProduct,
+  createProductVariantsAtomic,
   deleteProduct,
   deleteProductCode,
   fetchProductCodes,
   fetchProducts,
-  updateProduct,
-  upsertProductCode,
+  updateProductAtomic,
 } from "@/domains/productos/services/products";
 import {
   calculatePriceRange,
   deleteProductFinancial,
   fetchProductFinancials,
-  upsertProductFinancial,
 } from "@/domains/ventas/services/finance";
 import type { Product, ProductFinancial } from "@/types";
-import { capitalizeWords, formatColors, getProductColors, parseColorList } from "@/utils/colors";
+import { capitalizeWords } from "@/utils/colors";
 import { categoryLabel } from "@/utils/labels";
-import { aggregateColorStock, sumColorSizeStock, sumSizeStock } from "@/utils/stock";
+import { sumSizeStock } from "@/utils/stock";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import {
   compressImageFile,
   normalizeCloudinaryImageUrl,
   uploadImageToCloudinary,
 } from "@/domains/administradores/services/cloudinary";
+import {
+  CATEGORIAS,
+  MATERIAL_PRESETS,
+  describeCommercialDraftError,
+  footwearTypesForCategory,
+  normalizeAdminCategory,
+  sizesForCategory,
+} from "@/domains/productos/utils/commercialRules";
+import { buildVariantCreationPlan, isValidVariantCode, normalizeVariantCode } from "@/domains/productos/utils/variantCreation";
+import { IMAGE_RULES, imageValidationMessage, validateImageFile, validateImageUrlDimensions } from "@/domains/productos/utils/imageRules";
 import toast from "react-hot-toast";
 
 type AdminProduct = Product & { codigo?: string; finanzas?: ProductFinancial };
@@ -48,62 +58,39 @@ type ProductForm = Omit<Product, "id"> & {
   margenObjetivo: number;
   margenMaximo: number;
   tallaStock: Record<string, number>;
-  colorStock: Record<string, Record<string, number>>;
+};
+type VariantSlot = {
+  color: string;
+  imagenes: string[];
+  tallaStock: Record<string, number>;
 };
 
-const CATEGORY_SIZES: Record<string, string[]> = {
-  hombre: ["37", "38", "39", "40", "41", "42", "43", "44", "45"],
-  dama: ["32", "33", "34", "35", "36", "37", "38", "39", "40"],
-  juvenil: ["33", "34", "35", "36", "37", "38"],
-  nino: ["24", "25", "26", "27", "28", "29", "30", "31", "32"],
-  bebe: ["18", "19", "20", "21", "22"],
-};
-const CATEGORIAS = Object.keys(CATEGORY_SIZES);
-const FOOTWEAR_TYPES_BY_CATEGORY: Record<string, string[]> = {
-  dama: [
-    "Zapatillas",
-    "Sandalias",
-    "Zapatos Casuales",
-    "Zapatos de Vestir",
-    "Mocasines",
-    "Botas y Botines",
-    "Ballerinas",
-    "Pantuflas",
-    "Flip Flops",
-  ],
-  hombre: [
-    "Zapatillas",
-    "Zapatos de Vestir",
-    "Zapatos Casuales",
-    "Sandalias",
-    "Botines",
-    "Zapatos de Seguridad",
-    "Pantuflas",
-  ],
-  nino: [
-    "Escolar",
-    "Sandalias",
-    "Zapatillas",
-    "Zapatos",
-  ],
-  juvenil: [
-    "Escolar",
-    "Zapatillas",
-    "Sandalias",
-    "Zapatos",
-    "Botines",
-  ],
-  bebe: [
-    "Zapatos",
-    "Sandalias",
-    "Zapatillas",
-    "Pantuflas",
-  ],
-};
 const LOW_STOCK_LIMIT = 5;
 const IMAGE_SLOTS = 2;
-const COLOR_SLOTS = 5;
+const COLOR_SLOT_COUNT = 5;
 const FALLBACK_PRODUCT_IMAGE = "/placeholder-product.svg";
+const COLOR_PALETTE = [
+  { name: "Negro", hex: "#111111" },
+  { name: "Blanco", hex: "#f4f1e8" },
+  { name: "Nude", hex: "#d9d4ad" },
+  { name: "Camel", hex: "#c77b18" },
+  { name: "Multicolor", hex: "linear-gradient(90deg, #ff0000 0%, #ff8c00 16%, #ffe600 33%, #00c853 50%, #00b0ff 66%, #304ffe 83%, #d500f9 100%)" },
+  { name: "Gris", hex: "#8d8d8d" },
+  { name: "Dorado", hex: "#c9a227" },
+  { name: "Plata", hex: "#c7c7c7" },
+  { name: "Morado", hex: "#a349c4" },
+  { name: "Azul Claro", hex: "#a7cbdd" },
+  { name: "Azul", hex: "#3f46c9" },
+  { name: "Verde", hex: "#189c1f" },
+  { name: "Chocolate", hex: "#a87012" },
+  { name: "Marrón", hex: "#915d38" },
+  { name: "Rojo", hex: "#ff2f1f" },
+  { name: "Rosa", hex: "#e5b0b2" },
+  { name: "Café Claro", hex: "#d2b254" },
+  { name: "Guinda", hex: "#7b2432" },
+  { name: "Petróleo Oscuro", hex: "#2f535d" },
+  { name: "Rose Gold", hex: "#d9c2b2" },
+];
 
 const EMPTY_FORM: ProductForm = {
   codigo: "",
@@ -117,28 +104,22 @@ const EMPTY_FORM: ProductForm = {
   tipoCalzado: "",
   tallas: [],
   tallaStock: {},
-  colorStock: {},
   marca: "",
+  material: "",
+  estilo: "",
   color: "",
-  colores: [],
   destacado: false,
   descuento: undefined,
+  campana: undefined,
   costoCompra: 0,
   margenMinimo: 25,
   margenObjetivo: 45,
   margenMaximo: 75,
+  familiaId: "",
 };
 
 type StockFilter = "todos" | "con-stock" | "bajo-stock" | "sin-stock";
 type FeaturedFilter = "todos" | "destacados" | "normales";
-
-function normalizeProductCode(value: string) {
-  return value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 40);
-}
-
-function isValidProductCode(value: string) {
-  return /^[A-Z0-9-]{3,40}$/.test(value);
-}
 
 function sanitizeDecimal(value: string) {
   const cleaned = value.replace(/[^\d.]/g, "");
@@ -166,55 +147,11 @@ function editableImageSlots(images?: string[], fallback = "") {
   return Array.from({ length: IMAGE_SLOTS }, (_, index) => images?.[index] ?? (index === 0 ? fallback : ""));
 }
 
-function normalizeColorSlots(colors?: string[], fallback = "") {
-  const source = colors && colors.length > 0 ? colors : parseColorList(fallback);
-  return Array.from({ length: COLOR_SLOTS }, (_, index) => source[index] ?? "");
-}
-
-function sizesForCategory(category: string) {
-  return CATEGORY_SIZES[category] ?? [];
-}
-
-function footwearTypesForCategory(category: string) {
-  return FOOTWEAR_TYPES_BY_CATEGORY[category] ?? [];
-}
-
-function normalizeAdminCategory(category = "hombre") {
-  if (category === "mujer") return "dama";
-  return CATEGORY_SIZES[category] ? category : "hombre";
-}
-
 function filterStockByCategory(tallaStock: Record<string, number>, category: string) {
-  if (!CATEGORY_SIZES[category]) return {};
-  const allowed = new Set(sizesForCategory(category));
+  const sizes = sizesForCategory(category);
+  if (!sizes.length) return {};
+  const allowed = new Set(sizes);
   return Object.fromEntries(Object.entries(tallaStock).filter(([size]) => allowed.has(size)));
-}
-
-function filterColorStockByCategory(
-  colorStock: Record<string, Record<string, number>>,
-  category: string,
-  colors: string[]
-) {
-  if (!CATEGORY_SIZES[category]) return {};
-  const allowed = new Set(sizesForCategory(category));
-
-  return colors.reduce<Record<string, Record<string, number>>>((acc, color) => {
-    const stockBySize = colorStock[color] ?? {};
-    acc[color] = Object.fromEntries(
-      Object.entries(stockBySize)
-        .filter(([size]) => allowed.has(size))
-        .map(([size, qty]) => [size, Math.max(0, Number(qty) || 0)])
-    );
-    return acc;
-  }, {});
-}
-
-function colorStockFromProduct(product: Product, colors: string[], tallaStock: Record<string, number>) {
-  if (product.colorStock && Object.keys(product.colorStock).length > 0) {
-    return filterColorStockByCategory(product.colorStock, product.categoria, colors);
-  }
-  const firstColor = colors[0];
-  return firstColor ? { [firstColor]: tallaStock } : {};
 }
 
 function sizesFromStock(tallaStock: Record<string, number>) {
@@ -224,12 +161,30 @@ function sizesFromStock(tallaStock: Record<string, number>) {
     .sort((a, b) => Number(a) - Number(b));
 }
 
+function createEmptyStockForCategory(category: string) {
+  return Object.fromEntries(sizesForCategory(category).map((size) => [size, 0])) as Record<string, number>;
+}
+
+function createVariantSlots(category: string): VariantSlot[] {
+  return Array.from({ length: COLOR_SLOT_COUNT }, () => ({
+    color: "",
+    imagenes: normalizeImageSlots(),
+    tallaStock: createEmptyStockForCategory(category),
+  }));
+}
+
+function getColorHex(colorName: string): string {
+  const found = COLOR_PALETTE.find((c) => c.name.toLowerCase() === colorName.toLowerCase());
+  return found?.hex ?? "#888888";
+}
+
 export default function AdminProducts() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>({ ...EMPTY_FORM });
+  const [variantSlots, setVariantSlots] = useState<VariantSlot[]>(() => createVariantSlots(EMPTY_FORM.categoria));
   const [compressing, setCompressing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -237,7 +192,23 @@ export default function AdminProducts() {
   const [stockFilter, setStockFilter] = useState<StockFilter>("todos");
   const [featuredFilter, setFeaturedFilter] = useState<FeaturedFilter>("todos");
   const [previewImage, setPreviewImage] = useState<{ src: string; title: string; subtitle?: string } | null>(null);
+  const [colorPaletteOpen, setColorPaletteOpen] = useState(false);
+  const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
+  const [isDraggingVariants, setIsDraggingVariants] = useState(false);
+  const [popoverAbove, setPopoverAbove] = useState(false);
   const fileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const colorPaletteRef = useRef<HTMLDivElement | null>(null);
+  const activeColorSlotRef = useRef<HTMLDivElement | null>(null);
+  const variantsCarouselRef = useRef<HTMLDivElement | null>(null);
+  const modalRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const variantsDragStateRef = useRef({
+    active: false,
+    startX: 0,
+    startY: 0,
+    scrollLeft: 0,
+    scrollTop: 0,
+  });
 
   const load = () => {
     setLoading(true);
@@ -258,6 +229,103 @@ export default function AdminProducts() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!colorPaletteOpen) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (colorPaletteRef.current?.contains(event.target as Node)) return;
+      setColorPaletteOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [colorPaletteOpen]);
+
+  useEffect(() => {
+    if (activeColorSlot === null) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (activeColorSlotRef.current?.contains(event.target as Node)) return;
+      setActiveColorSlot(null);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [activeColorSlot]);
+
+  useEffect(() => {
+    if (!isDraggingVariants) return undefined;
+    const handleMouseUp = () => {
+      variantsDragStateRef.current.active = false;
+      setIsDraggingVariants(false);
+    };
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => window.removeEventListener("mouseup", handleMouseUp);
+  }, [isDraggingVariants]);
+
+  useEffect(() => {
+    if (!showModal || !modalRef.current) return;
+    const first = modalRef.current.querySelector<HTMLElement>(
+      "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])"
+    );
+    first?.focus();
+  }, [showModal]);
+
+  const closeModal = () => {
+    setShowModal(false);
+    window.setTimeout(() => triggerRef.current?.focus(), 0);
+  };
+
+  const trapFocus = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") { event.preventDefault(); closeModal(); return; }
+    if (event.key !== "Tab" || !modalRef.current) return;
+    const focusable = Array.from(
+      modalRef.current.querySelectorAll<HTMLElement>(
+        "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex='-1'])"
+      )
+    ).filter((el) => el.offsetParent !== null);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault(); last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault(); first.focus();
+    }
+  };
+
+  const isInteractiveDragTarget = (target: EventTarget | null): boolean => {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest("button, input, textarea, select, a, label, [role='button']"));
+  };
+
+  const handleVariantsMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (isInteractiveDragTarget(event.target)) return;
+    const carousel = variantsCarouselRef.current;
+    if (!carousel) return;
+    variantsDragStateRef.current = {
+      active: true,
+      startX: event.clientX,
+      startY: event.clientY,
+      scrollLeft: carousel.scrollLeft,
+      scrollTop: carousel.scrollTop,
+    };
+    setIsDraggingVariants(true);
+    event.preventDefault();
+  };
+
+  const handleVariantsMouseMove = (event: React.MouseEvent<HTMLDivElement>) => {
+    const carousel = variantsCarouselRef.current;
+    const drag = variantsDragStateRef.current;
+    if (!carousel || !drag.active) return;
+    const deltaY = event.clientY - drag.startY;
+    const deltaX = event.clientX - drag.startX;
+    carousel.scrollTop = drag.scrollTop - deltaY;
+    carousel.scrollLeft = drag.scrollLeft - deltaX;
+  };
+
+  const stopVariantsDrag = () => {
+    if (!variantsDragStateRef.current.active) return;
+    variantsDragStateRef.current.active = false;
+    setIsDraggingVariants(false);
+  };
+
   const stats = useMemo(() => {
     const bajoStock = products.filter((p) => p.stock > 0 && p.stock <= LOW_STOCK_LIMIT).length;
     const destacados = products.filter((p) => p.destacado).length;
@@ -267,14 +335,13 @@ export default function AdminProducts() {
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-
     return products.filter((product) => {
       const searchable = [
         product.codigo,
         product.nombre,
         product.marca,
+        product.material,
         product.color,
-        ...(product.colores ?? []),
         product.categoria,
         product.tipoCalzado,
         categoryLabel(product.categoria),
@@ -317,62 +384,109 @@ export default function AdminProducts() {
   );
 
   const currentImages = normalizeImageSlots(form.imagenes, form.imagen);
-  const currentColors = normalizeColorSlots(form.colores, form.color);
-  const activeColors = currentColors.map(capitalizeWords).filter(Boolean);
-  const currentStock = sumColorSizeStock(form.colorStock) || sumSizeStock(form.tallaStock);
+  const currentStock = sumSizeStock(form.tallaStock);
+  const variantTotalStock = useMemo(
+    () => variantSlots.reduce((sum, slot) => sum + sumSizeStock(slot.tallaStock), 0),
+    [variantSlots]
+  );
   const currentSizes = sizesForCategory(form.categoria);
   const currentFootwearTypes = footwearTypesForCategory(form.categoria);
 
+  const setSlotColor = (slotIndex: number, color: string) => {
+    const normalizedColor = capitalizeWords(color || "");
+    const isDuplicated = Boolean(
+      normalizedColor &&
+      variantSlots.some((slot, i) => i !== slotIndex && slot.color.toLowerCase() === normalizedColor.toLowerCase())
+    );
+    if (isDuplicated) {
+      toast.error(`"${normalizedColor}" ya está seleccionado en otro color`);
+      return;
+    }
+    setVariantSlots((prev) =>
+      prev.map((slot, i) => {
+        if (i === slotIndex) return { ...slot, color: normalizedColor };
+        if (i > slotIndex && !normalizedColor)
+          return { color: "", imagenes: normalizeImageSlots(), tallaStock: createEmptyStockForCategory(form.categoria) };
+        return slot;
+      })
+    );
+    setActiveColorSlot(null);
+  };
+
   const openCreate = () => {
+    triggerRef.current = document.activeElement as HTMLElement;
     setEditingId(null);
-    setForm({
-      ...EMPTY_FORM,
-      imagenes: normalizeImageSlots(),
-      colores: normalizeColorSlots(),
-    });
+    setColorPaletteOpen(false);
+    setActiveColorSlot(null);
+    const categoria = EMPTY_FORM.categoria;
+    setForm({ ...EMPTY_FORM, imagenes: normalizeImageSlots(), tallaStock: createEmptyStockForCategory(categoria) });
+    setVariantSlots(createVariantSlots(categoria));
     setShowModal(true);
   };
 
   const openEdit = (product: AdminProduct) => {
+    triggerRef.current = document.activeElement as HTMLElement;
     const { id: _id, finanzas: _finanzas, codigo: _codigo, ...productData } = product;
-    void _id;
-    void _finanzas;
-    void _codigo;
+    void _id; void _finanzas; void _codigo;
     const categoria = normalizeAdminCategory(product.categoria);
-    const tallaStock = filterStockByCategory(
-      product.tallaStock ?? Object.fromEntries((product.tallas ?? []).map((size) => [size, 1])),
-      categoria
-    );
-    const productColors = normalizeColorSlots(getProductColors(product));
-    const activeProductColors = productColors.map(capitalizeWords).filter(Boolean);
-    const colorStock = filterColorStockByCategory(
-      colorStockFromProduct({ ...product, categoria }, activeProductColors, tallaStock),
-      categoria,
-      activeProductColors
-    );
-    const aggregateStock = aggregateColorStock(colorStock);
+    const tallaStock = filterStockByCategory(product.tallaStock ?? {}, categoria);
 
     setEditingId(product.id);
+    setColorPaletteOpen(false);
+    setActiveColorSlot(null);
+    setVariantSlots(createVariantSlots(categoria));
     setForm({
       ...EMPTY_FORM,
       ...productData,
       categoria,
       codigo: product.codigo ?? "",
-      tallas: sizesFromStock(aggregateStock),
-      tallaStock: aggregateStock,
-      colorStock,
-      stock: sumColorSizeStock(colorStock),
-      marca: product.marca ?? "",
-      tipoCalzado: footwearTypesForCategory(categoria).includes(product.tipoCalzado ?? "") ? product.tipoCalzado ?? "" : "",
-      color: formatColors(getProductColors(product)),
-      colores: productColors,
+      tallas: sizesFromStock(tallaStock),
+      tallaStock,
+      stock: sumSizeStock(tallaStock),
+      color: capitalizeWords(product.color ?? ""),
       imagenes: normalizeImageSlots(product.imagenes, product.imagen),
       destacado: product.destacado ?? false,
       descuento: product.descuento,
+      estilo: product.estilo ?? "",
       costoCompra: product.finanzas?.costoCompra ?? 0,
       margenMinimo: product.finanzas?.margenMinimo ?? 25,
       margenObjetivo: product.finanzas?.margenObjetivo ?? 45,
       margenMaximo: product.finanzas?.margenMaximo ?? 75,
+      familiaId: product.familiaId?.trim() || product.id,
+    });
+    setShowModal(true);
+  };
+
+  const openVariant = (product: AdminProduct) => {
+    triggerRef.current = document.activeElement as HTMLElement;
+    const { id: _id, finanzas: _finanzas, codigo: _codigo, ...productData } = product;
+    void _id; void _finanzas; void _codigo;
+    const categoria = normalizeAdminCategory(product.categoria);
+    const emptyStock = Object.fromEntries(sizesForCategory(categoria).map((s) => [s, 0]));
+
+    setEditingId(null);
+    setColorPaletteOpen(false);
+    setActiveColorSlot(null);
+    setVariantSlots(createVariantSlots(categoria));
+    setForm({
+      ...EMPTY_FORM,
+      ...productData,
+      categoria,
+      codigo: "",
+      color: "",
+      imagenes: normalizeImageSlots(),
+      imagen: "",
+      tallaStock: emptyStock,
+      tallas: [],
+      stock: 0,
+      destacado: product.destacado ?? false,
+      descuento: product.descuento,
+      estilo: product.estilo ?? "",
+      costoCompra: product.finanzas?.costoCompra ?? 0,
+      margenMinimo: product.finanzas?.margenMinimo ?? 25,
+      margenObjetivo: product.finanzas?.margenObjetivo ?? 45,
+      margenMaximo: product.finanzas?.margenMaximo ?? 75,
+      familiaId: product.familiaId?.trim() || product.id,
     });
     setShowModal(true);
   };
@@ -389,7 +503,16 @@ export default function AdminProducts() {
     if (!file) return;
     setCompressing(true);
     try {
+      const dimError = await validateImageFile(file);
+      if (dimError) {
+        toast.error(imageValidationMessage(dimError));
+        return;
+      }
       const compressed = await compressImageFile(file, 1100, 0.78);
+      if (compressed.size > IMAGE_RULES.maxCompressedBytes) {
+        toast.error(imageValidationMessage("IMAGE_COMPRESSED_TOO_LARGE"));
+        return;
+      }
       const imageUrl = await uploadImageToCloudinary(compressed, file.name);
       setForm((current) => {
         const imagenes = editableImageSlots(current.imagenes, current.imagen);
@@ -412,18 +535,20 @@ export default function AdminProducts() {
     setForm({ ...form, imagenes, imagen: cleanImages[0] ?? "" });
   };
 
-  const validateImageUrl = (index: number, value: string) => {
+  const validateImageUrl = async (index: number, value: string) => {
     const normalized = normalizeCloudinaryImageUrl(value);
-    if (!normalized) {
-      updateImageUrl(index, "");
-      return;
-    }
-
+    if (!normalized) { updateImageUrl(index, ""); return; }
     try {
       new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(normalized) ? normalized : `https://${normalized}`);
-      updateImageUrl(index, normalized);
     } catch {
-      toast.error("Ingresa una URL valida de imagen");
+      toast.error("Ingresa una URL válida de imagen");
+      return;
+    }
+    updateImageUrl(index, normalized);
+    const dimError = await validateImageUrlDimensions(normalized);
+    if (dimError) {
+      updateImageUrl(index, "");
+      toast.error(imageValidationMessage(dimError));
     }
   };
 
@@ -434,114 +559,141 @@ export default function AdminProducts() {
     setForm({ ...form, imagenes, imagen: cleanImages[0] ?? "" });
   };
 
-  const updateColor = (index: number, value: string) => {
-    const colores = normalizeColorSlots(form.colores, form.color);
-    const previousColor = capitalizeWords(colores[index] ?? "");
-    colores[index] = value;
-    const cleanColors = colores.map(capitalizeWords).filter(Boolean);
-    const nextColor = capitalizeWords(value);
-    const nextColorStock = { ...form.colorStock };
+  const updateVariantSlot = (slotIndex: number, updater: (slot: VariantSlot) => VariantSlot) => {
+    setVariantSlots((current) =>
+      current.map((slot, index) => (index === slotIndex ? updater(slot) : slot))
+    );
+  };
 
-    if (previousColor && nextColor && previousColor !== nextColor && nextColorStock[previousColor]) {
-      nextColorStock[nextColor] = nextColorStock[previousColor];
-      delete nextColorStock[previousColor];
-    }
-
-    cleanColors.forEach((color) => {
-      nextColorStock[color] = nextColorStock[color] ?? {};
-    });
-
-    Object.keys(nextColorStock).forEach((color) => {
-      if (!cleanColors.includes(color)) delete nextColorStock[color];
-    });
-
-    const filteredColorStock = filterColorStockByCategory(nextColorStock, form.categoria, cleanColors);
-    const tallaStock = aggregateColorStock(filteredColorStock);
-    setForm({
-      ...form,
-      colores,
-      color: formatColors(cleanColors),
-      colorStock: filteredColorStock,
-      tallaStock,
-      tallas: sizesFromStock(tallaStock),
-      stock: sumColorSizeStock(filteredColorStock),
+  const updateVariantSlotImageUrl = (slotIndex: number, imageIndex: number, value: string) => {
+    updateVariantSlot(slotIndex, (slot) => {
+      const imagenes = [...normalizeImageSlots(slot.imagenes)];
+      imagenes[imageIndex] = value.trim();
+      return { ...slot, imagenes };
     });
   };
 
-  const updateColorTallaStock = (color: string, talla: string, quantity: number) => {
-    const colorStock = {
-      ...form.colorStock,
-      [color]: {
-        ...(form.colorStock[color] ?? {}),
-        [talla]: Math.max(0, Number(quantity) || 0),
-      },
-    };
-    const tallaStock = aggregateColorStock(colorStock);
+  const validateVariantSlotImageUrl = async (slotIndex: number, imageIndex: number, value: string) => {
+    const normalized = normalizeCloudinaryImageUrl(value);
+    if (!normalized) {
+      updateVariantSlotImageUrl(slotIndex, imageIndex, "");
+      return;
+    }
+    try {
+      new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(normalized) ? normalized : `https://${normalized}`);
+    } catch {
+      toast.error("Ingresa una URL válida de imagen");
+      return;
+    }
+    updateVariantSlotImageUrl(slotIndex, imageIndex, normalized);
+    const dimError = await validateImageUrlDimensions(normalized);
+    if (dimError) {
+      updateVariantSlotImageUrl(slotIndex, imageIndex, "");
+      toast.error(imageValidationMessage(dimError));
+    }
+  };
+
+  const handleVariantFileChange = async (event: ChangeEvent<HTMLInputElement>, slotIndex: number, imageIndex: number) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setCompressing(true);
+    try {
+      const dimError = await validateImageFile(file);
+      if (dimError) {
+        toast.error(imageValidationMessage(dimError));
+        return;
+      }
+      const compressed = await compressImageFile(file, 1100, 0.78);
+      if (compressed.size > IMAGE_RULES.maxCompressedBytes) {
+        toast.error(imageValidationMessage("IMAGE_COMPRESSED_TOO_LARGE"));
+        return;
+      }
+      const imageUrl = await uploadImageToCloudinary(compressed, file.name);
+      updateVariantSlot(slotIndex, (slot) => {
+        const imagenes = [...normalizeImageSlots(slot.imagenes)];
+        imagenes[imageIndex] = imageUrl;
+        return { ...slot, imagenes };
+      });
+    } catch {
+      toast.error("No se pudo subir la imagen a Cloudinary");
+    } finally {
+      setCompressing(false);
+      event.target.value = "";
+    }
+  };
+
+  const updateVariantSlotStock = (slotIndex: number, talla: string, quantity: number) => {
+    updateVariantSlot(slotIndex, (slot) => ({
+      ...slot,
+      tallaStock: { ...slot.tallaStock, [talla]: Math.max(0, Number(quantity) || 0) },
+    }));
+  };
+
+  const updateTallaStock = (talla: string, quantity: number) => {
+    const tallaStock = { ...form.tallaStock, [talla]: Math.max(0, Number(quantity) || 0) };
     setForm({
       ...form,
-      colorStock,
       tallaStock,
       tallas: sizesFromStock(tallaStock),
-      stock: sumColorSizeStock(colorStock),
+      stock: sumSizeStock(tallaStock),
     });
   };
 
   const updateCategory = (categoria: string) => {
-    const colors = normalizeColorSlots(form.colores, form.color).map(capitalizeWords).filter(Boolean);
-    const colorStock = filterColorStockByCategory(form.colorStock, categoria, colors);
-    const tallaStock = aggregateColorStock(colorStock);
+    const tallaStock = filterStockByCategory(form.tallaStock, categoria);
     const validTypes = footwearTypesForCategory(categoria);
+    if (!editingId) {
+      const allowed = new Set(sizesForCategory(categoria));
+      setVariantSlots((current) =>
+        current.map((slot) => {
+          const nextStock = Object.fromEntries(
+            sizesForCategory(categoria).map((size) => [
+              size,
+              allowed.has(size) ? Math.max(0, Number(slot.tallaStock[size]) || 0) : 0,
+            ])
+          ) as Record<string, number>;
+          return { ...slot, tallaStock: nextStock };
+        })
+      );
+    }
     setForm({
       ...form,
       categoria,
       tipoCalzado: validTypes.includes(form.tipoCalzado ?? "") ? form.tipoCalzado : "",
-      colorStock,
       tallaStock,
       tallas: sizesFromStock(tallaStock),
-      stock: sumColorSizeStock(colorStock),
+      stock: sumSizeStock(tallaStock),
     });
   };
 
   const handleSave = async (event: { preventDefault(): void }) => {
     event.preventDefault();
-    const codigo = normalizeProductCode(form.codigo ?? "");
-    const colores = normalizeColorSlots(form.colores, form.color)
-      .map(capitalizeWords)
-      .filter(Boolean)
-      .slice(0, COLOR_SLOTS);
-    const imagenes = normalizeImageSlots(form.imagenes, form.imagen)
-      .map(normalizeCloudinaryImageUrl)
-      .filter(Boolean);
-    const colorStock = filterColorStockByCategory(form.colorStock, form.categoria, colores);
-    const tallaStock = aggregateColorStock(colorStock);
-    const totalStock = sumColorSizeStock(colorStock);
+    const codigo = normalizeVariantCode(form.codigo ?? "");
 
-    if (!isValidProductCode(codigo)) {
+    if (!isValidVariantCode(codigo)) {
       toast.error("El código debe tener 3 a 40 caracteres: letras, números o guiones");
+      return;
+    }
+    const existingCodes = new Set(
+      products
+        .filter((product) => product.id !== editingId)
+        .map((product) => normalizeVariantCode(product.codigo ?? ""))
+        .filter(Boolean)
+    );
+    if (existingCodes.has(codigo)) {
+      toast.error(`El código "${codigo}" ya existe en otro producto`);
       return;
     }
     if (!form.nombre.trim() || form.precio <= 0) {
       toast.error("Nombre y precio son requeridos");
       return;
     }
-    if (!form.categoria || !CATEGORY_SIZES[form.categoria]) {
+    if (!form.categoria || !sizesForCategory(form.categoria).length) {
       toast.error("Selecciona la categoría del producto");
       return;
     }
     if (!form.marca?.trim()) {
       toast.error("La marca es obligatoria");
-      return;
-    }
-    if (colores.length === 0) {
-      toast.error("Registra al menos un color del producto");
-      return;
-    }
-    if (totalStock <= 0) {
-      toast.error("Registra al menos una talla con stock");
-      return;
-    }
-    if (colores.some((color) => sumSizeStock(colorStock[color] ?? {}) <= 0)) {
-      toast.error("Cada color registrado debe tener al menos una talla con stock");
       return;
     }
     if (!form.tipoCalzado?.trim()) {
@@ -554,10 +706,6 @@ export default function AdminProducts() {
     }
     if (form.costoCompra <= 0) {
       toast.error("Registra el costo real de compra");
-      return;
-    }
-    if (imagenes.length === 0) {
-      toast.error("Agrega al menos una imagen del producto");
       return;
     }
     if (form.margenMinimo > form.margenObjetivo || form.margenObjetivo > form.margenMaximo) {
@@ -578,65 +726,147 @@ export default function AdminProducts() {
 
     setSaving(true);
     try {
-      const payload: Omit<Product, "id"> = {
-        nombre: form.nombre.trim(),
-        precio: form.precio,
-        descripcion: form.descripcion.trim(),
-        imagen: imagenes[0] ?? "",
-        imagenes,
-        stock: totalStock,
-        categoria: form.categoria,
-        tipoCalzado: form.tipoCalzado.trim(),
-        tallas: sizesFromStock(tallaStock),
-        tallaStock: Object.fromEntries(Object.entries(tallaStock).filter(([, qty]) => qty > 0)),
-        colorStock: Object.fromEntries(
-          Object.entries(colorStock).map(([color, stockBySize]) => [
-            color,
-            Object.fromEntries(Object.entries(stockBySize).filter(([, qty]) => qty > 0)),
-          ])
-        ),
-        marca: form.marca.trim(),
-        color: formatColors(colores),
-        colores,
-        destacado: form.destacado,
-        descuento: form.descuento,
-      };
-      const financialPayload = {
-        costoCompra: form.costoCompra,
-        ...range,
-      };
-      const timeout = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("TIMEOUT")), 12000)
-      );
+      const familiaId =
+        editingId != null
+          ? (form.familiaId?.trim() || editingId)
+          : (form.familiaId?.trim() || crypto.randomUUID());
+      const financialPayload = { costoCompra: form.costoCompra, ...range };
 
-      const op = editingId
-        ? Promise.all([
-          updateProduct(editingId, payload),
-          upsertProductCode(editingId, codigo),
-          upsertProductFinancial(editingId, financialPayload),
-        ])
-        : addProduct(payload).then((productId) =>
-          Promise.all([
-            upsertProductCode(productId, codigo),
-            upsertProductFinancial(productId, financialPayload),
-          ])
+      if (editingId) {
+        const imagenes = normalizeImageSlots(form.imagenes, form.imagen)
+          .map(normalizeCloudinaryImageUrl)
+          .filter(Boolean);
+        const tallaStock = filterStockByCategory(form.tallaStock, form.categoria);
+        const totalStock = sumSizeStock(tallaStock);
+        const color = capitalizeWords(form.color ?? "");
+        if (!color) {
+          toast.error("Registra el color del producto");
+          return;
+        }
+        if (totalStock <= 0) {
+          toast.error("Registra al menos una talla con stock");
+          return;
+        }
+        if (imagenes.length === 0) {
+          toast.error("Agrega al menos una imagen del producto");
+          return;
+        }
+        const payload: Omit<Product, "id"> = {
+          nombre: form.nombre.trim(),
+          precio: form.precio,
+          descripcion: form.descripcion.trim(),
+          imagen: imagenes[0] ?? "",
+          imagenes,
+          stock: totalStock,
+          categoria: form.categoria,
+          tipoCalzado: form.tipoCalzado.trim(),
+          tallas: sizesFromStock(tallaStock),
+          tallaStock: Object.fromEntries(Object.entries(tallaStock).filter(([, qty]) => qty > 0)),
+          marca: form.marca.trim(),
+          material: form.material?.trim() || undefined,
+          estilo: form.estilo?.trim() || undefined,
+          color,
+          familiaId,
+          destacado: form.destacado,
+          descuento: form.descuento,
+          campana: form.campana,
+        };
+        await updateProductAtomic(editingId, payload, codigo, financialPayload);
+        toast.success("Producto actualizado");
+      } else {
+        const activeSlots = variantSlots
+          .map((slot, index) => {
+            const color = capitalizeWords(slot.color ?? "");
+            const imagenes = normalizeImageSlots(slot.imagenes)
+              .map(normalizeCloudinaryImageUrl)
+              .filter(Boolean);
+            const tallaStock = filterStockByCategory(slot.tallaStock, form.categoria);
+            const totalStock = sumSizeStock(tallaStock);
+            return { index, color, imagenes, tallaStock, totalStock };
+          })
+          .filter((slot) => slot.color || slot.imagenes.length > 0 || slot.totalStock > 0);
+
+        if (activeSlots.length === 0) {
+          toast.error("Completa al menos un bloque de color (1 a 5)");
+          return;
+        }
+
+        const normalizedColors = activeSlots.map((slot) => slot.color.toLowerCase()).filter(Boolean);
+        if (new Set(normalizedColors).size !== normalizedColors.length) {
+          toast.error("No repitas colores entre variantes");
+          return;
+        }
+
+        for (const slot of activeSlots) {
+          if (!slot.color) {
+            toast.error(`Color ${slot.index + 1}: registra el color`);
+            return;
+          }
+          if (slot.totalStock <= 0) {
+            toast.error(`Color ${slot.index + 1}: registra al menos una talla con stock`);
+            return;
+          }
+          if (slot.imagenes.length === 0) {
+            toast.error(`Color ${slot.index + 1}: agrega al menos una imagen`);
+            return;
+          }
+        }
+
+        const createPlan = buildVariantCreationPlan(
+          {
+            codigoBase: codigo,
+            familiaId,
+            nombre: form.nombre,
+            precio: form.precio,
+            descripcion: form.descripcion,
+            categoria: form.categoria,
+            tipoCalzado: form.tipoCalzado,
+            marca: form.marca,
+            material: form.material,
+            estilo: form.estilo,
+            destacado: form.destacado,
+            descuento: form.descuento,
+            campana: form.campana,
+          },
+          activeSlots
         );
-      await Promise.race([op, timeout]);
-      toast.success(editingId ? "Producto actualizado" : "Producto creado");
-      setShowModal(false);
+        const generatedCodes = createPlan.map((item) => normalizeVariantCode(item.generatedCode));
+        const duplicatedGenerated = generatedCodes.find((genCode) => existingCodes.has(genCode));
+        if (duplicatedGenerated) {
+          toast.error(`El código generado "${duplicatedGenerated}" ya existe. Cambia el código base.`);
+          return;
+        }
+
+        const variantInput = createPlan.map(({ generatedCode, product: payload }) => ({
+          product: payload,
+          codigo: generatedCode,
+          finanzas: financialPayload,
+        }));
+
+        await createProductVariantsAtomic(variantInput);
+        toast.success(`${activeSlots.length} variante(s) creadas`);
+      }
+      closeModal();
       load();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "";
       const code = typeof err === "object" && err && "code" in err ? String(err.code) : "";
       const isPermissionError =
-        code.includes("permission-denied") ||
-        msg.includes("permission-denied") ||
-        msg.includes("PERMISSION_DENIED") ||
-        msg.toLowerCase().includes("missing or insufficient permissions");
+        code === "42501" ||
+        msg.toLowerCase().includes("row-level security");
+      const isUniqueCodeError =
+        code === "23505" ||
+        msg.toLowerCase().includes("duplicate key value") ||
+        msg.toLowerCase().includes("unique");
+      const commercialError = describeCommercialDraftError(err);
       if (msg === "TIMEOUT") {
-        toast.error("Tiempo agotado. Ejecuta: firebase deploy --only firestore:rules");
+        toast.error("Tiempo agotado. Inténtalo de nuevo o revisa tu conexión.");
+      } else if (isUniqueCodeError) {
+        toast.error("Código duplicado: usa un código único para este producto");
+      } else if (commercialError) {
+        toast.error(commercialError);
       } else if (isPermissionError) {
-        toast.error("Sin permisos. Ejecuta: firebase deploy --only firestore:rules");
+        toast.error("Sin permisos para realizar esta operación.");
       } else {
         toast.error(`Error: ${msg || "no se pudo guardar el producto"}`);
       }
@@ -705,7 +935,7 @@ export default function AdminProducts() {
           <input
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Buscar por código, nombre, marca, categoría, tipo o descripción"
+            placeholder="Buscar por código, nombre, marca, color, categoría, tipo o descripción"
           />
         </div>
         <div className="admin-filter-grid">
@@ -799,6 +1029,7 @@ export default function AdminProducts() {
                       <strong>{product.nombre}</strong>
                       <span>
                         {product.marca || "Sin marca"}
+                        {product.material ? ` · ${product.material}` : ""}
                         {product.color ? ` · ${product.color}` : ""}
                       </span>
                     </div>
@@ -828,6 +1059,9 @@ export default function AdminProducts() {
                   </td>
                   <td>
                     <div className="admin-actions">
+                      <button onClick={() => openVariant(product)} className="action-btn" title="Crear variante de color" aria-label={`Crear variante de ${product.nombre}`}>
+                        <Copy size={14} />
+                      </button>
                       <button onClick={() => openEdit(product)} className="action-btn edit-btn" aria-label={`Editar ${product.nombre}`}>
                         <Pencil size={14} />
                       </button>
@@ -844,24 +1078,33 @@ export default function AdminProducts() {
       )}
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal product-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-overlay" onClick={closeModal}>
+          <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="product-modal-title"
+            className={`modal product-modal${!editingId ? " product-modal--create" : ""}`}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={trapFocus}
+          >
             <div className="modal-header">
-              <h2>{editingId ? "Editar producto" : "Nuevo producto"}</h2>
-              <button onClick={() => setShowModal(false)} className="modal-close" aria-label="Cerrar">
+              <h2 id="product-modal-title">{editingId ? "Editar producto" : "Nuevo producto"}</h2>
+              <button onClick={closeModal} className="modal-close" aria-label="Cerrar">
                 <X size={20} />
               </button>
             </div>
 
             <form onSubmit={handleSave} className="modal-form">
               <div className="product-form-layout">
-                <aside className="admin-form-card admin-image-card">
+                <aside className={`admin-form-card admin-image-card${!editingId ? " admin-variants-card" : ""}`}>
                   <div className="admin-form-card-header">
-                    <strong>Galería</strong>
-                    <span className="admin-stock-pill">Stock: <strong>{currentStock}</strong></span>
+                    <strong>{editingId ? "Galería" : "Variantes"}</strong>
+                    <span className="admin-stock-pill">Stock: <strong>{editingId ? currentStock : variantTotalStock}</strong></span>
                   </div>
-                  <div className="admin-image-grid">
-                    {currentImages.map((image, index) => (
+                  {editingId ? (
+                    <div className="admin-image-grid">
+                      {currentImages.map((image, index) => (
                       <div key={index} className="admin-image-slot">
                         <button
                           type="button"
@@ -920,8 +1163,95 @@ export default function AdminProducts() {
                           )}
                         </div>
                       </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <>
+                      {variantSlots.every((s) => !s.color) ? (
+                        <div className="admin-variants-empty">
+                          <p>Selecciona un color para ver aquí las imágenes de cada variante.</p>
+                        </div>
+                      ) : (
+                        <div
+                          ref={variantsCarouselRef}
+                          className={`admin-variants-carousel${isDraggingVariants ? " dragging" : ""}`}
+                          onMouseDown={handleVariantsMouseDown}
+                          onMouseMove={handleVariantsMouseMove}
+                          onMouseUp={stopVariantsDrag}
+                          onMouseLeave={stopVariantsDrag}
+                        >
+                          {variantSlots.map((slot, slotIndex) => {
+                            if (!slot.color) return null;
+                            const slotImages = normalizeImageSlots(slot.imagenes);
+                            const colorHex = getColorHex(slot.color);
+                            return (
+                              <div key={slotIndex} className="admin-variant-carousel-card">
+                                <div className="admin-variant-block-header">
+                                  <span className="admin-variant-block-label">
+                                    <span className="admin-variant-color-dot" style={{ background: colorHex }} />
+                                    {slot.color}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="admin-variant-block-clear"
+                                    onClick={() => setSlotColor(slotIndex, "")}
+                                    aria-label={`Quitar Color ${slotIndex + 1}`}
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                </div>
+                                <div className="admin-image-grid">
+                                  {slotImages.map((image, imageIndex) => (
+                                    <div key={imageIndex} className="admin-image-slot">
+                                      <button
+                                        type="button"
+                                        className="image-upload-area"
+                                        onClick={() => {
+                                          if (compressing) return;
+                                          const input = document.getElementById(`variant-upload-${slotIndex}-${imageIndex}`) as HTMLInputElement | null;
+                                          input?.click();
+                                        }}
+                                        disabled={compressing}
+                                      >
+                                        {image ? (
+                                          <img src={image} alt={`Color ${slotIndex + 1} imagen ${imageIndex + 1}`} className="image-preview" />
+                                        ) : (
+                                          <div className="image-upload-placeholder">
+                                            <Upload size={22} />
+                                            <span>{compressing ? "Subiendo..." : `Imagen ${imageIndex + 1}`}</span>
+                                            <small>JPG · PNG · WEBP</small>
+                                          </div>
+                                        )}
+                                      </button>
+                                      <input
+                                        id={`variant-upload-${slotIndex}-${imageIndex}`}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(event) => handleVariantFileChange(event, slotIndex, imageIndex)}
+                                        style={{ display: "none" }}
+                                      />
+                                      <div className="input-wrapper">
+                                        <LinkIcon size={14} className="input-icon" />
+                                        <input
+                                          type="text"
+                                          inputMode="url"
+                                          value={image.startsWith("data:") ? "" : image}
+                                          onChange={(event) => updateVariantSlotImageUrl(slotIndex, imageIndex, event.target.value)}
+                                          onBlur={(event) => validateVariantSlotImageUrl(slotIndex, imageIndex, event.target.value)}
+                                          placeholder={`URL imagen ${imageIndex + 1}`}
+                                          className="form-input with-icon"
+                                        />
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  )}
                 </aside>
 
                 <div className="product-form-fields">
@@ -930,7 +1260,7 @@ export default function AdminProducts() {
                       <label>Código interno *</label>
                       <input
                         value={form.codigo ?? ""}
-                        onChange={(event) => setForm({ ...form, codigo: normalizeProductCode(event.target.value) })}
+                        onChange={(event) => setForm({ ...form, codigo: normalizeVariantCode(event.target.value) })}
                         required
                         className="form-input"
                         placeholder="CV-FOR-001"
@@ -960,20 +1290,91 @@ export default function AdminProducts() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Colores <span className="form-hint">(hasta 5 colores, uno por campo)</span></label>
-                      <div className="admin-color-grid">
-                        {currentColors.map((color, index) => (
-                          <input
-                            key={index}
-                            value={color}
-                            onChange={(event) => updateColor(index, event.target.value)}
-                            className="form-input"
-                            placeholder={`Color ${index + 1}`}
-                          />
+                      <label>Material</label>
+                      <select
+                        value={form.material ?? ""}
+                        onChange={(event) => setForm({ ...form, material: event.target.value || undefined })}
+                        className="form-input"
+                      >
+                        <option value="">Sin material</option>
+                        {MATERIAL_PRESETS.map((material) => (
+                          <option key={material} value={material}>
+                            {material}
+                          </option>
                         ))}
-                      </div>
+                      </select>
                     </div>
                   </div>
+
+                  {editingId && (
+                    <div className="form-row form-row-single">
+                      <div className="form-group">
+                        <label>Color *</label>
+                        <div className="admin-material-select" ref={colorPaletteRef}>
+                          <button
+                            type="button"
+                            className={`admin-material-trigger ${colorPaletteOpen ? "active" : ""}`}
+                            onClick={() => setColorPaletteOpen((current) => !current)}
+                            aria-label="Abrir paleta de colores"
+                          >
+                            <span className="admin-material-trigger-copy">
+                              <span className="admin-material-trigger-label">Color</span>
+                              <span className="admin-material-trigger-value">{form.color ?? ""}</span>
+                            </span>
+                            <ChevronDown size={14} />
+                          </button>
+                          {colorPaletteOpen && (
+                            <div className="admin-color-popover" role="dialog" aria-label="Paleta de colores">
+                              <div className="admin-color-popover-grid">
+                                <button
+                                  type="button"
+                                  className={`admin-color-popover-item ${!form.color ? "active" : ""}`}
+                                  onClick={() => { setForm({ ...form, color: "" }); setColorPaletteOpen(false); }}
+                                >
+                                  <span className="admin-color-popover-swatch admin-color-popover-swatch-empty" aria-hidden="true" />
+                                  <span>Sin color</span>
+                                </button>
+                                {COLOR_PALETTE.map((preset) => {
+                                  const isActive = capitalizeWords(form.color ?? "").toLowerCase() === preset.name.toLowerCase();
+                                  return (
+                                    <button
+                                      key={preset.name}
+                                      type="button"
+                                      className={`admin-color-popover-item ${isActive ? "active" : ""}`}
+                                      onClick={() => { setForm({ ...form, color: preset.name }); setColorPaletteOpen(false); }}
+                                    >
+                                      <span
+                                        className="admin-color-popover-swatch"
+                                        style={{ background: preset.hex }}
+                                        aria-hidden="true"
+                                      />
+                                      <span>{preset.name}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          value={form.color ?? ""}
+                          onChange={(event) => setForm({ ...form, color: capitalizeWords(event.target.value) })}
+                          className="form-input"
+                          list="admin-color-suggestions"
+                          placeholder="Escribe un color (ej. Negro, Blanco, Azul Marino)"
+                          style={{ marginTop: "0.55rem" }}
+                        />
+                        <datalist id="admin-color-suggestions">
+                          {COLOR_PALETTE.map((preset) => (
+                            <option key={preset.name} value={preset.name} />
+                          ))}
+                        </datalist>
+                        <small className="admin-help-text">
+                          Si no se abre la paleta o no encuentras el color, escríbelo aquí.
+                        </small>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="form-row product-core-row">
                     <div className="form-group">
@@ -998,6 +1399,22 @@ export default function AdminProducts() {
                         {currentFootwearTypes.map((type) => (
                           <option key={type} value={type}>{type}</option>
                         ))}
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Estilo</label>
+                      <select
+                        value={form.estilo ?? ""}
+                        onChange={(event) => setForm({ ...form, estilo: event.target.value || undefined })}
+                        className="form-input"
+                      >
+                        <option value="">Sin estilo</option>
+                        <option value="Urbanas">Urbanas</option>
+                        <option value="Deportivas">Deportivas</option>
+                        <option value="Casuales">Casuales</option>
+                        <option value="Outdoor">Outdoor</option>
+                        <option value="Ejecutivo">Ejecutivo</option>
+                        <option value="Weekend">Weekend</option>
                       </select>
                     </div>
                     <div className="form-group">
@@ -1073,42 +1490,157 @@ export default function AdminProducts() {
                     </div>
                   </div>
 
-                  <div className="form-group">
-                    <div className="admin-stock-heading">
-                      <label>Stock por color y talla</label>
-                    </div>
-                    {activeColors.length === 0 ? (
-                      <p className="admin-empty">Primero registra al menos un color para asignar tallas.</p>
-                    ) : currentSizes.length === 0 ? (
-                      <p className="admin-empty">Selecciona la categoria para ver sus tallas.</p>
-                    ) : (
-                      <div className="admin-color-stock-groups">
-                        {activeColors.map((color) => (
-                          <section key={color} className="admin-color-stock-group">
-                            <div className="admin-color-stock-title">
-                              <strong>{color}</strong>
-                              <span>{sumSizeStock(form.colorStock[color] ?? {})} pares</span>
-                            </div>
-                            <div className="admin-size-stock-grid">
-                              {currentSizes.map((size) => (
-                                <label key={`${color}-${size}`} className="admin-size-stock-item">
-                                  <span>{size}</span>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={form.colorStock[color]?.[size] ?? 0}
-                                    onChange={(event) => updateColorTallaStock(color, size, toPositiveInteger(event.target.value))}
-                                  />
-                                </label>
-                              ))}
-                            </div>
-                          </section>
-                        ))}
+                  {editingId ? (
+                    <div className="form-group">
+                      <div className="admin-stock-heading">
+                        <label>Stock por talla</label>
                       </div>
-                    )}
-                  </div>
+                      {currentSizes.length === 0 ? (
+                        <p className="admin-empty">Selecciona la categoría para ver sus tallas.</p>
+                      ) : (
+                        <div className="admin-size-stock-grid">
+                          {currentSizes.map((size) => (
+                            <label key={size} className="admin-size-stock-item">
+                              <span>{size}</span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={form.tallaStock[size] ?? 0}
+                                onChange={(event) => updateTallaStock(size, toPositiveInteger(event.target.value))}
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="form-group">
+                      <label>Colores del producto</label>
+                      <div className="variant-chips-row">
+                        {variantSlots.map((slot, index) => {
+                          const isAvailable = index === 0 || Boolean(variantSlots[index - 1].color);
+                          const colorHex = slot.color ? getColorHex(slot.color) : null;
+                          return (
+                            <div
+                              key={index}
+                              className="variant-chip-wrap"
+                              ref={activeColorSlot === index ? activeColorSlotRef : null}
+                            >
+                              <button
+                                type="button"
+                                disabled={!isAvailable}
+                                className={`variant-chip${slot.color ? " variant-chip--active" : ""}${!isAvailable ? " variant-chip--locked" : ""}`}
+                                onClick={(e) => {
+                                  if (!isAvailable) return;
+                                  if (activeColorSlot === index) { setActiveColorSlot(null); return; }
+                                  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                  setPopoverAbove(window.innerHeight - rect.bottom < 300);
+                                  setActiveColorSlot(index);
+                                }}
+                              >
+                                {colorHex ? (
+                                  <span className="variant-chip-swatch" style={{ background: colorHex }} />
+                                ) : (
+                                  <span className="variant-chip-empty-swatch" />
+                                )}
+                                <span className="variant-chip-label">Color {index + 1}</span>
+                                {slot.color && <span className="variant-chip-name">{slot.color}</span>}
+                              </button>
+                              {activeColorSlot === index && isAvailable && (
+                                <div className={`variant-chip-popover${popoverAbove ? " variant-chip-popover--above" : ""}`}>
+                                  <div className="admin-color-popover-grid">
+                                    <button
+                                      type="button"
+                                      className={`admin-color-popover-item${!slot.color ? " active" : ""}`}
+                                      onClick={() => setSlotColor(index, "")}
+                                    >
+                                      <span className="admin-color-popover-swatch admin-color-popover-swatch-empty" aria-hidden="true" />
+                                      <span>Sin color</span>
+                                    </button>
+                                    {COLOR_PALETTE.map((preset) => {
+                                      const isActive = slot.color.toLowerCase() === preset.name.toLowerCase();
+                                      const isUsedByAnotherSlot = variantSlots.some(
+                                        (s, i) => i !== index && s.color.toLowerCase() === preset.name.toLowerCase()
+                                      );
+                                      return (
+                                        <button
+                                          key={preset.name}
+                                          type="button"
+                                          disabled={isUsedByAnotherSlot}
+                                          className={`admin-color-popover-item${isActive ? " active" : ""}${isUsedByAnotherSlot ? " disabled" : ""}`}
+                                          onClick={() => setSlotColor(index, preset.name)}
+                                        >
+                                          <span className="admin-color-popover-swatch" style={{ background: preset.hex }} aria-hidden="true" />
+                                          <span>{preset.name}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {!form.categoria && (
+                        <small className="admin-help-text">Selecciona la categoría para habilitar las tallas.</small>
+                      )}
+                    </div>
+                  )}
+
+                  {!editingId && variantSlots.some((s) => s.color) && (
+                    <div className="variant-tallas-section">
+                      <label>Tallas y stock por color</label>
+                      {!form.categoria ? (
+                        <p className="admin-empty">Selecciona la categoría para ver las tallas.</p>
+                      ) : (
+                        <div className="variant-tallas-list">
+                          {variantSlots.map((slot, slotIndex) => {
+                            if (!slot.color) return null;
+                            return (
+                              <div key={slotIndex} className="variant-tallas-block">
+                                <div className="variant-tallas-block-head">
+                                  <span className="admin-variant-color-dot" style={{ background: getColorHex(slot.color) }} />
+                                  <span className="variant-tallas-color-name">{slot.color}</span>
+                                  <span className="variant-tallas-stock-badge">Stock: {sumSizeStock(slot.tallaStock)}</span>
+                                </div>
+                                <div className="admin-size-stock-grid">
+                                  {currentSizes.map((size) => (
+                                    <label key={`t-${slotIndex}-${size}`} className="admin-size-stock-item">
+                                      <span>{size}</span>
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={slot.tallaStock[size] ?? 0}
+                                        onChange={(event) => updateVariantSlotStock(slotIndex, size, toPositiveInteger(event.target.value))}
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div className="form-row">
+                    <div className="form-group">
+                      <label>Campaña</label>
+                      <select
+                        value={form.campana ?? ""}
+                        onChange={(event) => setForm({ ...form, campana: event.target.value || undefined })}
+                        className="form-input"
+                      >
+                        <option value="">Sin campaña</option>
+                        <option value="lanzamiento">Lanzamiento</option>
+                        <option value="nueva-temporada">Nueva Temporada</option>
+                        <option value="cyber-wow">Cyber Wow</option>
+                        <option value="club-calzado">Club Calzado</option>
+                        <option value="outlet">Outlet</option>
+                      </select>
+                    </div>
                     <div className="form-group">
                       <label>Descuento Cyber Wow</label>
                       <select
@@ -1149,7 +1681,7 @@ export default function AdminProducts() {
               </div>
 
               <div className="modal-footer">
-                <button type="button" onClick={() => setShowModal(false)} className="btn-outline">Cancelar</button>
+                <button type="button" onClick={closeModal} className="btn-outline">Cancelar</button>
                 <button type="submit" disabled={saving || compressing} className="btn-primary">
                   {saving ? "Guardando..." : compressing ? "Subiendo imagen..." : editingId ? "Actualizar" : "Crear producto"}
                 </button>

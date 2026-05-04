@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Calculator, CircleDollarSign, Eye, FileText, IdCard, PackageSearch, Plus, RotateCcw, Trash2, TrendingUp, Truck, X } from "lucide-react";
 import toast from "react-hot-toast";
-import { addDailySale, fetchDailySales, fetchProductFinancials, markSaleReturned } from "@/domains/ventas/services/finance";
-import { fetchProductCodes, fetchProducts, updateProduct } from "@/domains/productos/services/products";
+import { addDailySale, decrementProductStock, fetchDailySales, fetchProductFinancials, markSaleReturned, restoreProductStock } from "@/domains/ventas/services/finance";
+import { fetchProductCodes, fetchProducts } from "@/domains/productos/services/products";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import type { DailySale, Product, ProductFinancial, SaleCustomer, SaleDocumentType } from "@/types";
 import { getProductColors } from "@/utils/colors";
 import { closeSaleDocumentWindow, openSaleDocumentWindow, renderSaleDocument, type SaleDocumentLine } from "@/utils/saleDocument";
-import { aggregateColorStock, getAvailableSizes, getSizeStock, sumColorSizeStock } from "@/utils/stock";
+import { getAvailableSizes, getSizeStock } from "@/utils/stock";
 
 type SaleProduct = Product & { codigo?: string; finanzas?: ProductFinancial };
 type PendingSaleLine = {
@@ -55,38 +55,6 @@ function makeDocumentNumber(type: Exclude<SaleDocumentType, "ninguno">, date: st
   return `${prefix}-${stamp}-${suffix}`;
 }
 
-function buildStockRestore(product: SaleProduct, sale: DailySale): Partial<Product> {
-  if (product.colorStock && sale.color && sale.talla) {
-    const nextColorStock = Object.fromEntries(
-      Object.entries(product.colorStock).map(([c, s]) => [c, { ...s }])
-    );
-    nextColorStock[sale.color] = {
-      ...(nextColorStock[sale.color] ?? {}),
-      [sale.talla]: Number(nextColorStock[sale.color]?.[sale.talla] ?? 0) + sale.cantidad,
-    };
-    const nextTallaStock = aggregateColorStock(nextColorStock);
-    return {
-      stock: sumColorSizeStock(nextColorStock),
-      colorStock: nextColorStock,
-      tallaStock: nextTallaStock,
-      tallas: Object.entries(nextTallaStock)
-        .filter(([, qty]) => Number(qty) > 0)
-        .map(([size]) => size)
-        .sort((a, b) => Number(a) - Number(b)),
-    };
-  }
-  const nextTallaStock = { ...(product.tallaStock ?? {}) };
-  if (sale.talla) nextTallaStock[sale.talla] = Number(nextTallaStock[sale.talla] ?? 0) + sale.cantidad;
-  const update: Partial<Product> = { stock: product.stock + sale.cantidad };
-  if (product.tallaStock) {
-    update.tallaStock = nextTallaStock;
-    update.tallas = Object.entries(nextTallaStock)
-      .filter(([, qty]) => Number(qty) > 0)
-      .map(([size]) => size)
-      .sort((a, b) => Number(a) - Number(b));
-  }
-  return update;
-}
 
 function showDniLookupError(err: unknown) {
   const msg = err instanceof Error ? err.message : "";
@@ -150,9 +118,7 @@ export default function AdminSales() {
 
   const selectedProduct = products.find((p) => p.id === productId);
   const availableColors = selectedProduct ? getProductColors(selectedProduct) : [];
-  const availableSizes = selectedProduct && (availableColors.length === 0 || selectedColor)
-    ? getAvailableSizes(selectedProduct, selectedColor || undefined)
-    : [];
+  const availableSizes = selectedProduct ? getAvailableSizes(selectedProduct) : [];
   const brandSuggestions = useMemo(() => {
     const term = brandSearch.trim().toLowerCase();
     const unique = new Map<string, string>();
@@ -172,7 +138,7 @@ export default function AdminSales() {
       .filter((product) => !brandTerm || product.marca?.toLowerCase().includes(brandTerm))
       .filter((product) =>
         !codeTerm ||
-        [product.codigo, product.nombre, product.marca, product.color, ...(product.colores ?? [])]
+        [product.codigo, product.nombre, product.marca, product.color]
           .filter(Boolean)
           .join(" ")
           .toLowerCase()
@@ -183,7 +149,7 @@ export default function AdminSales() {
   }, [brandSearch, codeSearch, products]);
 
   const selectedSizeStock = selectedProduct && selectedTalla
-    ? getSizeStock(selectedProduct, selectedTalla, selectedColor || undefined)
+    ? getSizeStock(selectedProduct, selectedTalla)
     : 0;
   const requiresCustomer = documentType !== "ninguno";
   const customerDni = normalizeDni(customer.dni);
@@ -256,7 +222,7 @@ export default function AdminSales() {
     setProductId(product.id);
     setBrandSearch(product.marca ?? "");
     setCodeSearch(productLabel(product));
-    setSelectedColor("");
+    setSelectedColor(product.color ?? "");
     setSelectedTalla("");
     setQuantity(1);
     setSalePrice(product.finanzas?.precioSugerido ?? product.precio);
@@ -270,7 +236,7 @@ export default function AdminSales() {
 
   const availableForSize = (size: string) => {
     if (!selectedProduct) return 0;
-    const stock = getSizeStock(selectedProduct, size, selectedColor || undefined);
+    const stock = getSizeStock(selectedProduct, size);
     const reserved = pendingLines
       .filter((line) => line.productId === productId && line.color === selectedColor && line.talla === size)
       .reduce((sum, line) => sum + line.quantity, 0);
@@ -374,54 +340,6 @@ export default function AdminSales() {
     setPendingLines((items) => items.filter((line) => line.id !== lineId));
   };
 
-  const buildProductUpdate = (product: SaleProduct, lines: PendingSaleLine[]) => {
-    const totalQuantity = lines.reduce((sum, line) => sum + line.quantity, 0);
-    if (product.colorStock) {
-      const nextColorStock = Object.fromEntries(
-        Object.entries(product.colorStock).map(([color, stockBySize]) => [color, { ...stockBySize }])
-      );
-
-      lines.forEach((line) => {
-        if (!line.color || !line.talla) return;
-        nextColorStock[line.color] = {
-          ...(nextColorStock[line.color] ?? {}),
-          [line.talla]: Math.max(0, Number(nextColorStock[line.color]?.[line.talla] ?? 0) - line.quantity),
-        };
-      });
-
-      const nextTallaStock = aggregateColorStock(nextColorStock);
-      return {
-        stock: sumColorSizeStock(nextColorStock),
-        colorStock: nextColorStock,
-        tallaStock: nextTallaStock,
-        tallas: Object.entries(nextTallaStock)
-          .filter(([, qty]) => Number(qty) > 0)
-          .map(([size]) => size)
-          .sort((a, b) => Number(a) - Number(b)),
-      };
-    }
-
-    const nextTallaStock = { ...(product.tallaStock ?? {}) };
-
-    lines.forEach((line) => {
-      if (!line.talla) return;
-      nextTallaStock[line.talla] = Math.max(0, Number(nextTallaStock[line.talla] ?? 0) - line.quantity);
-    });
-
-    const nextTallas = Object.entries(nextTallaStock)
-      .filter(([, qty]) => Number(qty) > 0)
-      .map(([size]) => size)
-      .sort((a, b) => Number(a) - Number(b));
-
-    const update: Partial<Product> = {
-      stock: Math.max(0, product.stock - totalQuantity),
-    };
-    if (product.tallaStock) {
-      update.tallaStock = nextTallaStock;
-      update.tallas = nextTallas;
-    }
-    return update;
-  };
 
   const registerPendingLines = async () => {
     if (pendingLines.length === 0) {
@@ -486,11 +404,12 @@ export default function AdminSales() {
       }, {});
 
       await Promise.all(
-        Object.entries(linesByProduct).map(([id, lines]) => {
-          const product = products.find((p) => p.id === id);
-          if (!product) throw new Error("Producto no encontrado");
-          return updateProduct(id, buildProductUpdate(product, lines));
-        })
+        Object.entries(linesByProduct).map(([id, lines]) =>
+          decrementProductStock(
+            id,
+            lines.map((l) => ({ talla: l.talla || null, cantidad: l.quantity }))
+          )
+        )
       );
 
       toast.success("Ventas registradas");
@@ -572,9 +491,8 @@ export default function AdminSales() {
     }
     setReturning(true);
     try {
-      const product = products.find((p) => p.id === selectedSale.productId);
       await markSaleReturned(selectedSale.id, motivo);
-      if (product) await updateProduct(selectedSale.productId, buildStockRestore(product, selectedSale));
+      await restoreProductStock(selectedSale.productId, selectedSale.talla ?? null, selectedSale.cantidad);
       const now = new Date().toISOString();
       setSales((prev) =>
         prev.map((s) =>
