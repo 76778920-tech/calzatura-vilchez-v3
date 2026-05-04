@@ -91,7 +91,7 @@ def save_ire_historial(ire: dict) -> None:
         "pesos":       ire.get("pesos", {}),
     }
     resp = requests.post(
-        f"{url}/rest/v1/ireHistorial",
+        f"{url}/rest/v1/ireHistorial?on_conflict=fecha",
         headers={
             **headers,
             "Prefer": "resolution=merge-duplicates,return=minimal",
