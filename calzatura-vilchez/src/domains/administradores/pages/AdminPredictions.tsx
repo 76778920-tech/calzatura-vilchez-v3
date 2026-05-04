@@ -841,15 +841,15 @@ function generateAIResponseV2(
     "sobre stock",
     "stock acumulado",
     "stock de sobra",
-    "rotacion lenta",
-    "lenta rotacion",
-    "poca rotacion",
+    "rotacion lenta", "rotación lenta",
+    "lenta rotacion", "lenta rotación",
+    "poca rotacion",  "poca rotación",
     "inmovilizado",
   ];
   const confidenceTerms = [
     "confianza",
     "confiable",
-    "precision",
+    "precision", "precisión",
     "preciso",
     "certeza",
     "que tan seguro",
@@ -861,18 +861,18 @@ function generateAIResponseV2(
     "producto estrella",
     "motor",
     "lidera",
-    "lider",
+    "lider", "líder",
     "empuja",
     "sostiene la venta",
     "defenderias",
   ];
-  const recommendationTerms = ["recomend", "consejo", "que hacer", "que debo", "accion", "pedir", "comprar", "reponer", "proveedor", "priorizar"];
+  const recommendationTerms = ["recomend", "consejo", "que hacer", "que debo", "accion", "acción", "pedir", "comprar", "reponer", "proveedor", "priorizar"];
   const trendTerms = ["tendencia", "trend", "sube", "subiendo", "baja", "bajando", "comportamiento", "creciendo", "cae", "caida", "como va", "como van"];
   const summaryTerms = [
     "resumen",
     "estado",
     "general",
-    "situacion",
+    "situacion", "situación",
     "panorama",
     "overview",
     "como estamos",
@@ -953,24 +953,24 @@ function generateAIResponseV2(
       return [
         "Por ahora no veo un riesgo fuerte de quiebre de stock.",
         "",
-        `De los ${withHistory.length} productos con historial, ninguno esta en una situacion critica. El inventario se ve estable según el ritmo de ventas actual.`,
+        `De los ${withHistory.length} productos con historial, ninguno está en una situación crítica. El inventario se ve estable según el ritmo de ventas actual.`,
         noHistory.length > 0
           ? `Eso sí, todavía hay ${noHistory.length} producto(s) sin historial suficiente, así que conviene revisarlos aparte.`
           : "No hay alertas graves en este momento.",
         "",
-        "En términos gerenciales, eso significa que hoy no se ve una perdida inmediata de ventas por falta de producto.",
+        "En términos gerenciales, eso significa que hoy no se ve una pérdida inmediata de ventas por falta de producto.",
       ].join("\n");
     }
 
     const lines = [
       "Resumen ejecutivo:",
-      `Hoy veo ${outOfStock.length} producto(s) sin stock, ${criticos.length} en nivel critico y ${atencion.length} en atencion.`,
+      `Hoy veo ${outOfStock.length} producto(s) sin stock, ${criticos.length} en nivel crítico y ${atencion.length} en atención.`,
       "",
       "Datos exactos:",
       `- Productos con historial analizado: ${withHistory.length}`,
       `- Sin stock: ${outOfStock.length}`,
-      `- Riesgo critico: ${criticos.length}`,
-      `- En atencion: ${atencion.length}`,
+      `- Riesgo crítico: ${criticos.length}`,
+      `- En atención: ${atencion.length}`,
       "",
     ];
 
@@ -1259,8 +1259,8 @@ function generateAIResponseV2(
       "",
       "Datos exactos:",
       `- Productos sin stock: ${outOfStock.length}`,
-      `- Riesgo critico: ${criticos.length}`,
-      `- En atencion: ${atencion.length}`,
+      `- Riesgo crítico: ${criticos.length}`,
+      `- En atención: ${atencion.length}`,
       `- Alta demanda: ${highDemand.length}`,
       `- Tendencia subiendo: ${subiendo.length}`,
       `- Tendencia estable: ${estables.length}`,
@@ -1269,7 +1269,7 @@ function generateAIResponseV2(
 
     if (s) {
       lines.push(`- Proyección de ingresos horizonte actual (${revenueForecast?.horizon_days ?? 30} días): ${formatCurrency(s.proximo_horizonte)}`);
-      lines.push(`- Variación estimada vs ultimo horizonte: ${formatPercent(s.crecimiento_estimado_horizonte_pct)}`);
+      lines.push(`- Variación estimada vs último horizonte: ${formatPercent(s.crecimiento_estimado_horizonte_pct)}`);
     }
 
     lines.push("");
