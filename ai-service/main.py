@@ -1,5 +1,6 @@
 import time
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 
 from dotenv import load_dotenv
@@ -111,12 +112,17 @@ def _load_data(force: bool = False, lookback_days: int = 180):
     ):
         return _cache["data"]
 
-    data = (
-        fetch_daily_sales(days=lookback_days),
-        fetch_completed_orders(days=lookback_days),
-        fetch_products(),
-        fetch_product_codes(),
-    )
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        f_daily = pool.submit(fetch_daily_sales, lookback_days)
+        f_orders = pool.submit(fetch_completed_orders, lookback_days)
+        f_products = pool.submit(fetch_products)
+        f_codes = pool.submit(fetch_product_codes)
+        data = (
+            f_daily.result(),
+            f_orders.result(),
+            f_products.result(),
+            f_codes.result(),
+        )
     _cache["data"] = data
     _cache["expires_at"] = now + _CACHE_TTL
     _cache["lookback_days"] = lookback_days
@@ -222,6 +228,80 @@ def demand_prediction(
             "total_products": len(predictions),
             "modelo_meta": training_meta,
             "predictions": predictions,
+        }
+    except Exception as error:
+        _raise_http_error(error)
+
+
+@app.get("/api/predict/combined")
+@limiter.limit("20/minute")
+def combined_prediction(
+    request: Request,
+    horizon: int = Query(default=30, ge=7, le=90, description="Dias a predecir (7-90)"),
+    history: int = Query(default=120, ge=30, le=365, description="Dias de historial a usar"),
+):
+    """
+    Returns demand predictions and revenue forecast in a single response.
+    Both models share the same Supabase data load, saving one round trip and
+    eliminating the second cache-miss penalty on the first page load.
+    """
+    try:
+        _require_service_auth(request, "ai-service/main.py:combined_prediction")
+        lookback_days = max(history, 120)
+        daily_sales, orders, products, product_codes = _load_data(lookback_days=lookback_days)
+
+        predictions, training_meta = predict_demand(
+            daily_sales=daily_sales,
+            completed_orders=orders,
+            products=products,
+            product_codes=product_codes,
+            horizon_days=horizon,
+            history_days=history,
+        )
+
+        # Update model registry and prediction log (same as /api/predict/demand)
+        _model_registry.clear()
+        _model_registry.update({**training_meta, "cached_at": date.today().isoformat()})
+        log_entry = {
+            "logged_at": date.today().isoformat(),
+            "horizon_days": horizon,
+            "model_type": training_meta.get("model_type", "unknown"),
+            "products": [
+                {
+                    "productId": p["productId"],
+                    "predicted_daily": p["prediccion_diaria"],
+                    "predicted_total": p["prediccion_unidades"],
+                }
+                for p in predictions
+                if not p.get("sin_historial")
+            ],
+        }
+        _prediction_log.append(log_entry)
+        if len(_prediction_log) > _PREDICTION_LOG_MAX:
+            _prediction_log.pop(0)
+
+        warnings: list[str] = []
+        try:
+            revenue = forecast_revenue(
+                daily_sales=daily_sales,
+                completed_orders=orders,
+                horizon_days=horizon,
+                history_days=history,
+            )
+        except Exception as rev_err:
+            revenue = None
+            warnings.append(f"Proyección de ingresos no disponible: {str(rev_err)[:120]}")
+
+        return {
+            "demand": {
+                "horizon_days": horizon,
+                "history_days": history,
+                "total_products": len(predictions),
+                "modelo_meta": training_meta,
+                "predictions": predictions,
+            },
+            "revenue": revenue,
+            "warnings": warnings,
         }
     except Exception as error:
         _raise_http_error(error)

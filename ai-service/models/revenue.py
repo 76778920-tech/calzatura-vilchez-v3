@@ -36,29 +36,43 @@ def build_daily_revenue_series(
     daily_sales: list[dict],
     completed_orders: list[dict],
     history_days: int = 120,
-) -> list[dict]:
-    """Returns a complete daily revenue series for the requested history."""
+) -> tuple[list[dict], float, float]:
+    """Returns (daily revenue series, tienda_total, web_total) for the requested history.
+
+    tienda_total / web_total solo acumulan días dentro del window para ser
+    consistentes con total_historical = sum(series[*].ingresos).
+    """
     revenue_by_date: dict[str, float] = defaultdict(float)
+    tienda_total = 0.0
+    web_total = 0.0
+    date_range = _build_date_range(history_days)
+    date_range_set = set(date_range)
 
     for sale in daily_sales:
+        # canal='web' rows ya están en pedidos → excluir para evitar doble conteo
+        if sale.get("canal") == "web":
+            continue
         fecha = sale.get("fecha", "")
         total = _safe_float(sale.get("total", 0))
         if fecha and total > 0 and not sale.get("devuelto", False):
             revenue_by_date[fecha] += total
+            if fecha in date_range_set:
+                tienda_total += total
 
     for order in completed_orders:
-        fecha = _iso_date(order.get("creadoEn"))
+        # pagadoEn = fecha real del pago (webhook); fallback a creadoEn para pedidos antiguos
+        fecha = _iso_date(order.get("pagadoEn") or order.get("creadoEn"))
         total = _safe_float(order.get("total", 0))
         if fecha and total > 0:
             revenue_by_date[fecha] += total
+            if fecha in date_range_set:
+                web_total += total
 
-    series = []
-    for current_date in _build_date_range(history_days):
-        series.append({
-            "fecha": current_date,
-            "ingresos": round(revenue_by_date.get(current_date, 0.0), 2),
-        })
-    return series
+    series = [
+        {"fecha": d, "ingresos": round(revenue_by_date.get(d, 0.0), 2)}
+        for d in date_range
+    ]
+    return series, round(tienda_total, 2), round(web_total, 2)
 
 
 def forecast_revenue(
@@ -69,7 +83,7 @@ def forecast_revenue(
     chart_history_days: int = 21,
     chart_forecast_days: int = 14,
 ) -> dict:
-    series = build_daily_revenue_series(
+    series, tienda_total, web_total = build_daily_revenue_series(
         daily_sales=daily_sales,
         completed_orders=completed_orders,
         history_days=history_days,
@@ -196,6 +210,8 @@ def forecast_revenue(
             "crecimiento_estimado_horizonte_pct": growth_vs_last_horizon,
             "tendencia": trend,
             "confianza": confidence,
+            "total_historico_tienda": tienda_total,
+            "total_historico_web": web_total,
         },
         "history": history_chart,
         "forecast": forecast_chart,

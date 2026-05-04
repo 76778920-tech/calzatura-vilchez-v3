@@ -44,25 +44,38 @@ def _query(table: str, params: dict | None = None) -> list[dict]:
 
 
 def fetch_daily_sales(days: int | None = None) -> list[dict]:
-    params = {"select": "*"}
+    # Contrato de campos — no añadir select=* sin revisar demand.py y revenue.py:
+    #   demand.py  → productId, fecha, cantidad, devuelto, nombre, categoria, precioVenta, codigo
+    #   revenue.py → fecha, total, devuelto, canal
+    params = {
+        "select": "productId,fecha,cantidad,total,devuelto,nombre,categoria,precioVenta,codigo,canal",
+    }
     if days and days > 0:
         params["fecha"] = f"gte.{_cutoff_iso(days)}"
     return _query("ventasDiarias", params)
 
 
 def fetch_completed_orders(days: int | None = None) -> list[dict]:
+    # Contrato de campos:
+    #   demand.py  → creadoEn, items (JSONB: items[].product.{id,nombre,categoria,precio}, items[].quantity)
+    #   revenue.py → pagadoEn (fecha real de pago; fallback creadoEn), total
     params = {
-        "select": "*",
+        "select": "creadoEn,pagadoEn,items,total",
         "estado": "in.(pagado,enviado,entregado)",
     }
     if days and days > 0:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        params["creadoEn"] = f"gte.{cutoff}"
+        # OR para capturar pedidos antiguos pagados recientemente (pagadoEn >= cutoff)
+        # aunque su creadoEn esté fuera del window. NULL en pagadoEn no matchea el
+        # segundo predicado, por lo que filas sin pagadoEn solo entran por creadoEn.
+        params["or"] = f"(creadoEn.gte.{cutoff},pagadoEn.gte.{cutoff})"
     return _query("pedidos", params)
 
 
 def fetch_products() -> list[dict]:
-    return _query("productos", {"select": "*"})
+    # Contrato de campos:
+    #   demand.py → id, nombre, categoria, precio, stock
+    return _query("productos", {"select": "id,nombre,categoria,precio,stock"})
 
 
 def fetch_product_codes() -> dict[str, str]:

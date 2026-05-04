@@ -1,0 +1,14 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://127.0.0.1:5173",
+      "localStorage": [
+        {
+          "name": "firebase:authUser:AIzaSyBAnVUP4M6wujGs-x8EytdGabkIP7EJkwo:[DEFAULT]",
+          "value": "{\"uid\":\"e2e-admin-uid-001\",\"email\":\"76778920@continental.edu.pe\",\"emailVerified\":true,\"displayName\":\"Admin E2E\",\"isAnonymous\":false,\"photoURL\":null,\"providerData\":[{\"providerId\":\"password\",\"uid\":\"76778920@continental.edu.pe\",\"email\":\"76778920@continental.edu.pe\",\"displayName\":\"Admin E2E\",\"photoURL\":null,\"phoneNumber\":null}],\"stsTokenManager\":{\"refreshToken\":\"e2e-fake-refresh\",\"accessToken\":\"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6ImUyZS1mYWtlLWtpZCJ9.eyJpc3MiOiJodHRwczovL3NlY3VyZXRva2VuLmdvb2dsZS5jb20vY2FsemF0dXJhdmlsY2hlei1hYjE3ZiIsImF1ZCI6ImNhbHphdHVyYXZpbGNoZXotYWIxN2YiLCJhdXRoX3RpbWUiOjE3MDAwMDAwMDAsInVzZXJfaWQiOiJlMmUtYWRtaW4tdWlkLTAwMSIsInN1YiI6ImUyZS1hZG1pbi11aWQtMDAxIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjk5OTk5OTk5OTksImVtYWlsIjoiNzY3Nzg5MjBAY29udGluZW50YWwuZWR1LnBlIiwiZW1haWxfdmVyaWZpZWQiOnRydWUsImZpcmViYXNlIjp7ImlkZW50aXRpZXMiOnsiZW1haWwiOlsiNzY3Nzg5MjBAY29udGluZW50YWwuZWR1LnBlIl19LCJzaWduX2luX3Byb3ZpZGVyIjoicGFzc3dvcmQifX0.e2e-fake-sig\",\"expirationTime\":9999999999999},\"createdAt\":\"1700000000000\",\"lastLoginAt\":\"1700000000000\",\"apiKey\":\"AIzaSyBAnVUP4M6wujGs-x8EytdGabkIP7EJkwo\",\"appName\":\"[DEFAULT]\"}"
+        }
+      ]
+    }
+  ]
+}

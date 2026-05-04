@@ -98,6 +98,9 @@ def build_daily_sales_by_product(
     result: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
 
     for sale in daily_sales:
+        # canal='web' ya está en pedidos → excluir para evitar doble conteo de unidades
+        if sale.get("canal") == "web":
+            continue
         pid = sale.get("productId", "")
         fecha = sale.get("fecha", "")
         qty = _safe_float(sale.get("cantidad", 0))
