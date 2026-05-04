@@ -1,0 +1,15 @@
+Req_ID,Tipo,Modulo,Enunciado_resumido,Prioridad,Estado,Fuente,Version_SRS
+RF-CAT-01,RF,Catalogo,Listar productos con filtros taxonomicos,Must,Implementado,05-SRS,1.0
+RF-CAT-02,RF,Catalogo,Ficha producto con stock talla color,Must,Implementado,05-SRS,1.0
+RF-AUT-02,RF,Auth,Login logout Firebase Auth,Must,Implementado,05-SRS,1.0
+RF-PED-01,RF,Pedidos,Crear pedido en Supabase,Must,Implementado,05-SRS,1.0
+RF-ADM-02,RF,Admin,CRUD productos con reglas comerciales,Must,Implementado,05-SRS,1.0
+RF-ADM-05,RF,Admin,Codigos unicos producto,Must,Implementado,05-SRS,1.0
+RF-ADM-13,RF,Admin,Campana comercial en producto,Should,Implementado,05-SRS,1.0
+RF-RN-01,RF,BD,Restricciones comerciales en servidor,Must,Implementado,05-SRS,1.0
+RF-IA-01,RF,IA,Definicion formal riesgo empresarial R,Must,Pendiente,05-SRS;07,1.0
+RF-IA-02,RF,IA,Modelo consume atributos documentados,Must,Pendiente,05-SRS;07,1.0
+RF-IA-03,RF,IA,Exposicion prediccion usuario autorizado,Should,Pendiente,05-SRS;07,1.0
+RNF-SEG-01,RNF,Seguridad,Rutas admin requieren sesion valida,Must,Implementado,05-SRS,1.0
+RNF-SEG-02,RNF,Seguridad,No secretos en repositorio,Must,Implementado,05-SRS,1.0
+RNF-REL-01,RNF,Datos,Migraciones SQL reproducibles,Must,Implementado,05-SRS,1.0

@@ -1,0 +1,9 @@
+Proceso_automatizado,Herramienta_o_script,Descripcion_breve,Respaldo1_tipo,Respaldo1_referencia_completa,Respaldo2_tipo,Respaldo2_referencia_completa,Evidencia_commit_o_URL
+CI GitHub Actions — npm test,GitHub Actions / Node 20,Pruebas unitarias Vitest en push y PR a main,Norma,ISO/IEC 12207 proceso de verificación,Doc oficial,https://vitest.dev/guide/,`.github/workflows/ci.yml` job test-and-build
+CI GitHub Actions — npm run typecheck,GitHub Actions / Node 20,Verificación estática TypeScript en push y PR a main,Norma,ISO/IEC 25010 mantenibilidad (analizabilidad),Doc oficial,https://www.typescriptlang.org/docs/,`.github/workflows/ci.yml` job test-and-build
+CI GitHub Actions — npm run build,GitHub Actions / Node 20,Compilación producción Vite con env secrets inyectados,Guia,https://vitejs.dev/guide/build.html,Norma,ISO/IEC 12207 proceso de integración,`.github/workflows/ci.yml` job test-and-build
+Calidad local npm run quality,npm scripts,Tests lint typecheck build (definición equipo),Norma,ISO/IEC 25010 mantenibilidad y funcionalidad,Guia,https://nodejs.org/docs/latest/api/,package.json script quality
+Tests unitarios Vitest,vitest,Regresión lógica dominio local y CI,Norma,ISO/IEC 12207 6.4.5 verification process,Doc oficial,https://vitest.dev/guide/,calzatura-vilchez/src/__tests__/
+Tests E2E Playwright,playwright,Flujos críticos UI (admin catálogo campaña códigos etc.),Doc,https://playwright.dev/docs/intro,IEEE 829 conceptos prueba documentada,calzatura-vilchez/e2e/
+Migraciones Supabase,supabase/migrations,Esquema reproducible y RPC,Norma,ISO/IEC 12207 maintenance,Doc,https://supabase.com/docs/guides/database,calzatura-vilchez/supabase/migrations/
+Lint ESLint,eslint,Estilo y errores estáticos,Guia,https://eslint.org/docs/latest/,Norma,ISO/IEC 25010 mantenibilidad,calzatura-vilchez/eslint.config.js

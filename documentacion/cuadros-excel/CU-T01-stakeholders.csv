@@ -1,0 +1,6 @@
+Stakeholder_ID,Nombre,Rol_o_relacion,Poder_1a5,Interes_1a5,Estrategia_gestion,Contacto,Notas
+STK-01,Calzatura Vilchez - Direccion,Cliente interno,5,5,Gestion cercana,COMPLETAR,
+STK-02,Clientes web,Usuario final,2,4,Encuestas y soporte,COMPLETAR,
+STK-03,Dr. Maglioni Arana Caparachin,Director tesis,5,5,Entregas programadas,COMPLETAR,
+STK-04,Ingeniero asesor,Control calidad ISO,4,5,Checklist por fase,COMPLETAR,
+STK-05,Equipo desarrollo,Implementacion,3,4,Repositorio y CI,COMPLETAR,

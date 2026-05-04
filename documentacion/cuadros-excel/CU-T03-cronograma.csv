@@ -1,0 +1,8 @@
+Fase_ID,Nombre_fase,Fecha_inicio_plan,Fecha_fin_plan,Fecha_inicio_real,Fecha_fin_real,Entregable_principal,Estado,Comentario
+F0,Marco y planificacion,COMPLETAR,COMPLETAR,,,INDICE maestro + plan proyecto,En curso,
+F1,Requisitos SRS baseline,COMPLETAR,COMPLETAR,,,05-SRS v1 aprobado,Pendiente,
+F2,Diseno y arquitectura,COMPLETAR,COMPLETAR,,,06-diseno v1,Pendiente,
+F3,MVP e-commerce,COMPLETAR,COMPLETAR,,,Demo publica,Pendiente,
+F4,Modelo IA v1,COMPLETAR,COMPLETAR,,,07 con metricas,Pendiente,
+F5,Integracion IA,COMPLETAR,COMPLETAR,,,UI + API,Pendiente,
+F6,Cierre pruebas documentacion,COMPLETAR,COMPLETAR,,,Matrices PDF + tag release,Pendiente,

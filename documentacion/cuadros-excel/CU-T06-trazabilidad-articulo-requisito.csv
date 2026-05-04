@@ -1,0 +1,21 @@
+EDA_ID,Titulo_articulo,Constructo_o_aporte_principal,RF_RNF_o_decision_diseno,Evidencia_en_producto_o_prueba,Estado_trazabilidad,Comentario
+EDA-01,Trust and TAM in Online Shopping: An Integrated Model,Confianza + TAM en intencion compra,RF-CAT-02 politicas confianza en checkout; RNF-USA,COMPLETAR capturas URL politicas devolucion,Pendiente,Completar evidencia
+EDA-02,Understanding and Predicting Electronic Commerce Adoption: An Extension of the Theory of Planned Behavior,Fases busqueda vs transaccion,RF-CHK-01 RF-PED-01 separacion funnel,BPMN PR-11 / E2E catalogo,Pendiente,
+EDA-03,Introduction to the Special Issue Social Commerce: A Research Framework for Social Commerce,Marco social commerce,RF-CAT-01 landings campana; destacados sociales,HomePage campanas; catalogRouting,Pendiente,
+EDA-04,Social Commerce Constructs and Consumer's Intention to Buy,Intencion compra social,RF-CAT-01,COMPLETAR,Pendiente,
+EDA-05,Business Intelligence and Analytics: From Big Data to Big Impact,BI para decisiones,RF-ADM-01 dashboard; datos ventas,Admin panel indicadores,Pendiente,
+EDA-06,Statistical and Machine Learning forecasting methods: Concerns and ways forward,Pronostico series y precauciones,RF-IA-02 baseline; limitaciones modelo,COMPLETAR enlace 07,Pendiente,
+EDA-07,Deep learning with long short-term memory networks for financial time series,LSTM series financieras,RF-IA-02 features temporales,COMPLETAR si se usa LSTM,Pendiente,
+EDA-08,Long Short-Term Memory,Fundamentos LSTM,RF-IA-02 arquitectura,COMPLETAR,Pendiente,
+EDA-09,Random Forests,Bosques aleatorios,RF-IA-02 modelo candidato,COMPLETAR,Pendiente,
+EDA-10,Deep Learning,Fundamentos deep learning,RF-IA-02,COMPLETAR,Pendiente,
+EDA-11,Deep learning for financial applications: A survey,DL en finanzas,RF-IA-01 RF-IA-04 riesgo financiero,COMPLETAR,Pendiente,
+EDA-12,Retail forecasting: Research and practice,Pronostico retail,RF-IA-02 demanda stock,AdminPredictions / ai-service,Pendiente,
+EDA-13,"Financial Ratios, Discriminant Analysis and the Prediction of Corporate Bankruptcy",Quiebra ratios Altman,RF-IA-01 definicion riesgo,COMPLETAR features ratios,Pendiente,Clave titulo tesis
+EDA-14,Financial Ratios and the Probabilistic Prediction of Bankruptcy,Probabilidad quiebra,RF-IA-01,COMPLETAR,Pendiente,
+EDA-15,Financial Ratios as Predictors of Failure,Fallo empresarial,RF-IA-01,COMPLETAR,Pendiente,
+EDA-16,Variable selection and corporate bankruptcy forecasts,Seleccion variables quiebra,RF-IA-02 feature selection,COMPLETAR,Pendiente,
+EDA-17,Two Credit Scoring Models Based on Dual Strategy Ensemble Trees,Credit scoring ensemble,RF-IA-02 modelo ensemble,COMPLETAR,Pendiente,
+EDA-18,Understanding digital transformation: A review and a research agenda,Transformacion digital PYME,RF-ADM-14 import datos; estrategia digital,AdminData escenarios,Pendiente,
+EDA-19,Digital Entrepreneurship: Toward a Digital Technology Perspective of Entrepreneurship,Emprendimiento digital,Decision arquitectura web SPA,ADR en 06-diseno,Pendiente,
+EDA-20,Digital Business Strategy: Toward a Next Generation of Insights,Estrategia digital negocio,Objetivos panel prediccion,AdminPredictions,Pendiente,

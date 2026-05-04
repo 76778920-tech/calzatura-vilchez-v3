@@ -1,0 +1,6 @@
+Riesgo_ID,Descripcion,Categoria,Probabilidad_1a5,Impacto_1a5,Puntuacion,Mitigacion,Propietario,Estado_residual
+RP-01,Retraso aprobacion capitulos,Academico,3,5,15,Entregas parciales quincenales,Autor,Abierto
+RP-02,Datos insuficientes para modelo IA,Tecnico,4,5,20,Escenarios sinteticos + baseline simple,Autor,Abierto
+RP-03,Desalineacion documentacion vs codigo,Documental,3,4,12,Sincronizar formato-09 y SRS,Ingeniero,Abierto
+RP-04,Cambio API Supabase breaking,Tecnico,2,4,8,Versionado migraciones + pruebas regresion,Dev,Abierto
+RP-05,Indisponibilidad cloud pago,Operativo,2,5,10,Modo degradado contraentrega + mensaje usuario,Dev,Abierto
