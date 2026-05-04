@@ -139,9 +139,16 @@ interface IreData {
   score: number;
   nivel: "bajo" | "moderado" | "alto" | "critico";
   descripcion: string;
+  horizonte_dias: number | null;
   dimensiones: IreDimensiones;
   pesos: IrePesos;
   detalle: IreDetalle;
+}
+
+interface IreHistorialPoint {
+  fecha: string;
+  score: number;
+  nivel: string;
 }
 
 interface FeatureImportance {
@@ -1458,6 +1465,34 @@ function DemandAccuracyChart({ predictions }: { predictions: Prediction[] }) {
   );
 }
 
+function IreSparkline({ data }: { data: IreHistorialPoint[] }) {
+  if (data.length < 2) return null;
+  const W = 280, H = 60, PAD = 4;
+  const scores = data.map((d) => d.score);
+  const minS = Math.min(...scores);
+  const maxS = Math.max(...scores);
+  const range = maxS - minS || 1;
+  const toX = (i: number) => PAD + (i / (data.length - 1)) * (W - PAD * 2);
+  const toY = (s: number) => PAD + (1 - (s - minS) / range) * (H - PAD * 2);
+  const pts = data.map((d, i) => `${toX(i)},${toY(d.score)}`).join(" ");
+  const last = data[data.length - 1];
+  const lx = toX(data.length - 1);
+  const ly = toY(last.score);
+  const colorMap: Record<string, string> = {
+    bajo: "#22c55e", moderado: "#f59e0b", alto: "#ef4444", critico: "#7c3aed",
+  };
+  const stroke = colorMap[last.nivel] ?? "#94a3b8";
+  return (
+    <div className="ire-sparkline-wrap">
+      <svg viewBox={`0 0 ${W} ${H}`} className="ire-sparkline-svg" aria-label="Evolución IRE">
+        <polyline points={pts} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" opacity="0.85" />
+        <circle cx={lx} cy={ly} r="3.5" fill={stroke} />
+      </svg>
+      <span className="ire-sparkline-label">Últimos {data.length} días</span>
+    </div>
+  );
+}
+
 function DriftBadge({ score }: { score: number | undefined }) {
   if (score === undefined) return null;
   if (score < 0.35) return null;
@@ -1659,6 +1694,8 @@ export default function AdminPredictions() {
   const [revenueForecast, setRevenueForecast] = useState<RevenueForecast | null>(null);
   const [revenueLoading, setRevenueLoading] = useState(false);
   const [ireData, setIreData] = useState<IreData | null>(null);
+  const [ireProyectado, setIreProyectado] = useState<IreData | null>(null);
+  const [ireHistorial, setIreHistorial] = useState<IreHistorialPoint[]>([]);
   const [modeloMeta, setModeloMeta] = useState<ModeloMeta | null>(null);
   const [modelMetrics, setModelMetrics] = useState<ModelMetrics | null>(null);
   const [horizon,    setHorizon]    = useState<HorizonOption>(() => loadPref("pred_horizon",    HORIZON_OPTIONS, 30));
@@ -1676,6 +1713,7 @@ export default function AdminPredictions() {
   const [weeklyChartLoading, setWeeklyChartLoading] = useState(false);
   const [modelMetricsFetched, setModelMetricsFetched] = useState(false);
   const [modelMetricsLoading, setModelMetricsLoading] = useState(false);
+  const [ireHistorialFetched, setIreHistorialFetched] = useState(false);
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -1705,12 +1743,14 @@ export default function AdminPredictions() {
       setModeloMeta(data.demand?.modelo_meta ?? null);
       setRevenueForecast(data.revenue ?? null);
       setIreData(data.ire ?? null);
+      setIreProyectado(data.ire_proyectado ?? null);
       setAiWarnings(Array.isArray(data.warnings) ? data.warnings : []);
     } catch (cause) {
       setError(describeAIError(cause));
       setPredictions([]);
       setModeloMeta(null);
       setIreData(null);
+      setIreProyectado(null);
       setRevenueForecast(null);
     } finally {
       setLoading(false);
@@ -1741,6 +1781,17 @@ export default function AdminPredictions() {
     setModelMetricsLoading(false);
   }, []);
 
+  const loadIreHistorial = useCallback(async () => {
+    try {
+      const res = await fetchAI("/api/ire/historial?days=60");
+      if (res.ok) {
+        const data = await res.json();
+        setIreHistorial(data.historial ?? []);
+      }
+    } catch { /* silencioso — historial es complementario */ }
+    setIreHistorialFetched(true);
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => void load(horizon, history), 0);
     return () => window.clearTimeout(timer);
@@ -1754,10 +1805,13 @@ export default function AdminPredictions() {
     if (activeTab === "modelo" && !modelMetricsFetched && !modelMetricsLoading && modeloMeta) {
       timers.push(window.setTimeout(() => void loadModelMetrics(), 0));
     }
+    if (activeTab === "resumen" && !ireHistorialFetched) {
+      timers.push(window.setTimeout(() => void loadIreHistorial(), 0));
+    }
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
     };
-  }, [activeTab, weeklyChartFetched, weeklyChartLoading, modelMetricsFetched, modelMetricsLoading, modeloMeta, loadWeeklyChart, loadModelMetrics]);
+  }, [activeTab, weeklyChartFetched, weeklyChartLoading, modelMetricsFetched, modelMetricsLoading, modeloMeta, loadWeeklyChart, loadModelMetrics, ireHistorialFetched, loadIreHistorial]);
 
   const refreshPredictions = useCallback(async () => {
     setWeeklyChartFetched(false);
@@ -2205,6 +2259,40 @@ export default function AdminPredictions() {
                   );
                 })}
               </div>
+              {ireHistorial.length >= 2 && (
+                <IreSparkline data={ireHistorial} />
+              )}
+            </motion.div>
+          )}
+
+          {/* IRE proyectado */}
+          {ireProyectado && ireData && (
+            <motion.div
+              className={`ire-proyectado-card ire-proyectado-${ireProyectado.nivel}`}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.12 }}
+            >
+              <div className="ire-proy-header">
+                <span className="ire-proy-label">IRE proyectado a {horizon} días</span>
+                <span className={`ire-proy-nivel ire-nivel-${ireProyectado.nivel}`}>
+                  {IRE_NIVEL_LABELS[ireProyectado.nivel] ?? ireProyectado.nivel}
+                </span>
+              </div>
+              <div className="ire-proy-body">
+                <span className="ire-proy-score">{ireProyectado.score}</span>
+                <span className="ire-proy-score-max">/100</span>
+                {(() => {
+                  const delta = ireProyectado.score - ireData.score;
+                  if (delta === 0) return <span className="ire-proy-delta ire-proy-delta-eq">sin cambio</span>;
+                  return (
+                    <span className={`ire-proy-delta ire-proy-delta-${delta > 0 ? "up" : "down"}`}>
+                      {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} pts
+                    </span>
+                  );
+                })()}
+              </div>
+              <p className="ire-proy-desc">{ireProyectado.descripcion}</p>
             </motion.div>
           )}
 

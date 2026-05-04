@@ -12,12 +12,15 @@ from slowapi.errors import RateLimitExceeded
 
 from models.demand import build_daily_sales_by_product, get_stock_alerts, get_weekly_chart, predict_demand
 from models.revenue import forecast_revenue
+from models.risk import compute_ire, compute_ire_proyectado
 from services.supabase_client import (
     fetch_completed_orders,
     fetch_daily_sales,
+    fetch_ire_historial,
     fetch_product_codes,
     fetch_products,
     get_client,
+    save_ire_historial,
 )
 
 load_dotenv()
@@ -292,6 +295,14 @@ def combined_prediction(
             revenue = None
             warnings.append(f"Proyección de ingresos no disponible: {str(rev_err)[:120]}")
 
+        ire = compute_ire(predictions, revenue)
+        ire_proyectado = compute_ire_proyectado(predictions, revenue, horizon)
+
+        try:
+            save_ire_historial(ire)
+        except Exception as save_err:
+            warnings.append(f"Historial IRE no guardado: {str(save_err)[:80]}")
+
         return {
             "demand": {
                 "horizon_days": horizon,
@@ -301,8 +312,25 @@ def combined_prediction(
                 "predictions": predictions,
             },
             "revenue": revenue,
+            "ire": ire,
+            "ire_proyectado": ire_proyectado,
             "warnings": warnings,
         }
+    except Exception as error:
+        _raise_http_error(error)
+
+
+@app.get("/api/ire/historial")
+@limiter.limit("30/minute")
+def ire_historial(
+    request: Request,
+    days: int = Query(default=30, ge=7, le=90, description="Días de historial a retornar"),
+):
+    """Devuelve el historial de IRE de los últimos N días."""
+    _require_service_auth(request, "api/ire/historial")
+    try:
+        rows = fetch_ire_historial(days)
+        return {"historial": rows, "days": days}
     except Exception as error:
         _raise_http_error(error)
 

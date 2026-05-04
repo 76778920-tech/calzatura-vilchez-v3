@@ -78,3 +78,34 @@ def fetch_products() -> list[dict]:
 def fetch_product_codes() -> dict[str, str]:
     rows = _query("productoCodigos", {"select": "productoId,codigo"})
     return {r["productoId"]: r["codigo"] for r in rows if r.get("codigo")}
+
+
+def save_ire_historial(ire: dict) -> None:
+    """Upsert del IRE del día. Un registro por fecha (UNIQUE en fecha)."""
+    url, headers = _get_headers()
+    payload = {
+        "fecha":       datetime.now(timezone.utc).date().isoformat(),
+        "score":       ire["score"],
+        "nivel":       ire["nivel"],
+        "dimensiones": ire.get("dimensiones", {}),
+        "pesos":       ire.get("pesos", {}),
+    }
+    resp = requests.post(
+        f"{url}/rest/v1/ireHistorial",
+        headers={
+            **headers,
+            "Prefer": "resolution=merge-duplicates,return=minimal",
+        },
+        json=payload,
+        timeout=10,
+    )
+    resp.raise_for_status()
+
+
+def fetch_ire_historial(days: int = 30) -> list[dict]:
+    """Últimos N días de historial IRE, ordenado por fecha ascendente."""
+    return _query("ireHistorial", {
+        "select": "fecha,score,nivel,dimensiones",
+        "fecha":  f"gte.{_cutoff_iso(days)}",
+        "order":  "fecha.asc",
+    })

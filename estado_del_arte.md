@@ -2,6 +2,8 @@
 **Tesis:** Sistema web de comercio electrónico con modelo de Inteligencia Artificial para la predicción del riesgo empresarial en la empresa Calzatura Vilchez
 **Asesor:** Dr. Maglioni Arana Caparachin
 
+**Documentación de ingeniería, ISO, planificación y trazabilidad (matrices Excel/CSV, SRS, pruebas):** ver carpeta `documentacion/` del repositorio e `documentacion/INDICE-MAESTRO.md`. Completar la matriz `documentacion/cuadros-excel/CU-T06-trazabilidad-articulo-requisito.csv` para vincular cada artículo con requisitos y evidencias del sistema.
+
 ---
 
 ## ARTÍCULO 1

@@ -4,7 +4,7 @@
 
 | Campo | Descripción |
 |---|---|
-| Nombre del proyecto | Sistema web de e-commerce, inventario, ventas y predicción de demanda para Calzatura Vilchez |
+| Nombre del proyecto | Sistema web de comercio electrónico con un modelo de inteligencia artificial para la predicción del riesgo empresarial en la empresa Calzatura Vilchez |
 | Integrantes del equipo | Equipo del proyecto Calzatura Vilchez |
 | Módulo / Sistema | Plataforma web comercial y administrativa |
 | Docente | Dr. Maglioni Arana Caparachin |
@@ -12,17 +12,17 @@
 
 ## Contexto Del Proyecto
 
-Calzatura Vilchez requiere una plataforma web que permita publicar productos de calzado, gestionar inventario, registrar ventas, administrar pedidos, controlar fabricantes, manejar usuarios y consultar indicadores de negocio desde un panel administrativo. La organización necesita reducir registros manuales dispersos, centralizar información comercial y disponer de una base para tomar decisiones sobre stock, ventas y demanda.
+Calzatura Vilchez requiere una plataforma web que permita publicar productos de calzado, gestionar inventario, registrar ventas, administrar pedidos, controlar fabricantes, manejar usuarios y consultar indicadores de negocio desde un panel administrativo. La organización necesita reducir registros manuales dispersos, centralizar información comercial y contar con herramientas de inteligencia artificial que permitan anticipar el riesgo empresarial antes de que se materialice en pérdidas operativas.
 
-El sistema se implementa como una aplicación web desarrollada con React, TypeScript y Vite. La persistencia principal se realiza en Supabase (PostgreSQL) con políticas RLS, la autenticación se gestiona con Firebase Auth, las imágenes de producto se administran mediante Cloudinary y la predicción de demanda se apoya en un servicio Python FastAPI conectado a Supabase.
+El sistema se implementa como una aplicación web desarrollada con React, TypeScript y Vite. La persistencia principal se realiza en Supabase (PostgreSQL) con políticas RLS, la autenticación se gestiona con Firebase Auth, las imágenes de producto se administran mediante Cloudinary y la predicción del riesgo empresarial se apoya en un servicio Python FastAPI con un modelo RandomForestRegressor (scikit-learn) conectado a Supabase.
 
 ### Problema Que Se Busca Resolver
 
-La empresa necesita controlar de forma integrada su catálogo, stock por talla y color, ventas diarias, pedidos de clientes, fabricantes, usuarios y reportes administrativos. Sin un sistema centralizado, se incrementa el riesgo de errores de inventario, duplicidad de información, baja trazabilidad de ventas y dificultad para analizar la demanda de productos.
+La empresa necesita controlar de forma integrada su catálogo, stock por talla y color, ventas diarias, pedidos de clientes, fabricantes, usuarios y reportes administrativos. Sin un sistema centralizado e inteligente, se incrementa el riesgo de quiebre de stock, pérdida de ingresos por demanda no atendida, capital inmovilizado en productos de baja rotación y dificultad para anticipar el estado de riesgo del negocio antes de que ocurra.
 
 ### Objetivo General Del Sistema
 
-Desarrollar una plataforma web que permita gestionar el comercio digital de Calzatura Vilchez, incluyendo catálogo público, autenticación de usuarios, carrito de compras, pedidos, ventas, inventario, fabricantes, roles administrativos e indicadores de demanda.
+Desarrollar una plataforma web de comercio electrónico para Calzatura Vilchez que integre un modelo de inteligencia artificial capaz de predecir el riesgo empresarial, permitiendo al administrador anticipar quiebres de stock, caídas de ingreso y deterioro del portafolio de productos mediante un Índice de Riesgo Empresarial (IRE) calculado y proyectado automáticamente.
 
 ### Usuarios Principales
 
@@ -54,7 +54,11 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 - Administrar fabricantes y documentos asociados.
 - Gestionar usuarios y roles de acceso.
 - Mostrar dashboard administrativo con indicadores de productos, ventas, pedidos y usuarios.
-- Consultar predicciones de demanda y alertas de stock mediante el servicio de IA.
+- Predecir la demanda futura por producto mediante un modelo RandomForestRegressor entrenado con historial de ventas.
+- Calcular y proyectar el Índice de Riesgo Empresarial (IRE) combinando riesgo de stock (40%), riesgo de ingresos (35%) y riesgo de demanda (25%), con clasificación Bajo / Moderado / Alto / Crítico.
+- Registrar el historial diario del IRE para evidenciar la evolución del riesgo a lo largo del tiempo.
+- Proveer análisis ABC de inventario, capital inmovilizado, ingresos en riesgo y flujo de caja proyectado.
+- Generar alertas de stock con fecha exacta de quiebre y ranking de productos por período (7, 15 y 30 días).
 - Proteger la información mediante reglas de seguridad, rutas protegidas y validaciones.
 
 ## Alcance Del Proyecto
@@ -88,8 +92,14 @@ Implementar una solución web integral para la gestión comercial, operativa y a
 | IN-23 | Devoluciones | Marca ventas como devueltas y repone stock. | RF ventas, RF inventario |
 | IN-24 | Gestión de usuarios | Permite listar usuarios y actualizar roles segun permisos. | RF seguridad |
 | IN-25 | Gestión de fabricantes | Registra datos de fabricantes, documentos y últimos ingresos. | RF fabricantes |
-| IN-26 | Predicción de demanda | Consulta servicio IA para estimar demanda futura por producto. | RF analítica |
-| IN-27 | Alertas de stock | Identifica productos con riesgo de agotarse. | RF analítica, RF inventario |
+| IN-26 | Predicción de demanda | Modelo RandomForestRegressor estima unidades a vender por producto en el horizonte configurado (7/15/30 días). | RF analítica, RF IA |
+| IN-27 | Alertas de stock con fecha exacta | Identifica productos con riesgo de agotarse y calcula la fecha exacta de quiebre de stock. | RF analítica, RF inventario |
+| IN-31 | IRE actual | Calcula el Índice de Riesgo Empresarial (0–100) combinando riesgo de stock, ingresos y demanda. Clasifica en Bajo / Moderado / Alto / Crítico. | RF analítica, RF IA |
+| IN-32 | IRE proyectado | Proyecta el IRE al horizonte configurado descontando el consumo estimado del stock actual. Permite anticipar el riesgo futuro. | RF analítica, RF IA |
+| IN-33 | Historial del IRE | Registra el score diario del IRE en Supabase para evidenciar su evolución temporal. | RF analítica, RF trazabilidad |
+| IN-34 | Análisis ABC de inventario | Clasifica productos en categorías A/B/C según su contribución al ingreso histórico (80/15/5%). | RF analítica, RF inventario |
+| IN-35 | Riesgo financiero | Calcula capital inmovilizado, ingresos en riesgo y flujo de caja proyectado a 4 semanas. | RF analítica, RF rentabilidad |
+| IN-36 | Ranking de productos | Muestra top 3 más vendidos y productos de baja rotación con recomendaciones automáticas por período. | RF analítica |
 | IN-28 | Reglas de seguridad | Supabase RLS sobre tablas de datos; Firestore Rules donde apliquen perfiles vinculados a Firebase Auth; validaciones en RPC/triggers. | RNF seguridad |
 | IN-29 | Despliegue web | Permite publicar frontend en Firebase Hosting. | RNF disponibilidad |
 | IN-30 | Docker para desarrollo | Permite levantar frontend y servicio IA con Docker Compose. | RNF mantenibilidad |

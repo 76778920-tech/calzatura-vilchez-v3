@@ -12,6 +12,11 @@ from datetime import date, timedelta
 import hashlib
 import math
 
+def _stockout_date(days_until: int) -> str | None:
+    if days_until >= 999:
+        return None
+    return (date.today() + timedelta(days=days_until)).isoformat()
+
 import numpy as np
 import pandas as pd
 import sklearn
@@ -448,6 +453,7 @@ def predict_demand(
             "consumo_diario_30": round(avg_30, 2),
             "consumo_estimado_diario": estimated_daily,
             "dias_hasta_agotarse": min(days_until_stockout, 999),
+            "fecha_quiebre_stock": _stockout_date(days_until_stockout),
             "tendencia": trend,
             "confianza": confidence,
             "modelo": "random_forest" if used_ml else "promedio_movil",
@@ -536,6 +542,7 @@ def predict_demand(
             "consumo_diario_30": 0,
             "consumo_estimado_diario": 0,
             "dias_hasta_agotarse": 999,
+            "fecha_quiebre_stock": None,
             "tendencia": "estable",
             "confianza": 0,
             "modelo": "sin_datos",

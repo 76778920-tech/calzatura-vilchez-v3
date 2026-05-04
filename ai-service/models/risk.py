@@ -114,9 +114,10 @@ def compute_ire(predictions: list[dict], revenue: dict | None) -> dict:
         )
 
     return {
-        "score": ire,
-        "nivel": nivel,
-        "descripcion": descripcion,
+        "score":          ire,
+        "nivel":          nivel,
+        "descripcion":    descripcion,
+        "horizonte_dias": None,   # None = estado actual; int = proyectado a N días
         "dimensiones": {
             "riesgo_stock":    round(stock_risk),
             "riesgo_ingresos": round(revenue_risk),
@@ -136,3 +137,48 @@ def compute_ire(predictions: list[dict], revenue: dict | None) -> dict:
             "total_sin_historial":   len(predictions) - total,
         },
     }
+
+
+def compute_ire_proyectado(
+    predictions: list[dict], revenue: dict | None, horizon: int
+) -> dict:
+    """
+    Proyecta el IRE a `horizon` días en el futuro descontando el consumo estimado
+    del stock actual. El riesgo de ingresos y demanda se toman del forecast
+    existente (ya son forward-looking). Solo el riesgo de stock se recalcula
+    con el stock proyectado.
+    """
+    projected: list[dict] = []
+    for p in predictions:
+        if p.get("sin_historial"):
+            projected.append({**p})
+            continue
+
+        stock_actual = float(p.get("stock_actual", 0))
+        consumo      = float(p.get("consumo_estimado_diario", 0))
+        stock_proy   = max(0.0, stock_actual - consumo * horizon)
+
+        dias_proy = (stock_proy / consumo) if consumo > 0 else 999
+
+        if stock_proy == 0:
+            nivel_proy = "critico"
+        elif dias_proy <= 7:
+            nivel_proy = "critico"
+        elif dias_proy <= 14:
+            nivel_proy = "atencion"
+        elif dias_proy <= 30:
+            nivel_proy = "vigilancia"
+        else:
+            nivel_proy = "estable"
+
+        projected.append({
+            **p,
+            "stock_actual":      round(stock_proy, 1),
+            "nivel_riesgo":      nivel_proy,
+            "dias_hasta_agotarse": min(round(dias_proy), 999),
+            "alta_demanda":      p.get("alta_demanda") and stock_proy < 5,
+        })
+
+    result = compute_ire(projected, revenue)
+    result["horizonte_dias"] = horizon
+    return result
