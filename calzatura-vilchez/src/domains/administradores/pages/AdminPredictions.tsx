@@ -2624,6 +2624,96 @@ export default function AdminPredictions() {
               </button>
             </div>
           )}
+
+          {/* ── Riesgo Financiero ─────────────────────────── */}
+          {(() => {
+            const sobrestock = predictionsForView.filter(
+              p => !p.sin_historial && p.dias_hasta_agotarse >= 60 && p.stock_actual > 5
+            );
+            const capitalInmovilizado = sobrestock.reduce((s, p) => s + p.stock_actual * p.precio, 0);
+            const enDescenso = predictionsForView.filter(p => !p.sin_historial && p.tendencia === "bajando");
+            const ingresosEnRiesgo = enDescenso.reduce((s, p) => s + p.consumo_estimado_diario * 30 * p.precio, 0);
+            const diarioProyect = revenueSummary?.promedio_diario_proyectado ?? 0;
+            const semanas = [1, 2, 3, 4].map(w => ({ label: `Semana ${w}`, valor: diarioProyect * 7, acumulado: diarioProyect * 7 * w }));
+
+            return (
+              <div className="fin-risk-panel">
+                <div className="fin-risk-header">
+                  <p className="pred-sub">Diagnóstico financiero · basado en predicciones</p>
+                  <h3 className="fin-risk-title">Riesgo Financiero</h3>
+                </div>
+
+                <div className="fin-risk-kpi-row">
+                  <div className="fin-risk-kpi fin-risk-kpi-warn">
+                    <span className="fin-risk-kpi-label">Capital inmovilizado</span>
+                    <span className="fin-risk-kpi-val">{formatCurrency(capitalInmovilizado)}</span>
+                    <span className="fin-risk-kpi-sub">{sobrestock.length} producto{sobrestock.length !== 1 ? "s" : ""} con más de 60 días de cobertura</span>
+                  </div>
+                  <div className={`fin-risk-kpi ${ingresosEnRiesgo > 0 ? "fin-risk-kpi-danger" : "fin-risk-kpi-ok"}`}>
+                    <span className="fin-risk-kpi-label">Ingresos en riesgo</span>
+                    <span className="fin-risk-kpi-val">{formatCurrency(ingresosEnRiesgo)}</span>
+                    <span className="fin-risk-kpi-sub">{enDescenso.length} producto{enDescenso.length !== 1 ? "s" : ""} con demanda bajando — proyección 30 d</span>
+                  </div>
+                  <div className="fin-risk-kpi fin-risk-kpi-info">
+                    <span className="fin-risk-kpi-label">Flujo est. / semana</span>
+                    <span className="fin-risk-kpi-val">{formatCurrency(diarioProyect * 7)}</span>
+                    <span className="fin-risk-kpi-sub">Basado en promedio diario del modelo</span>
+                  </div>
+                </div>
+
+                {sobrestock.length > 0 && (
+                  <div className="fin-risk-section">
+                    <div className="ranking-section-title">
+                      <Package size={14} /> Capital inmovilizado — productos con exceso de cobertura
+                    </div>
+                    <div className="fin-risk-stock-list">
+                      {[...sobrestock]
+                        .sort((a, b) => b.stock_actual * b.precio - a.stock_actual * a.precio)
+                        .slice(0, 5)
+                        .map(p => {
+                          const cap = p.stock_actual * p.precio;
+                          const pct = capitalInmovilizado > 0 ? (cap / capitalInmovilizado) * 100 : 0;
+                          return (
+                            <div key={p.productId} className="fin-risk-stock-row">
+                              <div className="fin-risk-stock-info">
+                                <span className="fin-risk-stock-name">{p.nombre}</span>
+                                <span className="fin-risk-stock-meta">
+                                  Stock: {p.stock_actual} uds · {p.dias_hasta_agotarse >= 999 ? "sin consumo activo" : `~${p.dias_hasta_agotarse} días de cobertura`}
+                                </span>
+                              </div>
+                              <div className="fin-risk-stock-bar-wrap">
+                                <div className="fin-risk-stock-bar-bg">
+                                  <div className="fin-risk-stock-bar" style={{ width: `${pct}%` }} />
+                                </div>
+                              </div>
+                              <span className="fin-risk-stock-val">{formatCurrency(cap)}</span>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+
+                {revenueSummary && (
+                  <div className="fin-risk-section">
+                    <div className="ranking-section-title">
+                      <TrendingUp size={14} /> Flujo de caja proyectado — próximas 4 semanas
+                    </div>
+                    <div className="fin-risk-flux-grid">
+                      {semanas.map((s, i) => (
+                        <div key={i} className="fin-risk-flux-card">
+                          <span className="fin-risk-flux-label">{s.label}</span>
+                          <span className="fin-risk-flux-val">{formatCurrency(s.valor)}</span>
+                          <span className="fin-risk-flux-acum">Acum.: {formatCurrency(s.acumulado)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="ranking-section-note">Proyección lineal basada en el promedio diario del modelo. No contempla estacionalidad ni eventos extraordinarios.</p>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </motion.div>
       )}
 
