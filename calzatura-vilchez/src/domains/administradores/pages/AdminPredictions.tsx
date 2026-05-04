@@ -70,6 +70,7 @@ interface Prediction {
   consumo_diario_30: number;
   consumo_estimado_diario: number;
   dias_hasta_agotarse: number;
+  fecha_quiebre_stock?: string | null;
   tendencia: "subiendo" | "bajando" | "estable";
   confianza: number;
   drift_score?: number;
@@ -114,6 +115,27 @@ interface RevenueForecast {
   summary: RevenueSummary;
   history: RevenuePoint[];
   forecast: RevenuePoint[];
+}
+
+interface IreDimensiones {
+  riesgo_stock: number;
+  riesgo_ingresos: number;
+  riesgo_demanda: number;
+}
+interface IreDetalle {
+  productos_criticos: number;
+  productos_atencion: number;
+  productos_vigilancia: number;
+  productos_sin_stock: number;
+  total_con_historial: number;
+  total_sin_historial: number;
+}
+interface IreData {
+  score: number;
+  nivel: "bajo" | "moderado" | "alto" | "critico";
+  descripcion: string;
+  dimensiones: IreDimensiones;
+  detalle: IreDetalle;
 }
 
 interface FeatureImportance {
@@ -1564,6 +1586,7 @@ export default function AdminPredictions() {
   const [weeklyChart, setWeeklyChart] = useState<WeekPoint[]>([]);
   const [revenueForecast, setRevenueForecast] = useState<RevenueForecast | null>(null);
   const [revenueLoading, setRevenueLoading] = useState(false);
+  const [ireData, setIreData] = useState<IreData | null>(null);
   const [modeloMeta, setModeloMeta] = useState<ModeloMeta | null>(null);
   const [modelMetrics, setModelMetrics] = useState<ModelMetrics | null>(null);
   const [horizon,    setHorizon]    = useState<HorizonOption>(() => loadPref("pred_horizon",    HORIZON_OPTIONS, 30));
@@ -1609,11 +1632,13 @@ export default function AdminPredictions() {
       setPredictions(data.demand?.predictions ?? []);
       setModeloMeta(data.demand?.modelo_meta ?? null);
       setRevenueForecast(data.revenue ?? null);
+      setIreData(data.ire ?? null);
       setAiWarnings(Array.isArray(data.warnings) ? data.warnings : []);
     } catch (cause) {
       setError(describeAIError(cause));
       setPredictions([]);
       setModeloMeta(null);
+      setIreData(null);
       setRevenueForecast(null);
     } finally {
       setLoading(false);
@@ -1768,6 +1793,19 @@ export default function AdminPredictions() {
   }, [revenueForecast]);
 
   const revenueSummary = normalizedRevenueForecast?.summary ?? null;
+  // Análisis ABC por ingreso histórico (A = 80%, B = 15%, C = 5%)
+  const abcData = useMemo(() => {
+    const withH = predictionsForView.filter(p => !p.sin_historial && p.total_vendido_historico > 0);
+    const sorted = [...withH].sort((a, b) => (b.total_vendido_historico * b.precio) - (a.total_vendido_historico * a.precio));
+    const totalRev = sorted.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+    let cum = 0;
+    return sorted.map(p => {
+      cum += p.total_vendido_historico * p.precio;
+      const pct = totalRev > 0 ? cum / totalRev : 0;
+      return { ...p, abc: pct <= 0.80 ? "A" : pct <= 0.95 ? "B" : "C" as "A" | "B" | "C" };
+    });
+  }, [predictionsForView]);
+
   const enRiesgo = predictionsForView.filter((item) => !item.sin_historial && item.alerta_stock).length;
   const sinStock = predictionsForView.filter((item) => !item.sin_historial && item.stock_actual === 0).length;
   const altaDemanda = predictionsForView.filter((item) => !item.sin_historial && item.alta_demanda).length;
@@ -2057,6 +2095,46 @@ export default function AdminPredictions() {
           animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
           transition={{ duration: 0.38, ease: "easeOut" }}
         >
+          {/* IRE hero */}
+          {ireData && (
+            <motion.div
+              className={`ire-hero ire-hero-${ireData.nivel}`}
+              initial={{ opacity: 0, y: -16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+            >
+              <div className="ire-left">
+                <div className="ire-label">Índice de Riesgo Empresarial</div>
+                <div className="ire-score-row">
+                  <span className="ire-score">{ireData.score}</span>
+                  <span className="ire-score-max">/100</span>
+                  <span className={`ire-nivel ire-nivel-${ireData.nivel}`}>
+                    {ireData.nivel.charAt(0).toUpperCase() + ireData.nivel.slice(1)}
+                  </span>
+                </div>
+                <p className="ire-desc">{ireData.descripcion}</p>
+              </div>
+              <div className="ire-dims">
+                {[
+                  { label: "Stock", val: ireData.dimensiones.riesgo_stock },
+                  { label: "Ingresos", val: ireData.dimensiones.riesgo_ingresos },
+                  { label: "Demanda", val: ireData.dimensiones.riesgo_demanda },
+                ].map(({ label, val }) => (
+                  <div key={label} className="ire-dim">
+                    <div className="ire-dim-label">{label}</div>
+                    <div className="ire-dim-bar-bg">
+                      <div
+                        className={`ire-dim-bar ire-dim-bar-${val >= 75 ? "critico" : val >= 50 ? "alto" : val >= 25 ? "moderado" : "bajo"}`}
+                        style={{ width: `${val}%` }}
+                      />
+                    </div>
+                    <div className="ire-dim-val">{val}</div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
           <div className="pred-summary-grid">
         <motion.article className="pred-summary-card pred-summary-hero" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.01 }}>
           <p className="pred-summary-kicker">Resumen ejecutivo</p>
@@ -2320,7 +2398,7 @@ export default function AdminPredictions() {
                     <th>Proyección ({horizon} días)</th>
                     <th>Por semana</th>
                     <th>Stock actual</th>
-                    <th>Stock dura aprox.</th>
+                    <th>Cobertura / Quiebre</th>
                     <th>Demanda</th>
                     <th>Estado</th>
                   </tr>
@@ -2371,6 +2449,11 @@ export default function AdminPredictions() {
                         </td>
                         <td>
                           <DuracionTexto p={prediction} />
+                          {!prediction.sin_historial && prediction.fecha_quiebre_stock && (
+                            <div className={`quiebre-date${prediction.dias_hasta_agotarse <= 7 ? "" : " quiebre-date-warn"}`}>
+                              📅 {prediction.fecha_quiebre_stock}
+                            </div>
+                          )}
                         </td>
                         <td>
                           {prediction.sin_historial ? (
@@ -2631,6 +2714,59 @@ export default function AdminPredictions() {
                 );
               })}
             </div>
+
+            {/* ── Análisis ABC ─────────────────────────────── */}
+            {abcData.length > 0 && (() => {
+              const catA = abcData.filter(p => p.abc === "A");
+              const catB = abcData.filter(p => p.abc === "B");
+              const catC = abcData.filter(p => p.abc === "C");
+              const totalRev = abcData.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+              const revA = catA.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+              const revB = catB.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+              const revC = catC.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+              const pct = (v: number) => totalRev > 0 ? ((v / totalRev) * 100).toFixed(1) : "0";
+              return (
+                <>
+                  <div className="ranking-section-title" style={{ marginTop: "2rem" }}>
+                    <Package size={16} /> Análisis ABC de inventario
+                  </div>
+                  <p className="ranking-section-note">Clasifica productos por su contribución a los ingresos históricos. A = 80% del ingreso, B = 15%, C = 5%.</p>
+                  <div className="abc-grid">
+                    <div className="abc-card abc-card-a">
+                      <div className="abc-letter abc-letter-a">A</div>
+                      <div className="abc-count">{catA.length} productos</div>
+                      <div className="abc-pct-rev">{pct(revA)}% del ingreso · S/ {revA.toLocaleString("es-PE", { maximumFractionDigits: 0 })}</div>
+                      <div className="abc-desc">Productos estrella. Mantén stock prioritario y reabastece antes de llegar al umbral crítico.</div>
+                    </div>
+                    <div className="abc-card abc-card-b">
+                      <div className="abc-letter abc-letter-b">B</div>
+                      <div className="abc-count">{catB.length} productos</div>
+                      <div className="abc-pct-rev">{pct(revB)}% del ingreso · S/ {revB.toLocaleString("es-PE", { maximumFractionDigits: 0 })}</div>
+                      <div className="abc-desc">Importancia media. Monitorea rotación y ajusta pedidos según tendencia.</div>
+                    </div>
+                    <div className="abc-card abc-card-c">
+                      <div className="abc-letter abc-letter-c">C</div>
+                      <div className="abc-count">{catC.length} productos</div>
+                      <div className="abc-pct-rev">{pct(revC)}% del ingreso · S/ {revC.toLocaleString("es-PE", { maximumFractionDigits: 0 })}</div>
+                      <div className="abc-desc">Baja contribución. Evalúa liquidar stock excedente o discontinuar si no hay demanda.</div>
+                    </div>
+                  </div>
+                  <div className="abc-list">
+                    {abcData.slice(0, 12).map(p => (
+                      <div key={p.productId} className="abc-row">
+                        <span className={`abc-row-badge abc-row-badge-${p.abc}`}>{p.abc}</span>
+                        <span className="abc-row-name">{p.nombre}</span>
+                        <span className="abc-row-rev">S/ {(p.total_vendido_historico * p.precio).toLocaleString("es-PE", { maximumFractionDigits: 0 })}</span>
+                        <span className="abc-row-pct">{pct(p.total_vendido_historico * p.precio)}%</span>
+                      </div>
+                    ))}
+                    {abcData.length > 12 && (
+                      <p className="ranking-section-note" style={{ margin: "0.25rem 0 0" }}>+ {abcData.length - 12} productos más no mostrados.</p>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </motion.div>
         );
       })()}
