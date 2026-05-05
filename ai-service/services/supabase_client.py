@@ -109,3 +109,30 @@ def fetch_ire_historial(days: int = 30) -> list[dict]:
         "fecha":  f"gte.{_cutoff_iso(days)}",
         "order":  "fecha.asc",
     })
+
+
+def save_modelo_estado(training_meta: dict) -> None:
+    """Persiste el training_meta del modelo en BD para sobrevivir reinicios (F-04)."""
+    url, headers = _get_headers()
+    payload = {
+        "id":           "singleton",
+        "trainingMeta": training_meta,
+        "actualizadoEn": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+    }
+    requests.post(
+        f"{url}/rest/v1/modeloEstado?on_conflict=id",
+        headers={**headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
+        json=payload,
+        timeout=10,
+    )
+
+
+def load_modelo_estado() -> dict | None:
+    """Carga el último training_meta guardado en BD (F-04). Retorna None si no existe."""
+    try:
+        rows = _query("modeloEstado", {"select": "trainingMeta,actualizadoEn", "id": "eq.singleton"})
+        if rows:
+            return rows[0].get("trainingMeta")
+    except Exception:
+        pass
+    return None

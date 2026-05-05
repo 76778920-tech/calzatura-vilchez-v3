@@ -72,3 +72,18 @@ export async function aiAdminFetch(pathAndQuery: string, init?: RequestInit): Pr
 export function aiAdminUsesProxy(): boolean {
   return Boolean(PROXY_URL);
 }
+
+/**
+ * Llama a /api/health (sin auth) para despertar el servicio en cold-start.
+ * Render free tier tarda ~20-30 s en arrancar; esta llamada da ventaja
+ * antes de que el usuario ejecute la primera predicción pesada.
+ * Fire-and-forget: nunca lanza ni bloquea.
+ */
+export function wakeAIService(): void {
+  const base = DIRECT_BASE.replace(/\/$/, "");
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 6_000);
+  fetch(`${base}/api/health`, { signal: controller.signal })
+    .catch(() => { /* warm-up silencioso */ })
+    .finally(() => window.clearTimeout(timer));
+}

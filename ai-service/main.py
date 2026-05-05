@@ -20,7 +20,9 @@ from services.supabase_client import (
     fetch_product_codes,
     fetch_products,
     get_client,
+    load_modelo_estado,
     save_ire_historial,
+    save_modelo_estado,
 )
 
 load_dotenv()
@@ -102,6 +104,17 @@ def log_startup_context():
     print(f"[startup] PORT={port}")
     print(f"[startup] SUPABASE_URL present={has_supabase_url}")
     print(f"[startup] SUPABASE_SERVICE_KEY present={has_supabase_key}")
+
+    # F-04: restaurar training_meta guardado en BD para no arrancar en frío sin contexto
+    try:
+        saved = load_modelo_estado()
+        if saved:
+            _model_registry.update({**saved, "restored_from_db": True})
+            print(f"[startup] training_meta restaurado desde BD (data_hash={saved.get('data_hash', '?')})")
+        else:
+            print("[startup] Sin training_meta previo en BD — se generará en la primera predicción")
+    except Exception as exc:
+        print(f"[startup] No se pudo restaurar training_meta: {exc}")
 
 
 def _load_data(force: bool = False, lookback_days: int = 180):
@@ -205,6 +218,12 @@ def demand_prediction(
         # Cache training metadata for /api/model/info
         _model_registry.clear()
         _model_registry.update({**training_meta, "cached_at": date.today().isoformat()})
+
+        # F-04: persiste en BD para sobrevivir reinicios (fire-and-forget)
+        try:
+            save_modelo_estado({**training_meta, "cached_at": date.today().isoformat()})
+        except Exception as save_err:
+            print(f"[model_registry] No se pudo persistir training_meta: {save_err}")
 
         # Log prediction for retrospective error monitoring
         log_entry = {

@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { motion, animate } from "framer-motion";
 import { PromptInputBox, type PromptPanelQuickAction } from "@/components/ui/ai-prompt-box";
-import { aiAdminFetch } from "@/services/aiAdminClient";
+import { aiAdminFetch, wakeAIService } from "@/services/aiAdminClient";
 
 // Render en plan gratuito puede tardar ~20-30 s en cold start.
 const AI_FETCH_TIMEOUT_MS = 45_000;
@@ -1728,6 +1728,9 @@ export default function AdminPredictions() {
   useEffect(() => { localStorage.setItem("pred_horizon",    String(horizon));   }, [horizon]);
   useEffect(() => { localStorage.setItem("pred_history",    String(history));   }, [history]);
   useEffect(() => { localStorage.setItem("pred_alert_days", String(alertDays)); }, [alertDays]);
+
+  // F-03: warm-up en mount para reducir cold-start de Render (ISO/IEC 25010 §5.2)
+  useEffect(() => { wakeAIService(); }, []);
 
   const load = useCallback(async (selectedHorizon: HorizonOption, selectedHistory: HistoryOption) => {
     setLoading(true);

@@ -47,8 +47,9 @@ export async function logAudit(
       usuarioEmail: user?.email ?? null,
       realizadoEn: new Date().toISOString(),
     });
-  } catch {
-    // La auditoría nunca debe interrumpir la operación principal
+  } catch (err) {
+    // La auditoría nunca debe interrumpir la operación principal, pero sí registrar el fallo
+    console.error("[audit] logAudit falló silenciosamente:", err);
   }
 }
 

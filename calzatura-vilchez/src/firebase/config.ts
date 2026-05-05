@@ -6,11 +6,11 @@ import {
 } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBAnVUP4M6wujGs-x8EytdGabkIP7EJkwo",
-  authDomain: "calzaturavilchez-ab17f.firebaseapp.com",
-  projectId: "calzaturavilchez-ab17f",
-  messagingSenderId: "337744526151",
-  appId: "1:337744526151:web:bc86b90832e667c36baa62",
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            as string,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN        as string,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID         as string,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID as string,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID              as string,
 };
 
 const app = initializeApp(firebaseConfig);
