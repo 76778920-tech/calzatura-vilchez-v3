@@ -300,6 +300,11 @@ export default function ProductsPage() {
   const discountTriggerRef = useRef<HTMLButtonElement | null>(null);
   const discountPopoverRef = useRef<HTMLDivElement | null>(null);
   const discountPopoverFrameRef = useRef<number | null>(null);
+  const [draftSelectedMarcas, setDraftSelectedMarcas] = useState<string[]>([]);
+  const [marcaPopoverStyle, setMarcaPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
+  const marcaTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const marcaPopoverRef = useRef<HTMLDivElement | null>(null);
+  const marcaPopoverFrameRef = useRef<number | null>(null);
 
   const categoria = toPublicCategorySlug(effectiveParams.get("categoria") ?? "todos");
   const vista = effectiveParams.get("vista");
@@ -390,6 +395,8 @@ export default function ProductsPage() {
       if (materialTriggerRef.current?.contains(event.target as Node)) return;
       if (discountPopoverRef.current?.contains(event.target as Node)) return;
       if (discountTriggerRef.current?.contains(event.target as Node)) return;
+      if (marcaPopoverRef.current?.contains(event.target as Node)) return;
+      if (marcaTriggerRef.current?.contains(event.target as Node)) return;
       if (filterRailRef.current?.contains(event.target as Node)) {
         setActiveMenu(null);
         return;
@@ -608,6 +615,34 @@ export default function ProductsPage() {
       if (discountPopoverFrameRef.current) {
         window.cancelAnimationFrame(discountPopoverFrameRef.current);
         discountPopoverFrameRef.current = null;
+      }
+      window.removeEventListener("resize", syncPopoverPosition);
+      window.removeEventListener("scroll", syncPopoverPosition, true);
+    };
+  }, [activeMenu]);
+
+  useEffect(() => {
+    if (activeMenu !== "marcaSlug" || !marcaTriggerRef.current) return undefined;
+    const syncPopoverPosition = () => {
+      if (!marcaTriggerRef.current) return;
+      if (marcaPopoverFrameRef.current) window.cancelAnimationFrame(marcaPopoverFrameRef.current);
+      marcaPopoverFrameRef.current = window.requestAnimationFrame(() => {
+        if (!marcaTriggerRef.current) return;
+        const rect = marcaTriggerRef.current.getBoundingClientRect();
+        const desiredWidth = Math.min(260, window.innerWidth - 32);
+        const margin = 16;
+        const maxLeft = Math.max(margin, window.innerWidth - desiredWidth - margin);
+        const left = Math.max(margin, Math.min(rect.left, maxLeft));
+        setMarcaPopoverStyle({ top: rect.bottom + 10, left, width: desiredWidth });
+      });
+    };
+    syncPopoverPosition();
+    window.addEventListener("resize", syncPopoverPosition);
+    window.addEventListener("scroll", syncPopoverPosition, true);
+    return () => {
+      if (marcaPopoverFrameRef.current) {
+        window.cancelAnimationFrame(marcaPopoverFrameRef.current);
+        marcaPopoverFrameRef.current = null;
       }
       window.removeEventListener("resize", syncPopoverPosition);
       window.removeEventListener("scroll", syncPopoverPosition, true);
@@ -1550,7 +1585,7 @@ export default function ProductsPage() {
 
         <div className="catalog-filter-rail" ref={filterRailRef}>
           {filterMenus.map((menu) => {
-            const isExpandable = menu.key === "precio" || menu.key === "talla" || menu.key === "color" || menu.key === "material" || menu.key === "descuento";
+            const isExpandable = menu.key === "precio" || menu.key === "talla" || menu.key === "marcaSlug" || menu.key === "color" || menu.key === "material" || menu.key === "descuento";
             const isOpen = activeMenu === menu.key;
 
             return (
@@ -1572,16 +1607,19 @@ export default function ProductsPage() {
                       ? "catalog-price-popover"
                       : menu.key === "talla"
                         ? "catalog-size-popover"
-                        : menu.key === "color"
-                          ? "catalog-color-popover"
-                          : menu.key === "material"
-                            ? "catalog-material-popover"
-                            : "catalog-discount-popover"
+                        : menu.key === "marcaSlug"
+                          ? "catalog-marca-popover"
+                          : menu.key === "color"
+                            ? "catalog-color-popover"
+                            : menu.key === "material"
+                              ? "catalog-material-popover"
+                              : "catalog-discount-popover"
                     : undefined
                 }
                 ref={
                   menu.key === "precio" ? priceTriggerRef
                   : menu.key === "talla" ? sizeTriggerRef
+                  : menu.key === "marcaSlug" ? marcaTriggerRef
                   : menu.key === "color" ? colorTriggerRef
                   : menu.key === "material" ? materialTriggerRef
                   : menu.key === "descuento" ? discountTriggerRef
@@ -1901,6 +1939,57 @@ export default function ProductsPage() {
                 onClick={() => {
                   const discountMenu = filterMenus.find((m) => m.key === "descuento");
                   discountMenu?.onSelect(draftSelectedDiscounts.join(","));
+                }}
+              >
+                Mostrar resultados
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeMenu === "marcaSlug" && marcaPopoverStyle && (
+          <div
+            id="catalog-marca-popover"
+            ref={marcaPopoverRef}
+            className="catalog-price-popover"
+            role="dialog"
+            aria-label="Filtro de marca"
+            style={{
+              top: `${marcaPopoverStyle.top}px`,
+              left: `${marcaPopoverStyle.left}px`,
+              width: `${marcaPopoverStyle.width}px`,
+            }}
+          >
+            <div className="catalog-filter-menu catalog-filter-menu-price">
+              <div className="catalog-checklist-vertical" role="group" aria-label="Marcas disponibles">
+                {marcas.length === 0 ? (
+                  <p className="catalog-size-empty">No hay marcas disponibles.</p>
+                ) : (
+                  marcas.map((brandOption) => {
+                    const selected = draftSelectedMarcas[0] === brandOption.value;
+                    return (
+                      <label key={brandOption.value} className="catalog-size-item">
+                        <input
+                          type="radio"
+                          name="catalog-marca-radio"
+                          checked={selected}
+                          onChange={() => {
+                            setDraftSelectedMarcas(selected ? [] : [brandOption.value]);
+                          }}
+                        />
+                        <span>{brandOption.label}</span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+
+              <button
+                type="button"
+                className="catalog-price-apply"
+                onClick={() => {
+                  const marcaMenu = filterMenus.find((m) => m.key === "marcaSlug");
+                  marcaMenu?.onSelect(draftSelectedMarcas[0] ?? "");
                 }}
               >
                 Mostrar resultados
