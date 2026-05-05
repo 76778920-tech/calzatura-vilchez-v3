@@ -8,6 +8,7 @@ function makeDraft(index: number, color: string): VariantDraft {
     imagenes: [`https://example.com/${color.toLowerCase()}-1.png`, `https://example.com/${color.toLowerCase()}-2.png`],
     tallaStock: { "37": index + 1, "38": index + 2, "39": 0 },
     totalStock: index + 3,
+    activo: true,
   };
 }
 
@@ -59,14 +60,23 @@ describe("buildVariantCreationPlan", () => {
     expect(plan[1].product.tallaStock).toEqual({ "37": 2, "38": 3 });
   });
 
-  it("falla si una variante activa no tiene imagen", () => {
-    const drafts = [
-      {
-        ...makeDraft(0, "Negro"),
-        imagenes: [],
-      },
-    ];
+  it("permite variante sin imágenes — imagen queda vacía pero no lanza error", () => {
+    const drafts = [{ ...makeDraft(0, "Negro"), imagenes: [] }];
+    const plan = buildVariantCreationPlan(base, drafts);
+    expect(plan).toHaveLength(1);
+    expect(plan[0].product.imagen).toBe("");
+    expect(plan[0].product.imagenes).toEqual([]);
+  });
 
-    expect(() => buildVariantCreationPlan(base, drafts)).toThrow(/Color 1: agrega al menos una imagen/i);
+  it("usa descripcion y activo por variante cuando vienen en el draft", () => {
+    const drafts = [
+      { ...makeDraft(0, "Negro"), descripcion: "Negro mate", activo: false },
+      { ...makeDraft(1, "Nude"), descripcion: "   ", activo: true },
+    ];
+    const plan = buildVariantCreationPlan({ ...base, descripcion: "Común", activo: true }, drafts);
+    expect(plan[0].product.descripcion).toBe("Negro mate");
+    expect(plan[0].product.activo).toBe(false);
+    expect(plan[1].product.descripcion).toBe("Común");
+    expect(plan[1].product.activo).toBe(true);
   });
 });
