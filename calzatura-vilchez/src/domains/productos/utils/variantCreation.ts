@@ -31,6 +31,10 @@ export type VariantDraft = {
   imagenes: string[];
   tallaStock: Record<string, number>;
   totalStock: number;
+  /** Texto solo para esta variante; si viene vacío se usa `base.descripcion`. */
+  descripcion?: string;
+  /** Visibilidad en tienda por color; si falta se usa `base.activo`. */
+  activo?: boolean;
 };
 
 type CreationPlanItem = {
@@ -54,16 +58,15 @@ export function buildVariantCreationPlan(
     if (!isValidVariantCode(generatedCode)) {
       throw new Error(`Código inválido para Color ${slot.index + 1}. Reduce el código base.`);
     }
-    if (slot.imagenes.length === 0) {
-      throw new Error(`Color ${slot.index + 1}: agrega al menos una imagen`);
-    }
     const tallaStockFiltered = Object.fromEntries(
       Object.entries(slot.tallaStock).filter(([, qty]) => qty > 0)
     );
+    const descripcionVariante = slot.descripcion?.trim();
+    const descripcionFinal = (descripcionVariante || base.descripcion).trim();
     const product: Omit<Product, "id"> = {
       nombre: base.nombre.trim(),
       precio: base.precio,
-      descripcion: base.descripcion.trim(),
+      descripcion: descripcionFinal,
       imagen: slot.imagenes[0] ?? "",
       imagenes: slot.imagenes,
       stock: slot.totalStock,
@@ -77,6 +80,7 @@ export function buildVariantCreationPlan(
       color: slot.color,
       familiaId: base.familiaId,
       destacado: base.destacado,
+      activo: slot.activo !== undefined ? slot.activo : (base.activo ?? true),
       descuento: base.descuento,
       campana: base.campana,
     };
