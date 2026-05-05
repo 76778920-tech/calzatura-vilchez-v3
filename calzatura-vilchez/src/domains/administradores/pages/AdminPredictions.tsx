@@ -1927,12 +1927,16 @@ export default function AdminPredictions() {
     const withH = predictionsForView.filter(p => !p.sin_historial && p.total_vendido_historico > 0);
     const sorted = [...withH].sort((a, b) => (b.total_vendido_historico * b.precio) - (a.total_vendido_historico * a.precio));
     const totalRev = sorted.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
-    let cum = 0;
-    return sorted.map(p => {
-      cum += p.total_vendido_historico * p.precio;
-      const pct = totalRev > 0 ? cum / totalRev : 0;
-      return { ...p, abc: pct <= 0.80 ? "A" : pct <= 0.95 ? "B" : "C" as "A" | "B" | "C" };
-    });
+    type Entry = (typeof sorted)[0] & { abc: "A" | "B" | "C" };
+    return sorted.reduce<{ items: Entry[]; cum: number }>(
+      ({ items, cum }, p) => {
+        const newCum = cum + p.total_vendido_historico * p.precio;
+        const pct = totalRev > 0 ? newCum / totalRev : 0;
+        const abc = (pct <= 0.80 ? "A" : pct <= 0.95 ? "B" : "C") as "A" | "B" | "C";
+        return { cum: newCum, items: [...items, { ...p, abc }] };
+      },
+      { items: [], cum: 0 }
+    ).items;
   }, [predictionsForView]);
 
   const enRiesgo = predictionsForView.filter((item) => !item.sin_historial && item.alerta_stock).length;
@@ -2019,7 +2023,7 @@ export default function AdminPredictions() {
       lecturaPortafolio,
       recomendacion,
     };
-  }, [altaDemanda, conHistorial, enRiesgo, horizon, productoMotor, promedioCobertura, revenueSummary, riskAlerts, rotacionDebil, sobreStock]);
+  }, [alertDays, altaDemanda, conHistorial, enRiesgo, horizon, productoMotor, promedioCobertura, revenueSummary, riskAlerts, rotacionDebil, sobreStock]);
 
   const distribucionInventario = useMemo(() => {
     const items = [
