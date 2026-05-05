@@ -61,6 +61,18 @@ export const STYLE_OPTIONS = [
   "Weekend",
 ] as const;
 
+/** Estilos presentes en `raw` (CSV), en el orden de `STYLE_OPTIONS`, sin duplicados. */
+export function orderedStyleTokensFromCsv(raw: string | undefined): string[] {
+  const set = new Set((raw ?? "").split(",").map((s) => s.trim()).filter(Boolean));
+  return STYLE_OPTIONS.filter((name) => set.has(name));
+}
+
+/** Valor normalizado para guardar en BD: CSV estable o `undefined` si no hay estilos. */
+export function normalizeEstiloField(raw: string | undefined): string | undefined {
+  const tokens = orderedStyleTokensFromCsv(raw);
+  return tokens.length ? tokens.join(",") : undefined;
+}
+
 const STYLE_ALLOWED_TYPES: Record<string, string[]> = {
   Urbanas: ["Zapatillas"],
   Deportivas: ["Zapatillas"],
@@ -126,10 +138,16 @@ export function validateCommercialProductDraft(draft: CommercialDraft): string[]
   }
 
   if (estilo) {
-    if (!STYLE_OPTIONS.includes(estilo as (typeof STYLE_OPTIONS)[number])) {
-      errors.push("Selecciona un estilo comercial válido.");
-    } else if (!styleIsAllowedForType(tipoCalzado, estilo)) {
-      errors.push("El estilo seleccionado no corresponde al tipo de calzado.");
+    const pieces = estilo.split(",").map((s) => s.trim()).filter(Boolean);
+    for (const piece of pieces) {
+      if (!STYLE_OPTIONS.includes(piece as (typeof STYLE_OPTIONS)[number])) {
+        errors.push(`El estilo "${piece}" no es un valor comercial permitido.`);
+        break;
+      }
+      if (!styleIsAllowedForType(tipoCalzado, piece)) {
+        errors.push(`El estilo "${piece}" no corresponde al tipo de calzado seleccionado.`);
+        break;
+      }
     }
   }
 

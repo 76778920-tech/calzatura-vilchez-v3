@@ -10,7 +10,7 @@ import {
   Truck,
 } from "lucide-react";
 import ProductCard from "@/domains/productos/components/ProductCard";
-import { fetchProducts } from "@/domains/productos/services/products";
+import { fetchPublicProducts } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import { countProductsForCategory, productMatchesAnySearch } from "@/utils/catalog";
 import { buildCatalogHref, buildCyberCatalogHref } from "@/routes/catalogRouting";
@@ -233,7 +233,7 @@ export default function HomePage() {
   useEffect(() => {
     let isMounted = true;
 
-    fetchProducts()
+    fetchPublicProducts()
       .then((nextProducts) => {
         if (!isMounted) return;
         setProducts(nextProducts);

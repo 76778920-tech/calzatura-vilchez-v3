@@ -12,7 +12,7 @@ import {
   ChevronRight,
   Maximize2,
 } from "lucide-react";
-import { fetchProductById, fetchRelatedProductsInFamily } from "@/domains/productos/services/products";
+import { fetchPublicProductById, fetchRelatedProductsInFamily } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { getProductColors } from "@/utils/colors";
@@ -38,7 +38,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    fetchProductById(id)
+    fetchPublicProductById(id)
       .then(async (p) => {
         setProduct(p);
         setSelectedImageIndex(0);

@@ -2,11 +2,11 @@
  * E2E: admin predicciones → tarjeta IRE y sparkline
  *
  * Semáforo:
- *   🔴 TC-IRE-001: la tarjeta IRE muestra score, nivel y dimensiones
- *   🔴 TC-IRE-002: el sparkline "Evolución IRE" se renderiza con datos históricos
- *   🟡 TC-IRE-003: la tarjeta IRE proyectado aparece cuando hay datos de proyección
- *   🟡 TC-IRE-004: el nivel del IRE proyectado refleja el campo nivel de la respuesta
- *   🟢 TC-IRE-005: sin datos de IRE no hay tarjeta hero visible
+ *   🟢 TC-IRE-001: la tarjeta IRE muestra score, nivel y dimensiones — VERIFICADO
+ *   🟢 TC-IRE-002: el sparkline "Evolución IRE" se renderiza con datos históricos — VERIFICADO
+ *   🟢 TC-IRE-003: la tarjeta IRE proyectado aparece cuando hay datos de proyección — VERIFICADO
+ *   🟢 TC-IRE-004: el nivel del IRE proyectado refleja el campo nivel de la respuesta — VERIFICADO
+ *   🟢 TC-IRE-005: sin datos de IRE no hay tarjeta hero visible — VERIFICADO
  *
  * Estrategia: mockear /api/predict/combined con respuestas controladas que
  * incluyan el bloque `ire` y `ire_proyectado`. Se usa injectFakeAdminAuth.

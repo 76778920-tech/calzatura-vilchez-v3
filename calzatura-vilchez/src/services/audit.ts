@@ -37,7 +37,7 @@ export async function logAudit(
 ): Promise<void> {
   try {
     const user = auth.currentUser;
-    await supabase.from("auditoria").insert({
+    const { error: dbError } = await supabase.from("auditoria").insert({
       accion,
       entidad,
       entidadId,
@@ -47,8 +47,10 @@ export async function logAudit(
       usuarioEmail: user?.email ?? null,
       realizadoEn: new Date().toISOString(),
     });
+    if (dbError) {
+      console.error("[audit] logAudit falló silenciosamente:", dbError);
+    }
   } catch (err) {
-    // La auditoría nunca debe interrumpir la operación principal, pero sí registrar el fallo
     console.error("[audit] logAudit falló silenciosamente:", err);
   }
 }

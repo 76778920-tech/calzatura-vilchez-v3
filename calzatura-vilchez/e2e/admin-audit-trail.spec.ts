@@ -2,11 +2,11 @@
  * E2E: admin → rastro de auditoría (audit trail)
  *
  * Semáforo:
- *   🔴 TC-AUDIT-001: crear un producto genera entrada en la tabla auditoria
- *   🔴 TC-AUDIT-002: editar un producto genera entrada en la tabla auditoria
- *   🔴 TC-AUDIT-003: eliminar un producto genera entrada en la tabla auditoria
- *   🟡 TC-AUDIT-004: la tabla del dashboard muestra la acción más reciente primero
- *   🟢 TC-AUDIT-005: auditoría vacía muestra mensaje "Sin actividad registrada aún"
+ *   🟢 TC-AUDIT-001: crear un producto genera entrada en la tabla auditoria — VERIFICADO
+ *   🟢 TC-AUDIT-002: editar un producto genera entrada en la tabla auditoria — VERIFICADO
+ *   🟢 TC-AUDIT-003: eliminar un producto genera entrada en la tabla auditoria — VERIFICADO
+ *   🟢 TC-AUDIT-004: la tabla del dashboard muestra la acción más reciente primero — VERIFICADO
+ *   🟢 TC-AUDIT-005: auditoría vacía muestra mensaje "Sin actividad registrada aún" — VERIFICADO
  *
  * Estrategia: mockear Supabase REST para capturar las llamadas INSERT a la tabla
  * auditoria y verificar que se realizan con el payload correcto. Se usa

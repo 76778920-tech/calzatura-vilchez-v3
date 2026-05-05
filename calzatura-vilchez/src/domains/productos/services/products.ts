@@ -25,6 +25,13 @@ export async function fetchProductById(id: string): Promise<Product | null> {
   return data as Product;
 }
 
+/** Ficha en tienda pública: solo existe si el producto está visible (`activo`). */
+export async function fetchPublicProductById(id: string): Promise<Product | null> {
+  const { data, error } = await supabase.from(COL).select("*").eq("id", id).eq("activo", true).maybeSingle();
+  if (error) return null;
+  return (data as Product) ?? null;
+}
+
 /** Otros productos de la misma familia (otros colores), excluyendo el actual. */
 export async function fetchRelatedProductsInFamily(product: Pick<Product, "id" | "familiaId">): Promise<Product[]> {
   const key = effectiveFamiliaKey(product);
@@ -34,9 +41,9 @@ export async function fetchRelatedProductsInFamily(product: Pick<Product, "id" |
   return ((data ?? []) as Product[]).filter((row) => row.id !== product.id);
 }
 
-/** Recuento por clave de familia en todo el catálogo (para badges en listados). */
+/** Recuento por clave de familia solo entre productos visibles en tienda (badges en catálogo público). */
 export async function fetchProductFamilyGroupCounts(): Promise<Record<string, number>> {
-  const { data, error } = await supabase.from(COL).select("id, familiaId");
+  const { data, error } = await supabase.from(COL).select("id, familiaId").eq("activo", true);
   if (error) throw error;
   return tallyFamilyGroupSizes((data ?? []) as Pick<Product, "id" | "familiaId">[]);
 }
@@ -47,6 +54,17 @@ export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
   const { data, error } = await supabase.from(COL).select("*").in("id", uniqueIds);
   if (error) throw error;
   return data as Product[];
+}
+
+/** Misma idea que `fetchProductsByIds`, pero solo variantes visibles en tienda (p. ej. favoritos). */
+export async function fetchPublicProductsByIds(ids: string[]): Promise<Product[]> {
+  const uniqueIds = Array.from(new Set(ids)).filter(Boolean);
+  if (!uniqueIds.length) return [];
+  const { data, error } = await supabase.from(COL).select("*").in("id", uniqueIds).eq("activo", true);
+  if (error) throw error;
+  const rows = (data ?? []) as Product[];
+  const byId = new Map(rows.map((p) => [p.id, p]));
+  return uniqueIds.map((id) => byId.get(id)).filter((p): p is Product => Boolean(p));
 }
 
 export async function fetchProductsByCategory(categoria: string): Promise<Product[]> {

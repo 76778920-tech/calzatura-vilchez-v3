@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import ProductCard from "@/domains/productos/components/ProductCard";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { fetchFavoriteProductIds } from "@/domains/clientes/services/favorites";
-import { fetchProductsByIds } from "@/domains/productos/services/products";
+import { fetchPublicProductsByIds } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import toast from "react-hot-toast";
 
@@ -32,7 +32,7 @@ export default function FavoritesPage() {
     const timer = window.setTimeout(() => {
       setLoading(true);
       fetchFavoriteProductIds(user.uid)
-        .then((ids) => fetchProductsByIds(ids))
+        .then((ids) => fetchPublicProductsByIds(ids))
         .then((favoriteProducts) => {
           if (active) setProducts(favoriteProducts);
         })

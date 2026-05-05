@@ -2,10 +2,10 @@
  * E2E: catálogo → filtro por marca (popover)
  *
  * Semáforo:
- *   🔴 TC-MARCA-001: El botón de marca abre un popover con opciones
- *   🔴 TC-MARCA-002: Seleccionar una marca actualiza el parámetro de URL ?marcaSlug=
- *   🟡 TC-MARCA-003: El facet activo aparece como chip en la barra de filtros
- *   🟢 TC-MARCA-004: Limpiar el chip de marca borra el filtro de URL
+ *   🟢 TC-MARCA-001: El botón de marca abre un popover con opciones — VERIFICADO
+ *   🟢 TC-MARCA-002: Seleccionar una marca actualiza el parámetro de URL ?marcaSlug= — VERIFICADO
+ *   🟢 TC-MARCA-003: El facet activo aparece como chip en la barra de filtros — VERIFICADO
+ *   🟢 TC-MARCA-004: Limpiar el chip de marca borra el filtro de URL — VERIFICADO
  *
  * Estrategia: se mockea /rest/v1/productos para entregar un catálogo controlado
  * con dos marcas conocidas, de modo que los tests no dependan de datos reales.

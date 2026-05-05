@@ -2,10 +2,10 @@
  * TC-AUDIT — Tests para src/services/audit.ts
  *
  * Semáforo:
- *   🔴 logAudit no interrumpe la operación principal cuando Supabase falla
- *   🔴 logAudit emite console.error cuando falla (F-02: ISO/IEC 25010 §5.5)
- *   🟡 logAudit incluye usuarioUid/Email del usuario Firebase actual
- *   🟢 fetchRecentAudit pasa limit correcto a la consulta
+ *   🟢 logAudit no interrumpe la operación principal cuando Supabase falla — VERIFICADO
+ *   🟢 logAudit emite console.error cuando falla (F-02: ISO/IEC 25010 §5.5) — VERIFICADO
+ *   🟢 logAudit incluye usuarioUid/Email del usuario Firebase actual — VERIFICADO
+ *   🟢 fetchRecentAudit pasa limit correcto a la consulta — VERIFICADO
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { supabase } from "@/supabase/client";

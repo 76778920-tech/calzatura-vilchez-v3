@@ -21,7 +21,7 @@ import {
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { logoutUser } from "@/domains/usuarios/services/auth";
-import { fetchProducts } from "@/domains/productos/services/products";
+import { fetchPublicProducts } from "@/domains/productos/services/products";
 import { useThemeMode } from "@/hooks/useThemeMode";
 import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 import {
@@ -766,7 +766,7 @@ export default function Header() {
   }, [location.pathname, location.search, searchParams]);
 
   useEffect(() => {
-    fetchProducts()
+    fetchPublicProducts()
       .then(setProducts)
       .catch(() => setProducts([]));
   }, []);

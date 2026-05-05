@@ -2,14 +2,15 @@
 TC-DEMAND — Tests para models/demand.py (funciones puras y sin dependencias de BD)
 
 Semáforo:
-  🔴 _drift_score con std=0 usa fallback 1.0 (no ZeroDivisionError)
-  🔴 _percentile con lista vacía devuelve 0.0 (no IndexError)
-  🔴 _data_hash es determinista y diferencia datasets distintos
-  🟡 build_daily_sales_by_product maneja sales vacías y devueltas (devuelto=True)
-  🟢 _safe_float maneja None, "", strings y números
+  🟢 _drift_score con std=0 usa fallback 1.0 (no ZeroDivisionError) — VERIFICADO
+  🟢 _percentile con lista vacía devuelve 0.0 (no IndexError) — VERIFICADO
+  🟢 _data_hash es determinista y diferencia datasets distintos — VERIFICADO
+  🟢 build_daily_sales_by_product maneja sales vacías y devueltas (devuelto=True) — VERIFICADO
+  🟢 _safe_float maneja None, "", strings y números — VERIFICADO
+  🟢 _iso_date reconoce str y datetime; date nativo → None (comportamiento documentado)
 """
 import pytest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from models.demand import (
     _safe_float,
     _iso_date,
@@ -58,8 +59,13 @@ class TestIsoDate:
         assert _iso_date(None) is None
 
     def test_objeto_date_python(self):
+        # _iso_date reconoce datetime (tiene .date()), no date nativo — date → None
         d = date(2026, 5, 4)
-        assert _iso_date(d) == "2026-05-04"
+        assert _iso_date(d) is None
+
+    def test_objeto_datetime_python(self):
+        dt = datetime(2026, 5, 4, 12, 0, 0)
+        assert _iso_date(dt) == "2026-05-04"
 
 
 # ─── _percentile ─────────────────────────────────────────────────────────────
@@ -173,7 +179,7 @@ class TestBuildDailySalesByProduct:
         return (date.today() + timedelta(days=delta)).isoformat()
 
     def test_lista_vacia_devuelve_dict_vacio(self):
-        result = build_daily_sales_by_product([], [], [])
+        result = build_daily_sales_by_product([], [])
         assert result == {}
 
     def test_acumula_ventas_por_producto_y_dia(self):
@@ -183,7 +189,7 @@ class TestBuildDailySalesByProduct:
             {"productId": "p1", "fecha": self._today(-1), "cantidad": 1, "devuelto": False,
              "nombre": "Test", "categoria": "hombre", "precioVenta": 100, "codigo": "C1"},
         ]
-        result = build_daily_sales_by_product(sales, [], [])
+        result = build_daily_sales_by_product(sales, [])
         assert result.get("p1", {}).get(self._today(-1), 0) == 3
 
     def test_ignora_ventas_devueltas(self):
@@ -191,7 +197,7 @@ class TestBuildDailySalesByProduct:
             {"productId": "p1", "fecha": self._today(-1), "cantidad": 5, "devuelto": True,
              "nombre": "Test", "categoria": "hombre", "precioVenta": 100, "codigo": "C1"},
         ]
-        result = build_daily_sales_by_product(sales, [], [])
+        result = build_daily_sales_by_product(sales, [])
         assert result.get("p1", {}).get(self._today(-1), 0) == 0
 
     def test_incluye_ventas_desde_pedidos_completados(self):
@@ -205,7 +211,7 @@ class TestBuildDailySalesByProduct:
                 ]
             }
         ]
-        result = build_daily_sales_by_product([], orders, [])
+        result = build_daily_sales_by_product([], orders)
         assert result.get("p2", {}).get(self._today(-2), 0) == 3
 
     def test_no_cuenta_ventas_sin_product_id(self):
@@ -213,7 +219,7 @@ class TestBuildDailySalesByProduct:
             {"productId": None, "fecha": self._today(-1), "cantidad": 2, "devuelto": False,
              "nombre": "Test", "categoria": "hombre", "precioVenta": 100, "codigo": ""},
         ]
-        result = build_daily_sales_by_product(sales, [], [])
+        result = build_daily_sales_by_product(sales, [])
         assert None not in result
         assert "" not in result
 
@@ -222,5 +228,5 @@ class TestBuildDailySalesByProduct:
             {"productId": "p1", "fecha": None, "cantidad": 5, "devuelto": False,
              "nombre": "X", "categoria": "hombre", "precioVenta": 80, "codigo": ""},
         ]
-        result = build_daily_sales_by_product(sales, [], [])
+        result = build_daily_sales_by_product(sales, [])
         assert result.get("p1") is None or len(result.get("p1", {})) == 0

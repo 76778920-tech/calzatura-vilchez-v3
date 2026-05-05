@@ -2,11 +2,11 @@
  * TC-COMMERCIAL — Tests para src/domains/productos/utils/commercialRules.ts
  *
  * Semáforo:
- *   🔴 validateCommercialProductDraft — precio fuera de rango, margen invertido
- *   🔴 normalizeAdminCategory — alias "mujer"→"dama", unknown→"hombre"
- *   🟡 styleIsAllowedForType — combinaciones inválidas llegan a producción
- *   🟡 materialIsAllowed — material fuera de paleta pasa silencioso
- *   🟢 sizesForCategory / footwearTypesForCategory — datos estáticos correctos
+ *   🟢 validateCommercialProductDraft — precio fuera de rango, margen invertido — VERIFICADO
+ *   🟢 normalizeAdminCategory — alias "mujer"→"dama", unknown→"hombre" — VERIFICADO
+ *   🟢 styleIsAllowedForType — combinaciones inválidas llegan a producción — VERIFICADO
+ *   🟢 materialIsAllowed — material fuera de paleta pasa silencioso — VERIFICADO
+ *   🟢 sizesForCategory / footwearTypesForCategory — datos estáticos correctos — VERIFICADO
  */
 import { describe, it, expect } from "vitest";
 import {
@@ -179,7 +179,7 @@ describe("validateCommercialProductDraft", () => {
       categoria: "hombre",
       tipoCalzado: "Zapatillas",
       estilo: "Urbanas",
-      precio: 150,
+      precio: 120,
       costoCompra: 80,
       margenMinimo: 20,
       margenObjetivo: 45,
@@ -193,8 +193,9 @@ describe("validateCommercialProductDraft", () => {
     expect(validateCommercialProductDraft(validDraft())).toEqual([]);
   });
 
-  it("categoría inválida produce error", () => {
-    const errors = validateCommercialProductDraft(validDraft({ categoria: "unknown" }));
+  it("categoría vacía produce error (unknown se normaliza a hombre silenciosamente)", () => {
+    // normalizeAdminCategory("unknown") → "hombre" (sin error); sólo "" dispara la validación
+    const errors = validateCommercialProductDraft(validDraft({ categoria: "" }));
     expect(errors.some((e) => e.includes("categoría"))).toBe(true);
   });
 

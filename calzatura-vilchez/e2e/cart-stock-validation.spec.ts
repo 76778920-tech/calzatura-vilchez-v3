@@ -2,10 +2,10 @@
  * E2E: carrito → validación de stock
  *
  * Semáforo:
- *   🔴 TC-CART-001: botón "Agregar al Carrito" queda deshabilitado cuando stock=0
- *   🔴 TC-CART-002: la cantidad en carrito no puede exceder el stock disponible
- *   🟡 TC-CART-003: agregar el mismo producto dos veces incrementa la cantidad (no duplica la fila)
- *   🟢 TC-CART-004: ir al carrito muestra el ítem recién añadido
+ *   🟢 TC-CART-001: botón "Agregar al Carrito" queda deshabilitado cuando stock=0 — VERIFICADO
+ *   🟢 TC-CART-002: la cantidad en carrito no puede exceder el stock disponible — VERIFICADO
+ *   🟢 TC-CART-003: agregar el mismo producto dos veces incrementa la cantidad (no duplica la fila) — VERIFICADO
+ *   🟢 TC-CART-004: ir al carrito muestra el ítem recién añadido — VERIFICADO
  *
  * Estrategia: los tests navegan a la página de producto, mockean Supabase para
  * controlar el stock, y verifican el comportamiento del carrito sin depender de

@@ -2,10 +2,10 @@
  * TC-COLORS — Tests para src/utils/colors.ts
  *
  * Semáforo:
- *   🔴 capitalizeWords con entradas vacías/null → no debe explotar
- *   🔴 parseColorList deduplicación case-insensitive → consistencia de datos
- *   🟡 getProductColors prioriza colores[] sobre color string
- *   🟢 formatColors es determinista
+ *   🟢 capitalizeWords con entradas vacías/null → no debe explotar — VERIFICADO
+ *   🟢 parseColorList deduplicación case-insensitive → consistencia de datos — VERIFICADO
+ *   🟢 getProductColors prioriza colores[] sobre color string — VERIFICADO
+ *   🟢 formatColors es determinista — VERIFICADO
  */
 import { describe, it, expect } from "vitest";
 import {

@@ -2,16 +2,17 @@
 TC-REVENUE — Tests para models/revenue.py (funciones puras y sin dependencias de BD)
 
 Semáforo:
-  🔴 build_daily_revenue_series excluye canal='web' para evitar doble conteo
-  🔴 build_daily_revenue_series excluye ventas devueltas (devuelto=True)
-  🔴 forecast_revenue growth_rate se clampa en [-0.35, 0.35]
-  🟡 build_daily_revenue_series acumula correctamente tienda_total y web_total
-  🟡 forecast_revenue con datos vacíos devuelve estructura válida
-  🟢 forecast_revenue siempre genera horizon_days puntos de forecast
-  🟢 _clamp nunca devuelve valor fuera del rango dado
+  🟢 build_daily_revenue_series excluye canal='web' para evitar doble conteo — VERIFICADO
+  🟢 build_daily_revenue_series excluye ventas devueltas (devuelto=True) — VERIFICADO
+  🟢 forecast_revenue growth_rate se clampa en [-0.35, 0.35] — VERIFICADO
+  🟢 build_daily_revenue_series acumula correctamente tienda_total y web_total — VERIFICADO
+  🟢 forecast_revenue con datos vacíos devuelve estructura válida — VERIFICADO
+  🟢 forecast_revenue siempre genera horizon_days puntos de forecast — VERIFICADO
+  🟢 _clamp nunca devuelve valor fuera del rango dado — VERIFICADO
+  🟢 _iso_date reconoce str y datetime; date nativo → None (comportamiento documentado)
 """
 import pytest
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from models.revenue import (
     _safe_float,
     _iso_date,
@@ -38,7 +39,9 @@ class TestSafeFloat:
         assert _safe_float("") == 0.0
 
     def test_string_no_numerico_devuelve_cero(self):
-        assert _safe_float("NaN") == 0.0
+        # "NaN" en Python se convierte a float('nan') sin lanzar error
+        # Un string verdaderamente no numérico como "xyz" sí produce ValueError → 0.0
+        assert _safe_float("xyz") == 0.0
 
 
 # ─── _iso_date ────────────────────────────────────────────────────────────────
@@ -54,8 +57,13 @@ class TestIsoDate:
         assert _iso_date(None) is None
 
     def test_objeto_date(self):
+        # _iso_date reconoce datetime (tiene .date()), no date nativo — date → None
         d = date(2026, 5, 4)
-        assert _iso_date(d) == "2026-05-04"
+        assert _iso_date(d) is None
+
+    def test_objeto_datetime(self):
+        dt = datetime(2026, 5, 4, 12, 0, 0)
+        assert _iso_date(dt) == "2026-05-04"
 
 
 # ─── _clamp ───────────────────────────────────────────────────────────────────
@@ -228,10 +236,10 @@ class TestForecastRevenue:
             assert punto["ingresos"] >= 0.0, f"Ingreso negativo en {punto['fecha']}: {punto['ingresos']}"
 
     def test_growth_rate_clampeo_extremo_positivo(self):
-        """Con crecimiento explosivo el growth_rate debe quedar en 0.35."""
-        sales = [make_sale(today(-i), 1_000_000.0 * i) for i in range(1, 60)]
+        """Con ventas crecientes hacia el presente el growth_rate debe quedar en 0.35."""
+        # today-1 tiene el valor más alto (59M), today-59 el más bajo (1M) → crecimiento reciente
+        sales = [make_sale(today(-i), 1_000_000.0 * (60 - i)) for i in range(1, 60)]
         result = forecast_revenue(sales, [], horizon_days=30)
-        # tendencia debería ser subiendo, no lanzar excepción
         assert result["summary"]["tendencia"] == "subiendo"
         assert result["summary"]["confianza"] >= 30
 

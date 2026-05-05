@@ -35,16 +35,21 @@ import { sumSizeStock } from "@/utils/stock";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import {
   compressImageFile,
+  isCloudinaryImageUrl,
   normalizeCloudinaryImageUrl,
   uploadImageToCloudinary,
 } from "@/domains/administradores/services/cloudinary";
 import {
   CATEGORIAS,
   MATERIAL_PRESETS,
+  STYLE_OPTIONS,
   describeCommercialDraftError,
   footwearTypesForCategory,
   normalizeAdminCategory,
+  normalizeEstiloField,
+  orderedStyleTokensFromCsv,
   sizesForCategory,
+  validateCommercialProductDraft,
 } from "@/domains/productos/utils/commercialRules";
 import { buildVariantCreationPlan, isValidVariantCode, normalizeVariantCode } from "@/domains/productos/utils/variantCreation";
 import { IMAGE_RULES, imageValidationMessage, validateImageFile, validateImageUrlDimensions } from "@/domains/productos/utils/imageRules";
@@ -63,6 +68,9 @@ type VariantSlot = {
   color: string;
   imagenes: string[];
   tallaStock: Record<string, number>;
+  /** Descripción solo para esta variante; vacío → se usa la descripción común del formulario. */
+  descripcion: string;
+  activo: boolean;
 };
 
 const LOW_STOCK_LIMIT = 5;
@@ -171,6 +179,8 @@ function createVariantSlots(category: string): VariantSlot[] {
     color: "",
     imagenes: normalizeImageSlots(),
     tallaStock: createEmptyStockForCategory(category),
+    descripcion: "",
+    activo: true,
   }));
 }
 
@@ -194,11 +204,13 @@ export default function AdminProducts() {
   const [featuredFilter, setFeaturedFilter] = useState<FeaturedFilter>("todos");
   const [previewImage, setPreviewImage] = useState<{ src: string; title: string; subtitle?: string } | null>(null);
   const [colorPaletteOpen, setColorPaletteOpen] = useState(false);
+  const [estiloSelectOpen, setEstiloSelectOpen] = useState(false);
   const [activeColorSlot, setActiveColorSlot] = useState<number | null>(null);
   const [isDraggingVariants, setIsDraggingVariants] = useState(false);
   const [popoverAbove, setPopoverAbove] = useState(false);
   const fileInputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const colorPaletteRef = useRef<HTMLDivElement | null>(null);
+  const estiloSelectRef = useRef<HTMLDivElement | null>(null);
   const activeColorSlotRef = useRef<HTMLDivElement | null>(null);
   const variantsCarouselRef = useRef<HTMLDivElement | null>(null);
   const modalRef = useRef<HTMLDivElement | null>(null);
@@ -241,6 +253,16 @@ export default function AdminProducts() {
   }, [colorPaletteOpen]);
 
   useEffect(() => {
+    if (!estiloSelectOpen) return undefined;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (estiloSelectRef.current?.contains(event.target as Node)) return;
+      setEstiloSelectOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [estiloSelectOpen]);
+
+  useEffect(() => {
     if (activeColorSlot === null) return undefined;
     const handlePointerDown = (event: MouseEvent) => {
       if (activeColorSlotRef.current?.contains(event.target as Node)) return;
@@ -269,6 +291,7 @@ export default function AdminProducts() {
   }, [showModal]);
 
   const closeModal = () => {
+    setEstiloSelectOpen(false);
     setShowModal(false);
     window.setTimeout(() => triggerRef.current?.focus(), 0);
   };
@@ -390,6 +413,19 @@ export default function AdminProducts() {
     () => variantSlots.reduce((sum, slot) => sum + sumSizeStock(slot.tallaStock), 0),
     [variantSlots]
   );
+  const isMultiColorCreate = !editingId && variantSlots.some((s) => Boolean(s.color));
+  const estiloChipTokens = useMemo(() => orderedStyleTokensFromCsv(form.estilo), [form.estilo]);
+  const estiloSummaryLabel = estiloChipTokens.length === 0 ? "Sin estilo" : estiloChipTokens.join(", ");
+  const toggleEstiloOption = (opt: (typeof STYLE_OPTIONS)[number]) => {
+    const next = new Set(estiloChipTokens);
+    if (next.has(opt)) next.delete(opt);
+    else next.add(opt);
+    const nextOrdered = STYLE_OPTIONS.filter((name) => next.has(name));
+    setForm({
+      ...form,
+      estilo: nextOrdered.length ? nextOrdered.join(",") : undefined,
+    });
+  };
   const currentSizes = sizesForCategory(form.categoria);
   const currentFootwearTypes = footwearTypesForCategory(form.categoria);
 
@@ -407,7 +443,13 @@ export default function AdminProducts() {
       prev.map((slot, i) => {
         if (i === slotIndex) return { ...slot, color: normalizedColor };
         if (i > slotIndex && !normalizedColor)
-          return { color: "", imagenes: normalizeImageSlots(), tallaStock: createEmptyStockForCategory(form.categoria) };
+          return {
+            color: "",
+            imagenes: normalizeImageSlots(),
+            tallaStock: createEmptyStockForCategory(form.categoria),
+            descripcion: "",
+            activo: true,
+          };
         return slot;
       })
     );
@@ -418,6 +460,7 @@ export default function AdminProducts() {
     triggerRef.current = document.activeElement as HTMLElement;
     setEditingId(null);
     setColorPaletteOpen(false);
+    setEstiloSelectOpen(false);
     setActiveColorSlot(null);
     const categoria = EMPTY_FORM.categoria;
     setForm({ ...EMPTY_FORM, imagenes: normalizeImageSlots(), tallaStock: createEmptyStockForCategory(categoria) });
@@ -434,6 +477,7 @@ export default function AdminProducts() {
 
     setEditingId(product.id);
     setColorPaletteOpen(false);
+    setEstiloSelectOpen(false);
     setActiveColorSlot(null);
     setVariantSlots(createVariantSlots(categoria));
     setForm({
@@ -468,6 +512,7 @@ export default function AdminProducts() {
 
     setEditingId(null);
     setColorPaletteOpen(false);
+    setEstiloSelectOpen(false);
     setActiveColorSlot(null);
     setVariantSlots(createVariantSlots(categoria));
     setForm({
@@ -548,10 +593,12 @@ export default function AdminProducts() {
       return;
     }
     updateImageUrl(index, normalized);
-    const dimError = await validateImageUrlDimensions(normalized);
-    if (dimError) {
-      updateImageUrl(index, "");
-      toast.error(imageValidationMessage(dimError));
+    if (isCloudinaryImageUrl(normalized)) {
+      const dimError = await validateImageUrlDimensions(normalized);
+      if (dimError) {
+        updateImageUrl(index, "");
+        toast.error(imageValidationMessage(dimError));
+      }
     }
   };
 
@@ -589,10 +636,12 @@ export default function AdminProducts() {
       return;
     }
     updateVariantSlotImageUrl(slotIndex, imageIndex, normalized);
-    const dimError = await validateImageUrlDimensions(normalized);
-    if (dimError) {
-      updateVariantSlotImageUrl(slotIndex, imageIndex, "");
-      toast.error(imageValidationMessage(dimError));
+    if (isCloudinaryImageUrl(normalized)) {
+      const dimError = await validateImageUrlDimensions(normalized);
+      if (dimError) {
+        updateVariantSlotImageUrl(slotIndex, imageIndex, "");
+        toast.error(imageValidationMessage(dimError));
+      }
     }
   };
 
@@ -727,6 +776,23 @@ export default function AdminProducts() {
       return;
     }
 
+    const estiloNorm = normalizeEstiloField(form.estilo);
+    const commercialErrors = validateCommercialProductDraft({
+      categoria: form.categoria,
+      tipoCalzado: form.tipoCalzado,
+      estilo: estiloNorm,
+      precio: form.precio,
+      costoCompra: form.costoCompra,
+      margenMinimo: form.margenMinimo,
+      margenObjetivo: form.margenObjetivo,
+      margenMaximo: form.margenMaximo,
+      material: form.material,
+    });
+    if (commercialErrors.length > 0) {
+      toast.error(commercialErrors[0]);
+      return;
+    }
+
     setSaving(true);
     try {
       const familiaId =
@@ -767,7 +833,7 @@ export default function AdminProducts() {
           tallaStock: Object.fromEntries(Object.entries(tallaStock).filter(([, qty]) => qty > 0)),
           marca: form.marca.trim(),
           material: form.material?.trim() || undefined,
-          estilo: form.estilo?.trim() || undefined,
+          estilo: normalizeEstiloField(form.estilo),
           color,
           familiaId,
           destacado: form.destacado,
@@ -786,7 +852,15 @@ export default function AdminProducts() {
               .filter(Boolean);
             const tallaStock = filterStockByCategory(slot.tallaStock, form.categoria);
             const totalStock = sumSizeStock(tallaStock);
-            return { index, color, imagenes, tallaStock, totalStock };
+            return {
+              index,
+              color,
+              imagenes,
+              tallaStock,
+              totalStock,
+              descripcion: slot.descripcion,
+              activo: slot.activo,
+            };
           })
           .filter((slot) => slot.color || slot.imagenes.length > 0 || slot.totalStock > 0);
 
@@ -827,7 +901,7 @@ export default function AdminProducts() {
             tipoCalzado: form.tipoCalzado,
             marca: form.marca,
             material: form.material,
-            estilo: form.estilo,
+            estilo: normalizeEstiloField(form.estilo),
             destacado: form.destacado,
             activo: form.activo ?? true,
             descuento: form.descuento,
@@ -1250,6 +1324,37 @@ export default function AdminProducts() {
                                     </div>
                                   ))}
                                 </div>
+                                <details className="admin-variant-details">
+                                  <summary>Texto y visibilidad ({slot.color})</summary>
+                                  <div className="admin-variant-details-body">
+                                    <label className="checkbox-label admin-variant-details-check">
+                                      <input
+                                        type="checkbox"
+                                        checked={slot.activo}
+                                        onChange={(event) =>
+                                          updateVariantSlot(slotIndex, (s) => ({ ...s, activo: event.target.checked }))
+                                        }
+                                      />
+                                      Visible en tienda (solo este color)
+                                    </label>
+                                    <label className="admin-variant-details-label" htmlFor={`variant-desc-${slotIndex}`}>
+                                      Descripción del color
+                                    </label>
+                                    <textarea
+                                      id={`variant-desc-${slotIndex}`}
+                                      value={slot.descripcion}
+                                      onChange={(event) =>
+                                        updateVariantSlot(slotIndex, (s) => ({ ...s, descripcion: event.target.value }))
+                                      }
+                                      rows={2}
+                                      className="form-input admin-variant-details-textarea"
+                                      placeholder="Tonos, material visible en este color, combinaciones…"
+                                    />
+                                    <p className="admin-variant-details-hint">
+                                      Si lo dejas vacío, se usará la descripción común del final del formulario.
+                                    </p>
+                                  </div>
+                                </details>
                               </div>
                             );
                           })}
@@ -1407,20 +1512,39 @@ export default function AdminProducts() {
                       </select>
                     </div>
                     <div className="form-group">
-                      <label>Estilo</label>
-                      <select
-                        value={form.estilo ?? ""}
-                        onChange={(event) => setForm({ ...form, estilo: event.target.value || undefined })}
-                        className="form-input"
-                      >
-                        <option value="">Sin estilo</option>
-                        <option value="Urbanas">Urbanas</option>
-                        <option value="Deportivas">Deportivas</option>
-                        <option value="Casuales">Casuales</option>
-                        <option value="Outdoor">Outdoor</option>
-                        <option value="Ejecutivo">Ejecutivo</option>
-                        <option value="Weekend">Weekend</option>
-                      </select>
+                      <label id="admin-estilo-label">Estilo</label>
+                      <div className="admin-estilo-dropdown" ref={estiloSelectRef}>
+                        <button
+                          type="button"
+                          className={`admin-estilo-dropdown-trigger${estiloSelectOpen ? " active" : ""}`}
+                          aria-haspopup="listbox"
+                          aria-expanded={estiloSelectOpen}
+                          aria-labelledby="admin-estilo-label"
+                          onClick={() => setEstiloSelectOpen((o) => !o)}
+                        >
+                          <span className="admin-estilo-dropdown-value">{estiloSummaryLabel}</span>
+                          <ChevronDown size={18} aria-hidden />
+                        </button>
+                        {estiloSelectOpen && (
+                          <div
+                            className="admin-estilo-dropdown-panel"
+                            role="listbox"
+                            aria-multiselectable="true"
+                            aria-labelledby="admin-estilo-label"
+                          >
+                            {STYLE_OPTIONS.map((opt) => (
+                              <label key={opt} className="admin-estilo-check-row" role="option" aria-selected={estiloChipTokens.includes(opt)}>
+                                <input
+                                  type="checkbox"
+                                  checked={estiloChipTokens.includes(opt)}
+                                  onChange={() => toggleEstiloOption(opt)}
+                                />
+                                <span>{opt}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div className="form-group">
                       <label>Precio (S/) *</label>
@@ -1670,25 +1794,42 @@ export default function AdminProducts() {
                       />
                       Producto destacado
                     </label>
-                    <label className="checkbox-label" style={{ alignSelf: "flex-end", paddingBottom: "0.5rem" }}>
-                      <input
-                        type="checkbox"
-                        checked={form.activo ?? true}
-                        onChange={(event) => setForm({ ...form, activo: event.target.checked })}
-                      />
-                      Visible en tienda
-                    </label>
+                    {(editingId || !isMultiColorCreate) && (
+                      <label className="checkbox-label" style={{ alignSelf: "flex-end", paddingBottom: "0.5rem" }}>
+                        <input
+                          type="checkbox"
+                          checked={form.activo ?? true}
+                          onChange={(event) => setForm({ ...form, activo: event.target.checked })}
+                        />
+                        Visible en tienda
+                      </label>
+                    )}
                   </div>
 
+                  {isMultiColorCreate && (
+                    <p className="admin-help-text" style={{ marginTop: "-0.25rem", marginBottom: "0.35rem" }}>
+                      La visibilidad en tienda es por color: en la columna <strong>Variantes</strong>, abre <strong>Texto y visibilidad</strong> en cada tarjeta.
+                    </p>
+                  )}
+
                   <div className="form-group">
-                    <label>Descripción</label>
+                    <label>{isMultiColorCreate ? "Descripción común (respaldo)" : "Descripción"}</label>
                     <textarea
                       value={form.descripcion}
                       onChange={(event) => setForm({ ...form, descripcion: event.target.value })}
-                      rows={3}
+                      rows={isMultiColorCreate ? 2 : 3}
                       className="form-input"
-                      placeholder="Material, acabado, ocasión de uso..."
+                      placeholder={
+                        isMultiColorCreate
+                          ? "Se aplica a los colores que no tengan texto propio…"
+                          : "Material, acabado, ocasión de uso..."
+                      }
                     />
+                    {isMultiColorCreate && (
+                      <small className="admin-help-text">
+                        Cada color puede tener su propia descripción en <strong>Variantes → Texto y visibilidad</strong>.
+                      </small>
+                    )}
                   </div>
                 </div>
               </div>

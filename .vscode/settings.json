@@ -1,0 +1,4 @@
+{
+  "typescript.tsdk": "calzatura-vilchez/node_modules/typescript/lib",
+  "eslint.workingDirectories": ["calzatura-vilchez"]
+}
