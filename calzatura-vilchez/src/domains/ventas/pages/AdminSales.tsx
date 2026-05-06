@@ -95,10 +95,15 @@ export default function AdminSales() {
   const [selectedSale, setSelectedSale] = useState<DailySale | null>(null);
   const [returnMotivo, setReturnMotivo] = useState("");
   const [returning, setReturning] = useState(false);
+  const [historialSearch, setHistorialSearch] = useState("");
+
+  const loadSales = useCallback((targetDate: string) => {
+    fetchDailySales(targetDate).then(setSales).catch(() => {});
+  }, []);
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.all([fetchProducts(), fetchProductCodes(), fetchProductFinancials(), fetchDailySales()])
+    Promise.all([fetchProducts(), fetchProductCodes(), fetchProductFinancials(), fetchDailySales(todayISO())])
       .then(([items, codes, financials, daySales]) => {
         const merged = items.map((item) => ({
           ...item,
@@ -115,6 +120,10 @@ export default function AdminSales() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
+
+  useEffect(() => {
+    loadSales(date);
+  }, [date, loadSales]);
 
   const selectedProduct = products.find((p) => p.id === productId);
   const availableColors = selectedProduct ? getProductColors(selectedProduct) : [];
@@ -857,52 +866,86 @@ export default function AdminSales() {
             <h2 style={{ fontSize: "13px", fontWeight: 700 }}>Historial de ventas</h2>
             <span style={{ fontSize: "12px" }}>Haz clic en una venta para ver el detalle o registrar una devolución</span>
           </div>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Producto</th>
-                <th>Color</th>
-                <th>Talla</th>
-                <th>Cant.</th>
-                <th>Fecha</th>
-                <th>Total</th>
-                <th>Ganancia</th>
-                <th>Documento</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sales.length === 0 && (
-                <tr><td colSpan={9} className="admin-empty-cell">No hay ventas registradas.</td></tr>
-              )}
-              {sales.map((sale) => (
-                <tr
-                  key={sale.id}
-                  className={`sale-row-clickable${sale.devuelto ? " sale-row-devuelto" : ""}`}
-                  onClick={() => { setSelectedSale(sale); setReturnMotivo(""); }}
-                >
-                  <td><span className="admin-code-badge">{sale.codigo}</span></td>
-                  <td>{sale.nombre}</td>
-                  <td>{sale.color || "-"}</td>
-                  <td>{sale.talla || "-"}</td>
-                  <td>{sale.cantidad}</td>
-                  <td>{new Date(sale.creadoEn).toLocaleDateString("es-PE", { day: "2-digit", month: "2-digit", year: "2-digit" })}</td>
-                  <td>S/ {sale.total.toFixed(2)}</td>
-                  <td><strong>S/ {sale.ganancia.toFixed(2)}</strong></td>
-                  <td>
-                    <div className="admin-sale-document-cell">
-                      <strong>{SALE_DOCUMENT_LABELS[sale.documentoTipo ?? "ninguno"]}</strong>
-                      {sale.devuelto
-                        ? <span className="sale-devuelto-badge">Devuelto</span>
-                        : sale.cliente
-                          ? <span>{sale.cliente.dni} - {sale.cliente.nombres}</span>
-                          : <span>Venta simple</span>}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="admin-search-wrapper" style={{ marginBottom: "0.75rem" }}>
+            <PackageSearch size={15} />
+            <input
+              value={historialSearch}
+              onChange={(e) => setHistorialSearch(e.target.value)}
+              placeholder="Buscar por código, producto, color, talla, DNI..."
+              style={{ fontSize: "13px" }}
+            />
+            {historialSearch && (
+              <button
+                type="button"
+                onClick={() => setHistorialSearch("")}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: "0 4px", color: "var(--text-muted)" }}
+                aria-label="Limpiar búsqueda"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {(() => {
+            const term = historialSearch.trim().toLowerCase();
+            const filtered = sales.filter((s) => {
+              if (!term) return true;
+              return [
+                s.codigo, s.nombre, s.color, s.talla,
+                s.cliente?.dni, s.cliente?.nombres, s.cliente?.apellidos,
+                s.documentoNumero,
+              ].some((v) => v?.toLowerCase().includes(term));
+            });
+            return (
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Producto</th>
+                    <th>Color</th>
+                    <th>Talla</th>
+                    <th>Cant.</th>
+                    <th>Hora</th>
+                    <th>Total</th>
+                    <th>Ganancia</th>
+                    <th>Documento</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 && (
+                    <tr><td colSpan={9} className="admin-empty-cell">
+                      {sales.length === 0 ? "No hay ventas para esta fecha." : "Sin resultados para esa búsqueda."}
+                    </td></tr>
+                  )}
+                  {filtered.map((sale) => (
+                    <tr
+                      key={sale.id}
+                      className={`sale-row-clickable${sale.devuelto ? " sale-row-devuelto" : ""}`}
+                      onClick={() => { setSelectedSale(sale); setReturnMotivo(""); }}
+                    >
+                      <td><span className="admin-code-badge">{sale.codigo}</span></td>
+                      <td>{sale.nombre}</td>
+                      <td>{sale.color || "-"}</td>
+                      <td>{sale.talla || "-"}</td>
+                      <td>{sale.cantidad}</td>
+                      <td>{new Date(sale.creadoEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</td>
+                      <td>S/ {sale.total.toFixed(2)}</td>
+                      <td><strong>S/ {sale.ganancia.toFixed(2)}</strong></td>
+                      <td>
+                        <div className="admin-sale-document-cell">
+                          <strong>{SALE_DOCUMENT_LABELS[sale.documentoTipo ?? "ninguno"]}</strong>
+                          {sale.devuelto
+                            ? <span className="sale-devuelto-badge">Devuelto</span>
+                            : sale.cliente
+                              ? <span>{sale.cliente.dni} - {sale.cliente.nombres}</span>
+                              : <span>Venta simple</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          })()}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingCart, Heart, X } from "lucide-react";
+import { ShoppingCart, Heart } from "lucide-react";
 import type { Product } from "@/types";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useCart } from "@/domains/carrito/context/CartContext";
@@ -74,11 +74,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
     setShowSizePicker(false);
   };
 
-  const handleCloseSizePicker = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setShowSizePicker(false);
-  };
+  const handleCloseSizePicker = () => setShowSizePicker(false);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -110,7 +106,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   };
 
   return (
-    <Link to={`/producto/${product.id}`} className="product-card">
+    <Link to={`/producto/${product.id}`} className="product-card" onMouseLeave={handleCloseSizePicker}>
       <div className="product-card-img-wrapper">
         <img
           src={imageSrc}
@@ -160,15 +156,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
         </button>
 
         {showSizePicker && (
-          <div className="product-size-picker" onClick={handleCloseSizePicker}>
-            <button
-              type="button"
-              className="product-size-picker-close"
-              onClick={handleCloseSizePicker}
-              aria-label="Cerrar"
-            >
-              <X size={14} />
-            </button>
+          <div className="product-size-picker">
             <p className="product-size-picker-label">Selecciona tu talla</p>
             <div className="product-size-picker-grid">
               {availableSizes.map((size) => (

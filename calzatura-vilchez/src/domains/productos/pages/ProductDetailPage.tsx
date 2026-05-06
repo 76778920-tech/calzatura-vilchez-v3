@@ -303,28 +303,34 @@ export default function ProductDetailPage() {
           <p className="detail-desc">{product.descripcion}</p>
 
           {/* Tallas */}
-          {availableSizes.length > 0 && (
+          {(product.tallas?.length || Object.keys(product.tallaStock ?? {}).length > 0) ? (
             <div className="detail-tallas">
               <p className="detail-section-label">
-                Talla: <strong>{selectedTalla}</strong>
-                {selectedTalla && <span className="detail-size-stock"> {selectedSizeStock} disponibles</span>}
+                {selectedTalla
+                  ? <>Talla: <strong>{selectedTalla}</strong> <span className="detail-size-stock">· {selectedSizeStock} disponibles</span></>
+                  : <span className="detail-size-hint">SELECCIONE SU TALLA</span>}
               </p>
               <div className="tallas-grid">
-                {availableSizes.map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => {
-                      setSelectedTalla(t);
-                      setQuantity(1);
-                    }}
-                    className={`talla-btn ${selectedTalla === t ? "active" : ""}`}
-                  >
-                    {t}
-                  </button>
-                ))}
+                {(product.tallaStock
+                  ? Object.keys(product.tallaStock).sort((a, b) => Number(a) - Number(b))
+                  : (product.tallas ?? [])
+                ).map((t) => {
+                  const stock = product.tallaStock ? (product.tallaStock[t] ?? 0) : 1;
+                  const outOfStock = stock <= 0;
+                  return (
+                    <button
+                      key={t}
+                      onClick={() => { if (!outOfStock) { setSelectedTalla(t); setQuantity(1); } }}
+                      disabled={outOfStock}
+                      className={`talla-btn${selectedTalla === t ? " active" : ""}${outOfStock ? " out-of-stock" : ""}`}
+                    >
+                      {t}
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Cantidad */}
           {product.stock > 0 && (

@@ -1,0 +1,24 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Anillo exterior dorado (sin relleno) -->
+  <circle cx="90" cy="90" r="66" fill="none" stroke="#C9A227" stroke-width="2.5"/>
+  <!-- Anillo interior punteado -->
+  <circle cx="90" cy="90" r="50" fill="none" stroke="#A8841A" stroke-width="1.2" stroke-dasharray="3 6"/>
+  <!-- 12 pétalos cada 30° — patrón girasol -->
+  <g transform="translate(90 90)">
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(0) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(30) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(60) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(90) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(120) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(150) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(180) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(210) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(240) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(270) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(300) translate(0 -34)"/>
+    <ellipse rx="5" ry="13" fill="#E8C96D" transform="rotate(330) translate(0 -34)"/>
+    <!-- Centro marrón -->
+    <circle r="18" fill="#2A1706"/>
+    <circle r="11" fill="#1A0F05"/>
+  </g>
+</svg>

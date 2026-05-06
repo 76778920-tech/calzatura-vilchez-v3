@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "337744526151",
+    "project_id": "calzaturavilchez-ab17f",
+    "storage_bucket": "calzaturavilchez-ab17f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:337744526151:android:3d868dfd6d1bd81e6baa62",
+        "android_client_info": {
+          "package_name": "com.calzaturavilchez.calzatura_vilchez_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYMMfvHsK3qIdrSCBgCLI4CNPGcsyewno"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -15,6 +15,7 @@ import ProductCard from "@/domains/productos/components/ProductCard";
 import { getProductColors } from "@/utils/colors";
 import cyberWowJuvenilEditorial from "@/assets/home/cyber/cyber-wow-juvenil-editorial.png";
 import cyberWowZapatillasEditorial from "@/assets/home/cyber/cyber-wow-zapatillas-editorial.png";
+import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import {
   productMatchesBrandSlug,
   productMatchesCategory,
@@ -270,6 +271,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  useProductsRealtime(() => setReloadToken((t) => t + 1));
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [activeCampaignSlide, setActiveCampaignSlide] = useState(0);
   const [draftPriceMin, setDraftPriceMin] = useState(0);

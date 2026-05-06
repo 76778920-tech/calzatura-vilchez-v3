@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type TouchEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type TouchEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import ProductCard from "@/domains/productos/components/ProductCard";
 import { fetchPublicProducts } from "@/domains/productos/services/products";
+import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import type { Product } from "@/types";
 import { countProductsForCategory, productMatchesAnySearch } from "@/utils/catalog";
 import { buildCatalogHref, buildCyberCatalogHref } from "@/routes/catalogRouting";
@@ -230,26 +231,18 @@ export default function HomePage() {
   const [categoriesVisible, setCategoriesVisible] = useState(false);
   const categoriesGridRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    let isMounted = true;
-
+  const loadProducts = useCallback(() => {
     fetchPublicProducts()
-      .then((nextProducts) => {
-        if (!isMounted) return;
-        setProducts(nextProducts);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setError("No pudimos cargar los productos destacados.");
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
+      .then(setProducts)
+      .catch(() => setError("No pudimos cargar los productos destacados."))
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  useProductsRealtime(loadProducts);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -573,20 +566,45 @@ export default function HomePage() {
               </aside>
             </div>
           </div>
-          <div className="home-hero-progress" aria-hidden="true">
-            <span className="home-hero-progress-track">
-              <span
-                key={`hero-progress-${activeHero.id}-${activeHeroIndex}`}
-                className={`home-hero-progress-fill ${canAutoRotateHero ? "is-animating" : ""} ${
-                  isHeroInteractionPaused ? "is-paused" : ""
-                }`}
-                style={
-                  canAutoRotateHero
-                    ? ({ "--hero-progress-duration": `${HERO_ROTATION_MS}ms` } as CSSProperties)
-                    : undefined
-                }
-              />
-            </span>
+          {/* Flechas de navegación */}
+          <button
+            type="button"
+            className="home-hero-arrow-btn home-hero-arrow-prev"
+            onClick={(e) => { e.stopPropagation(); shiftHeroSlide(-1); }}
+            aria-label="Slide anterior"
+          >
+            <ChevronLeft size={22} />
+          </button>
+          <button
+            type="button"
+            className="home-hero-arrow-btn home-hero-arrow-next"
+            onClick={(e) => { e.stopPropagation(); shiftHeroSlide(1); }}
+            aria-label="Siguiente slide"
+          >
+            <ChevronRight size={22} />
+          </button>
+
+          {/* Puntos de navegación con timer */}
+          <div className="home-hero-dots" role="tablist" aria-label="Slides del carrusel">
+            {heroSlides.map((slide, index) => (
+              <button
+                key={slide.id}
+                type="button"
+                role="tab"
+                aria-selected={index === activeHeroIndex}
+                aria-label={slide.kicker}
+                className={`home-hero-dot${index === activeHeroIndex ? " is-active" : ""}`}
+                onClick={(e) => { e.stopPropagation(); setActiveHeroIndex(index); setIsHeroInteractionPaused(false); }}
+              >
+                {index === activeHeroIndex && (
+                  <span
+                    key={`dot-fill-${activeHeroIndex}`}
+                    className={`home-hero-dot-fill${canAutoRotateHero ? " is-animating" : ""}${isHeroInteractionPaused ? " is-paused" : ""}`}
+                    style={canAutoRotateHero ? ({ "--hero-progress-duration": `${HERO_ROTATION_MS}ms` } as CSSProperties) : undefined}
+                  />
+                )}
+              </button>
+            ))}
           </div>
         </div>
       </section>
