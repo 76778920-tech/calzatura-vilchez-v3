@@ -206,6 +206,7 @@ test.describe("admin predicciones → cold start y carga exitosa", () => {
     // El nombre del producto del mock debe aparecer en la tabla
     await expect(page.getByText("Zapatilla E2E Pred")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Índice de Riesgo Empresarial")).toBeVisible();
+    await page.getByRole("tab", { name: /Detalle IRE/i }).click();
     await expect(page.getByText("Variables del riesgo empresarial")).toBeVisible();
     await expect(page.getByText("IRE = riesgo_stock * 0.40")).toBeVisible();
   });

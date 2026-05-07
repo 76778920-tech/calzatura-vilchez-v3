@@ -223,7 +223,7 @@ function loadPref<T extends number>(key: string, valid: T[], fallback: T): T {
   const v = Number(localStorage.getItem(key));
   return (valid as number[]).includes(v) ? (v as T) : fallback;
 }
-type PredictionTab = "resumen" | "ventas" | "finanzas" | "ranking" | "modelo" | "asistente";
+type PredictionTab = "resumen" | "ire" | "ventas" | "finanzas" | "ranking" | "modelo" | "asistente";
 type RankingPeriod = 7 | 15 | 30;
 
 interface ChatMessage {
@@ -231,7 +231,7 @@ interface ChatMessage {
   content: string;
 }
 
-const TAB_SEQUENCE: PredictionTab[] = ["resumen", "ventas", "finanzas", "ranking", "modelo", "asistente"];
+const TAB_SEQUENCE: PredictionTab[] = ["resumen", "ire", "ventas", "finanzas", "ranking", "modelo", "asistente"];
 
 const IRE_NIVEL_LABELS: Record<string, string> = {
   bajo: "Bajo", moderado: "Moderado", alto: "Alto", critico: "Crítico",
@@ -2243,6 +2243,9 @@ export default function AdminPredictions() {
           Resumen
           {enRiesgo > 0 && <span className="pred-tab-count pred-tab-count-alert">{enRiesgo}</span>}
         </button>
+        <button type="button" role="tab" aria-selected={activeTab === "ire"} className={`pred-tab ${activeTab === "ire" ? "active" : ""}`} onClick={() => changeTab("ire")}>
+          Detalle IRE
+        </button>
         <button type="button" role="tab" aria-selected={activeTab === "ventas"} className={`pred-tab ${activeTab === "ventas" ? "active" : ""}`} onClick={() => changeTab("ventas")}>
           Ventas e inventario
         </button>
@@ -2312,48 +2315,6 @@ export default function AdminPredictions() {
               )}
             </motion.div>
           )}
-
-          {ireData?.variables?.length ? (
-            <motion.section
-              className="ire-variable-panel"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.08 }}
-            >
-              <div className="ire-variable-head">
-                <div>
-                  <p className="ire-variable-kicker">Definición del IRE</p>
-                  <h3 className="ire-variable-title">Variables del riesgo empresarial</h3>
-                </div>
-                <div className="ire-formula-wrap">
-                  {ireData.version && <span className="ire-version">v{ireData.version}</span>}
-                  {ireData.formula && <code className="ire-formula">{ireData.formula}</code>}
-                </div>
-              </div>
-              {ireData.definicion && <p className="ire-variable-def">{ireData.definicion}</p>}
-              <div className="ire-variable-grid">
-                {ireData.variables.map((variable) => (
-                  <article key={variable.codigo} className="ire-variable-card">
-                    <div className="ire-variable-top">
-                      <span className="ire-variable-name">{variable.nombre}</span>
-                      <span className="ire-variable-weight">{Math.round(variable.peso * 100)}%</span>
-                    </div>
-                    <div className="ire-variable-score-row">
-                      <span className="ire-variable-score">{variable.valor}</span>
-                      <span className="ire-variable-impact">aporta {variable.contribucion_score} pts</span>
-                    </div>
-                    <p className="ire-variable-copy">{variable.descripcion}</p>
-                    <p className="ire-variable-source">{variable.fuente}</p>
-                    <div className="ire-variable-tags">
-                      {variable.indicadores.map((indicador) => (
-                        <span key={indicador}>{IRE_INDICATOR_LABELS[indicador] ?? indicador}</span>
-                      ))}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </motion.section>
-          ) : null}
 
           {/* IRE proyectado */}
           {ireProyectado && ireData && (
@@ -2544,6 +2505,67 @@ export default function AdminPredictions() {
               </div>
             </div>
           </div>
+        </motion.div>
+      )}
+
+      {/* ── Pestaña: Detalle IRE ─────────────────────────── */}
+      {activeTab === "ire" && (
+        <motion.div
+          key="tab-ire"
+          className="pred-tab-panel"
+          initial={{ opacity: 0, x: tabDirection >= 0 ? 54 : -54, y: 18, filter: "blur(8px)" }}
+          animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.38, ease: "easeOut" }}
+        >
+          {ireData?.variables?.length ? (
+            <motion.section
+              className="ire-variable-panel"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.08 }}
+            >
+              <div className="ire-variable-head">
+                <div>
+                  <p className="ire-variable-kicker">Definición del IRE</p>
+                  <h3 className="ire-variable-title">Variables del riesgo empresarial</h3>
+                </div>
+                <div className="ire-formula-wrap">
+                  {ireData.version && <span className="ire-version">v{ireData.version}</span>}
+                  {ireData.formula && <code className="ire-formula">{ireData.formula}</code>}
+                </div>
+              </div>
+              {ireData.definicion && <p className="ire-variable-def">{ireData.definicion}</p>}
+              <div className="ire-variable-grid">
+                {ireData.variables.map((variable) => (
+                  <article key={variable.codigo} className="ire-variable-card">
+                    <div className="ire-variable-top">
+                      <span className="ire-variable-name">{variable.nombre}</span>
+                      <span className="ire-variable-weight">{Math.round(variable.peso * 100)}%</span>
+                    </div>
+                    <div className="ire-variable-score-row">
+                      <span className="ire-variable-score">{variable.valor}</span>
+                      <span className="ire-variable-impact">aporta {variable.contribucion_score} pts</span>
+                    </div>
+                    <p className="ire-variable-copy">{variable.descripcion}</p>
+                    <p className="ire-variable-source">{variable.fuente}</p>
+                    <div className="ire-variable-tags">
+                      {variable.indicadores.map((indicador) => (
+                        <span key={indicador}>{IRE_INDICATOR_LABELS[indicador] ?? indicador}</span>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </motion.section>
+          ) : (
+            <div className="pred-empty-card">
+              <Brain size={28} />
+              <p className="pred-empty-title">Sin detalle del IRE todavía</p>
+              <p className="pred-empty-copy">
+                Ejecuta una predicción para ver la definición, fórmula, variables y aportes del Índice de Riesgo Empresarial.
+              </p>
+            </div>
+          )}
         </motion.div>
       )}
 
