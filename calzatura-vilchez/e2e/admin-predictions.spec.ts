@@ -21,15 +21,15 @@ const MOCK_COMBINED_RESPONSE = {
         nombre: "Zapatilla E2E Pred",
         categoria: "hombre",
         precio: 150,
-        stock_actual: 10,
-        prediccion_unidades: 5,
-        prediccion_diaria: 0.17,
-        prediccion_semanal: 1.2,
-        dias_hasta_agotarse: 59,
-        tendencia: "estable",
-        nivel_riesgo: "ok",
-        alerta_stock: false,
-        alta_demanda: false,
+        stock_actual: 1,
+        prediccion_unidades: 15,
+        prediccion_diaria: 2.1,
+        prediccion_semanal: 14.7,
+        dias_hasta_agotarse: 3,
+        tendencia: "subiendo",
+        nivel_riesgo: "critico",
+        alerta_stock: true,
+        alta_demanda: true,
         sin_historial: false,
         feature_importance: [],
         ventas_semanales: [],
@@ -204,8 +204,10 @@ test.describe("admin predicciones → cold start y carga exitosa", () => {
     await goToPredictions(page);
 
     // El nombre del producto del mock debe aparecer en la tabla
-    await expect(page.getByText("Zapatilla E2E Pred")).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator(".pred-alert-name").getByText("Zapatilla E2E Pred", { exact: true })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("Índice de Riesgo Empresarial")).toBeVisible();
+    await expect(page.getByText("Recomendaciones automáticas priorizadas")).toBeVisible();
+    await expect(page.getByText("Prioriza este producto en el siguiente pedido.")).toBeVisible();
     await page.getByRole("tab", { name: /Detalle IRE/i }).click();
     await expect(page.getByText("Variables del riesgo empresarial")).toBeVisible();
     await expect(page.getByText("IRE = riesgo_stock * 0.40")).toBeVisible();

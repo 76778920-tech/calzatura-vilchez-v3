@@ -2456,7 +2456,10 @@ export default function AdminPredictions() {
           <div className="dash-card-header">
             <div>
               <p className="dash-card-kicker">Lo que debes hacer ahora</p>
-              <h2 className="dash-card-title">Recomendaciones priorizadas</h2>
+              <h2 className="dash-card-title">Recomendaciones automáticas priorizadas</h2>
+              <p className="pred-sub" style={{ marginTop: "0.35rem" }}>
+                Generadas por reglas de decisión sobre stock, demanda, tendencia y horizonte de agotamiento para apoyar compras, reposición y control de sobrestock.
+              </p>
             </div>
           </div>
           {recomendaciones.length > 0 ? (
