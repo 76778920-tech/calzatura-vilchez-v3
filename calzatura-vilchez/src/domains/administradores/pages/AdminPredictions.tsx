@@ -132,16 +132,33 @@ interface IreDetalle {
   productos_atencion: number;
   productos_vigilancia: number;
   productos_sin_stock: number;
+  productos_bajando?: number;
+  alta_demanda_bajo_stock?: number;
+  productos_drift_alto?: number;
   total_con_historial: number;
   total_sin_historial: number;
+}
+interface IreVariable {
+  codigo: keyof IreDimensiones;
+  nombre: string;
+  peso: number;
+  valor: number;
+  contribucion_score: number;
+  descripcion: string;
+  fuente: string;
+  indicadores: string[];
 }
 interface IreData {
   score: number;
   nivel: "bajo" | "moderado" | "alto" | "critico";
   descripcion: string;
+  version?: string;
+  definicion?: string;
+  formula?: string;
   horizonte_dias: number | null;
   dimensiones: IreDimensiones;
   pesos: IrePesos;
+  variables?: IreVariable[];
   detalle: IreDetalle;
 }
 
@@ -149,6 +166,12 @@ interface IreHistorialPoint {
   fecha: string;
   score: number;
   nivel: string;
+  dimensiones?: IreDimensiones;
+  pesos?: IrePesos;
+  version?: string;
+  formula?: string;
+  variables?: IreVariable[];
+  detalle?: IreDetalle;
 }
 
 interface FeatureImportance {
@@ -219,6 +242,20 @@ const IRE_DIM_CONFIG: { key: keyof IreDimensiones; label: string }[] = [
   { key: "riesgo_ingresos", label: "Ingresos" },
   { key: "riesgo_demanda",  label: "Demanda" },
 ];
+
+const IRE_INDICATOR_LABELS: Record<string, string> = {
+  productos_criticos: "Productos críticos",
+  productos_atencion: "Productos en atención",
+  productos_vigilancia: "Productos en vigilancia",
+  productos_sin_stock: "Productos sin stock",
+  total_con_historial: "Productos con historial",
+  tendencia_ingresos: "Tendencia de ingresos",
+  crecimiento_estimado_pct: "Crecimiento proyectado",
+  confianza_ingresos: "Confianza de ingresos",
+  productos_bajando: "Productos bajando",
+  alta_demanda_bajo_stock: "Alta demanda con bajo stock",
+  drift_alto: "Drift alto",
+};
 
 interface Recomendación {
   tipo: "urgente" | "atencion" | "oportunidad" | "tranquilo";
@@ -1488,7 +1525,11 @@ function IreSparkline({ data }: { data: IreHistorialPoint[] }) {
         <polyline points={pts} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" opacity="0.85" />
         <circle cx={lx} cy={ly} r="3.5" fill={stroke} />
       </svg>
-      <span className="ire-sparkline-label">Últimos {data.length} días</span>
+      <span className="ire-sparkline-label">
+        Últimos {data.length} días
+        {last.version ? ` · IRE v${last.version}` : ""}
+        {last.detalle?.total_con_historial != null ? ` · ${last.detalle.total_con_historial} con historial` : ""}
+      </span>
     </div>
   );
 }
@@ -2271,6 +2312,48 @@ export default function AdminPredictions() {
               )}
             </motion.div>
           )}
+
+          {ireData?.variables?.length ? (
+            <motion.section
+              className="ire-variable-panel"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.08 }}
+            >
+              <div className="ire-variable-head">
+                <div>
+                  <p className="ire-variable-kicker">Definición del IRE</p>
+                  <h3 className="ire-variable-title">Variables del riesgo empresarial</h3>
+                </div>
+                <div className="ire-formula-wrap">
+                  {ireData.version && <span className="ire-version">v{ireData.version}</span>}
+                  {ireData.formula && <code className="ire-formula">{ireData.formula}</code>}
+                </div>
+              </div>
+              {ireData.definicion && <p className="ire-variable-def">{ireData.definicion}</p>}
+              <div className="ire-variable-grid">
+                {ireData.variables.map((variable) => (
+                  <article key={variable.codigo} className="ire-variable-card">
+                    <div className="ire-variable-top">
+                      <span className="ire-variable-name">{variable.nombre}</span>
+                      <span className="ire-variable-weight">{Math.round(variable.peso * 100)}%</span>
+                    </div>
+                    <div className="ire-variable-score-row">
+                      <span className="ire-variable-score">{variable.valor}</span>
+                      <span className="ire-variable-impact">aporta {variable.contribucion_score} pts</span>
+                    </div>
+                    <p className="ire-variable-copy">{variable.descripcion}</p>
+                    <p className="ire-variable-source">{variable.fuente}</p>
+                    <div className="ire-variable-tags">
+                      {variable.indicadores.map((indicador) => (
+                        <span key={indicador}>{IRE_INDICATOR_LABELS[indicador] ?? indicador}</span>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </motion.section>
+          ) : null}
 
           {/* IRE proyectado */}
           {ireProyectado && ireData && (

@@ -124,6 +124,15 @@ async function setupAIMock(page: Page, response: object) {
   await page.route("**/api/cache/**", async (route) => {
     await route.fulfill({ status: 200, body: "{}" });
   });
+
+  await page.route("**/api/ire/historial**", async (route) => {
+    const historial = (response as { ire_historial?: unknown[] }).ire_historial ?? [];
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ days: 60, historial }),
+    });
+  });
 }
 
 async function goToPredictions(page: Page) {
@@ -180,7 +189,7 @@ test.describe("admin predicciones → tarjeta IRE y sparkline", () => {
     await expect(page.locator(".ire-hero")).toBeVisible({ timeout: 20_000 });
 
     // El SVG del sparkline debe estar visible
-    const sparkline = page.locator("svg.ire-sparkline-svg[aria-label='Evolución IRE']");
+    const sparkline = page.locator("svg.ire-sparkline-svg");
     await expect(sparkline).toBeVisible({ timeout: 10_000 });
 
     // La etiqueta de días debe aparecer

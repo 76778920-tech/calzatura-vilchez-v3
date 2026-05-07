@@ -1,7 +1,39 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+
+const MOCK_PRODUCT = {
+  id: "e2e-catalog-cart-001",
+  nombre: "Zapatilla Catalog Cart E2E",
+  precio: 129,
+  descripcion: "Producto controlado para prueba de catalogo a carrito",
+  imagen: "",
+  imagenes: [],
+  stock: 4,
+  categoria: "hombre",
+  color: "Negro",
+  tallas: ["40", "41"],
+  marcaSlug: "test-marca",
+  marca: "TestMarca",
+  activo: true,
+  codigo: "CAT-CART-001",
+};
+
+async function setupProductMock(page: Page) {
+  await page.route("**/rest/v1/productos*", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify([MOCK_PRODUCT]),
+    });
+  });
+}
 
 test.describe("catálogo → detalle → carrito", () => {
   test("desde productos abre ficha, agrega al carrito y aparece en /carrito", async ({ page }) => {
+    await setupProductMock(page);
     await page.goto("/productos");
     await page.evaluate(() => localStorage.removeItem("calzatura_cart"));
     await page.reload();

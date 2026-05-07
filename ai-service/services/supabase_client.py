@@ -6,6 +6,8 @@ import requests
 _SUPABASE_URL: str | None = None
 _HEADERS: dict | None = None
 
+_AUDIT_FALLBACK_STATUS_CODES = {400, 404, 406, 409, 422}
+
 
 def _get_headers() -> tuple[str, dict]:
     global _SUPABASE_URL, _HEADERS
@@ -83,29 +85,45 @@ def fetch_product_codes() -> dict[str, str]:
 def save_ire_historial(ire: dict) -> None:
     """Upsert del IRE del día. Un registro por fecha (UNIQUE en fecha)."""
     url, headers = _get_headers()
-    payload = {
+    base_payload = {
         "fecha":       datetime.now(timezone.utc).date().isoformat(),
         "score":       ire["score"],
         "nivel":       ire["nivel"],
         "dimensiones": ire.get("dimensiones", {}),
         "pesos":       ire.get("pesos", {}),
     }
-    resp = requests.post(
-        f"{url}/rest/v1/ireHistorial?on_conflict=fecha",
-        headers={
-            **headers,
-            "Prefer": "resolution=merge-duplicates,return=minimal",
-        },
-        json=payload,
-        timeout=10,
-    )
+    audit_payload = {
+        **base_payload,
+        "version":    ire.get("version"),
+        "definicion": ire.get("definicion"),
+        "formula":    ire.get("formula"),
+        "variables":  ire.get("variables", []),
+        "detalle":    ire.get("detalle", {}),
+    }
+
+    def _post(payload: dict):
+        return requests.post(
+            f"{url}/rest/v1/ireHistorial?on_conflict=fecha",
+            headers={
+                **headers,
+                "Prefer": "resolution=merge-duplicates,return=minimal",
+            },
+            json=payload,
+            timeout=10,
+        )
+
+    resp = _post(audit_payload)
+    if resp.status_code in _AUDIT_FALLBACK_STATUS_CODES:
+        # Compatibilidad con instalaciones donde ireHistorial aun no tiene
+        # columnas de auditoria; se conserva el comportamiento previo.
+        resp = _post(base_payload)
     resp.raise_for_status()
 
 
 def fetch_ire_historial(days: int = 30) -> list[dict]:
     """Últimos N días de historial IRE, ordenado por fecha ascendente."""
     return _query("ireHistorial", {
-        "select": "fecha,score,nivel,dimensiones",
+        "select": "fecha,score,nivel,dimensiones,pesos,version,definicion,formula,variables,detalle",
         "fecha":  f"gte.{_cutoff_iso(days)}",
         "order":  "fecha.asc",
     })

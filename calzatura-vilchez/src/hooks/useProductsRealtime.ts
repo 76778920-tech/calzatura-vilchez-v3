@@ -12,7 +12,10 @@ import { supabase } from "@/supabase/client";
 export function useProductsRealtime(onProductChange: () => void): void {
   // useRef evita re-suscribirse cuando el callback cambia de referencia
   const callbackRef = useRef(onProductChange);
-  callbackRef.current = onProductChange;
+
+  useEffect(() => {
+    callbackRef.current = onProductChange;
+  }, [onProductChange]);
 
   useEffect(() => {
     const channel = supabase
@@ -25,5 +28,5 @@ export function useProductsRealtime(onProductChange: () => void): void {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 }

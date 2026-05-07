@@ -72,6 +72,19 @@ Todo cambio al sistema que afecte la base de datos, la lógica de negocio o la s
 6. Verificar logs de Railway que startup completa sin errores
 ```
 
+### 3.4 Verificacion real de `ireHistorial` en Supabase
+
+Despues de aplicar la migracion `20260506180000_extend_ire_historial_audit.sql`, ejecutar desde `ai-service/`:
+
+```powershell
+$env:SUPABASE_URL="https://<proyecto>.supabase.co"
+$env:SUPABASE_SERVICE_KEY="<service-role-key>"
+python scripts/verify_ire_historial_schema.py
+python scripts/verify_ire_historial_schema.py --write-probe
+```
+
+La primera corrida valida lectura de columnas extendidas: `version`, `definicion`, `formula`, `variables` y `detalle`. La segunda hace un upsert temporal con `on_conflict=fecha`, valida tipos JSON y borra la fila de prueba. Si falla, no desplegar el servicio IA hasta aplicar o reparar la migracion.
+
 ---
 
 ## 4. Roles operativos

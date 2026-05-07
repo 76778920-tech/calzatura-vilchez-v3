@@ -2,10 +2,12 @@ import time
 import os
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
+from typing import Any
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -70,6 +72,11 @@ _model_registry: dict = {}
 # Capped at 200 entries (≈ 200 unique prediction calls).
 _prediction_log: list = []
 _PREDICTION_LOG_MAX = 200
+
+
+class IreHistorialResponse(BaseModel):
+    historial: list[dict[str, Any]] = Field(default_factory=list)
+    days: int
 
 
 def _request_context(request: Request) -> dict:
@@ -339,7 +346,7 @@ def combined_prediction(
         _raise_http_error(error)
 
 
-@app.get("/api/ire/historial")
+@app.get("/api/ire/historial", response_model=IreHistorialResponse)
 @limiter.limit("30/minute")
 def ire_historial(
     request: Request,

@@ -633,9 +633,15 @@ export default function ProductsPage() {
         const rect = marcaTriggerRef.current.getBoundingClientRect();
         const desiredWidth = Math.min(260, window.innerWidth - 32);
         const margin = 16;
+        const estimatedHeight = 172;
         const maxLeft = Math.max(margin, window.innerWidth - desiredWidth - margin);
         const left = Math.max(margin, Math.min(rect.left, maxLeft));
-        setMarcaPopoverStyle({ top: rect.bottom + 10, left, width: desiredWidth });
+        const topBelow = rect.bottom + 10;
+        const topAbove = rect.top - estimatedHeight - 10;
+        const top = topBelow + estimatedHeight <= window.innerHeight - margin
+          ? topBelow
+          : Math.max(margin, topAbove);
+        setMarcaPopoverStyle({ top, left, width: desiredWidth });
       });
     };
     syncPopoverPosition();

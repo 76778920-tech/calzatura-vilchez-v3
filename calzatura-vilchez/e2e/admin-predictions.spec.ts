@@ -41,6 +41,81 @@ const MOCK_COMBINED_RESPONSE = {
     generated_at: "2026-05-03T12:00:00Z",
   },
   revenue: null,
+  ire: {
+    score: 38,
+    nivel: "moderado",
+    descripcion: "IRE de prueba para contrato visual.",
+    version: "1.1.0",
+    definicion: "Índice proxy de 0 a 100 que resume el riesgo empresarial comercial-operativo.",
+    formula: "IRE = riesgo_stock * 0.40 + riesgo_ingresos * 0.35 + riesgo_demanda * 0.25",
+    horizonte_dias: null,
+    dimensiones: { riesgo_stock: 40, riesgo_ingresos: 45, riesgo_demanda: 25 },
+    pesos: { riesgo_stock: 0.4, riesgo_ingresos: 0.35, riesgo_demanda: 0.25 },
+    variables: [
+      {
+        codigo: "riesgo_stock",
+        nombre: "Riesgo de stock",
+        peso: 0.4,
+        valor: 40,
+        contribucion_score: 16,
+        descripcion: "Presión del inventario.",
+        fuente: "Predicción de demanda e inventario.",
+        indicadores: ["productos_criticos", "total_con_historial"],
+      },
+      {
+        codigo: "riesgo_ingresos",
+        nombre: "Riesgo de ingresos",
+        peso: 0.35,
+        valor: 45,
+        contribucion_score: 16,
+        descripcion: "Presión de ingresos.",
+        fuente: "Proyección de ingresos.",
+        indicadores: ["tendencia_ingresos"],
+      },
+      {
+        codigo: "riesgo_demanda",
+        nombre: "Riesgo de demanda",
+        peso: 0.25,
+        valor: 25,
+        contribucion_score: 6,
+        descripcion: "Cambios de demanda.",
+        fuente: "Predicción por producto.",
+        indicadores: ["productos_bajando"],
+      },
+    ],
+    detalle: {
+      productos_criticos: 0,
+      productos_atencion: 0,
+      productos_vigilancia: 0,
+      productos_sin_stock: 0,
+      productos_bajando: 0,
+      alta_demanda_bajo_stock: 0,
+      productos_drift_alto: 0,
+      total_con_historial: 1,
+      total_sin_historial: 0,
+    },
+  },
+  ire_proyectado: {
+    score: 40,
+    nivel: "moderado",
+    descripcion: "IRE proyectado de prueba.",
+    version: "1.1.0",
+    definicion: "Índice proxy de 0 a 100 que resume el riesgo empresarial comercial-operativo.",
+    formula: "IRE = riesgo_stock * 0.40 + riesgo_ingresos * 0.35 + riesgo_demanda * 0.25",
+    horizonte_dias: 30,
+    dimensiones: { riesgo_stock: 45, riesgo_ingresos: 45, riesgo_demanda: 25 },
+    pesos: { riesgo_stock: 0.4, riesgo_ingresos: 0.35, riesgo_demanda: 0.25 },
+    variables: [],
+    detalle: {
+      productos_criticos: 0,
+      productos_atencion: 0,
+      productos_vigilancia: 0,
+      productos_sin_stock: 0,
+      total_con_historial: 1,
+      total_sin_historial: 0,
+    },
+  },
+  warnings: [],
 };
 
 // ─── Setup helpers ────────────────────────────────────────────────────────────
@@ -58,6 +133,10 @@ async function setupAITimeout(page: Page) {
   await page.route("**/api/cache/**", async (route) => {
     await route.fulfill({ status: 200, body: "{}" });
   });
+
+  await page.route("**/api/ire/historial**", async (route) => {
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ historial: [], days: 60 }) });
+  });
 }
 
 /** Mockea la ruta del servicio IA para que devuelva datos válidos. */
@@ -72,6 +151,20 @@ async function setupAISuccess(page: Page) {
 
   await page.route("**/api/cache/**", async (route) => {
     await route.fulfill({ status: 200, body: "{}" });
+  });
+
+  await page.route("**/api/ire/historial**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        days: 60,
+        historial: [
+          { fecha: "2026-05-05", score: 37, nivel: "moderado", version: "1.1.0", detalle: { total_con_historial: 1 } },
+          { fecha: "2026-05-06", score: 38, nivel: "moderado", version: "1.1.0", detalle: { total_con_historial: 1 } },
+        ],
+      }),
+    });
   });
 }
 
@@ -112,5 +205,8 @@ test.describe("admin predicciones → cold start y carga exitosa", () => {
 
     // El nombre del producto del mock debe aparecer en la tabla
     await expect(page.getByText("Zapatilla E2E Pred")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Índice de Riesgo Empresarial")).toBeVisible();
+    await expect(page.getByText("Variables del riesgo empresarial")).toBeVisible();
+    await expect(page.getByText("IRE = riesgo_stock * 0.40")).toBeVisible();
   });
 });

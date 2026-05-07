@@ -95,6 +95,25 @@ class TestComputeIre:
         total = pesos["riesgo_stock"] + pesos["riesgo_ingresos"] + pesos["riesgo_demanda"]
         assert abs(total - 1.0) < 1e-9, f"Pesos no suman 1.0: {total}"
 
+    def test_incluye_definicion_formula_y_variables_del_ire(self):
+        result = compute_ire([make_pred()], make_revenue())
+        assert result["version"]
+        assert "riesgo empresarial comercial-operativo" in result["definicion"]
+        assert result["formula"] == (
+            "IRE = riesgo_stock * 0.40 + "
+            "riesgo_ingresos * 0.35 + "
+            "riesgo_demanda * 0.25"
+        )
+        variables = result["variables"]
+        assert [v["codigo"] for v in variables] == [
+            "riesgo_stock",
+            "riesgo_ingresos",
+            "riesgo_demanda",
+        ]
+        assert all("valor" in v and "contribucion_score" in v for v in variables)
+        assert sum(v["peso"] for v in variables) == pytest.approx(1.0)
+        assert sum(v["contribucion_score"] for v in variables) == result["score"]
+
     def test_sin_revenue_usa_45_por_defecto(self):
         preds = [make_pred()]
         result = compute_ire(preds, None)
@@ -106,20 +125,19 @@ class TestComputeIre:
         result_alto = compute_ire(preds, make_revenue("bajando", -20.0, 50))
         assert result_alto["dimensiones"]["riesgo_ingresos"] > result_bajo["dimensiones"]["riesgo_ingresos"]
 
-    def test_nivel_bajo_cuando_score_le_25(self):
-        # Forzamos predicciones muy favorables
+    def test_nivel_bajo_con_escenario_favorable(self):
         preds = [make_pred(nivel_riesgo="estable", tendencia="subiendo", stock=200, consumo=0.1)] * 5
-        revenue = make_revenue("subiendo", 30.0, 95)
+        revenue = make_revenue("subiendo", 100.0, 100)
         result = compute_ire(preds, revenue)
-        if result["score"] <= 25:
-            assert result["nivel"] == "bajo"
+        assert result["score"] <= 25
+        assert result["nivel"] == "bajo"
 
-    def test_nivel_critico_cuando_score_gt_75(self):
+    def test_nivel_critico_con_escenario_extremo(self):
         preds = [make_pred(nivel_riesgo="critico", tendencia="bajando", stock=0, consumo=5.0, alta_demanda=True, drift=0.9)] * 10
-        revenue = make_revenue("bajando", -50.0, 30)
+        revenue = make_revenue("bajando", -100.0, 0)
         result = compute_ire(preds, revenue)
-        if result["score"] > 75:
-            assert result["nivel"] == "critico"
+        assert result["score"] > 75
+        assert result["nivel"] == "critico"
 
     def test_umbrales_de_nivel_correctos(self):
         for score, expected_nivel in [(25, "bajo"), (26, "moderado"), (50, "moderado"),
@@ -148,6 +166,9 @@ class TestComputeIre:
         det = result["detalle"]
         assert det["productos_criticos"] == 1
         assert det["productos_atencion"] == 1
+        assert det["productos_bajando"] == 0
+        assert det["alta_demanda_bajo_stock"] == 0
+        assert det["productos_drift_alto"] == 0
         assert det["total_con_historial"] == 3
         assert det["total_sin_historial"] == 1
 

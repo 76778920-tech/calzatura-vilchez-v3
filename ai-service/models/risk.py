@@ -10,6 +10,101 @@ Pesos:
 """
 from __future__ import annotations
 
+import math
+
+IRE_VERSION = "1.1.0"
+
+PESO_STOCK = 0.40
+PESO_INGRESOS = 0.35
+PESO_DEMANDA = 0.25
+
+IRE_DEFINITION = (
+    "Índice proxy de 0 a 100 que resume el riesgo empresarial comercial-operativo "
+    "del e-commerce a partir de inventario, ingresos proyectados y demanda."
+)
+
+IRE_VARIABLES = [
+    {
+        "codigo": "riesgo_stock",
+        "nombre": "Riesgo de stock",
+        "peso": PESO_STOCK,
+        "descripcion": (
+            "Mide la presión del inventario según productos críticos, en atención, "
+            "en vigilancia y productos sin stock con demanda estimada."
+        ),
+        "fuente": "Predicción de demanda e inventario actual de productos.",
+        "indicadores": [
+            "productos_criticos",
+            "productos_atencion",
+            "productos_vigilancia",
+            "productos_sin_stock",
+            "total_con_historial",
+        ],
+    },
+    {
+        "codigo": "riesgo_ingresos",
+        "nombre": "Riesgo de ingresos",
+        "peso": PESO_INGRESOS,
+        "descripcion": (
+            "Mide la probabilidad de presión financiera por tendencia negativa "
+            "de ingresos, crecimiento proyectado y confianza del forecast."
+        ),
+        "fuente": "Proyección de ingresos del servicio de IA.",
+        "indicadores": [
+            "tendencia_ingresos",
+            "crecimiento_estimado_pct",
+            "confianza_ingresos",
+        ],
+    },
+    {
+        "codigo": "riesgo_demanda",
+        "nombre": "Riesgo de demanda",
+        "peso": PESO_DEMANDA,
+        "descripcion": (
+            "Mide cambios comerciales relevantes: productos con demanda bajando, "
+            "alta demanda con bajo stock y drift del comportamiento reciente."
+        ),
+        "fuente": "Predicción por producto, consumo estimado y drift del modelo.",
+        "indicadores": [
+            "productos_bajando",
+            "alta_demanda_bajo_stock",
+            "drift_alto",
+            "total_con_historial",
+        ],
+    },
+]
+
+
+def _format_weight(weight: float) -> str:
+    return f"{weight:.2f}"
+
+
+def _ire_formula() -> str:
+    return (
+        f"IRE = riesgo_stock * {_format_weight(PESO_STOCK)} + "
+        f"riesgo_ingresos * {_format_weight(PESO_INGRESOS)} + "
+        f"riesgo_demanda * {_format_weight(PESO_DEMANDA)}"
+    )
+
+
+def _score_contributions(dimension_values: dict[str, float], score: int) -> dict[str, int]:
+    """
+    Integer contribution points that add up exactly to the final IRE score.
+    Uses largest remainder allocation, so the UI and audit trail do not show
+    partial contributions whose rounded sum differs from the displayed score.
+    """
+    exact = {
+        "riesgo_stock": dimension_values["riesgo_stock"] * PESO_STOCK,
+        "riesgo_ingresos": dimension_values["riesgo_ingresos"] * PESO_INGRESOS,
+        "riesgo_demanda": dimension_values["riesgo_demanda"] * PESO_DEMANDA,
+    }
+    result = {key: math.floor(value) for key, value in exact.items()}
+    remaining = max(0, score - sum(result.values()))
+    order = sorted(exact, key=lambda key: exact[key] - result[key], reverse=True)
+    for key in order[:remaining]:
+        result[key] += 1
+    return result
+
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, value))
@@ -78,10 +173,6 @@ def compute_ire(predictions: list[dict], revenue: dict | None) -> dict:
         demand_risk = 25.0
 
     # ── Score compuesto ──────────────────────────────────────────────────────
-    PESO_STOCK    = 0.40
-    PESO_INGRESOS = 0.35
-    PESO_DEMANDA  = 0.25
-
     ire = round(_clamp(
         stock_risk   * PESO_STOCK +
         revenue_risk * PESO_INGRESOS +
@@ -113,26 +204,47 @@ def compute_ire(predictions: list[dict], revenue: dict | None) -> dict:
             "de productos clave. Requiere decisiones urgentes de reposición y estrategia comercial."
         )
 
+    raw_dimension_values = {
+        "riesgo_stock": stock_risk,
+        "riesgo_ingresos": revenue_risk,
+        "riesgo_demanda": demand_risk,
+    }
+    dimension_values = {
+        key: round(value)
+        for key, value in raw_dimension_values.items()
+    }
+    contribution_values = _score_contributions(raw_dimension_values, ire)
+
     return {
         "score":          ire,
         "nivel":          nivel,
         "descripcion":    descripcion,
+        "version":        IRE_VERSION,
+        "definicion":     IRE_DEFINITION,
+        "formula":        _ire_formula(),
         "horizonte_dias": None,   # None = estado actual; int = proyectado a N días
-        "dimensiones": {
-            "riesgo_stock":    round(stock_risk),
-            "riesgo_ingresos": round(revenue_risk),
-            "riesgo_demanda":  round(demand_risk),
-        },
+        "dimensiones": dimension_values,
         "pesos": {
             "riesgo_stock":    PESO_STOCK,
             "riesgo_ingresos": PESO_INGRESOS,
             "riesgo_demanda":  PESO_DEMANDA,
         },
+        "variables": [
+            {
+                **variable,
+                "valor": dimension_values[variable["codigo"]],
+                "contribucion_score": contribution_values[variable["codigo"]],
+            }
+            for variable in IRE_VARIABLES
+        ],
         "detalle": {
             "productos_criticos":    criticos,
             "productos_atencion":    atencion,
             "productos_vigilancia":  vigilancia,
             "productos_sin_stock":   sin_stock,
+            "productos_bajando":     bajando,
+            "alta_demanda_bajo_stock": alta_sin_stock,
+            "productos_drift_alto":  drift_alto,
             "total_con_historial":   total,
             "total_sin_historial":   len(predictions) - total,
         },

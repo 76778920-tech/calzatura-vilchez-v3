@@ -75,7 +75,7 @@ test.describe("carrito → validación de stock", () => {
     await setupProductMock(page, MOCK_PRODUCT_NO_STOCK);
     await goToProductDetail(page, MOCK_PRODUCT_NO_STOCK.id);
 
-    const addBtn = page.getByRole("button", { name: /Agregar al Carrito/i });
+    const addBtn = page.getByRole("button", { name: /Agotado|Agregar al Carrito/i });
     await expect(addBtn).toBeVisible({ timeout: 15_000 });
     await expect(addBtn).toBeDisabled();
   });
@@ -147,7 +147,9 @@ test.describe("carrito → validación de stock", () => {
 
     // Agregar dos veces
     await addBtn.click();
-    await page.waitForTimeout(500);
+    await expect(page.locator(".cart-sidebar")).toBeVisible({ timeout: 5_000 });
+    await page.getByRole("button", { name: /Continuar Comprando/i }).click();
+    await expect(page.locator(".cart-sidebar")).not.toBeVisible({ timeout: 5_000 });
     await addBtn.click();
 
     // Navegar al carrito

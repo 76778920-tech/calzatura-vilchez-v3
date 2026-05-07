@@ -81,7 +81,7 @@ test.describe("catálogo → filtro por marca (popover)", () => {
   test("botón Marca abre popover con lista de marcas (TC-MARCA-001)", async ({ page }) => {
     await goToCatalog(page);
 
-    const marcaBtn = page.getByRole("button", { name: /marca/i }).first();
+    const marcaBtn = page.locator(".catalog-filter-trigger").filter({ hasText: /^Marca/ }).first();
     await expect(marcaBtn).toBeVisible({ timeout: 15_000 });
     await marcaBtn.click();
 
@@ -100,7 +100,7 @@ test.describe("catálogo → filtro por marca (popover)", () => {
   test("seleccionar marca actualiza el parámetro marcaSlug en la URL (TC-MARCA-002)", async ({ page }) => {
     await goToCatalog(page);
 
-    const marcaBtn = page.getByRole("button", { name: /marca/i }).first();
+    const marcaBtn = page.locator(".catalog-filter-trigger").filter({ hasText: /^Marca/ }).first();
     await marcaBtn.click();
 
     const popover = page.locator("#catalog-marca-popover");
