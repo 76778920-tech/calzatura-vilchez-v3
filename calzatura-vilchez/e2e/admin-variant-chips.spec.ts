@@ -1,15 +1,15 @@
 import { test, expect } from "@playwright/test";
-import { ensureAdminSessionDetailed } from "./helpers/adminAuth";
+import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 
 const COLORS = ["Negro", "Blanco", "Camel", "Gris", "Rojo"];
+const VARIANT_CARDS = ".admin-variant-carousel-card";
 
 test.describe("admin → nuevo producto: chips de 5 colores", () => {
   test.beforeEach(async ({ page }) => {
-    const session = await ensureAdminSessionDetailed(page);
-    if (!session.ok) {
-      console.log(`[admin-variant-chips] SKIP beforeEach -> ${session.reason}`);
-      test.skip(true, session.reason);
-    }
+    await injectFakeAdminAuth(page);
+    await page.goto("/admin/productos");
+    await page.waitForLoadState("domcontentloaded");
+    await page.getByRole("button", { name: /producto nuevo/i }).waitFor({ state: "visible", timeout: 15_000 });
     await page.getByRole("button", { name: /producto nuevo/i }).click();
     await expect(page.locator(".product-modal--create")).toBeVisible({ timeout: 10_000 });
   });
@@ -46,12 +46,12 @@ test.describe("admin → nuevo producto: chips de 5 colores", () => {
   });
 
   test("el panel izquierdo acumula un bloque por cada color activo hasta llegar a 5", async ({ page }) => {
-    await expect(page.locator(".admin-variant-block")).toHaveCount(0);
+    await expect(page.locator(VARIANT_CARDS)).toHaveCount(0);
 
     for (let i = 0; i < 5; i++) {
       await page.locator(".variant-chip").nth(i).click();
       await page.locator(".admin-color-popover-item").filter({ hasText: COLORS[i] }).first().click();
-      await expect(page.locator(".admin-variant-block")).toHaveCount(i + 1);
+      await expect(page.locator(VARIANT_CARDS)).toHaveCount(i + 1);
     }
   });
 
@@ -61,13 +61,13 @@ test.describe("admin → nuevo producto: chips de 5 colores", () => {
       await page.locator(".variant-chip").nth(i).click();
       await page.locator(".admin-color-popover-item").filter({ hasText: COLORS[i] }).first().click();
     }
-    await expect(page.locator(".admin-variant-block")).toHaveCount(5);
+    await expect(page.locator(VARIANT_CARDS)).toHaveCount(5);
 
     // Quitar Color 3 (tercer bloque del panel, índice 2)
     await page.locator(".admin-variant-block-clear").nth(2).click();
 
     // Solo quedan Color 1 y Color 2
-    await expect(page.locator(".admin-variant-block")).toHaveCount(2);
+    await expect(page.locator(VARIANT_CARDS)).toHaveCount(2);
 
     // Color 1 y 2 siguen activos
     await expect(page.locator(".variant-chip").nth(0)).toHaveClass(/variant-chip--active/);
