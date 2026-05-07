@@ -149,20 +149,14 @@ jobs:
 
       - name: Instalar Chromium + dependencias del sistema (primera vez)
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: |
-          unset NO_COLOR FORCE_COLOR
-          node scripts/run-playwright.mjs install --with-deps chromium
+        run: node scripts/run-playwright.mjs install --with-deps chromium
 
       - name: Instalar dependencias del sistema (cache hit)
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: |
-          unset NO_COLOR FORCE_COLOR
-          node scripts/run-playwright.mjs install-deps chromium
+        run: node scripts/run-playwright.mjs install-deps chromium
 
       - name: Ejecutar pruebas E2E
-        run: |
-          unset NO_COLOR FORCE_COLOR
-          npm run test:e2e
+        run: npm run test:e2e
         env:
           CI: "true"
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
