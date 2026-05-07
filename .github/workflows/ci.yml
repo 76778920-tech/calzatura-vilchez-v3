@@ -154,7 +154,9 @@ jobs:
         run: npx playwright install-deps chromium
 
       - name: Ejecutar pruebas E2E
-        run: npm run test:e2e
+        run: |
+          unset NO_COLOR
+          npm run test:e2e
         env:
           CI: "true"
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
