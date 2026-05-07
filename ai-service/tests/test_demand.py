@@ -12,12 +12,17 @@ Semáforo:
 import pytest
 from datetime import date, datetime, timedelta
 from models.demand import (
+    FEATURE_COLS,
     _safe_float,
     _iso_date,
     _percentile,
     _data_hash,
     _drift_score,
+    _lag_features,
+    _normalize_campaign,
+    _season_flags,
     build_daily_sales_by_product,
+    predict_demand,
 )
 
 
@@ -127,6 +132,12 @@ class TestDataHash:
         d2 = {"b": {"d": 2.0}, "a": {"d": 1.0}}
         assert _data_hash(d1) == _data_hash(d2)
 
+    def test_campana_cambia_hash_del_contexto_de_entrenamiento(self):
+        data = {"p1": {"2026-01-01": 3.0}}
+        meta_a = {"p1": {"categoria": "escolar", "campana": "nueva-temporada"}}
+        meta_b = {"p1": {"categoria": "escolar", "campana": "outlet"}}
+        assert _data_hash(data, meta_a) != _data_hash(data, meta_b)
+
 
 # ─── _drift_score ─────────────────────────────────────────────────────────────
 
@@ -230,3 +241,79 @@ class TestBuildDailySalesByProduct:
         ]
         result = build_daily_sales_by_product(sales, [])
         assert result.get("p1") is None or len(result.get("p1", {})) == 0
+
+
+class TestSeasonalityAndCampaignFeatures:
+    def test_normaliza_campana_para_codificacion_estable(self):
+        assert _normalize_campaign(None) == ""
+        assert _normalize_campaign(" Cyber-Wow ") == "cyber-wow"
+
+    def test_banderas_temporada_inicio_escolar_y_verano(self):
+        flags = _season_flags(date(2026, 2, 15))
+        assert flags["temporada_verano"] == 1
+        assert flags["temporada_escolar"] == 1
+        assert flags["temporada_fiestas_patrias"] == 0
+        assert flags["temporada_navidad"] == 0
+
+    def test_banderas_temporada_fiestas_patrias(self):
+        flags = _season_flags(date(2026, 7, 10))
+        assert flags["temporada_fiestas_patrias"] == 1
+        assert flags["temporada_verano"] == 0
+
+    def test_banderas_temporada_navidad_y_verano(self):
+        flags = _season_flags(date(2026, 12, 20))
+        assert flags["temporada_navidad"] == 1
+        assert flags["temporada_verano"] == 1
+
+    def test_lag_features_incluye_campana_y_temporadas(self):
+        current = date(2026, 12, 20)
+        day_sales = {
+            (current - timedelta(days=1)).isoformat(): 7,
+            (current - timedelta(days=8)).isoformat(): 3,
+        }
+        features = _lag_features(current, day_sales, cat_enc=2, campaign_enc=3)
+
+        assert features["campana"] == 3
+        assert features["categoria"] == 2
+        assert features["temporada_navidad"] == 1
+        assert set(FEATURE_COLS).issubset(features.keys())
+
+    def test_predict_demand_expone_campana_y_features_estacionales_en_meta(self):
+        today = date.today()
+        product = {
+            "id": "p1",
+            "nombre": "Zapato escolar",
+            "categoria": "escolar",
+            "precio": 120,
+            "stock": 20,
+            "imagen": "",
+            "campana": "nueva-temporada",
+        }
+        sales = [
+            {
+                "productId": "p1",
+                "fecha": (today - timedelta(days=day)).isoformat(),
+                "cantidad": 1 + (day % 3),
+                "devuelto": False,
+                "nombre": product["nombre"],
+                "categoria": product["categoria"],
+                "precioVenta": product["precio"],
+                "codigo": "ESC-001",
+            }
+            for day in range(0, 31)
+        ]
+
+        predictions, meta = predict_demand(
+            sales,
+            [],
+            [product],
+            horizon_days=7,
+            history_days=30,
+        )
+
+        assert "campana" in meta["feature_cols"]
+        assert "temporada_escolar" in meta["seasonality_features"]
+        assert "temporada_navidad" in meta["seasonality_features"]
+        assert "nueva-temporada" in meta["campaign_values"]
+        assert predictions[0]["campana"] == "nueva-temporada"
+        assert predictions[0]["modelo"] == "random_forest"

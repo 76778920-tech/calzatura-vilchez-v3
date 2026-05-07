@@ -39,6 +39,24 @@ const MOCK_COMBINED_RESPONSE = {
     ],
     model_version: "rf-v2",
     generated_at: "2026-05-03T12:00:00Z",
+    modelo_meta: {
+      n_samples: 90,
+      n_products: 1,
+      date_range_start: "2026-04-01",
+      date_range_end: "2026-05-01",
+      random_state: 42,
+      sklearn_version: "1.5.0",
+      feature_cols: ["weekday", "month", "day_of_month", "lag_7", "lag_30", "categoria", "campana", "temporada_escolar"],
+      feature_importances: [
+        { feature: "campana", importance: 0.21 },
+        { feature: "temporada_escolar", importance: 0.13 },
+      ],
+      feature_stats: { lag_7: { mean: 2, std: 0.5 }, lag_30: { mean: 1.8, std: 0.4 } },
+      seasonality_features: ["temporada_verano", "temporada_escolar", "temporada_fiestas_patrias", "temporada_navidad"],
+      campaign_values: ["nueva-temporada"],
+      data_hash: "abc123def4567890",
+      model_type: "random_forest",
+    },
   },
   revenue: null,
   ire: {
@@ -211,5 +229,9 @@ test.describe("admin predicciones → cold start y carga exitosa", () => {
     await page.getByRole("tab", { name: /Detalle IRE/i }).click();
     await expect(page.getByText("Variables del riesgo empresarial")).toBeVisible();
     await expect(page.getByText("IRE = riesgo_stock * 0.40")).toBeVisible();
+    await page.getByRole("tab", { name: /Modelo IA/i }).click();
+    await expect(page.getByText("Temporadas y campañas incorporadas")).toBeVisible();
+    await expect(page.getByText("Campaña: nueva-temporada")).toBeVisible();
+    await expect(page.locator(".ire-variable-tags span", { hasText: "Inicio escolar" })).toBeVisible();
   });
 });

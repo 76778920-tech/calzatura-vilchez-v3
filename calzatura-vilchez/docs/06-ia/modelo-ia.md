@@ -65,15 +65,19 @@ for cada pedido en pedidos (estado='confirmado'):
 
 | Feature | Descripción | Tipo |
 |---|---|---|
-| `dias_con_ventas` | Número de días con al menos 1 unidad vendida | Numérico |
-| `media_ventas_diarias` | Media de ventas en los días con ventas > 0 | Numérico |
-| `std_ventas` | Desviación estándar de las ventas diarias | Numérico |
-| `max_ventas_dia` | Máximo de ventas en un solo día | Numérico |
-| `tendencia_pendiente` | Pendiente de la regresión lineal de la serie | Numérico |
-| `dias_desde_ultima_venta` | Días transcurridos desde la última venta | Numérico |
-| `total_unidades_historico` | Total de unidades vendidas en el período | Numérico |
+| `weekday` | Día de la semana de la observación | Calendario |
+| `month` | Mes del año | Calendario |
+| `day_of_month` | Día del mes | Calendario |
+| `lag_7` | Promedio diario vendido en los últimos 7 días | Histórico |
+| `lag_30` | Promedio diario vendido en los últimos 30 días | Histórico |
+| `categoria` | Categoría comercial del producto codificada | Categórica |
+| `campana` | Campaña comercial del producto codificada | Categórica |
+| `temporada_verano` | Bandera de temporada verano (dic-mar) | Estacional |
+| `temporada_escolar` | Bandera de inicio escolar (feb-mar) | Estacional |
+| `temporada_fiestas_patrias` | Bandera de Fiestas Patrias (jul) | Estacional |
+| `temporada_navidad` | Bandera de Navidad / fin de año (nov-dic) | Estacional |
 
-*Fundamento académico: Fildes et al. (2022) — Las covariables más relevantes para el forecasting de retail son: historial de ventas pasadas, estacionalidad y tendencia. El modelo actual incorpora tendencia y estadísticas de historial. Futuras versiones incorporarán variables de precio y campaña.*
+*Fundamento académico: Fildes et al. (2022) — Las covariables más relevantes para forecasting retail incluyen historial de ventas, estacionalidad, tendencia y señales comerciales. Por ello, el modelo incorpora lags de ventas, variables de calendario, categoría, campaña y banderas de temporada propias del negocio de calzado.*
 
 ---
 

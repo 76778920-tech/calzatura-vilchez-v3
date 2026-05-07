@@ -56,6 +56,7 @@ interface Prediction {
   codigo: string;
   nombre: string;
   categoria: string;
+  campana?: string;
   precio: number;
   stock_actual: number;
   prediccion_unidades: number;
@@ -189,6 +190,8 @@ interface ModeloMeta {
   feature_cols: string[];
   feature_importances: FeatureImportance[];
   feature_stats: Record<string, { mean: number; std: number }>;
+  seasonality_features?: string[];
+  campaign_values?: string[];
   data_hash: string;
   model_type: string;
   cached_at?: string;
@@ -1421,6 +1424,11 @@ const FEATURE_LABELS: Record<string, string> = {
   month: "Mes del año",
   day_of_month: "Día del mes",
   categoria: "Categoría del producto",
+  campana: "Campaña comercial",
+  temporada_verano: "Temporada verano",
+  temporada_escolar: "Inicio escolar",
+  temporada_fiestas_patrias: "Fiestas Patrias",
+  temporada_navidad: "Navidad / fin de año",
 };
 
 function FeatureImportanceChart({ importances }: { importances: FeatureImportance[] }) {
@@ -3187,6 +3195,22 @@ export default function AdminPredictions() {
                     <code>{modeloMeta.data_hash}</code>
                   </div>
                 </div>
+                {((modeloMeta.seasonality_features?.length ?? 0) > 0 || (modeloMeta.campaign_values?.length ?? 0) > 0) && (
+                  <div className="pred-model-section">
+                    <h3 className="pred-model-section-title">Temporadas y campañas incorporadas</h3>
+                    <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
+                      El modelo considera picos comerciales propios del calzado, como verano, inicio escolar, Fiestas Patrias y Navidad, además de la campaña asignada al producto.
+                    </p>
+                    <div className="ire-variable-tags">
+                      {modeloMeta.seasonality_features?.map((feature) => (
+                        <span key={feature}>{FEATURE_LABELS[feature] ?? feature}</span>
+                      ))}
+                      {modeloMeta.campaign_values?.map((campaign) => (
+                        <span key={campaign}>Campaña: {campaign}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {modeloMeta.feature_importances.length > 0 && (
                   <div className="pred-model-section">
                     <h3 className="pred-model-section-title">Importancia de variables (Feature Importance)</h3>

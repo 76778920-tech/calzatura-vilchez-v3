@@ -72,9 +72,8 @@ def fetch_completed_orders(days: int | None = None) -> list[dict]:
 
 
 def fetch_products() -> list[dict]:
-    # Contrato de campos:
-    #   demand.py → id, nombre, categoria, precio, stock, imagen
-    return _query("productos", {"select": "id,nombre,categoria,precio,stock,imagen"})
+    # Contrato de campos para demand.py: id, nombre, categoria, precio, stock, imagen, campana.
+    return _query("productos", {"select": "id,nombre,categoria,precio,stock,imagen,campana"})
 
 
 def fetch_product_codes() -> dict[str, str]:

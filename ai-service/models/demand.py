@@ -2,7 +2,8 @@
 Demand prediction model.
 Uses a RandomForestRegressor (scikit-learn) trained on all products' aggregated
 historical daily sales. Features: weekday, month, day-of-month, 7-day lag
-average, 30-day lag average, category (label-encoded).
+average, 30-day lag average, category, campaign (label-encoded), and
+seasonal flags for footwear sales peaks.
 
 Falls back to weighted moving average (70 % last-7d + 30 % last-30d) only when
 there are fewer than MIN_TRAIN_ROWS training samples across all products.
@@ -25,7 +26,22 @@ from sklearn.preprocessing import LabelEncoder
 
 # Minimum training rows (product × day pairs) to use the ML model.
 MIN_TRAIN_ROWS = 30
-FEATURE_COLS = ["weekday", "month", "day_of_month", "lag_7", "lag_30", "categoria"]
+SEASONAL_FEATURES = [
+    "temporada_verano",
+    "temporada_escolar",
+    "temporada_fiestas_patrias",
+    "temporada_navidad",
+]
+FEATURE_COLS = [
+    "weekday",
+    "month",
+    "day_of_month",
+    "lag_7",
+    "lag_30",
+    "categoria",
+    "campana",
+    *SEASONAL_FEATURES,
+]
 
 
 # ---------------------------------------------------------------------------
@@ -62,14 +78,40 @@ def _percentile(values: list[float], quantile: float) -> float:
     return ordered[lower] * (1 - weight) + ordered[upper] * weight
 
 
+def _normalize_campaign(value) -> str:
+    """Normalize campaign names so model encoding is stable across sources."""
+    if not isinstance(value, str):
+        return ""
+    return value.strip().lower()
+
+
+def _season_flags(current_date: date) -> dict[str, int]:
+    """
+    Footwear-specific seasonality flags used by the demand model.
+    They represent expected commercial peaks: summer, back-to-school,
+    Peru's Fiestas Patrias, and Christmas / year-end.
+    """
+    month = current_date.month
+    return {
+        "temporada_verano": 1 if month in {12, 1, 2, 3} else 0,
+        "temporada_escolar": 1 if month in {2, 3} else 0,
+        "temporada_fiestas_patrias": 1 if month == 7 else 0,
+        "temporada_navidad": 1 if month in {11, 12} else 0,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Reproducibility helpers
 # ---------------------------------------------------------------------------
 
-def _data_hash(sales_map: dict) -> str:
-    """Stable MD5 fingerprint of the training dataset (sorted by product + total units)."""
+def _data_hash(sales_map: dict, sale_meta: dict | None = None) -> str:
+    """Stable MD5 fingerprint of the training dataset and commercial context."""
+    sale_meta = sale_meta or {}
     key = "|".join(
-        f"{pid}:{sum(v for v in day_sales.values()):.1f}"
+        f"{pid}:"
+        f"{sum(v for v in day_sales.values()):.1f}:"
+        f"{sale_meta.get(pid, {}).get('categoria') or ''}:"
+        f"{_normalize_campaign(sale_meta.get(pid, {}).get('campana'))}"
         for pid, day_sales in sorted(sales_map.items())
     )
     return hashlib.md5(key.encode()).hexdigest()[:16]
@@ -130,7 +172,7 @@ def build_daily_sales_by_product(
 # Feature engineering
 # ---------------------------------------------------------------------------
 
-def _lag_features(current_date: date, day_sales: dict, cat_enc: int) -> dict:
+def _lag_features(current_date: date, day_sales: dict, cat_enc: int, campaign_enc: int = 0) -> dict:
     """Compute temporal and lag features for a single date."""
     lag_7 = sum(
         day_sales.get((current_date - timedelta(days=d)).isoformat(), 0.0)
@@ -147,6 +189,8 @@ def _lag_features(current_date: date, day_sales: dict, cat_enc: int) -> dict:
         "lag_7": lag_7,                          # mean daily units last 7 days
         "lag_30": lag_30,                        # mean daily units last 30 days
         "categoria": cat_enc,
+        "campana": campaign_enc,
+        **_season_flags(current_date),
     }
 
 
@@ -161,18 +205,25 @@ def _train_global_model(
 ) -> tuple:
     """
     Train a RandomForestRegressor on the combined historical data of all
-    products. Returns (model, label_encoder, used_ml, training_meta).
+    products. Returns (model, category_encoder, campaign_encoder, used_ml, training_meta).
     used_ml=False when data is insufficient; model is None in that case.
     training_meta always contains reproducibility and explainability fields.
     """
     today = date.today()
     date_range_start = (today - timedelta(days=history_days - 1)).isoformat()
     date_range_end = today.isoformat()
-    data_hash = _data_hash(sales_map)
+    data_hash = _data_hash(sales_map, sale_meta)
 
     categories = list({(sale_meta.get(pid, {}).get("categoria") or "") for pid in sales_map})
     le = LabelEncoder()
     le.fit(categories + [""])
+
+    campaigns = list({
+        _normalize_campaign(sale_meta.get(pid, {}).get("campana"))
+        for pid in sales_map
+    })
+    campaign_le = LabelEncoder()
+    campaign_le.fit(campaigns + [""])
 
     rows = []
     for pid, day_sales in sales_map.items():
@@ -181,11 +232,16 @@ def _train_global_model(
             cat_enc = int(le.transform([cat_raw])[0])
         except ValueError:
             cat_enc = 0
+        campaign_raw = _normalize_campaign(sale_meta.get(pid, {}).get("campana"))
+        try:
+            campaign_enc = int(campaign_le.transform([campaign_raw])[0])
+        except ValueError:
+            campaign_enc = 0
 
         for i in range(history_days):
             current_date = today - timedelta(days=history_days - 1 - i)
             fecha = current_date.isoformat()
-            feat = _lag_features(current_date, day_sales, cat_enc)
+            feat = _lag_features(current_date, day_sales, cat_enc, campaign_enc)
             feat["y"] = day_sales.get(fecha, 0.0)
             rows.append(feat)
 
@@ -197,11 +253,13 @@ def _train_global_model(
         "random_state": 42,
         "sklearn_version": sklearn.__version__,
         "feature_cols": FEATURE_COLS,
+        "seasonality_features": SEASONAL_FEATURES,
+        "campaign_values": sorted(v for v in campaigns if v),
         "data_hash": data_hash,
     }
 
     if len(rows) < MIN_TRAIN_ROWS:
-        return None, le, False, {
+        return None, le, campaign_le, False, {
             **base_meta,
             "model_type": "promedio_movil",
             "feature_importances": [],
@@ -240,7 +298,7 @@ def _train_global_model(
         for col in ["lag_7", "lag_30"]
     }
 
-    return model, le, True, {
+    return model, le, campaign_le, True, {
         **base_meta,
         "model_type": "random_forest",
         "feature_importances": importances,
@@ -255,8 +313,10 @@ def _train_global_model(
 def _ml_predict_horizon(
     model: RandomForestRegressor,
     le: LabelEncoder,
+    campaign_le: LabelEncoder,
     day_sales: dict[str, float],
     cat_raw: str,
+    campaign_raw: str,
     horizon_days: int,
 ) -> tuple[float, float]:
     """
@@ -268,11 +328,15 @@ def _ml_predict_horizon(
         cat_enc = int(le.transform([cat_raw or ""])[0])
     except ValueError:
         cat_enc = 0
+    try:
+        campaign_enc = int(campaign_le.transform([_normalize_campaign(campaign_raw)])[0])
+    except ValueError:
+        campaign_enc = 0
 
     preds = []
     for step in range(1, horizon_days + 1):
         future_date = today + timedelta(days=step)
-        feat = _lag_features(future_date, day_sales, cat_enc)
+        feat = _lag_features(future_date, day_sales, cat_enc, campaign_enc)
         X = np.array([[feat[c] for c in FEATURE_COLS]], dtype=float)
         pred = max(0.0, float(model.predict(X)[0]))
         preds.append(pred)
@@ -342,6 +406,7 @@ def predict_demand(
                 "categoria": sale.get("categoria", ""),
                 "precio": _safe_float(sale.get("precioVenta", 0)),
                 "codigo": sale.get("codigo", ""),
+                "campana": _normalize_campaign(sale.get("campana", "")),
             }
     for order in completed_orders:
         for item in order.get("items", []):
@@ -352,10 +417,22 @@ def predict_demand(
                     "nombre": product.get("nombre", pid),
                     "categoria": product.get("categoria", ""),
                     "precio": _safe_float(product.get("precio", 0)),
+                    "campana": _normalize_campaign(product.get("campana", "")),
                 }
 
+    for pid, product in product_map.items():
+        product_meta = sale_meta.setdefault(pid, {})
+        product_meta.setdefault("nombre", product.get("nombre", pid))
+        product_meta.setdefault("categoria", product.get("categoria", ""))
+        product_meta.setdefault("precio", _safe_float(product.get("precio", 0)))
+        product_meta["campana"] = _normalize_campaign(
+            product.get("campana", product_meta.get("campana", ""))
+        )
+
     # Train global ML model once for all products
-    ml_model, label_enc, used_ml, training_meta = _train_global_model(sales_map, sale_meta, history_days)
+    ml_model, label_enc, campaign_enc, used_ml, training_meta = _train_global_model(
+        sales_map, sale_meta, history_days
+    )
     feature_stats = training_meta.get("feature_stats", {})
 
     window_7 = min(7, history_days)
@@ -371,11 +448,15 @@ def predict_demand(
         if total_sold <= 0:
             continue
 
+        product = product_map.get(pid, {})
+        meta = sale_meta.get(pid, {})
+        cat_raw = product.get("categoria") or meta.get("categoria") or ""
+        campaign_raw = _normalize_campaign(product.get("campana", meta.get("campana", "")))
+
         # Choose prediction method
         if used_ml:
-            cat_raw = sale_meta.get(pid, {}).get("categoria") or ""
             estimated_daily, predicted_units = _ml_predict_horizon(
-                ml_model, label_enc, day_sales, cat_raw, horizon_days
+                ml_model, label_enc, campaign_enc, day_sales, cat_raw, campaign_raw, horizon_days
             )
         else:
             estimated_daily, predicted_units = _heuristic_predict(
@@ -391,8 +472,6 @@ def predict_demand(
         avg_daily_hist = total_sold / history_days
         active_days = sum(1 for v in series if v > 0)
 
-        product = product_map.get(pid, {})
-        meta = sale_meta.get(pid, {})
         stock = int(product.get("stock", 0))
         nombre = product.get("nombre") or meta.get("nombre", pid)
         categoria = product.get("categoria") or meta.get("categoria", "")
@@ -439,6 +518,7 @@ def predict_demand(
             "codigo": codigo,
             "nombre": nombre,
             "categoria": categoria,
+            "campana": campaign_raw,
             "precio": precio,
             "stock_actual": stock,
             "prediccion_unidades": predicted_units,
@@ -528,6 +608,7 @@ def predict_demand(
             "codigo": codes_map.get(pid, ""),
             "nombre": product.get("nombre", pid),
             "categoria": product.get("categoria", ""),
+            "campana": _normalize_campaign(product.get("campana", "")),
             "precio": _safe_float(product.get("precio", 0)),
             "stock_actual": int(product.get("stock", 0)),
             "prediccion_unidades": 0,
