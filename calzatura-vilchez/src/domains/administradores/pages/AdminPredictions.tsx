@@ -3194,9 +3194,9 @@ export default function AdminPredictions() {
                   </div>
                 )}
                 <div className="pred-model-section">
-                  <h3 className="pred-model-section-title">Predicción vs. ventas reales (últimos 30 días)</h3>
+                  <h3 className="pred-model-section-title">Métricas de precisión visual: predicción vs. ventas reales</h3>
                   <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
-                    Compara las unidades vendidas realmente en los últimos 30 días con la estimación diaria del modelo escalada al mismo período. El MAPE mide el error porcentual medio absoluto.
+                    Compara las unidades vendidas realmente en los últimos 30 días con la estimación diaria del modelo escalada al mismo período. Esta lectura muestra si la predicción se acerca al comportamiento real observado. El MAPE mide el error porcentual medio absoluto.
                   </p>
                   <DemandAccuracyChart predictions={predictionsForView} />
                 </div>
@@ -3218,7 +3218,10 @@ export default function AdminPredictions() {
                   </div>
                 )}
                 <div className="pred-model-section">
-                  <h3 className="pred-model-section-title">Monitoreo retrospectivo (MAE / MAPE)</h3>
+                  <h3 className="pred-model-section-title">Métricas de precisión del modelo (MAE / MAPE)</h3>
+                  <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
+                    Evaluación retrospectiva: compara predicciones registradas contra ventas reales cuando el horizonte ya transcurrió. Sirve como evidencia de que el modelo fue evaluado y no solo implementado.
+                  </p>
                   {(!modelMetricsFetched || modelMetricsLoading) && (
                     <div className="pred-lazy-loading">
                       <div className="success-spinner" />
