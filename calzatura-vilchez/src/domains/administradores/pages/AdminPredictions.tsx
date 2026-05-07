@@ -1542,6 +1542,109 @@ function IreSparkline({ data }: { data: IreHistorialPoint[] }) {
   );
 }
 
+function IreHistoryPanel({ data }: { data: IreHistorialPoint[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="dash-card">
+        <div className="dash-card-header">
+          <div>
+            <p className="dash-card-kicker">Evolución histórica</p>
+            <h2 className="dash-card-title">Historial del riesgo empresarial</h2>
+          </div>
+        </div>
+        <div className="pred-empty-card">
+          <p className="pred-empty-title">Aún no hay historial IRE guardado</p>
+          <p className="pred-empty-copy">
+            El historial se registra automáticamente cuando el servicio calcula el IRE en una predicción combinada.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const first = data[0];
+  const last = data[data.length - 1];
+  const delta = last.score - first.score;
+  const avg = data.reduce((sum, item) => sum + item.score, 0) / data.length;
+  const max = data.reduce((best, item) => item.score > best.score ? item : best, data[0]);
+  const min = data.reduce((best, item) => item.score < best.score ? item : best, data[0]);
+  const rows = [...data].reverse().slice(0, 10);
+
+  return (
+    <div className="dash-card">
+      <div className="dash-card-header">
+        <div>
+          <p className="dash-card-kicker">Evolución histórica</p>
+          <h2 className="dash-card-title">Historial del riesgo empresarial</h2>
+          <p className="pred-section-note">
+            Cada registro conserva el score, nivel, dimensiones y snapshot de auditoría del IRE calculado por el servicio IA.
+          </p>
+        </div>
+      </div>
+
+      <div className="pred-model-meta-grid" style={{ marginBottom: "1rem" }}>
+        <div className="pred-model-meta-item">
+          <span className="pred-sub">Último registro</span>
+          <strong>{last.fecha} · {last.score}/100</strong>
+        </div>
+        <div className="pred-model-meta-item">
+          <span className="pred-sub">Cambio del período</span>
+          <strong>{delta === 0 ? "sin cambio" : `${delta > 0 ? "+" : ""}${delta} pts`}</strong>
+        </div>
+        <div className="pred-model-meta-item">
+          <span className="pred-sub">Promedio histórico</span>
+          <strong>{avg.toFixed(1)}/100</strong>
+        </div>
+        <div className="pred-model-meta-item">
+          <span className="pred-sub">Rango observado</span>
+          <strong>{min.score}–{max.score} pts</strong>
+        </div>
+      </div>
+
+      {data.length >= 2 && (
+        <div style={{ marginBottom: "1rem" }}>
+          <IreSparkline data={data} />
+        </div>
+      )}
+
+      <div className="admin-table-wrap">
+        <table className="admin-table" style={{ fontSize: "12px" }}>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Score</th>
+              <th>Nivel</th>
+              <th>Versión</th>
+              <th>Stock</th>
+              <th>Ingresos</th>
+              <th>Demanda</th>
+              <th>Productos con historial</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((item) => (
+              <tr key={item.fecha}>
+                <td>{item.fecha}</td>
+                <td><strong>{item.score}/100</strong></td>
+                <td>
+                  <span className={`ire-nivel ire-nivel-${item.nivel}`}>
+                    {IRE_NIVEL_LABELS[item.nivel] ?? item.nivel}
+                  </span>
+                </td>
+                <td>{item.version ? `v${item.version}` : "—"}</td>
+                <td>{item.dimensiones?.riesgo_stock ?? "—"}</td>
+                <td>{item.dimensiones?.riesgo_ingresos ?? "—"}</td>
+                <td>{item.dimensiones?.riesgo_demanda ?? "—"}</td>
+                <td>{item.detalle?.total_con_historial ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function DriftBadge({ score }: { score: number | undefined }) {
   if (score === undefined) return null;
   if (score < 0.35) return null;
@@ -1857,7 +1960,7 @@ export default function AdminPredictions() {
     if (activeTab === "modelo" && !modelMetricsFetched && !modelMetricsLoading && modeloMeta) {
       timers.push(window.setTimeout(() => void loadModelMetrics(), 0));
     }
-    if (activeTab === "resumen" && !ireHistorialFetched) {
+    if ((activeTab === "resumen" || activeTab === "ire") && !ireHistorialFetched) {
       timers.push(window.setTimeout(() => void loadIreHistorial(), 0));
     }
     return () => {
@@ -1868,8 +1971,10 @@ export default function AdminPredictions() {
   const refreshPredictions = useCallback(async () => {
     setWeeklyChartFetched(false);
     setModelMetricsFetched(false);
+    setIreHistorialFetched(false);
     setWeeklyChart([]);
     setModelMetrics(null);
+    setIreHistorial([]);
     await invalidateAICache();
     await load(horizon, history);
   }, [horizon, history, load]);
@@ -2529,45 +2634,48 @@ export default function AdminPredictions() {
           transition={{ duration: 0.38, ease: "easeOut" }}
         >
           {ireData?.variables?.length ? (
-            <motion.section
-              className="ire-variable-panel"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.08 }}
-            >
-              <div className="ire-variable-head">
-                <div>
-                  <p className="ire-variable-kicker">Definición del IRE</p>
-                  <h3 className="ire-variable-title">Variables del riesgo empresarial</h3>
+            <>
+              <motion.section
+                className="ire-variable-panel"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: 0.08 }}
+              >
+                <div className="ire-variable-head">
+                  <div>
+                    <p className="ire-variable-kicker">Definición del IRE</p>
+                    <h3 className="ire-variable-title">Variables del riesgo empresarial</h3>
+                  </div>
+                  <div className="ire-formula-wrap">
+                    {ireData.version && <span className="ire-version">v{ireData.version}</span>}
+                    {ireData.formula && <code className="ire-formula">{ireData.formula}</code>}
+                  </div>
                 </div>
-                <div className="ire-formula-wrap">
-                  {ireData.version && <span className="ire-version">v{ireData.version}</span>}
-                  {ireData.formula && <code className="ire-formula">{ireData.formula}</code>}
+                {ireData.definicion && <p className="ire-variable-def">{ireData.definicion}</p>}
+                <div className="ire-variable-grid">
+                  {ireData.variables.map((variable) => (
+                    <article key={variable.codigo} className="ire-variable-card">
+                      <div className="ire-variable-top">
+                        <span className="ire-variable-name">{variable.nombre}</span>
+                        <span className="ire-variable-weight">{Math.round(variable.peso * 100)}%</span>
+                      </div>
+                      <div className="ire-variable-score-row">
+                        <span className="ire-variable-score">{variable.valor}</span>
+                        <span className="ire-variable-impact">aporta {variable.contribucion_score} pts</span>
+                      </div>
+                      <p className="ire-variable-copy">{variable.descripcion}</p>
+                      <p className="ire-variable-source">{variable.fuente}</p>
+                      <div className="ire-variable-tags">
+                        {variable.indicadores.map((indicador) => (
+                          <span key={indicador}>{IRE_INDICATOR_LABELS[indicador] ?? indicador}</span>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
                 </div>
-              </div>
-              {ireData.definicion && <p className="ire-variable-def">{ireData.definicion}</p>}
-              <div className="ire-variable-grid">
-                {ireData.variables.map((variable) => (
-                  <article key={variable.codigo} className="ire-variable-card">
-                    <div className="ire-variable-top">
-                      <span className="ire-variable-name">{variable.nombre}</span>
-                      <span className="ire-variable-weight">{Math.round(variable.peso * 100)}%</span>
-                    </div>
-                    <div className="ire-variable-score-row">
-                      <span className="ire-variable-score">{variable.valor}</span>
-                      <span className="ire-variable-impact">aporta {variable.contribucion_score} pts</span>
-                    </div>
-                    <p className="ire-variable-copy">{variable.descripcion}</p>
-                    <p className="ire-variable-source">{variable.fuente}</p>
-                    <div className="ire-variable-tags">
-                      {variable.indicadores.map((indicador) => (
-                        <span key={indicador}>{IRE_INDICATOR_LABELS[indicador] ?? indicador}</span>
-                      ))}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </motion.section>
+              </motion.section>
+              <IreHistoryPanel data={ireHistorial} />
+            </>
           ) : (
             <div className="pred-empty-card">
               <Brain size={28} />

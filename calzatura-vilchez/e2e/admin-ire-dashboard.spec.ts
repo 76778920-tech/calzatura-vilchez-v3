@@ -20,8 +20,23 @@ const MOCK_IRE_BAJO = {
   score: 18,
   nivel: "bajo",
   descripcion: "El riesgo empresarial es bajo. La operación está bajo control.",
+  version: "1.1.0",
+  definicion: "Indice proxy de riesgo empresarial comercial-operativo.",
+  formula: "IRE = riesgo_stock * 0.40 + riesgo_ingresos * 0.35 + riesgo_demanda * 0.25",
   dimensiones: { riesgo_stock: 15, riesgo_ingresos: 20, riesgo_demanda: 18 },
   pesos: { riesgo_stock: 0.4, riesgo_ingresos: 0.35, riesgo_demanda: 0.25 },
+  variables: [
+    {
+      codigo: "riesgo_stock",
+      nombre: "Riesgo de stock",
+      peso: 0.4,
+      valor: 15,
+      contribucion_score: 6,
+      descripcion: "Presion del inventario.",
+      fuente: "Prediccion de demanda e inventario.",
+      indicadores: ["productos_criticos", "total_con_historial"],
+    },
+  ],
   detalle: {
     total_productos: 5,
     productos_criticos: 0,
@@ -35,8 +50,23 @@ const MOCK_IRE_CRITICO = {
   score: 82,
   nivel: "critico",
   descripcion: "El riesgo empresarial es crítico. Requiere atención inmediata.",
+  version: "1.1.0",
+  definicion: "Indice proxy de riesgo empresarial comercial-operativo.",
+  formula: "IRE = riesgo_stock * 0.40 + riesgo_ingresos * 0.35 + riesgo_demanda * 0.25",
   dimensiones: { riesgo_stock: 90, riesgo_ingresos: 75, riesgo_demanda: 80 },
   pesos: { riesgo_stock: 0.4, riesgo_ingresos: 0.35, riesgo_demanda: 0.25 },
+  variables: [
+    {
+      codigo: "riesgo_stock",
+      nombre: "Riesgo de stock",
+      peso: 0.4,
+      valor: 90,
+      contribucion_score: 36,
+      descripcion: "Presion del inventario.",
+      fuente: "Prediccion de demanda e inventario.",
+      indicadores: ["productos_criticos", "total_con_historial"],
+    },
+  ],
   detalle: {
     total_productos: 5,
     productos_criticos: 4,
@@ -63,11 +93,11 @@ const MOCK_IRE_PROYECTADO = {
 };
 
 const MOCK_IRE_HISTORIAL = [
-  { fecha: "2026-04-28", score: 20, nivel: "bajo" },
-  { fecha: "2026-04-29", score: 22, nivel: "bajo" },
-  { fecha: "2026-04-30", score: 19, nivel: "bajo" },
-  { fecha: "2026-05-01", score: 21, nivel: "bajo" },
-  { fecha: "2026-05-02", score: 18, nivel: "bajo" },
+  { fecha: "2026-04-28", score: 20, nivel: "bajo", version: "1.1.0", dimensiones: { riesgo_stock: 18, riesgo_ingresos: 22, riesgo_demanda: 20 }, detalle: { total_con_historial: 4 } },
+  { fecha: "2026-04-29", score: 22, nivel: "bajo", version: "1.1.0", dimensiones: { riesgo_stock: 20, riesgo_ingresos: 24, riesgo_demanda: 22 }, detalle: { total_con_historial: 4 } },
+  { fecha: "2026-04-30", score: 19, nivel: "bajo", version: "1.1.0", dimensiones: { riesgo_stock: 16, riesgo_ingresos: 21, riesgo_demanda: 19 }, detalle: { total_con_historial: 4 } },
+  { fecha: "2026-05-01", score: 21, nivel: "bajo", version: "1.1.0", dimensiones: { riesgo_stock: 17, riesgo_ingresos: 23, riesgo_demanda: 21 }, detalle: { total_con_historial: 4 } },
+  { fecha: "2026-05-02", score: 18, nivel: "bajo", version: "1.1.0", dimensiones: { riesgo_stock: 15, riesgo_ingresos: 20, riesgo_demanda: 18 }, detalle: { total_con_historial: 4 } },
 ];
 
 function buildCombinedResponse(opts: {
@@ -194,6 +224,24 @@ test.describe("admin predicciones → tarjeta IRE y sparkline", () => {
 
     // La etiqueta de días debe aparecer
     await expect(page.locator(".ire-sparkline-label")).toBeVisible();
+  });
+
+  test("Detalle IRE muestra historial auditable del riesgo empresarial", async ({ page }) => {
+    const response = buildCombinedResponse({
+      ire: MOCK_IRE_BAJO,
+      ire_historial: MOCK_IRE_HISTORIAL,
+    });
+    await setupAIMock(page, response);
+    await goToPredictions(page);
+
+    await expect(page.locator(".ire-hero")).toBeVisible({ timeout: 20_000 });
+    await page.getByRole("tab", { name: /Detalle IRE/i }).click();
+
+    await expect(page.getByText("Historial del riesgo empresarial")).toBeVisible();
+    await expect(page.getByText("Último registro")).toBeVisible();
+    await expect(page.getByText("2026-05-02 · 18/100")).toBeVisible();
+    await expect(page.getByRole("cell", { name: "2026-05-02" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "v1.1.0" }).first()).toBeVisible();
   });
 
   // ──────────────────────────────────────────────────────────────────────────
