@@ -126,8 +126,13 @@ def log_startup_context():
     has_supabase_key = bool(os.getenv("SUPABASE_SERVICE_KEY"))
     print(f"[startup] cwd={os.getcwd()}")
     print(f"[startup] PORT={port}")
+    has_firebase_project = bool(os.getenv("FIREBASE_PROJECT_ID"))
+    superadmin_emails_raw = os.getenv("SUPERADMIN_EMAILS", "")
+    superadmin_count = len([e for e in superadmin_emails_raw.split(",") if e.strip()])
     print(f"[startup] SUPABASE_URL present={has_supabase_url}")
     print(f"[startup] SUPABASE_SERVICE_KEY present={has_supabase_key}")
+    print(f"[startup] FIREBASE_PROJECT_ID present={has_firebase_project}")
+    print(f"[startup] SUPERADMIN_EMAILS count={superadmin_count}")
 
     # F-04: restaurar training_meta guardado en BD para no arrancar en frío sin contexto
     try:
