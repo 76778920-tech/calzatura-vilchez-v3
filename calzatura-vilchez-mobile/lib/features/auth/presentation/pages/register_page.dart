@@ -169,10 +169,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       return;
     }
 
-    final nombre =
-        '${_nombresCtrl.text.trim()} ${_apellidosCtrl.text.trim()}'.trim();
+    final nombre = '${_nombresCtrl.text.trim()} ${_apellidosCtrl.text.trim()}'
+        .trim();
 
-    final ok = await ref.read(authNotifierProvider.notifier).register(
+    final ok = await ref
+        .read(authNotifierProvider.notifier)
+        .register(
           email: _emailCtrl.text.trim(),
           password: _passCtrl.text,
           dni: _validatedDni,
@@ -316,7 +318,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                               Icons.search,
                                               color: Colors.white54,
                                             ),
-                                      onPressed: _lookingUpDni || dniDigits.length != 8
+                                      onPressed:
+                                          _lookingUpDni || dniDigits.length != 8
                                           ? null
                                           : _lookupDni,
                                     ),
@@ -473,11 +476,11 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                               ),
                             ),
                           ).animate().slideY(
-                                begin: 0.2,
-                                delay: 300.ms,
-                                duration: 400.ms,
-                                curve: Curves.easeOutCubic,
-                              ),
+                            begin: 0.2,
+                            delay: 300.ms,
+                            duration: 400.ms,
+                            curve: Curves.easeOutCubic,
+                          ),
                           const SizedBox(height: 24),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,

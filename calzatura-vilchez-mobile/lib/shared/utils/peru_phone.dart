@@ -13,7 +13,9 @@ String peruPhoneDigits(String value) {
 
 String _groupMobileDigits(String nineDigits) {
   final slice = nineDigits.length > 9 ? nineDigits.substring(0, 9) : nineDigits;
-  return slice.replaceAllMapped(RegExp(r'(\d{3})(?=\d)'), (m) => '${m[0]} ').trim();
+  return slice
+      .replaceAllMapped(RegExp(r'(\d{3})(?=\d)'), (m) => '${m[0]} ')
+      .trim();
 }
 
 /// Formato guardado en Supabase / alineado con la web: `+51 9xx xxx xxx`
@@ -26,7 +28,8 @@ String formatPeruPhone(String value) {
 
 bool isValidPeruPhone(String value) {
   final digits = peruPhoneDigits(value);
-  return RegExp(r'^9\d{8}$').hasMatch(digits) && !_blockedNumbers.contains(digits);
+  return RegExp(r'^9\d{8}$').hasMatch(digits) &&
+      !_blockedNumbers.contains(digits);
 }
 
 /// Normaliza la entrada del usuario a solo dígitos (máx 9).

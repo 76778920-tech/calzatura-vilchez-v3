@@ -18,8 +18,7 @@ class ProfilePage extends ConsumerWidget {
     final nombre =
         user?.displayName ?? user?.email?.split('@').first ?? 'Usuario';
     final email = user?.email ?? '';
-    final initial =
-        nombre.isNotEmpty ? nombre[0].toUpperCase() : 'U';
+    final initial = nombre.isNotEmpty ? nombre[0].toUpperCase() : 'U';
 
     return Scaffold(
       backgroundColor: AppColors.beige,
@@ -68,12 +67,11 @@ class ProfilePage extends ConsumerWidget {
                             ),
                           ),
                         ),
-                      )
-                          .animate()
-                          .scale(
-                              delay: 100.ms,
-                              duration: 500.ms,
-                              curve: Curves.elasticOut),
+                      ).animate().scale(
+                        delay: 100.ms,
+                        duration: 500.ms,
+                        curve: Curves.elasticOut,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         nombre,
@@ -87,30 +85,41 @@ class ProfilePage extends ConsumerWidget {
                       Text(
                         email,
                         style: const TextStyle(
-                            color: Colors.white54, fontSize: 12),
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
                       ).animate().fadeIn(delay: 400.ms),
                       const SizedBox(height: 8),
-                      roleAsync.whenData(
-                        (role) => Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.gold.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                                color: AppColors.gold.withValues(alpha: 0.4)),
-                          ),
-                          child: Text(
-                            role.toUpperCase(),
-                            style: const TextStyle(
-                              color: AppColors.gold,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                      ).valueOrNull ??
+                      roleAsync
+                              .whenData(
+                                (role) => Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.gold.withValues(
+                                      alpha: 0.15,
+                                    ),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: AppColors.gold.withValues(
+                                        alpha: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    role.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: AppColors.gold,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .valueOrNull ??
                           const SizedBox(),
                     ],
                   ),
@@ -135,7 +144,8 @@ class ProfilePage extends ConsumerWidget {
                         color: AppColors.black,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                            color: AppColors.gold.withValues(alpha: 0.4)),
+                          color: AppColors.gold.withValues(alpha: 0.4),
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.gold.withValues(alpha: 0.15),
@@ -164,13 +174,18 @@ class ProfilePage extends ConsumerWidget {
                                 Text(
                                   'Gestionar productos, pedidos y usuarios',
                                   style: TextStyle(
-                                      color: Colors.white54, fontSize: 11),
+                                    color: Colors.white54,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
-                          const Icon(Icons.arrow_forward_ios,
-                              color: AppColors.gold, size: 14),
+                          const Icon(
+                            Icons.arrow_forward_ios,
+                            color: AppColors.gold,
+                            size: 14,
+                          ),
                         ],
                       ),
                     ),
@@ -216,20 +231,23 @@ class ProfilePage extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 4),
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      await ref
-                          .read(authNotifierProvider.notifier)
-                          .signOut();
+                      await ref.read(authNotifierProvider.notifier).signOut();
                       if (context.mounted) context.go('/login');
                     },
-                    icon: const Icon(Icons.logout_rounded,
-                        color: AppColors.error),
-                    label: const Text('Cerrar sesión',
-                        style: TextStyle(color: AppColors.error)),
+                    icon: const Icon(
+                      Icons.logout_rounded,
+                      color: AppColors.error,
+                    ),
+                    label: const Text(
+                      'Cerrar sesión',
+                      style: TextStyle(color: AppColors.error),
+                    ),
                     style: OutlinedButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50),
                       side: const BorderSide(color: AppColors.error),
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14)),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                   ),
                 ).animate(delay: 350.ms).fadeIn(),
@@ -311,15 +329,21 @@ class _ProfileTile extends StatelessWidget {
           ),
         ),
         subtitle: subtitle != null
-            ? Text(subtitle!,
+            ? Text(
+                subtitle!,
                 style: const TextStyle(
-                    color: AppColors.textSecondary, fontSize: 12))
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              )
             : null,
-        trailing: const Icon(Icons.arrow_forward_ios,
-            size: 14, color: AppColors.textSecondary),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 14,
+          color: AppColors.textSecondary,
+        ),
         onTap: onTap,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
     );
   }

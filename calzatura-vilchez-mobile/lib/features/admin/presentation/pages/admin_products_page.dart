@@ -1,10 +1,14 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../../../../core/config/env.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 
@@ -52,6 +56,67 @@ const _tallasPorCategoria = {
   'nino': ['24', '25', '26', '27', '28', '29', '30', '31', '32'],
   'bebe': ['18', '19', '20', '21', '22'],
 };
+const _materialPresets = [
+  'Cuero',
+  'Gamuza',
+  'Charol',
+  'Nubuk',
+  'Sintético',
+  'Textil',
+];
+const _styleOptions = [
+  'Urbanas',
+  'Deportivas',
+  'Casuales',
+  'Outdoor',
+  'Ejecutivo',
+  'Weekend',
+];
+const _styleAllowedTypes = {
+  'Urbanas': ['Zapatillas'],
+  'Deportivas': ['Zapatillas'],
+  'Casuales': [
+    'Zapatillas',
+    'Zapatos Casuales',
+    'Zapatos',
+    'Sandalias',
+    'Botines',
+  ],
+  'Outdoor': ['Zapatillas', 'Botines'],
+  'Ejecutivo': ['Zapatos de Vestir', 'Mocasines', 'Zapatos', 'Escolar'],
+  'Weekend': [
+    'Zapatillas',
+    'Zapatos Casuales',
+    'Botines',
+    'Sandalias',
+    'Mocasines',
+  ],
+};
+const _colorPalette = [
+  ('Negro', Color(0xFF111111)),
+  ('Blanco', Color(0xFFF4F1E8)),
+  ('Nude', Color(0xFFD9D4AD)),
+  ('Camel', Color(0xFFC77B18)),
+  ('Multicolor', Color(0xFF9C27B0)),
+  ('Gris', Color(0xFF8D8D8D)),
+  ('Dorado', Color(0xFFC9A227)),
+  ('Plata', Color(0xFFC7C7C7)),
+  ('Morado', Color(0xFFA349C4)),
+  ('Azul Claro', Color(0xFFA7CBDD)),
+  ('Azul', Color(0xFF3F46C9)),
+  ('Verde', Color(0xFF189C1F)),
+  ('Chocolate', Color(0xFFA87012)),
+  ('Marrón', Color(0xFF915D38)),
+  ('Rojo', Color(0xFFFF2F1F)),
+  ('Rosa', Color(0xFFE5B0B2)),
+  ('Café Claro', Color(0xFFD2B254)),
+  ('Guinda', Color(0xFF7B2432)),
+  ('Petróleo Oscuro', Color(0xFF2F535D)),
+  ('Rose Gold', Color(0xFFD9C2B2)),
+];
+
+const _variantSlotCount = 5;
+const _imageSlotCount = 2;
 
 String _normalizeAdminCategory(String category) {
   if (category == 'mujer') return 'dama';
@@ -59,21 +124,88 @@ String _normalizeAdminCategory(String category) {
 }
 
 List<String> _sizesForCategory(String category) {
+  if (category.trim().isEmpty) return [];
   return _tallasPorCategoria[_normalizeAdminCategory(category)] ??
       _tallasPorCategoria['hombre']!;
 }
 
 List<String> _typesForCategory(String category) {
+  if (category.trim().isEmpty) return [];
   return _tiposCalzado[_normalizeAdminCategory(category)] ??
       _tiposCalzado['hombre']!;
 }
 
 String _normalizeVariantCode(String value) {
-  return value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9-]'), '').trim();
+  final normalized = value
+      .toUpperCase()
+      .replaceAll(RegExp(r'[^A-Z0-9-]'), '')
+      .trim();
+  return normalized.length > 40 ? normalized.substring(0, 40) : normalized;
 }
 
 bool _isValidVariantCode(String value) {
   return RegExp(r'^[A-Z0-9-]{3,40}$').hasMatch(value);
+}
+
+String _capitalizeWords(String value) => value
+    .trim()
+    .split(RegExp(r'\s+'))
+    .where((part) => part.isNotEmpty)
+    .map(
+      (part) =>
+          part[0].toUpperCase() +
+          (part.length > 1 ? part.substring(1).toLowerCase() : ''),
+    )
+    .join(' ');
+
+Color _colorSwatch(String colorName) {
+  final normalized = colorName.toLowerCase();
+  for (final item in _colorPalette) {
+    if (item.$1.toLowerCase() == normalized) return item.$2;
+  }
+  return AppColors.textSecondary;
+}
+
+bool _isValidUrl(String value) {
+  final uri = Uri.tryParse(value.trim());
+  return uri != null && uri.hasScheme && uri.host.isNotEmpty;
+}
+
+Future<String> _pickAndUploadCloudinaryImage() async {
+  final picked = await ImagePicker().pickImage(
+    source: ImageSource.gallery,
+    maxWidth: 1200,
+    imageQuality: 78,
+  );
+  if (picked == null) return '';
+  final length = await picked.length();
+  if (length > 4 * 1024 * 1024) {
+    throw Exception('La imagen supera 4 MB despues de comprimir.');
+  }
+
+  final request =
+      http.MultipartRequest(
+          'POST',
+          Uri.parse(
+            'https://api.cloudinary.com/v1_1/${Env.cloudinaryCloudName}/image/upload',
+          ),
+        )
+        ..fields['upload_preset'] = Env.cloudinaryUploadPreset
+        ..files.add(await http.MultipartFile.fromPath('file', picked.path));
+
+  final response = await request.send();
+  final body = await response.stream.bytesToString();
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw Exception('No se pudo subir la imagen a Cloudinary.');
+  }
+  final secureUrlMatch = RegExp(
+    r'"secure_url"\s*:\s*"([^"]+)"',
+  ).firstMatch(body);
+  final url = secureUrlMatch?.group(1)?.replaceAll(r'\/', '/');
+  if (url == null || url.isEmpty) {
+    throw Exception('Cloudinary no devolvio URL segura.');
+  }
+  return url;
 }
 
 double _parseDouble(String value) {
@@ -103,6 +235,84 @@ Map<String, double> _calculatePriceRange({
     'precioSugerido': _roundMoney(safeCost * (1 + safeTarget / 100)),
     'precioMaximo': _roundMoney(safeCost * (1 + safeMax / 100)),
   };
+}
+
+String? _validateCommercialDraft({
+  required String category,
+  required String type,
+  required String material,
+  required Set<String> styles,
+}) {
+  if (category.isEmpty || !_categorias.contains(category)) {
+    return 'Selecciona una categoria comercial valida.';
+  }
+  if (type.trim().isEmpty) {
+    return 'Selecciona el tipo de calzado.';
+  }
+  if (!_typesForCategory(category).contains(type.trim())) {
+    return 'El tipo de calzado no corresponde a la categoria seleccionada.';
+  }
+  if (material.trim().isNotEmpty &&
+      !_materialPresets.contains(material.trim())) {
+    return 'Selecciona un material permitido en la paleta comercial.';
+  }
+  for (final style in styles) {
+    if (!_styleOptions.contains(style)) {
+      return 'El estilo "$style" no es un valor comercial permitido.';
+    }
+    final allowedTypes = _styleAllowedTypes[style] ?? const <String>[];
+    if (!allowedTypes.contains(type.trim())) {
+      return 'El estilo "$style" no corresponde al tipo de calzado seleccionado.';
+    }
+  }
+  return null;
+}
+
+class _VariantDraft {
+  _VariantDraft(String category)
+    : imageCtrls = List.generate(
+        _imageSlotCount,
+        (_) => TextEditingController(),
+      ),
+      descriptionCtrl = TextEditingController(),
+      sizeStock = {for (final size in _sizesForCategory(category)) size: 0};
+
+  String color = '';
+  final List<TextEditingController> imageCtrls;
+  final TextEditingController descriptionCtrl;
+  Map<String, int> sizeStock;
+  bool active = true;
+
+  int get totalStock => sizeStock.values.fold(0, (sum, qty) => sum + qty);
+
+  List<String> get images => imageCtrls
+      .map((ctrl) => ctrl.text.trim())
+      .where((url) => url.isNotEmpty)
+      .toList();
+
+  void syncCategory(String category) {
+    sizeStock = {
+      for (final size in _sizesForCategory(category))
+        size: sizeStock[size] ?? 0,
+    };
+  }
+
+  void clear(String category) {
+    color = '';
+    for (final ctrl in imageCtrls) {
+      ctrl.clear();
+    }
+    descriptionCtrl.clear();
+    sizeStock = {for (final size in _sizesForCategory(category)) size: 0};
+    active = true;
+  }
+
+  void dispose() {
+    for (final ctrl in imageCtrls) {
+      ctrl.dispose();
+    }
+    descriptionCtrl.dispose();
+  }
 }
 
 Future<Map<String, String>> _fetchProductCodesMap() async {
@@ -140,6 +350,8 @@ Future<Map<String, Map<String, dynamic>>> _fetchProductFinancialsMap() async {
 
 final adminProductsProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+      ref.watch(_adminProductsRealtimeProvider);
+      ref.watch(_adminProductsVersionProvider);
       final productsData = await _supabase
           .from('productos')
           .select(
@@ -161,6 +373,48 @@ final adminProductsProvider =
       }).toList();
     });
 
+final _adminProductsVersionProvider = StateProvider<int>((ref) => 0);
+
+final _adminProductsRealtimeProvider = Provider<void>((ref) {
+  Timer? debounce;
+
+  void refresh(_) {
+    debounce?.cancel();
+    debounce = Timer(const Duration(milliseconds: 300), () {
+      ref
+          .read(_adminProductsVersionProvider.notifier)
+          .update((value) => value + 1);
+    });
+  }
+
+  final channel = sb.Supabase.instance.client
+      .channel('cv-admin-productos')
+      .onPostgresChanges(
+        event: sb.PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'productos',
+        callback: refresh,
+      )
+      .onPostgresChanges(
+        event: sb.PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'productoCodigos',
+        callback: refresh,
+      )
+      .onPostgresChanges(
+        event: sb.PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'productoFinanzas',
+        callback: refresh,
+      )
+      .subscribe();
+
+  ref.onDispose(() {
+    debounce?.cancel();
+    channel.unsubscribe();
+  });
+});
+
 class AdminProductsPage extends ConsumerStatefulWidget {
   const AdminProductsPage({super.key});
 
@@ -173,6 +427,7 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
   bool _searching = false;
   String _categoryFilter = 'todos';
   String _stockFilter = 'todos';
+  String _featuredFilter = 'todos';
 
   @override
   void dispose() {
@@ -194,10 +449,20 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
         final stock = (p['stock'] as num?)?.toInt() ?? 0;
         return stock > 0 && stock <= 5;
       }).toList();
+    } else if (_stockFilter == 'con') {
+      list = list
+          .where((p) => ((p['stock'] as num?)?.toInt() ?? 0) > 5)
+          .toList();
     } else if (_stockFilter == 'sin') {
       list = list
           .where((p) => ((p['stock'] as num?)?.toInt() ?? 0) == 0)
           .toList();
+    }
+
+    if (_featuredFilter == 'destacados') {
+      list = list.where((p) => p['destacado'] == true).toList();
+    } else if (_featuredFilter == 'normales') {
+      list = list.where((p) => p['destacado'] != true).toList();
     }
 
     final query = _searchCtrl.text.trim().toLowerCase();
@@ -414,12 +679,28 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
                       child: _FilterChips(
                         items: {
                           'todos': 'Todo stock',
+                          'con': 'Con stock',
                           'bajo': 'Stock bajo ≤5',
                           'sin': 'Sin stock',
                         },
                         selected: _stockFilter,
                         onSelect: (value) =>
                             setState(() => _stockFilter = value),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                      child: _FilterChips(
+                        items: const {
+                          'todos': 'Todos',
+                          'destacados': 'Destacados',
+                          'normales': 'Normales',
+                        },
+                        selected: _featuredFilter,
+                        onSelect: (value) =>
+                            setState(() => _featuredFilter = value),
                       ),
                     ),
                   ),
@@ -701,10 +982,16 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
 
   late String _category;
   late String _type;
+  String _material = '';
+  final Set<String> _styles = {};
+  String _campaign = '';
+  int? _discount;
   late bool _active;
   late bool _featured;
   Map<String, int> _sizeStock = {};
+  late final List<_VariantDraft> _variantSlots;
   bool _saving = false;
+  bool _uploadingImage = false;
 
   Map<String, double> get _priceRange => _calculatePriceRange(
     cost: _parseDouble(_costCtrl.text),
@@ -721,14 +1008,15 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
       product?['finanzas'] as Map? ?? {},
     );
 
-    _category = _normalizeAdminCategory(
-      product?['categoria']?.toString() ?? 'hombre',
-    );
-    _type =
-        product?['tipoCalzado']?.toString() ??
-        _typesForCategory(_category).first;
-    if (!_typesForCategory(_category).contains(_type)) {
-      _type = _typesForCategory(_category).first;
+    _category = product == null
+        ? ''
+        : _normalizeAdminCategory(product['categoria']?.toString() ?? '');
+    final initialTypes = _typesForCategory(_category);
+    _type = product == null ? '' : product['tipoCalzado']?.toString() ?? '';
+    if (initialTypes.isEmpty) {
+      _type = '';
+    } else if (!initialTypes.contains(_type)) {
+      _type = initialTypes.first;
     }
 
     _codeCtrl = TextEditingController(
@@ -772,8 +1060,24 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     _descriptionCtrl = TextEditingController(
       text: product?['descripcion']?.toString() ?? '',
     );
+    _material = product?['material']?.toString() ?? '';
+    final rawStyles = product?['estilo']?.toString() ?? '';
+    _styles
+      ..clear()
+      ..addAll(
+        rawStyles
+            .split(',')
+            .map((style) => style.trim())
+            .where(_styleOptions.contains),
+      );
+    _campaign = product?['campana']?.toString() ?? '';
+    _discount = (product?['descuento'] as num?)?.toInt();
     _active = product?['activo'] != false;
     _featured = product?['destacado'] == true;
+    _variantSlots = List.generate(
+      _variantSlotCount,
+      (_) => _VariantDraft(_category),
+    );
 
     final rawStock = product?['tallaStock'];
     if (rawStock is Map) {
@@ -802,10 +1106,23 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     ]) {
       controller.dispose();
     }
+    for (final slot in _variantSlots) {
+      slot.dispose();
+    }
     super.dispose();
   }
 
-  int get _totalStock => _sizeStock.values.fold(0, (sum, qty) => sum + qty);
+  bool get _isEditing => widget.product != null;
+
+  List<_VariantDraft> get _activeVariantSlots =>
+      _variantSlots.where((slot) => slot.color.trim().isNotEmpty).toList();
+
+  int get _variantTotalStock =>
+      _variantSlots.fold(0, (sum, slot) => sum + slot.totalStock);
+
+  int get _totalStock => _isEditing
+      ? _sizeStock.values.fold(0, (sum, qty) => sum + qty)
+      : _variantTotalStock;
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -813,11 +1130,15 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     final normalizedCode = _normalizeVariantCode(_codeCtrl.text);
     final price = _parseDouble(_priceCtrl.text);
     final cost = _parseDouble(_costCtrl.text);
-    final color = _colorCtrl.text.trim();
+    final color = _capitalizeWords(_colorCtrl.text);
     final image = _imageCtrl.text.trim();
     final minMargin = _parseDouble(_minMarginCtrl.text);
     final targetMargin = _parseDouble(_targetMarginCtrl.text);
     final maxMargin = _parseDouble(_maxMarginCtrl.text);
+    final material = _material.trim();
+    final styleCsv = _styleOptions
+        .where((style) => _styles.contains(style))
+        .join(',');
     final range = _calculatePriceRange(
       cost: cost,
       minMargin: minMargin,
@@ -834,13 +1155,26 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
 
     final existingCodes = await _fetchProductCodesMap();
     final currentId = widget.product?['id']?.toString();
-    final duplicate = existingCodes.entries.any(
-      (entry) =>
-          entry.key != currentId &&
-          _normalizeVariantCode(entry.value) == normalizedCode,
-    );
+    final duplicate =
+        _isEditing &&
+        existingCodes.entries.any(
+          (entry) =>
+              entry.key != currentId &&
+              _normalizeVariantCode(entry.value) == normalizedCode,
+        );
     if (duplicate) {
       _showError('El código "$normalizedCode" ya existe en otro producto.');
+      return;
+    }
+
+    final duplicateBaseOnCreate =
+        !_isEditing &&
+        existingCodes.values.any(
+          (existingCode) =>
+              _normalizeVariantCode(existingCode) == normalizedCode,
+        );
+    if (duplicateBaseOnCreate) {
+      _showError('El codigo base ya existe en otro producto.');
       return;
     }
 
@@ -856,8 +1190,22 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
       _showError('Selecciona una categoría comercial válida.');
       return;
     }
+    if (_type.trim().isEmpty) {
+      _showError('Selecciona el tipo de calzado.');
+      return;
+    }
     if (!_typesForCategory(_category).contains(_type)) {
       _showError('Selecciona un tipo de calzado acorde a la categoría.');
+      return;
+    }
+    final commercialError = _validateCommercialDraft(
+      category: _category,
+      type: _type,
+      material: material,
+      styles: _styles,
+    );
+    if (commercialError != null) {
+      _showError(commercialError);
       return;
     }
     if (cost <= 0) {
@@ -875,17 +1223,67 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
       );
       return;
     }
-    if (color.isEmpty) {
-      _showError('Registra el color del producto.');
-      return;
-    }
-    if (_totalStock <= 0) {
-      _showError('Registra al menos una talla con stock.');
-      return;
-    }
-    if (image.isEmpty || Uri.tryParse(image)?.hasAbsolutePath != true) {
-      _showError('Ingresa una URL válida para la imagen principal.');
-      return;
+    if (_isEditing) {
+      if (color.isEmpty) {
+        _showError('Registra el color del producto.');
+        return;
+      }
+      if (_totalStock <= 0) {
+        _showError('Registra al menos una talla con stock.');
+        return;
+      }
+      if (image.isEmpty || !_isValidUrl(image)) {
+        _showError('Ingresa una URL valida para la imagen principal.');
+        return;
+      }
+    } else {
+      final activeSlots = _activeVariantSlots;
+      if (activeSlots.isEmpty) {
+        _showError('Completa al menos un color del producto.');
+        return;
+      }
+      final colorNames = activeSlots.map((slot) => slot.color.toLowerCase());
+      if (colorNames.toSet().length != colorNames.length) {
+        _showError('No repitas colores entre variantes.');
+        return;
+      }
+      for (final slot in activeSlots) {
+        if (slot.totalStock <= 0) {
+          _showError('${slot.color}: registra al menos una talla con stock.');
+          return;
+        }
+        if (slot.images.isEmpty) {
+          _showError('${slot.color}: agrega al menos una imagen.');
+          return;
+        }
+        if (slot.images.any((url) => !_isValidUrl(url))) {
+          _showError('${slot.color}: revisa las URL de imagen.');
+          return;
+        }
+      }
+      final generatedCodes = activeSlots.map(
+        (slot) => _normalizeVariantCode(
+          '$normalizedCode-${_variantSlots.indexOf(slot) + 1}',
+        ),
+      );
+      final invalidGenerated = generatedCodes.where(
+        (code) => !_isValidVariantCode(code),
+      );
+      if (invalidGenerated.isNotEmpty) {
+        _showError('Reduce el codigo base para poder generar las variantes.');
+        return;
+      }
+      final duplicatedGenerated = generatedCodes.where(
+        (code) => existingCodes.values.any(
+          (existingCode) => _normalizeVariantCode(existingCode) == code,
+        ),
+      );
+      if (duplicatedGenerated.isNotEmpty) {
+        _showError(
+          'El codigo generado "${duplicatedGenerated.first}" ya existe. Cambia el codigo base.',
+        );
+        return;
+      }
     }
 
     setState(() => _saving = true);
@@ -914,14 +1312,14 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
       'tallas': sizes,
       'tallaStock': filteredStock,
       'marca': _brandCtrl.text.trim(),
-      'material': widget.product?['material']?.toString(),
-      'estilo': widget.product?['estilo']?.toString(),
+      'material': material.isEmpty ? null : material,
+      'estilo': styleCsv.isEmpty ? null : styleCsv,
       'color': color,
       'familiaId': familyId,
       'destacado': _featured,
       'activo': _active,
-      'descuento': widget.product?['descuento'],
-      'campana': widget.product?['campana'],
+      'descuento': _discount,
+      'campana': _campaign.isEmpty ? null : _campaign,
     };
 
     final financialPayload = {
@@ -946,17 +1344,35 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
           },
         );
       } else {
+        final variants = _activeVariantSlots.map((slot) {
+          final slotIndex = _variantSlots.indexOf(slot);
+          final slotStock = <String, int>{};
+          for (final size in _sizesForCategory(_category)) {
+            final qty = slot.sizeStock[size] ?? 0;
+            if (qty > 0) slotStock[size] = qty;
+          }
+          final slotSizes = slotStock.keys.toList()
+            ..sort((a, b) => int.parse(a).compareTo(int.parse(b)));
+          final images = slot.images;
+          return {
+            ...productPayload,
+            'descripcion': slot.descriptionCtrl.text.trim().isEmpty
+                ? _descriptionCtrl.text.trim()
+                : slot.descriptionCtrl.text.trim(),
+            'imagen': images.first,
+            'imagenes': images,
+            'stock': slot.totalStock,
+            'tallas': slotSizes,
+            'tallaStock': slotStock,
+            'color': slot.color,
+            'activo': slot.active,
+            'codigo': _normalizeVariantCode('$normalizedCode-${slotIndex + 1}'),
+            'finanzas': financialPayload,
+          };
+        }).toList();
         await _supabase.rpc(
           'create_product_variants_atomic',
-          params: {
-            'variants': [
-              {
-                ...productPayload,
-                'codigo': normalizedCode,
-                'finanzas': financialPayload,
-              },
-            ],
-          },
+          params: {'variants': variants},
         );
       }
 
@@ -968,9 +1384,18 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
         _showError('Código duplicado: usa un código único para este producto.');
       } else if (message.contains('cv_guard_producto_tipo')) {
         _showError('El tipo de calzado no corresponde a la categoría.');
-      } else if (message.contains('cv_guard_producto_precio') ||
-          message.contains('cv_guard_producto_finanzas')) {
+      } else if (message.contains('cv_guard_producto_estilo')) {
+        _showError('El estilo seleccionado no corresponde al tipo de calzado.');
+      } else if (message.contains('cv_guard_producto_material')) {
+        _showError(
+          'El material seleccionado no pertenece a la paleta comercial permitida.',
+        );
+      } else if (message.contains('cv_guard_producto_precio')) {
         _showError('El precio quedó fuera del rango comercial permitido.');
+      } else if (message.contains('cv_guard_producto_finanzas')) {
+        _showError(
+          'Los márgenes o el rango de precio no coinciden con la regla comercial del producto.',
+        );
       } else {
         _showError('Error al guardar: $error');
       }
@@ -988,13 +1413,26 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     );
   }
 
+  Future<void> _uploadInto(TextEditingController controller) async {
+    if (_uploadingImage) return;
+    setState(() => _uploadingImage = true);
+    try {
+      final url = await _pickAndUploadCloudinaryImage();
+      if (url.isNotEmpty) {
+        controller.text = url;
+        setState(() {});
+      }
+    } catch (error) {
+      _showError(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _uploadingImage = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final sizes = _sizesForCategory(_category);
-    final types = _typesForCategory(_category);
-    if (!types.contains(_type)) {
-      _type = types.first;
-    }
+    final sizes = _category.isEmpty ? <String>[] : _sizesForCategory(_category);
+    final types = _category.isEmpty ? <String>[] : _typesForCategory(_category);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.94,
@@ -1077,33 +1515,60 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                       icon: Icons.sell_outlined,
                       required: true,
                     ),
-                    _Field(
-                      ctrl: _colorCtrl,
-                      label: 'Color *',
-                      icon: Icons.palette_outlined,
-                      required: true,
+                    _DropdownField(
+                      label: 'Material',
+                      value: _material,
+                      items: const ['', ..._materialPresets],
+                      itemLabels: const {'': 'Sin material'},
+                      onChanged: (value) {
+                        setState(() => _material = value ?? '');
+                      },
                     ),
-                    _Field(
-                      ctrl: _imageCtrl,
-                      label: 'Imagen principal (URL) *',
-                      icon: Icons.image_outlined,
-                      required: true,
-                    ),
+                    if (_isEditing) ...[
+                      _Field(
+                        ctrl: _colorCtrl,
+                        label: 'Color *',
+                        icon: Icons.palette_outlined,
+                        required: true,
+                      ),
+                      _Field(
+                        ctrl: _imageCtrl,
+                        label: 'Imagen principal (URL) *',
+                        icon: Icons.image_outlined,
+                        required: true,
+                      ),
+                      _UploadImageButton(
+                        busy: _uploadingImage,
+                        onPressed: () => _uploadInto(_imageCtrl),
+                      ),
+                    ],
 
                     const _FormSection('Categoría y tipo'),
                     _DropdownField(
                       label: 'Categoría',
                       value: _category,
-                      items: _categorias,
+                      items: const ['', ..._categorias],
+                      itemLabels: const {
+                        '': 'Selecciona la categoría',
+                        'hombre': 'Hombre',
+                        'dama': 'Dama',
+                        'juvenil': 'Juvenil',
+                        'nino': 'Niños',
+                        'bebe': 'Bebé',
+                      },
                       onChanged: (value) {
                         if (value == null) return;
                         setState(() {
                           _category = value;
-                          _type = _typesForCategory(value).first;
+                          final nextTypes = _typesForCategory(value);
+                          _type = nextTypes.contains(_type) ? _type : '';
                           _sizeStock = {
                             for (final size in _sizesForCategory(value))
                               size: _sizeStock[size] ?? 0,
                           };
+                          for (final slot in _variantSlots) {
+                            slot.syncCategory(value);
+                          }
                         });
                       },
                     ),
@@ -1111,10 +1576,24 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                     _DropdownField(
                       label: 'Tipo de calzado',
                       value: _type,
-                      items: types,
+                      items: ['', ...types],
+                      itemLabels: const {'': 'Selecciona un tipo'},
                       onChanged: (value) {
                         if (value == null) return;
                         setState(() => _type = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    _StyleSelector(
+                      selected: _styles,
+                      onToggle: (style) {
+                        setState(() {
+                          if (_styles.contains(style)) {
+                            _styles.remove(style);
+                          } else {
+                            _styles.add(style);
+                          }
+                        });
                       },
                     ),
 
@@ -1185,28 +1664,105 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                       maxPrice: _priceRange['precioMaximo'] ?? 0,
                     ),
 
-                    const _FormSection('Stock por talla'),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: sizes.map((size) {
-                        final qty = _sizeStock[size] ?? 0;
-                        return _SizeBox(
-                          size: size,
-                          qty: qty,
-                          onChanged: (value) =>
-                              setState(() => _sizeStock[size] = value),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Stock total: $_totalStock',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
+                    if (_isEditing) ...[
+                      const _FormSection('Stock por talla'),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: sizes.map((size) {
+                          final qty = _sizeStock[size] ?? 0;
+                          return _SizeBox(
+                            size: size,
+                            qty: qty,
+                            onChanged: (value) =>
+                                setState(() => _sizeStock[size] = value),
+                          );
+                        }).toList(),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Stock total: $_totalStock',
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ] else ...[
+                      const _FormSection('Variantes'),
+                      _VariantColorPicker(
+                        slots: _variantSlots,
+                        onSelectColor: (index, color) {
+                          setState(() {
+                            if (color.isEmpty) {
+                              _variantSlots[index].clear(_category);
+                              for (
+                                var i = index + 1;
+                                i < _variantSlots.length;
+                                i++
+                              ) {
+                                _variantSlots[i].clear(_category);
+                              }
+                            } else if (_variantSlots.any(
+                              (slot) =>
+                                  slot != _variantSlots[index] &&
+                                  slot.color.toLowerCase() ==
+                                      color.toLowerCase(),
+                            )) {
+                              _showError('Ese color ya esta seleccionado.');
+                            } else {
+                              _variantSlots[index].color = color;
+                            }
+                          });
+                        },
+                      ),
+                      if (_category.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: Text(
+                            'Selecciona la categoría para habilitar las tallas.',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 10),
+                      if (_activeVariantSlots.isEmpty)
+                        const _VariantEmptyState()
+                      else
+                        ..._variantSlots.indexed
+                            .where((item) => item.$2.color.isNotEmpty)
+                            .map(
+                              (item) => _VariantCard(
+                                index: item.$1,
+                                slot: item.$2,
+                                sizes: sizes,
+                                uploading: _uploadingImage,
+                                onUpload: _uploadInto,
+                                onChanged: () => setState(() {}),
+                                onClear: () => setState(() {
+                                  item.$2.clear(_category);
+                                  for (
+                                    var i = item.$1 + 1;
+                                    i < _variantSlots.length;
+                                    i++
+                                  ) {
+                                    _variantSlots[i].clear(_category);
+                                  }
+                                }),
+                              ),
+                            ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Stock total: $_variantTotalStock',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
 
                     const _FormSection('Descripción'),
                     TextFormField(
@@ -1218,12 +1774,53 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                     ),
 
                     const _FormSection('Opciones'),
-                    _SwitchRow(
-                      label: 'Visible en tienda',
-                      icon: Icons.visibility_outlined,
-                      value: _active,
-                      onChanged: (value) => setState(() => _active = value),
+                    _DropdownField(
+                      label: 'Campaña',
+                      value: _campaign,
+                      items: const [
+                        '',
+                        'lanzamiento',
+                        'nueva-temporada',
+                        'cyber-wow',
+                        'club-calzado',
+                        'outlet',
+                      ],
+                      itemLabels: const {
+                        '': 'Sin campaña',
+                        'lanzamiento': 'Lanzamiento',
+                        'nueva-temporada': 'Nueva Temporada',
+                        'cyber-wow': 'Cyber Wow',
+                        'club-calzado': 'Club Calzado',
+                        'outlet': 'Outlet',
+                      },
+                      onChanged: (value) =>
+                          setState(() => _campaign = value ?? ''),
                     ),
+                    const SizedBox(height: 12),
+                    _DropdownField(
+                      label: 'Descuento Cyber Wow',
+                      value: _discount?.toString() ?? '',
+                      items: const ['', '10', '20', '30'],
+                      itemLabels: const {
+                        '': 'Sin descuento',
+                        '10': '10%',
+                        '20': '20%',
+                        '30': '30%',
+                      },
+                      onChanged: (value) => setState(
+                        () => _discount = (value == null || value.isEmpty)
+                            ? null
+                            : int.parse(value),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_isEditing)
+                      _SwitchRow(
+                        label: 'Visible en tienda',
+                        icon: Icons.visibility_outlined,
+                        value: _active,
+                        onChanged: (value) => setState(() => _active = value),
+                      ),
                     _SwitchRow(
                       label: 'Producto destacado',
                       icon: Icons.star_outline_rounded,
@@ -1235,7 +1832,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                     SizedBox(
                       height: 52,
                       child: ElevatedButton(
-                        onPressed: _saving ? null : _save,
+                        onPressed: (_saving || _uploadingImage) ? null : _save,
                         child: _saving
                             ? const CircularProgressIndicator(
                                 color: AppColors.black,
@@ -1520,21 +2117,424 @@ class _DropdownField extends StatelessWidget {
     required this.value,
     required this.items,
     required this.onChanged,
+    this.itemLabels = const {},
   });
 
   final String label;
   final String value;
   final List<String> items;
   final ValueChanged<String?> onChanged;
+  final Map<String, String> itemLabels;
 
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<String>(
     initialValue: items.contains(value) ? value : items.first,
     decoration: InputDecoration(labelText: label),
     items: items
-        .map((item) => DropdownMenuItem(value: item, child: Text(item)))
+        .map(
+          (item) => DropdownMenuItem(
+            value: item,
+            child: Text(itemLabels[item] ?? item),
+          ),
+        )
         .toList(),
     onChanged: onChanged,
+  );
+}
+
+class _StyleSelector extends StatelessWidget {
+  const _StyleSelector({required this.selected, required this.onToggle});
+
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      const Text(
+        'Estilo',
+        style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+      ),
+      const SizedBox(height: 8),
+      Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: _styleOptions.map((style) {
+          final active = selected.contains(style);
+          return FilterChip(
+            selected: active,
+            label: Text(style),
+            selectedColor: AppColors.gold.withValues(alpha: 0.16),
+            checkmarkColor: AppColors.goldDark,
+            side: BorderSide(
+              color: active ? AppColors.gold : AppColors.shimmerBase,
+            ),
+            onSelected: (_) => onToggle(style),
+          );
+        }).toList(),
+      ),
+    ],
+  );
+}
+
+class _VariantColorPicker extends StatelessWidget {
+  const _VariantColorPicker({required this.slots, required this.onSelectColor});
+
+  final List<_VariantDraft> slots;
+  final void Function(int index, String color) onSelectColor;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    child: Row(
+      children: List.generate(slots.length, (index) {
+        final slot = slots[index];
+        final available = index == 0 || slots[index - 1].color.isNotEmpty;
+        return Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: GestureDetector(
+            onTap: available
+                ? () => _openColorSheet(context, index, slot.color)
+                : null,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 160),
+              opacity: available ? 1 : 0.38,
+              child: Container(
+                width: 96,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: slot.color.isEmpty
+                      ? Colors.white
+                      : AppColors.gold.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: slot.color.isEmpty
+                        ? AppColors.shimmerBase
+                        : AppColors.gold,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        color: slot.color.isEmpty
+                            ? Colors.transparent
+                            : _colorSwatch(slot.color),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.shimmerBase),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Color ${index + 1}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    Text(
+                      slot.color.isEmpty ? 'Elegir' : slot.color,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }),
+    ),
+  );
+
+  void _openColorSheet(BuildContext context, int index, String current) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Selecciona un color',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              Flexible(
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 3.6,
+                  children: [
+                    _ColorOption(
+                      name: 'Sin color',
+                      color: Colors.transparent,
+                      selected: current.isEmpty,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        onSelectColor(index, '');
+                      },
+                    ),
+                    ..._colorPalette.map(
+                      (item) => _ColorOption(
+                        name: item.$1,
+                        color: item.$2,
+                        selected:
+                            current.toLowerCase() == item.$1.toLowerCase(),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          onSelectColor(index, item.$1);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ColorOption extends StatelessWidget {
+  const _ColorOption({
+    required this.name,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String name;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: selected ? AppColors.gold : AppColors.shimmerBase,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.shimmerBase),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _VariantEmptyState extends StatelessWidget {
+  const _VariantEmptyState();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: AppColors.shimmerBase),
+    ),
+    child: const Text(
+      'Selecciona un color para ver aqui las imagenes, tallas, stock y visibilidad de cada variante.',
+      textAlign: TextAlign.center,
+      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+    ),
+  );
+}
+
+class _VariantCard extends StatelessWidget {
+  const _VariantCard({
+    required this.index,
+    required this.slot,
+    required this.sizes,
+    required this.uploading,
+    required this.onUpload,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final int index;
+  final _VariantDraft slot;
+  final List<String> sizes;
+  final bool uploading;
+  final ValueChanged<TextEditingController> onUpload;
+  final VoidCallback onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 10),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.gold.withValues(alpha: 0.28)),
+    ),
+    child: ExpansionTile(
+      initiallyExpanded: index == 0,
+      tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+      leading: Container(
+        width: 28,
+        height: 28,
+        decoration: BoxDecoration(
+          color: _colorSwatch(slot.color),
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.shimmerBase),
+        ),
+      ),
+      title: Text(
+        slot.color,
+        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+      ),
+      subtitle: Text(
+        'Stock: ${slot.totalStock}',
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+      ),
+      trailing: IconButton(
+        icon: const Icon(Icons.close_rounded, size: 18),
+        onPressed: onClear,
+      ),
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _SwitchRow(
+                label: 'Visible en tienda',
+                icon: Icons.visibility_outlined,
+                value: slot.active,
+                onChanged: (value) {
+                  slot.active = value;
+                  onChanged();
+                },
+              ),
+            ),
+          ],
+        ),
+        for (var i = 0; i < slot.imageCtrls.length; i++)
+          _Field(
+            ctrl: slot.imageCtrls[i],
+            label: 'URL imagen ${i + 1}',
+            icon: Icons.image_outlined,
+            onChanged: (_) => onChanged(),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: _UploadImageButton(
+            busy: uploading,
+            onPressed: () => onUpload(
+              slot.imageCtrls.firstWhere(
+                (ctrl) => ctrl.text.trim().isEmpty,
+                orElse: () => slot.imageCtrls.last,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 2),
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Tallas y stock',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: sizes.map((size) {
+            final qty = slot.sizeStock[size] ?? 0;
+            return _SizeBox(
+              size: size,
+              qty: qty,
+              onChanged: (value) {
+                slot.sizeStock[size] = value;
+                onChanged();
+              },
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        TextFormField(
+          controller: slot.descriptionCtrl,
+          maxLines: 2,
+          decoration: const InputDecoration(
+            labelText: 'Descripcion del color',
+            hintText: 'Si lo dejas vacio usa la descripcion comun',
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _UploadImageButton extends StatelessWidget {
+  const _UploadImageButton({required this.busy, required this.onPressed});
+
+  final bool busy;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: OutlinedButton.icon(
+      onPressed: busy ? null : onPressed,
+      icon: busy
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.upload_rounded, size: 18),
+      label: Text(busy ? 'Subiendo imagen...' : 'Subir imagen'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: AppColors.goldDark,
+        side: const BorderSide(color: AppColors.gold),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
   );
 }
 

@@ -192,9 +192,11 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  static const int _kInitialPage = 600; // múltiplo de 6 slides → bucle infinito limpio
-  late final PageController _bannerCtrl =
-      PageController(initialPage: _kInitialPage);
+  static const int _kInitialPage =
+      600; // múltiplo de 6 slides → bucle infinito limpio
+  late final PageController _bannerCtrl = PageController(
+    initialPage: _kInitialPage,
+  );
   int _bannerPage = _kInitialPage;
   int get _bannerIdx => _bannerPage % _heroSlides.length;
   Timer? _autoTimer;
@@ -719,10 +721,7 @@ class _HeroProgressBarState extends State<_HeroProgressBar>
                     ],
                   ),
                   boxShadow: [
-                    BoxShadow(
-                      color: Color(0x55C9A227),
-                      blurRadius: 8,
-                    ),
+                    BoxShadow(color: Color(0x55C9A227), blurRadius: 8),
                   ],
                 ),
               ),
@@ -778,9 +777,9 @@ class _TrustStripState extends State<_TrustStrip> {
   @override
   Widget build(BuildContext context) {
     Widget item((IconData, String) d) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: _TrustItem(icon: d.$1, label: d.$2),
-        );
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: _TrustItem(icon: d.$1, label: d.$2),
+    );
 
     return Container(
       height: 44,
@@ -984,10 +983,7 @@ class _CategoryTile extends StatelessWidget {
 }
 
 class _CyberWowBanner extends StatelessWidget {
-  const _CyberWowBanner({
-    required this.onTapHombre,
-    required this.onTapMujer,
-  });
+  const _CyberWowBanner({required this.onTapHombre, required this.onTapMujer});
 
   final VoidCallback onTapHombre;
   final VoidCallback onTapMujer;

@@ -22,29 +22,31 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
         .doc(_userId)
         .snapshots()
         .listen(
-      (snap) {
-        if (!snap.exists) {
-          state = [];
-          return;
-        }
-        final raw = snap.data()?['items'] as List<dynamic>? ?? [];
-        state = raw
-            .map((e) => CartItem.fromMap(e as Map<String, dynamic>))
-            .toList();
-      },
-      onError: (error, stackTrace) {
-        // Mantener el estado actual en memoria si falla el stream temporalmente.
-      },
-    );
+          (snap) {
+            if (!snap.exists) {
+              state = [];
+              return;
+            }
+            final raw = snap.data()?['items'] as List<dynamic>? ?? [];
+            state = raw
+                .map((e) => CartItem.fromMap(e as Map<String, dynamic>))
+                .toList();
+          },
+          onError: (error, stackTrace) {
+            // Mantener el estado actual en memoria si falla el stream temporalmente.
+          },
+        );
   }
 
   void _save() {
     if (_userId == null) return;
-    FirebaseFirestore.instance.collection('carts').doc(_userId).set({
-      'items': state.map((item) => item.toMap()).toList(),
-    }).catchError((_) {
-      // El estado local ya se actualizó; el snapshot remoto reconciliará si hay red.
-    });
+    FirebaseFirestore.instance
+        .collection('carts')
+        .doc(_userId)
+        .set({'items': state.map((item) => item.toMap()).toList()})
+        .catchError((_) {
+          // El estado local ya se actualizó; el snapshot remoto reconciliará si hay red.
+        });
   }
 
   void addItem(Product product, {String? talla, String? color}) {
@@ -64,7 +66,10 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
         ...state.sublist(idx + 1),
       ];
     } else {
-      state = [...state, CartItem(product: product, quantity: 1, talla: talla, color: color)];
+      state = [
+        ...state,
+        CartItem(product: product, quantity: 1, talla: talla, color: color),
+      ];
     }
     _save();
   }

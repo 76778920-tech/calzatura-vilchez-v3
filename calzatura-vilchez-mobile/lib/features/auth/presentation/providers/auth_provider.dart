@@ -33,7 +33,8 @@ final userRoleProvider = FutureProvider<String>((ref) async {
 
 final isAdminProvider = Provider<bool>((ref) {
   final roleAsync = ref.watch(userRoleProvider);
-  return roleAsync.valueOrNull == 'admin' || roleAsync.valueOrNull == 'trabajador';
+  return roleAsync.valueOrNull == 'admin' ||
+      roleAsync.valueOrNull == 'trabajador';
 });
 
 /// Nombre para mostrar del usuario actual, leído desde Supabase.
@@ -177,5 +178,5 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
 
 final authNotifierProvider =
     StateNotifierProvider<AuthNotifier, AsyncValue<void>>(
-  (ref) => AuthNotifier(ref.watch(authRepositoryProvider)),
-);
+      (ref) => AuthNotifier(ref.watch(authRepositoryProvider)),
+    );

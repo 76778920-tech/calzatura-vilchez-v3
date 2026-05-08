@@ -78,8 +78,7 @@ class WishlistNotifier extends AsyncNotifier<Set<String>> {
   }
 }
 
-final wishlistProvider =
-    AsyncNotifierProvider<WishlistNotifier, Set<String>>(
+final wishlistProvider = AsyncNotifierProvider<WishlistNotifier, Set<String>>(
   WishlistNotifier.new,
 );
 

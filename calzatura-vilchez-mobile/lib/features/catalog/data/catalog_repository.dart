@@ -6,10 +6,7 @@ class CatalogRepository {
   final _supabase = Supabase.instance.client;
 
   Future<List<Product>> getActiveProducts({String? categoria}) async {
-    var query = _supabase
-        .from('productos')
-        .select('*')
-        .eq('activo', true);
+    var query = _supabase.from('productos').select('*').eq('activo', true);
     if (categoria != null && categoria != 'todos') {
       query = query.eq('categoria', categoria);
     }
@@ -51,5 +48,6 @@ class CatalogRepository {
   }
 }
 
-final catalogRepositoryProvider =
-    Provider<CatalogRepository>((ref) => CatalogRepository());
+final catalogRepositoryProvider = Provider<CatalogRepository>(
+  (ref) => CatalogRepository(),
+);

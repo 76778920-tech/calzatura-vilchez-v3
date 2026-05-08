@@ -4,32 +4,26 @@ import 'package:http/http.dart' as http;
 
 import '../../../shared/utils/dni.dart';
 
-enum DniLookupError {
-  invalid,
-  notConfigured,
-  notFound,
-  failed,
-}
+enum DniLookupError { invalid, notConfigured, notFound, failed }
 
 extension DniLookupErrorX on DniLookupError {
   String get userMessage => switch (this) {
-        DniLookupError.invalid => 'Ingresa un DNI válido de 8 dígitos',
-        DniLookupError.notConfigured =>
-          'La búsqueda por DNI aún no está configurada en la app',
-        DniLookupError.notFound => 'No se encontraron datos para este DNI',
-        DniLookupError.failed => 'No se pudo consultar el DNI',
-      };
+    DniLookupError.invalid => 'Ingresa un DNI válido de 8 dígitos',
+    DniLookupError.notConfigured =>
+      'La búsqueda por DNI aún no está configurada en la app',
+    DniLookupError.notFound => 'No se encontraron datos para este DNI',
+    DniLookupError.failed => 'No se pudo consultar el DNI',
+  };
 }
 
 /// POST JSON `{ "dni": "12345678" }` — misma API que la web (`VITE_DNI_LOOKUP_URL`).
 class DniLookupService {
   DniLookupResult parsePayload(Map<String, dynamic> json, String requestedDni) {
     final rawDni = json['dni'];
-    final dni = normalizeDni(
-      rawDni is String ? rawDni : (requestedDni),
-    );
+    final dni = normalizeDni(rawDni is String ? rawDni : (requestedDni));
     final nombres = (json['nombres'] as String?)?.trim().toUpperCase() ?? '';
-    final apellidos = (json['apellidos'] as String?)?.trim().toUpperCase() ?? '';
+    final apellidos =
+        (json['apellidos'] as String?)?.trim().toUpperCase() ?? '';
 
     if (dni != requestedDni || nombres.isEmpty || apellidos.isEmpty) {
       throw DniLookupError.notFound;

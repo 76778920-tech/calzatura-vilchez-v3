@@ -29,10 +29,11 @@ final _productRealtimeProvider = Provider<void>((ref) {
   ref.onDispose(() => channel.unsubscribe());
 });
 
-final productsProvider =
-    FutureProvider.autoDispose<List<Product>>((ref) async {
+final productsProvider = FutureProvider.autoDispose<List<Product>>((ref) async {
   ref.watch(_productRealtimeProvider); // mantiene el canal vivo
-  ref.watch(_catalogVersionProvider);  // se re-ejecuta al recibir cambios remotos
+  ref.watch(
+    _catalogVersionProvider,
+  ); // se re-ejecuta al recibir cambios remotos
 
   final categoria = ref.watch(selectedCategoryProvider);
   final query = ref.watch(searchQueryProvider);
@@ -42,24 +43,27 @@ final productsProvider =
   return repo.getActiveProducts(categoria: categoria);
 });
 
-final featuredProductsProvider =
-    FutureProvider.autoDispose<List<Product>>((ref) async {
+final featuredProductsProvider = FutureProvider.autoDispose<List<Product>>((
+  ref,
+) async {
   ref.watch(_productRealtimeProvider);
   ref.watch(_catalogVersionProvider);
   return ref.watch(catalogRepositoryProvider).getFeaturedProducts();
 });
 
-final productDetailProvider =
-    FutureProvider.autoDispose.family<Product?, String>((ref, id) async {
-  return ref.watch(catalogRepositoryProvider).getProductById(id);
-});
+final productDetailProvider = FutureProvider.autoDispose
+    .family<Product?, String>((ref, id) async {
+      return ref.watch(catalogRepositoryProvider).getProductById(id);
+    });
 
 // Categorías — coinciden con los valores exactos de la BD
-final categoriesProvider = Provider<List<Map<String, String>>>((ref) => [
-      {'id': 'todos', 'label': 'Todos'},
-      {'id': 'hombre', 'label': 'Hombre'},
-      {'id': 'dama', 'label': 'Dama'},
-      {'id': 'juvenil', 'label': 'Juvenil'},
-      {'id': 'nino', 'label': 'Niños'},
-      {'id': 'bebe', 'label': 'Bebé'},
-    ]);
+final categoriesProvider = Provider<List<Map<String, String>>>(
+  (ref) => [
+    {'id': 'todos', 'label': 'Todos'},
+    {'id': 'hombre', 'label': 'Hombre'},
+    {'id': 'dama', 'label': 'Dama'},
+    {'id': 'juvenil', 'label': 'Juvenil'},
+    {'id': 'nino', 'label': 'Niños'},
+    {'id': 'bebe', 'label': 'Bebé'},
+  ],
+);

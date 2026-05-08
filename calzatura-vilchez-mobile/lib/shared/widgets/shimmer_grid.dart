@@ -36,8 +36,9 @@ class ShimmerGrid extends StatelessWidget {
                 child: Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
                   ),
                 ),
               ),
@@ -47,7 +48,10 @@ class ShimmerGrid extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                        height: 12, width: double.infinity, color: Colors.white),
+                      height: 12,
+                      width: double.infinity,
+                      color: Colors.white,
+                    ),
                     const SizedBox(height: 6),
                     Container(height: 10, width: 80, color: Colors.white),
                     const SizedBox(height: 8),

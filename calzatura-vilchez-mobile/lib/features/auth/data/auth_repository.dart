@@ -20,7 +20,9 @@ class AuthRepository {
     required String telefonoFormatted,
   }) async {
     final cred = await _auth.createUserWithEmailAndPassword(
-        email: email, password: password);
+      email: email,
+      password: password,
+    );
     await cred.user?.updateDisplayName(nombre);
     try {
       await _supabase.from('usuarios').upsert({
@@ -49,5 +51,6 @@ class AuthRepository {
   User? get currentUser => _auth.currentUser;
 }
 
-final authRepositoryProvider =
-    Provider<AuthRepository>((ref) => AuthRepository());
+final authRepositoryProvider = Provider<AuthRepository>(
+  (ref) => AuthRepository(),
+);

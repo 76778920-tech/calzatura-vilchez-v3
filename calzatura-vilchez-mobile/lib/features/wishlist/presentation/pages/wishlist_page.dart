@@ -29,85 +29,85 @@ class WishlistPage extends ConsumerWidget {
             parent: AlwaysScrollableScrollPhysics(),
           ),
           slivers: [
-          // ── AppBar ──────────────────────────────────────────────
-          SliverAppBar(
-            floating: true,
-            snap: true,
-            pinned: false,
-            toolbarHeight: 60,
-            backgroundColor: AppColors.black,
-            automaticallyImplyLeading: false,
-            title: Row(
-              children: [
-                const CVLogo(size: 38, dark: true),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text(
-                      'Mis Favoritos',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
+            // ── AppBar ──────────────────────────────────────────────
+            SliverAppBar(
+              floating: true,
+              snap: true,
+              pinned: false,
+              toolbarHeight: 60,
+              backgroundColor: AppColors.black,
+              automaticallyImplyLeading: false,
+              title: Row(
+                children: [
+                  const CVLogo(size: 38, dark: true),
+                  const SizedBox(width: 10),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        'Mis Favoritos',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.3,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'Productos guardados',
-                      style: TextStyle(
-                        color: AppColors.gold,
-                        fontSize: 10,
-                        letterSpacing: 0.2,
+                      Text(
+                        'Productos guardados',
+                        style: TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 10,
+                          letterSpacing: 0.2,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // ── Contenido ────────────────────────────────────────────
-          if (user == null)
-            const SliverFillRemaining(child: _NotLoggedIn())
-          else
-            productsAsync.when(
-              loading: () => const SliverFillRemaining(
-                child: Center(
-                  child: CircularProgressIndicator(color: AppColors.gold),
+            // ── Contenido ────────────────────────────────────────────
+            if (user == null)
+              const SliverFillRemaining(child: _NotLoggedIn())
+            else
+              productsAsync.when(
+                loading: () => const SliverFillRemaining(
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.gold),
+                  ),
                 ),
-              ),
-              error: (e, _) => SliverFillRemaining(
-                child: _ErrorState(
-                  onRetry: () => ref.invalidate(wishlistProductsProvider),
+                error: (e, _) => SliverFillRemaining(
+                  child: _ErrorState(
+                    onRetry: () => ref.invalidate(wishlistProductsProvider),
+                  ),
                 ),
-              ),
-              data: (products) => products.isEmpty
-                  ? const SliverFillRemaining(child: _EmptyState())
-                  : SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
-                      sliver: SliverGrid(
-                        delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => ProductCard(
-                            product: products[i],
-                            index: i,
-                            showWishlist: true,
-                            showAddToCart: true,
-                            showTypeLabel: true,
+                data: (products) => products.isEmpty
+                    ? const SliverFillRemaining(child: _EmptyState())
+                    : SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                        sliver: SliverGrid(
+                          delegate: SliverChildBuilderDelegate(
+                            (ctx, i) => ProductCard(
+                              product: products[i],
+                              index: i,
+                              showWishlist: true,
+                              showAddToCart: true,
+                              showTypeLabel: true,
+                            ),
+                            childCount: products.length,
                           ),
-                          childCount: products.length,
-                        ),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.56,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.56,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
                         ),
                       ),
-                    ),
-            ),
+              ),
           ],
         ),
       ),
@@ -204,8 +204,11 @@ class _ErrorState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.wifi_off_rounded,
-              size: 48, color: AppColors.textSecondary),
+          const Icon(
+            Icons.wifi_off_rounded,
+            size: 48,
+            color: AppColors.textSecondary,
+          ),
           const SizedBox(height: 16),
           const Text(
             'Error al cargar favoritos',

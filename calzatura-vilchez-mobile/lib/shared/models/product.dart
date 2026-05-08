@@ -59,7 +59,8 @@ class Product {
       precio: (json['precio'] as num?)?.toDouble() ?? 0.0,
       descripcion: json['descripcion'] as String? ?? '',
       imagen: json['imagen'] as String? ?? '',
-      imagenes: (json['imagenes'] as List<dynamic>?)
+      imagenes:
+          (json['imagenes'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           [],
@@ -95,33 +96,32 @@ class Product {
   double get precioConDescuento =>
       hasDescuento ? precio * (1 - descuento! / 100) : precio;
 
-  String get precioFormatted =>
-      'S/ ${precioConDescuento.toStringAsFixed(2)}';
+  String get precioFormatted => 'S/ ${precioConDescuento.toStringAsFixed(2)}';
 
   String get precioOriginalFormatted => 'S/ ${precio.toStringAsFixed(2)}';
 
   int stockDeTalla(String talla) => tallaStock?[talla] ?? 0;
 
   Map<String, dynamic> toMap() => {
-        'id': id,
-        'nombre': nombre,
-        'precio': precio,
-        'descripcion': descripcion,
-        'imagen': imagen,
-        'imagenes': imagenes,
-        'stock': stock,
-        'categoria': categoria,
-        'color': color,
-        'tallas': tallas,
-        'tallaStock': tallaStock,
-        'marca': marca,
-        'tipoCalzado': tipoCalzado,
-        'estilo': estilo,
-        'material': material,
-        'activo': activo,
-        'destacado': destacado,
-        'descuento': descuento,
-        'campana': campana,
-        'familiaId': familiaId,
-      };
+    'id': id,
+    'nombre': nombre,
+    'precio': precio,
+    'descripcion': descripcion,
+    'imagen': imagen,
+    'imagenes': imagenes,
+    'stock': stock,
+    'categoria': categoria,
+    'color': color,
+    'tallas': tallas,
+    'tallaStock': tallaStock,
+    'marca': marca,
+    'tipoCalzado': tipoCalzado,
+    'estilo': estilo,
+    'material': material,
+    'activo': activo,
+    'destacado': destacado,
+    'descuento': descuento,
+    'campana': campana,
+    'familiaId': familiaId,
+  };
 }

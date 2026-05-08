@@ -3,7 +3,12 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 /// Logo Calzatura Vilchez — emblema girasol (badge circular sin fondo).
 class CVLogo extends StatelessWidget {
-  const CVLogo({super.key, this.size = 80, this.dark = true, this.opacity = 1.0});
+  const CVLogo({
+    super.key,
+    this.size = 80,
+    this.dark = true,
+    this.opacity = 1.0,
+  });
 
   final double size;
   final bool dark;

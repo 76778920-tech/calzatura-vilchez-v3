@@ -6,6 +6,14 @@ class Env {
   static String get aiServiceUrl => dotenv.env['AI_SERVICE_URL']!;
   static String get aiServiceToken => dotenv.env['AI_SERVICE_BEARER_TOKEN']!;
   static String get superadminEmail => dotenv.env['SUPERADMIN_EMAIL']!;
+  static String get cloudinaryCloudName =>
+      dotenv.env['CLOUDINARY_CLOUD_NAME']?.trim().isNotEmpty == true
+      ? dotenv.env['CLOUDINARY_CLOUD_NAME']!.trim()
+      : 'dnenqnvbg';
+  static String get cloudinaryUploadPreset =>
+      dotenv.env['CLOUDINARY_UPLOAD_PRESET']?.trim().isNotEmpty == true
+      ? dotenv.env['CLOUDINARY_UPLOAD_PRESET']!.trim()
+      : 'calzatura_uploads';
 
   /// Misma URL que `VITE_DNI_LOOKUP_URL` en la web (opcional).
   static String? get dniLookupUrl {

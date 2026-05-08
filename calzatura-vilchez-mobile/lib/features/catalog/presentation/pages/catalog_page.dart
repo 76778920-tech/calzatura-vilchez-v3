@@ -67,7 +67,9 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
               loading: () =>
                   const SliverToBoxAdapter(child: ShimmerGrid(count: 6)),
               error: (err, s) => SliverToBoxAdapter(
-                child: _ErrorState(onRetry: () => ref.invalidate(productsProvider)),
+                child: _ErrorState(
+                  onRetry: () => ref.invalidate(productsProvider),
+                ),
               ),
               data: (products) => products.isEmpty
                   ? SliverToBoxAdapter(child: _EmptyState())
@@ -75,16 +77,17 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 120),
                       sliver: SliverGrid(
                         delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => ProductCard(product: products[i], index: i),
+                          (ctx, i) =>
+                              ProductCard(product: products[i], index: i),
                           childCount: products.length,
                         ),
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          childAspectRatio: 0.56,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 12,
-                        ),
+                              crossAxisCount: 2,
+                              childAspectRatio: 0.56,
+                              crossAxisSpacing: 12,
+                              mainAxisSpacing: 12,
+                            ),
                       ),
                     ),
             ),
@@ -113,14 +116,19 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                 hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
                 filled: true,
                 fillColor: Colors.white.withValues(alpha: 0.1),
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
                 ),
-                prefixIcon:
-                    const Icon(Icons.search, color: Colors.white38, size: 18),
+                prefixIcon: const Icon(
+                  Icons.search,
+                  color: Colors.white38,
+                  size: 18,
+                ),
               ),
               onChanged: (v) =>
                   ref.read(searchQueryProvider.notifier).state = v.trim(),
@@ -173,8 +181,11 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
         ),
         if (!_searchActive)
           IconButton(
-            icon: const Icon(Icons.person_outline_rounded,
-                color: Colors.white70, size: 22),
+            icon: const Icon(
+              Icons.person_outline_rounded,
+              color: Colors.white70,
+              size: 22,
+            ),
             onPressed: () => context.go('/profile'),
           ),
         const SizedBox(width: 4),
@@ -188,10 +199,7 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _CatalogHeader extends StatelessWidget {
-  const _CatalogHeader({
-    required this.productsAsync,
-    required this.selected,
-  });
+  const _CatalogHeader({required this.productsAsync, required this.selected});
   final AsyncValue<dynamic> productsAsync;
   final String selected;
 
@@ -223,7 +231,9 @@ class _CatalogHeader extends StatelessWidget {
                   .whenData(
                     (p) => Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.gold.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(20),
@@ -330,11 +340,16 @@ class _ErrorState extends StatelessWidget {
         padding: const EdgeInsets.all(40),
         child: Column(
           children: [
-            const Icon(Icons.wifi_off_rounded,
-                size: 56, color: AppColors.textSecondary),
+            const Icon(
+              Icons.wifi_off_rounded,
+              size: 56,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(height: 16),
-            const Text('Error al cargar productos',
-                style: TextStyle(color: AppColors.textSecondary)),
+            const Text(
+              'Error al cargar productos',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 12),
             ElevatedButton(onPressed: onRetry, child: const Text('Reintentar')),
           ],
@@ -352,9 +367,11 @@ class _EmptyState extends StatelessWidget {
         padding: const EdgeInsets.all(60),
         child: Column(
           children: [
-            Icon(Icons.search_off_rounded,
-                size: 64,
-                color: AppColors.textSecondary.withValues(alpha: 0.4)),
+            Icon(
+              Icons.search_off_rounded,
+              size: 64,
+              color: AppColors.textSecondary.withValues(alpha: 0.4),
+            ),
             const SizedBox(height: 16),
             const Text(
               'No se encontraron productos',

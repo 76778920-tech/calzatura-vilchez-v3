@@ -56,14 +56,16 @@ class _CVRefreshWrapperState extends State<CVRefreshWrapper>
           }
         }
 
-        final opacity = (controller.isLoading ||
+        final opacity =
+            (controller.isLoading ||
                 controller.isSettling ||
                 controller.isComplete ||
                 controller.isFinalizing)
             ? 1.0
             : controller.value.clamp(0.0, 1.0);
 
-        final visible = controller.value > 0.05 ||
+        final visible =
+            controller.value > 0.05 ||
             controller.isLoading ||
             controller.isSettling ||
             controller.isFinalizing;
