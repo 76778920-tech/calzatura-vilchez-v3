@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart, Heart } from "lucide-react";
 import type { Product } from "@/types";
@@ -6,7 +6,7 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { getProductColors } from "@/utils/colors";
 import { getAvailableSizes } from "@/utils/stock";
-import { isProductFavorite, toggleFavoriteProduct } from "@/domains/clientes/services/favorites";
+import { useFavorites } from "@/domains/clientes/context/FavoritesContext";
 import toast from "react-hot-toast";
 
 interface Props {
@@ -22,7 +22,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   const { user } = useAuth();
   const { addItem } = useCart();
   const navigate = useNavigate();
-  const [liked, setLiked] = useState(false);
+  const { favoriteIds, toggle } = useFavorites();
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [showSizePicker, setShowSizePicker] = useState(false);
   const colors = getProductColors(product);
@@ -38,27 +38,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
       ? imageSrc
       : secondaryImage
     : null;
-  const isLiked = Boolean(user) && liked;
-
-  useEffect(() => {
-    let active = true;
-
-    if (!user) return () => {
-      active = false;
-    };
-
-    isProductFavorite(user.uid, product.id)
-      .then((isFavorite) => {
-        if (active) setLiked(isFavorite);
-      })
-      .catch(() => {
-        if (active) setLiked(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [product.id, user]);
+  const isLiked = Boolean(user) && favoriteIds.has(product.id);
 
   const handleOpenSizePicker = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -88,18 +68,10 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
 
     if (favoriteBusy) return;
 
-    const nextLiked = !isLiked;
     setFavoriteBusy(true);
-    setLiked(nextLiked);
-
     try {
-      await toggleFavoriteProduct(user.uid, product.id, nextLiked);
-      onFavoriteChange?.(product.id, nextLiked);
-      toast.success(nextLiked ? "Agregado a favoritos" : "Quitado de favoritos");
-    } catch (error) {
-      console.error("Favorite error", error);
-      setLiked(!nextLiked);
-      toast.error("No se pudo actualizar favoritos. Inténtalo de nuevo.");
+      await toggle(product.id);
+      onFavoriteChange?.(product.id, !isLiked);
     } finally {
       setFavoriteBusy(false);
     }

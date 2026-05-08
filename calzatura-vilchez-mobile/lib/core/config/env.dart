@@ -6,4 +6,11 @@ class Env {
   static String get aiServiceUrl => dotenv.env['AI_SERVICE_URL']!;
   static String get aiServiceToken => dotenv.env['AI_SERVICE_BEARER_TOKEN']!;
   static String get superadminEmail => dotenv.env['SUPERADMIN_EMAIL']!;
+
+  /// Misma URL que `VITE_DNI_LOOKUP_URL` en la web (opcional).
+  static String? get dniLookupUrl {
+    final u = dotenv.env['DNI_LOOKUP_URL']?.trim();
+    if (u == null || u.isEmpty) return null;
+    return u;
+  }
 }

@@ -360,9 +360,9 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       match /favoritos/{productId} {
-        allow read: if isOwner(userId) || isAdmin();
+        allow read: if isOwner(userId);
         allow create, update: if isOwner(userId) && isValidFavorite(request.resource.data, productId);
-        allow delete: if isOwner(userId) || isAdmin();
+        allow delete: if isOwner(userId);
       }
     }
   }

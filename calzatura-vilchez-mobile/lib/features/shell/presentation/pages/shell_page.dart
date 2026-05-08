@@ -27,31 +27,22 @@ class ShellPage extends ConsumerWidget {
     final currentIdx = _currentIndex(location);
 
     return Scaffold(
-      body: Stack(
-        children: [
-          child,
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: MediaQuery.of(context).padding.bottom + 12,
-            child: _FloatingNav(
-              currentIdx: currentIdx,
-              cartCount: cartCount,
-              onTap: (i) {
-                switch (i) {
-                  case 0:
-                    context.go('/home');
-                  case 1:
-                    context.go('/catalog');
-                  case 2:
-                    context.go('/wishlist');
-                  case 3:
-                    context.go('/cart');
-                }
-              },
-            ),
-          ),
-        ],
+      body: child,
+      bottomNavigationBar: _FloatingNav(
+        currentIdx: currentIdx,
+        cartCount: cartCount,
+        onTap: (i) {
+          switch (i) {
+            case 0:
+              context.go('/home');
+            case 1:
+              context.go('/catalog');
+            case 2:
+              context.go('/wishlist');
+            case 3:
+              context.go('/cart');
+          }
+        },
       ),
     );
   }
@@ -70,24 +61,25 @@ class _FloatingNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
     return Container(
-      height: 60,
       decoration: BoxDecoration(
         color: AppColors.black,
-        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.35),
             blurRadius: 24,
-            offset: const Offset(0, 8),
+            offset: const Offset(0, -4),
           ),
           BoxShadow(
-            color: AppColors.gold.withValues(alpha: 0.12),
+            color: AppColors.gold.withValues(alpha: 0.10),
             blurRadius: 12,
-            offset: const Offset(0, 2),
+            offset: const Offset(0, -1),
           ),
         ],
       ),
+      padding: EdgeInsets.only(bottom: bottomPadding),
+      height: 60 + bottomPadding,
       child: Row(
         children: [
           _NavIcon(

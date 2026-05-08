@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
 
 class AuthField extends StatelessWidget {
@@ -9,8 +10,13 @@ class AuthField extends StatelessWidget {
     required this.icon,
     this.keyboardType,
     this.obscureText = false,
+    this.readOnly = false,
+    this.enabled = true,
     this.suffix,
     this.validator,
+    this.maxLength,
+    this.inputFormatters,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -18,8 +24,13 @@ class AuthField extends StatelessWidget {
   final IconData icon;
   final TextInputType? keyboardType;
   final bool obscureText;
+  final bool readOnly;
+  final bool enabled;
   final Widget? suffix;
   final String? Function(String?)? validator;
+  final int? maxLength;
+  final List<TextInputFormatter>? inputFormatters;
+  final void Function(String)? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +38,11 @@ class AuthField extends StatelessWidget {
       controller: controller,
       keyboardType: keyboardType,
       obscureText: obscureText,
+      readOnly: readOnly,
+      enabled: enabled,
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
+      onChanged: onChanged,
       style: const TextStyle(color: Colors.white, fontSize: 15),
       validator: validator,
       decoration: InputDecoration(
@@ -59,6 +75,7 @@ class AuthField extends StatelessWidget {
           borderSide: const BorderSide(color: AppColors.error),
         ),
         errorStyle: const TextStyle(color: Color(0xFFFF8A80)),
+        counterText: maxLength != null ? '' : null,
       ),
     );
   }

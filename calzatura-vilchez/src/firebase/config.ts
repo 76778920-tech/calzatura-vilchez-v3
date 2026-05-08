@@ -4,6 +4,7 @@ import {
   indexedDBLocalPersistence,
   initializeAuth,
 } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            as string,
@@ -22,5 +23,6 @@ export const auth = initializeAuth(app, {
     ? [browserLocalPersistence]
     : [indexedDBLocalPersistence, browserLocalPersistence],
 });
+export const db = getFirestore(app);
 
 export default app;

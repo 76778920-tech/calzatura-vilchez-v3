@@ -60,6 +60,25 @@ test.describe("catálogo → detalle → carrito", () => {
 
     await addBtn.click();
 
+    // Esperar a que el CartContext persista el ítem en localStorage antes de
+    // la recarga completa de página que provoca page.goto(). Sin esta espera
+    // existe una condición de carrera: el useEffect que hace
+    // localStorage.setItem puede no haberse ejecutado aún y la nueva página
+    // lee el carrito vacío.
+    await page.waitForFunction(
+      (key: string) => {
+        const stored = localStorage.getItem(key);
+        if (!stored) return false;
+        try {
+          return (JSON.parse(stored) as unknown[]).length > 0;
+        } catch {
+          return false;
+        }
+      },
+      "calzatura_cart",
+      { timeout: 5_000 }
+    );
+
     await page.goto("/carrito");
     await expect(page.getByRole("heading", { name: /Mi Carrito/i })).toBeVisible({ timeout: 15_000 });
     await expect(page.locator(".cart-page-item")).toHaveCount(1, { timeout: 10_000 });

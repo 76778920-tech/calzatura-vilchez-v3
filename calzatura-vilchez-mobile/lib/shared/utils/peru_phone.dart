@@ -1,15 +1,7 @@
-const _peruPrefix = '+51';
-const _blockedNumbers = {'000000000', '999999999'};
+/// Misma lógica que `calzatura-vilchez/src/utils/phone.ts` (Perú móvil 9 dígitos, empieza en 9).
+const String _peruPrefix = '+51';
 
-String _groupMobileDigits(String digits) {
-  final normalized = digits.replaceAll(RegExp(r'\D'), '');
-  final buffer = StringBuffer();
-  for (var i = 0; i < normalized.length && i < 9; i++) {
-    if (i > 0 && i % 3 == 0) buffer.write(' ');
-    buffer.write(normalized[i]);
-  }
-  return buffer.toString().trim();
-}
+final Set<String> _blockedNumbers = {'000000000', '999999999'};
 
 String peruPhoneDigits(String value) {
   var digits = value.replaceAll(RegExp(r'\D'), '');
@@ -19,34 +11,45 @@ String peruPhoneDigits(String value) {
   return digits;
 }
 
-String normalizePeruPhoneInput(String value) {
-  final trimmed = value.trim();
-  final wantsPrefix =
-      trimmed.startsWith('+') ||
-      trimmed.startsWith('51') ||
-      trimmed.startsWith(_peruPrefix);
-  var digits = peruPhoneDigits(trimmed);
-  if (digits.length > 9) digits = digits.substring(0, 9);
-  return wantsPrefix ? formatPeruPhone(digits) : _groupMobileDigits(digits);
+String _groupMobileDigits(String nineDigits) {
+  final slice = nineDigits.length > 9 ? nineDigits.substring(0, 9) : nineDigits;
+  return slice.replaceAllMapped(RegExp(r'(\d{3})(?=\d)'), (m) => '${m[0]} ').trim();
+}
+
+/// Formato guardado en Supabase / alineado con la web: `+51 9xx xxx xxx`
+String formatPeruPhone(String value) {
+  final digits = peruPhoneDigits(value);
+  final slice = digits.length > 9 ? digits.substring(0, 9) : digits;
+  final grouped = _groupMobileDigits(slice);
+  return grouped.isEmpty ? _peruPrefix : '$_peruPrefix $grouped';
 }
 
 bool isValidPeruPhone(String value) {
   final digits = peruPhoneDigits(value);
-  final validFormat = RegExp(r'^9\d{8}$').hasMatch(digits);
-  return validFormat && !_blockedNumbers.contains(digits);
+  return RegExp(r'^9\d{8}$').hasMatch(digits) && !_blockedNumbers.contains(digits);
 }
 
-String formatPeruPhone(String value) {
+/// Normaliza la entrada del usuario a solo dígitos (máx 9).
+/// Para usar en `onChanged` del campo de teléfono.
+String normalizePeruPhoneInput(String value) {
   final digits = peruPhoneDigits(value);
-  final limited = digits.length > 9 ? digits.substring(0, 9) : digits;
-  final grouped = _groupMobileDigits(limited);
-  return grouped.isEmpty ? _peruPrefix : '$_peruPrefix $grouped';
+  return digits.length > 9 ? digits.substring(0, 9) : digits;
 }
 
-String? peruPhoneError(String value) {
+/// Mensaje de error para validador de formulario, o `null` si es válido.
+String? peruPhoneError(String? value) {
+  if (value == null || value.trim().isEmpty) {
+    return 'Ingresa tu celular';
+  }
   final digits = peruPhoneDigits(value);
-  if (digits.length != 9) return 'El teléfono debe tener 9 dígitos.';
-  if (!digits.startsWith('9')) return 'El teléfono debe empezar con 9.';
-  if (_blockedNumbers.contains(digits)) return 'Ingresa un teléfono real.';
+  if (digits.length != 9) {
+    return 'El teléfono debe tener 9 dígitos.';
+  }
+  if (!digits.startsWith('9')) {
+    return 'El teléfono debe empezar con 9.';
+  }
+  if (_blockedNumbers.contains(digits)) {
+    return 'Ingresa un teléfono real.';
+  }
   return null;
 }

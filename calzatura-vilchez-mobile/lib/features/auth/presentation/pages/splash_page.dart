@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/cv_logo.dart';
 import '../providers/auth_provider.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
@@ -13,91 +13,79 @@ class SplashPage extends ConsumerStatefulWidget {
   ConsumerState<SplashPage> createState() => _SplashPageState();
 }
 
-class _SplashPageState extends ConsumerState<SplashPage> {
+class _SplashPageState extends ConsumerState<SplashPage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spin;
+  bool _minDelayDone = false;
+  bool _navigated = false;
+
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 2200), () {
+    _spin = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..repeat();
+
+    // Mostrar splash mínimo 2 segundos, luego navegar en cuanto auth esté listo
+    Future.delayed(const Duration(milliseconds: 2000), () {
       if (!mounted) return;
-      final auth = ref.read(authStateProvider);
-      auth.whenData((user) {
-        if (!mounted) return;
-        context.go(user != null ? '/home' : '/login');
-      });
+      _minDelayDone = true;
+      _tryNavigate();
     });
+  }
+
+  void _tryNavigate() {
+    if (!mounted || _navigated || !_minDelayDone) return;
+    final auth = ref.read(authStateProvider);
+    if (auth.isLoading) return; // el listener en build llamará de nuevo
+    _navigated = true;
+    final user = auth.valueOrNull;
+    context.go(user != null ? '/home' : '/login');
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Reacciona cuando el stream de auth emite su primer valor
+    ref.listen(authStateProvider, (prev, next) => _tryNavigate());
+
     return Scaffold(
       backgroundColor: AppColors.primary,
-      body: Stack(
-        children: [
-          Positioned(
-            top: -80,
-            right: -80,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.accent.withValues(alpha: 0.12),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            RotationTransition(
+              turns: _spin,
+              child: SvgPicture.asset(
+                'assets/images/sunflower.svg',
+                width: 120,
+                height: 120,
               ),
             ),
-          ),
-          Positioned(
-            bottom: -100,
-            left: -60,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.surface.withValues(alpha: 0.35),
+            const SizedBox(height: 36),
+            const Text(
+              'Calzatura Vilchez',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 0.8,
               ),
-            ),
-          ),
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CVLogo(size: 110)
-                    .animate()
-                    .scale(
-                      delay: 150.ms,
-                      duration: 700.ms,
-                      curve: Curves.elasticOut,
-                    )
-                    .then()
-                    .shimmer(duration: 1200.ms, color: Colors.white30),
-                const SizedBox(height: 28),
-                const Text(
-                  'Calzatura Vilchez',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.8,
-                  ),
-                ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
-                const SizedBox(height: 6),
-                const Text(
-                  'Moda y confort en cada paso',
-                  style: TextStyle(color: Colors.white54, fontSize: 14),
-                ).animate().fadeIn(delay: 700.ms),
-                const SizedBox(height: 64),
-                SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: CircularProgressIndicator(
-                    color: AppColors.accent,
-                    strokeWidth: 2.5,
-                  ),
-                ).animate().fadeIn(delay: 1000.ms),
-              ],
-            ),
-          ),
-        ],
+            ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
+            const SizedBox(height: 6),
+            const Text(
+              'Moda y confort en cada paso',
+              style: TextStyle(color: Colors.white54, fontSize: 14),
+            ).animate().fadeIn(delay: 650.ms),
+          ],
+        ),
       ),
     );
   }

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Package, ChevronDown, ChevronUp } from "lucide-react";
 import { fetchOrdersByUser } from "@/domains/pedidos/services/orders";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
+import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
 import type { Order } from "@/types";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -19,12 +20,21 @@ export default function OrderHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadOrders = useCallback(() => {
     if (!user) return;
     fetchOrdersByUser(user.uid)
       .then(setOrders)
       .finally(() => setLoading(false));
   }, [user]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setLoading(true);
+      loadOrders();
+    });
+  }, [loadOrders]);
+
+  useOrdersRealtime(loadOrders, user?.uid);
 
   if (!user) {
     return (

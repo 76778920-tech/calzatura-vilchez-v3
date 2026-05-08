@@ -567,44 +567,23 @@ export default function HomePage() {
             </div>
           </div>
           {/* Flechas de navegación */}
-          <button
-            type="button"
-            className="home-hero-arrow-btn home-hero-arrow-prev"
-            onClick={(e) => { e.stopPropagation(); shiftHeroSlide(-1); }}
-            aria-label="Slide anterior"
+          {/* Barra de progreso del carrusel */}
+          <div
+            className="home-hero-progress"
+            role="progressbar"
+            aria-label="Progreso del carrusel"
+            aria-valuemin={1}
+            aria-valuemax={heroSlides.length}
+            aria-valuenow={activeHeroIndex + 1}
+            aria-valuetext={`${activeHeroIndex + 1} de ${heroSlides.length}`}
           >
-            <ChevronLeft size={22} />
-          </button>
-          <button
-            type="button"
-            className="home-hero-arrow-btn home-hero-arrow-next"
-            onClick={(e) => { e.stopPropagation(); shiftHeroSlide(1); }}
-            aria-label="Siguiente slide"
-          >
-            <ChevronRight size={22} />
-          </button>
-
-          {/* Puntos de navegación con timer */}
-          <div className="home-hero-dots" role="tablist" aria-label="Slides del carrusel">
-            {heroSlides.map((slide, index) => (
-              <button
-                key={slide.id}
-                type="button"
-                role="tab"
-                aria-selected={index === activeHeroIndex}
-                aria-label={slide.kicker}
-                className={`home-hero-dot${index === activeHeroIndex ? " is-active" : ""}`}
-                onClick={(e) => { e.stopPropagation(); setActiveHeroIndex(index); setIsHeroInteractionPaused(false); }}
-              >
-                {index === activeHeroIndex && (
-                  <span
-                    key={`dot-fill-${activeHeroIndex}`}
-                    className={`home-hero-dot-fill${canAutoRotateHero ? " is-animating" : ""}${isHeroInteractionPaused ? " is-paused" : ""}`}
-                    style={canAutoRotateHero ? ({ "--hero-progress-duration": `${HERO_ROTATION_MS}ms` } as CSSProperties) : undefined}
-                  />
-                )}
-              </button>
-            ))}
+            <span className="home-hero-progress-track">
+              <span
+                key={`hero-progress-${activeHeroIndex}`}
+                className={`home-hero-progress-fill${canAutoRotateHero ? " is-animating" : ""}${isHeroInteractionPaused ? " is-paused" : ""}`}
+                style={canAutoRotateHero ? ({ "--hero-progress-duration": `${HERO_ROTATION_MS}ms` } as CSSProperties) : undefined}
+              />
+            </span>
           </div>
         </div>
       </section>

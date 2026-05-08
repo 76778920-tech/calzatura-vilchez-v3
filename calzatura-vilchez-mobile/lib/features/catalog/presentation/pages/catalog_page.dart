@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/cv_refresh_wrapper.dart';
 import '../../../../shared/widgets/cv_logo.dart';
 import '../../../../shared/widgets/shimmer_grid.dart';
 import '../providers/catalog_provider.dart';
@@ -39,12 +40,13 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
 
     return Scaffold(
       backgroundColor: AppColors.beige,
-      body: RefreshIndicator(
-        color: AppColors.gold,
-        displacement: 80,
+      body: CVRefreshWrapper(
         onRefresh: () async => ref.invalidate(productsProvider),
+        bubbleTop: 68,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
           slivers: [
             _buildAppBar(),
             SliverToBoxAdapter(
@@ -79,7 +81,7 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
-                          childAspectRatio: 0.63,
+                          childAspectRatio: 0.56,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
                         ),

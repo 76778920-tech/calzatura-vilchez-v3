@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, PointerEvent } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   buildCanonicalCatalogLocation,
@@ -26,6 +27,8 @@ import {
 } from "@/utils/catalog";
 import { categoryLabel } from "@/utils/labels";
 import { effectiveFamiliaKey } from "@/utils/productFamily";
+
+const CATALOG_CAMPAIGN_ROTATION_MS = 9000;
 
 type CatalogQuickFilter = {
   label: string;
@@ -287,6 +290,12 @@ export default function ProductsPage() {
   const sizePopoverRef = useRef<HTMLDivElement | null>(null);
   const sizePopoverFrameRef = useRef<number | null>(null);
   const campaignTrackRef = useRef<HTMLDivElement | null>(null);
+  const campaignDragStartXRef = useRef<number | null>(null);
+  const campaignDragDeltaXRef = useRef(0);
+  const [isCampaignDragging, setIsCampaignDragging] = useState(false);
+  const [campaignDragOffset, setCampaignDragOffset] = useState(0);
+  const [campaignWidth, setCampaignWidth] = useState(0);
+  const [campaignTransition, setCampaignTransition] = useState<{ from: number; to: number; direction: 1 | -1 } | null>(null);
   const [draftSelectedColors, setDraftSelectedColors] = useState<string[]>([]);
   const [colorPopoverStyle, setColorPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
   const colorTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -1448,24 +1457,135 @@ export default function ProductsPage() {
 
   const hasAnyProducts = filtered.length > 0;
 
-  const handleCampaignScroll = useCallback(() => {
+  useEffect(() => {
     const track = campaignTrackRef.current;
-    if (!track) return;
-    const nextIndex = Math.round(track.scrollLeft / Math.max(track.clientWidth, 1));
-    setActiveCampaignSlide(Math.max(0, Math.min(nextIndex, catalogCampaignSlides.length - 1)));
-  }, [catalogCampaignSlides.length]);
+    if (!track) return undefined;
 
-  const scrollToCampaignSlide = useCallback((index: number) => {
-    const track = campaignTrackRef.current;
-    if (!track) return;
-    const slide = track.children[index] as HTMLElement | undefined;
-    slide?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-      inline: "start",
-    });
-    setActiveCampaignSlide(index);
+    const updateCampaignWidth = () => {
+      setCampaignWidth(track.getBoundingClientRect().width);
+    };
+    updateCampaignWidth();
+
+    const observer = new ResizeObserver(updateCampaignWidth);
+    observer.observe(track);
+    return () => observer.disconnect();
   }, []);
+
+  const moveCampaignBy = useCallback((direction: 1 | -1) => {
+    const slideCount = catalogCampaignSlides.length;
+    if (slideCount < 2 || campaignTransition) return;
+
+    const from = activeCampaignSlide;
+    const to = (activeCampaignSlide + direction + slideCount) % slideCount;
+    setActiveCampaignSlide(to);
+    setCampaignTransition({ from, to, direction });
+  }, [activeCampaignSlide, campaignTransition, catalogCampaignSlides.length]);
+
+  const handleCampaignPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const track = campaignTrackRef.current;
+    if (!track || catalogCampaignSlides.length < 2 || campaignTransition) return;
+    campaignDragStartXRef.current = event.clientX;
+    campaignDragDeltaXRef.current = 0;
+    setCampaignWidth(track.getBoundingClientRect().width);
+    setIsCampaignDragging(true);
+    try {
+      track.setPointerCapture?.(event.pointerId);
+    } catch {
+      // Playwright synthetic touch events do not always create an active pointer.
+    }
+  }, [campaignTransition, catalogCampaignSlides.length]);
+
+  const handleCampaignPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    const startX = campaignDragStartXRef.current;
+    if (startX === null) return;
+
+    const deltaX = event.clientX - startX;
+    campaignDragDeltaXRef.current = deltaX;
+    setCampaignDragOffset(deltaX);
+    event.preventDefault();
+  }, []);
+
+  const endCampaignDrag = useCallback((pointerId?: number) => {
+    const track = campaignTrackRef.current;
+    const startX = campaignDragStartXRef.current;
+    campaignDragStartXRef.current = null;
+    setIsCampaignDragging(false);
+    setCampaignDragOffset(0);
+    if (!track || startX === null) return;
+
+    if (typeof pointerId === "number" && track.hasPointerCapture?.(pointerId)) {
+      track.releasePointerCapture(pointerId);
+    }
+
+    const dragDeltaX = campaignDragDeltaXRef.current;
+    if (Math.abs(dragDeltaX) > 44) {
+      moveCampaignBy(dragDeltaX < 0 ? 1 : -1);
+    }
+  }, [moveCampaignBy]);
+
+  const handleCampaignPointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    endCampaignDrag(event.pointerId);
+  }, [endCampaignDrag]);
+
+  const handleCampaignPointerCancel = useCallback((event: PointerEvent<HTMLDivElement>) => {
+    endCampaignDrag(event.pointerId);
+  }, [endCampaignDrag]);
+
+  const advanceCampaignSlide = useCallback(() => {
+    if (catalogCampaignSlides.length < 2) return;
+    moveCampaignBy(1);
+  }, [catalogCampaignSlides.length, moveCampaignBy]);
+
+  useEffect(() => {
+    if (catalogCampaignSlides.length < 2 || isCampaignDragging || campaignTransition) return undefined;
+    const timer = window.setTimeout(() => {
+      advanceCampaignSlide();
+    }, CATALOG_CAMPAIGN_ROTATION_MS);
+    return () => window.clearTimeout(timer);
+  }, [activeCampaignSlide, advanceCampaignSlide, campaignTransition, catalogCampaignSlides.length, isCampaignDragging]);
+
+  const handleCampaignAnimationEnd = useCallback((index: number) => {
+    if (campaignTransition?.to === index) {
+      setCampaignTransition(null);
+    }
+  }, [campaignTransition]);
+
+  const campaignDragDirection = campaignDragOffset < 0 ? 1 : campaignDragOffset > 0 ? -1 : 0;
+  const campaignDragTarget = campaignDragDirection === 0
+    ? null
+    : (activeCampaignSlide + campaignDragDirection + catalogCampaignSlides.length) % catalogCampaignSlides.length;
+
+  const getCampaignSlideClassName = useCallback((index: number) => {
+    let className = "catalog-campaign-slide";
+    if (campaignTransition) {
+      if (index === campaignTransition.from) {
+        className += ` is-active is-exiting ${campaignTransition.direction === 1 ? "to-left" : "to-right"}`;
+      }
+      if (index === campaignTransition.to) {
+        className += ` is-active is-entering ${campaignTransition.direction === 1 ? "from-right" : "from-left"}`;
+      }
+      return className;
+    }
+
+    if (index === activeCampaignSlide) className += " is-active";
+    if (isCampaignDragging && campaignDragTarget === index) className += " is-drag-target";
+    return className;
+  }, [activeCampaignSlide, campaignDragTarget, campaignTransition, isCampaignDragging]);
+
+  const getCampaignSlideStyle = useCallback((index: number) => {
+    if (!isCampaignDragging || campaignDragDirection === 0 || campaignWidth <= 0) return undefined;
+
+    if (index === activeCampaignSlide) {
+      return { transform: `translate3d(${campaignDragOffset}px, 0, 0)`, opacity: 1, zIndex: 2 } as CSSProperties;
+    }
+
+    if (index === campaignDragTarget) {
+      const origin = campaignDragDirection === 1 ? campaignWidth : -campaignWidth;
+      return { transform: `translate3d(${origin + campaignDragOffset}px, 0, 0)`, opacity: 1, zIndex: 1 } as CSSProperties;
+    }
+
+    return undefined;
+  }, [activeCampaignSlide, campaignDragDirection, campaignDragOffset, campaignDragTarget, campaignWidth, isCampaignDragging]);
 
   const fillRangeLeft = (() => {
     if (priceBounds.max <= priceBounds.min) return "10px";
@@ -1486,31 +1606,42 @@ export default function ProductsPage() {
       >
         <div
           ref={campaignTrackRef}
-          className="catalog-campaign-track"
-          onScroll={handleCampaignScroll}
+          className={`catalog-campaign-track ${isCampaignDragging ? "is-dragging" : ""}`}
+          onPointerDown={handleCampaignPointerDown}
+          onPointerMove={handleCampaignPointerMove}
+          onPointerUp={handleCampaignPointerUp}
+          onPointerCancel={handleCampaignPointerCancel}
         >
           {catalogCampaignSlides.map((slide, index) => (
-            <article key={slide.id} className="catalog-campaign-slide">
+            <article
+              key={slide.id}
+              className={getCampaignSlideClassName(index)}
+              style={getCampaignSlideStyle(index)}
+              onAnimationEnd={() => handleCampaignAnimationEnd(index)}
+            >
               <img
                 className="catalog-campaign-image"
                 src={slide.image}
                 alt={slide.alt}
                 loading={index === 0 ? "eager" : "lazy"}
+                draggable={false}
               />
             </article>
           ))}
         </div>
 
-        <div className="catalog-campaign-dots" aria-label="Cambiar campaña destacada">
-          {catalogCampaignSlides.map((slide, index) => (
-            <button
-              key={slide.id}
-              type="button"
-              className={`catalog-campaign-dot ${activeCampaignSlide === index ? "is-active" : ""}`}
-              onClick={() => scrollToCampaignSlide(index)}
-              aria-label={`Mostrar campaña ${slide.id}`}
-            />
-          ))}
+        <div
+          className="catalog-campaign-progress"
+          role="progressbar"
+          aria-label="Progreso de campañas"
+          aria-valuemin={1}
+          aria-valuemax={catalogCampaignSlides.length}
+          aria-valuenow={activeCampaignSlide + 1}
+          aria-valuetext={`${activeCampaignSlide + 1} de ${catalogCampaignSlides.length}`}
+        >
+          <span className="catalog-campaign-progress-track">
+            <span key={`campaign-progress-${activeCampaignSlide}`} className="catalog-campaign-progress-fill" />
+          </span>
         </div>
       </section>
 

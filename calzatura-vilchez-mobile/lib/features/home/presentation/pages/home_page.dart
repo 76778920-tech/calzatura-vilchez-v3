@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/product.dart';
+import '../../../../shared/widgets/cv_refresh_wrapper.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../catalog/presentation/providers/catalog_provider.dart';
 import '../../../catalog/presentation/widgets/product_card.dart';
@@ -118,15 +119,15 @@ const _categoryCards = [
 const _campaignCards = [
   _Campaign(
     asset: 'assets/images/cyber-zapatillas-vertical-ai.png',
-    label: 'Zapatillas',
-    tag: '-30%',
-    category: 'juvenil',
+    label: 'Lo mejor en zapatillas',
+    btnLabel: 'Ver zapatillas',
+    btnCategory: 'juvenil',
   ),
   _Campaign(
     asset: 'assets/images/cyber-escolar-vertical-ai.png',
-    label: 'Escolar',
-    tag: 'NUEVO',
-    category: 'nino',
+    label: 'Lo mejor en zapato escolar',
+    btnLabel: 'Ver escolar',
+    btnCategory: 'nino',
   ),
 ];
 
@@ -173,14 +174,14 @@ class _Campaign {
   const _Campaign({
     required this.asset,
     required this.label,
-    required this.tag,
-    required this.category,
+    required this.btnLabel,
+    required this.btnCategory,
   });
 
   final String asset;
   final String label;
-  final String tag;
-  final String category;
+  final String btnLabel;
+  final String btnCategory;
 }
 
 class HomePage extends ConsumerStatefulWidget {
@@ -191,9 +192,13 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  final _bannerCtrl = PageController();
-  int _bannerIdx = 0;
+  static const int _kInitialPage = 600; // múltiplo de 6 slides → bucle infinito limpio
+  late final PageController _bannerCtrl =
+      PageController(initialPage: _kInitialPage);
+  int _bannerPage = _kInitialPage;
+  int get _bannerIdx => _bannerPage % _heroSlides.length;
   Timer? _autoTimer;
+  bool _heroPreloaded = false;
 
   @override
   void initState() {
@@ -201,13 +206,23 @@ class _HomePageState extends ConsumerState<HomePage> {
     _startAutoScroll();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_heroPreloaded) {
+      _heroPreloaded = true;
+      for (final slide in _heroSlides) {
+        precacheImage(AssetImage(slide.asset), context);
+      }
+    }
+  }
+
   void _startAutoScroll() {
     _autoTimer?.cancel();
     _autoTimer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (!mounted || !_bannerCtrl.hasClients) return;
-      final next = (_bannerIdx + 1) % _heroSlides.length;
       _bannerCtrl.animateToPage(
-        next,
+        _bannerPage + 1,
         duration: const Duration(milliseconds: 550),
         curve: Curves.easeInOut,
       );
@@ -224,7 +239,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Future<void> _refreshHome() async {
     ref.invalidate(productsProvider);
     ref.invalidate(featuredProductsProvider);
-    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await Future<void>.delayed(const Duration(milliseconds: 800));
   }
 
   void _goToCatalog([String category = 'todos']) {
@@ -232,19 +247,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     context.go('/catalog');
   }
 
-  String _greeting() {
-    final displayName = ref.read(currentUserProvider)?.displayName ?? '';
-    final parts = displayName.trim().split(RegExp(r'\s+'));
-    String cap(String text) {
-      if (text.isEmpty) return text;
-      return text[0].toUpperCase() + text.substring(1).toLowerCase();
-    }
-
-    if (parts.length >= 2) return 'Hola, ${cap(parts[0])} ${cap(parts[1])}';
-    if (parts.length == 1 && parts[0].isNotEmpty) {
-      return 'Hola, ${cap(parts[0])}';
-    }
-    return 'Hola';
+  String _greeting(String name) {
+    if (name.isEmpty) return 'Hola';
+    return 'Hola, $name';
   }
 
   @override
@@ -253,12 +258,13 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     return Scaffold(
       backgroundColor: AppColors.beige,
-      body: RefreshIndicator(
-        color: AppColors.gold,
-        displacement: 80,
+      body: CVRefreshWrapper(
         onRefresh: _refreshHome,
+        bubbleTop: 68,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
           slivers: [
             _buildAppBar(),
             SliverToBoxAdapter(child: _PromoTicker(messages: _promoTicker)),
@@ -267,19 +273,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                 slides: _heroSlides,
                 controller: _bannerCtrl,
                 currentIndex: _bannerIdx,
-                onPageChanged: (index) => setState(() => _bannerIdx = index),
+                onPageChanged: (page) => setState(() => _bannerPage = page),
                 onCategoryTap: _goToCatalog,
               ),
             ),
             const SliverToBoxAdapter(child: _TrustStrip()),
             SliverToBoxAdapter(
-              child: _EditorialCategoryGrid(
-                cards: _categoryCards,
-                onTap: _goToCatalog,
+              child: _CyberWowBanner(
+                onTapHombre: () => _goToCatalog('hombre'),
+                onTapMujer: () => _goToCatalog('dama'),
               ),
-            ),
-            SliverToBoxAdapter(
-              child: _CyberWowBanner(onTap: () => _goToCatalog('todos')),
             ),
             SliverToBoxAdapter(
               child: _VerticalCampaigns(
@@ -305,6 +308,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                       ),
                     ),
             ),
+            SliverToBoxAdapter(
+              child: _EditorialCategoryGrid(
+                cards: _categoryCards,
+                onTap: _goToCatalog,
+              ),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 100)),
           ],
         ),
@@ -313,6 +322,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildAppBar() {
+    final name = ref.watch(userDisplayNameProvider).valueOrNull ?? '';
     return SliverAppBar(
       floating: true,
       snap: true,
@@ -323,7 +333,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       centerTitle: false,
       titleSpacing: 16,
       title: Text(
-        _greeting(),
+        _greeting(name),
         style: const TextStyle(
           color: Colors.white,
           fontSize: 17,
@@ -460,12 +470,14 @@ class _HeroCarousel extends StatelessWidget {
         children: [
           PageView.builder(
             controller: controller,
-            itemCount: slides.length,
             onPageChanged: onPageChanged,
-            itemBuilder: (ctx, index) => _HeroSlide(
-              slide: slides[index],
-              onTap: () => onCategoryTap(slides[index].category),
-            ),
+            itemBuilder: (ctx, index) {
+              final slide = slides[index % slides.length];
+              return _HeroSlide(
+                slide: slide,
+                onTap: () => onCategoryTap(slide.category),
+              );
+            },
           ),
           Positioned(
             bottom: 18,
@@ -478,47 +490,22 @@ class _HeroCarousel extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: active.badges
-                        .map((badge) => _HeroBadge(label: badge))
-                        .toList(),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      ...List.generate(
-                        slides.length,
-                        (index) => AnimatedContainer(
-                          duration: const Duration(milliseconds: 220),
-                          margin: const EdgeInsets.only(right: 6),
-                          width: index == currentIndex ? 22 : 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: index == currentIndex
-                                ? Colors.white
-                                : Colors.white.withValues(alpha: 0.38),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '${currentIndex + 1} / ${slides.length}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: active.badges
+                    .map((badge) => _HeroBadge(label: badge))
+                    .toList(),
               ),
+            ),
+          ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: _HeroProgressBar(
+              currentIndex: currentIndex,
+              totalDuration: const Duration(seconds: 6),
             ),
           ),
         ],
@@ -669,34 +656,144 @@ class _HeroBadge extends StatelessWidget {
   }
 }
 
-class _TrustStrip extends StatelessWidget {
-  const _TrustStrip();
+class _HeroProgressBar extends StatefulWidget {
+  const _HeroProgressBar({
+    required this.currentIndex,
+    required this.totalDuration,
+  });
+
+  final int currentIndex;
+  final Duration totalDuration;
+
+  @override
+  State<_HeroProgressBar> createState() => _HeroProgressBarState();
+}
+
+class _HeroProgressBarState extends State<_HeroProgressBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: widget.totalDuration);
+    _ctrl.forward();
+  }
+
+  @override
+  void didUpdateWidget(_HeroProgressBar old) {
+    super.didUpdateWidget(old);
+    if (old.currentIndex != widget.currentIndex) {
+      _ctrl
+        ..reset()
+        ..forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    return SizedBox(
+      height: 4,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (ctx, _) => Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(color: Colors.white.withValues(alpha: 0.15)),
+            FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: _ctrl.value,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(0xFFC9A227),
+                      AppColors.gold,
+                      Color(0xFFF6DC72),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x55C9A227),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TrustStrip extends StatefulWidget {
+  const _TrustStrip();
+
+  @override
+  State<_TrustStrip> createState() => _TrustStripState();
+}
+
+class _TrustStripState extends State<_TrustStrip> {
+  late final ScrollController _scroll;
+  Timer? _timer;
+
+  static const _items = [
+    (Icons.local_shipping_outlined, 'Envio a domicilio'),
+    (Icons.shield_outlined, 'Pago seguro'),
+    (Icons.inventory_2_outlined, 'Stock en tiempo real'),
+    (Icons.support_agent_rounded, 'Asesoria por WhatsApp'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll = ScrollController();
+    // 16ms ≈ 60fps; 0.75px por frame ≈ 45px/s
+    _timer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final max = _scroll.position.maxScrollExtent;
+      if (max <= 0) return;
+      final half = max / 2;
+      var next = _scroll.offset + 0.75;
+      if (next >= half) next -= half;
+      _scroll.jumpTo(next);
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget item((IconData, String) d) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: _TrustItem(icon: d.$1, label: d.$2),
+        );
+
     return Container(
+      height: 44,
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: SingleChildScrollView(
+        controller: _scroll,
         scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
         child: Row(
-          children: const [
-            _TrustItem(
-              icon: Icons.local_shipping_outlined,
-              label: 'Envio a domicilio',
-            ),
-            SizedBox(width: 18),
-            _TrustItem(icon: Icons.shield_outlined, label: 'Pago seguro'),
-            SizedBox(width: 18),
-            _TrustItem(
-              icon: Icons.inventory_2_outlined,
-              label: 'Stock en tiempo real',
-            ),
-            SizedBox(width: 18),
-            _TrustItem(
-              icon: Icons.support_agent_rounded,
-              label: 'Asesoria por WhatsApp',
-            ),
+          children: [
+            // Dos copias idénticas para el loop continuo sin salto visible
+            ..._items.map(item),
+            ..._items.map(item),
           ],
         ),
       ),
@@ -738,56 +835,71 @@ class _EditorialCategoryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(
+    // cards[0]=Hombre  cards[1]=Dama  cards[2]=Ninos  cards[3]=Zapatillas
+    // Layout: Hombre (full) / Dama+Zapatillas (row) / Ninos (full)
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 24, 16, 14),
+          child: _SectionHeader(
             title: 'Categorias',
             actionLabel: 'Ver todo',
             onAction: () => onTap('todos'),
           ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 5,
-                child: _CategoryTile(
-                  card: cards[0],
-                  height: 220,
-                  onTap: onTap,
-                  fontSize: 14,
-                ),
+        ),
+        Column(
+          children: [
+            // ── Fila 1: HOMBRE ancho completo ─────────────────
+            SizedBox(
+              height: 210,
+              width: double.infinity,
+              child: _CategoryTile(
+                card: cards[0],
+                fontSize: 18,
+                onTap: onTap,
+                borderRadius: BorderRadius.zero,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 4,
-                child: Column(
-                  children: [
-                    _CategoryTile(
+            ),
+            // ── Fila 2: DAMA + ZAPATILLAS ─────────────────────
+            SizedBox(
+              height: 165,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _CategoryTile(
                       card: cards[1],
-                      height: 104,
+                      fontSize: 14,
                       onTap: onTap,
-                      fontSize: 12,
+                      borderRadius: BorderRadius.zero,
                     ),
-                    const SizedBox(height: 10),
-                    _CategoryTile(
-                      card: cards[2],
-                      height: 104,
+                  ),
+                  Expanded(
+                    child: _CategoryTile(
+                      card: cards[3],
+                      fontSize: 14,
                       onTap: onTap,
-                      fontSize: 12,
+                      borderRadius: BorderRadius.zero,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _WideCategoryTile(card: cards[3], onTap: onTap),
-        ],
-      ),
+            ),
+            // ── Fila 3: NIÑOS ancho completo ──────────────────
+            SizedBox(
+              height: 155,
+              width: double.infinity,
+              child: _CategoryTile(
+                card: cards[2],
+                fontSize: 16,
+                onTap: onTap,
+                borderRadius: BorderRadius.zero,
+              ),
+            ),
+          ],
+        ),
+      ],
     ).animate().fadeIn(delay: 50.ms);
   }
 }
@@ -795,145 +907,70 @@ class _EditorialCategoryGrid extends StatelessWidget {
 class _CategoryTile extends StatelessWidget {
   const _CategoryTile({
     required this.card,
-    required this.height,
-    required this.onTap,
     required this.fontSize,
+    required this.onTap,
+    this.borderRadius = const BorderRadius.all(Radius.circular(12)),
   });
 
   final _CatCard card;
-  final double height;
-  final ValueChanged<String> onTap;
   final double fontSize;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => onTap(card.category),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
-        child: SizedBox(
-          height: height,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Image.asset(
-                card.asset,
-                fit: BoxFit.cover,
-                errorBuilder: (ctx, error, stackTrace) =>
-                    Container(color: AppColors.shimmerBase),
-              ),
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: height * 0.52,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.black87, Colors.transparent],
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 10,
-                right: 10,
-                bottom: 12,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      card.label.toUpperCase(),
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: fontSize,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      card.copy,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.82),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WideCategoryTile extends StatelessWidget {
-  const _WideCategoryTile({required this.card, required this.onTap});
-
-  final _CatCard card;
   final ValueChanged<String> onTap;
+  final BorderRadius borderRadius;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () => onTap(card.category),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: borderRadius,
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            SizedBox(
-              height: 92,
-              width: double.infinity,
-              child: Image.asset(
-                card.asset,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                errorBuilder: (ctx, error, stackTrace) =>
-                    Container(color: AppColors.shimmerBase),
-              ),
+            Image.asset(
+              card.asset,
+              fit: BoxFit.cover,
+              errorBuilder: (ctx, error, stackTrace) =>
+                  Container(color: AppColors.shimmerBase),
             ),
-            Container(
-              height: 92,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.black.withValues(alpha: 0.68),
-                    Colors.transparent,
-                  ],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 110,
+              child: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.black87, Colors.transparent],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  ),
                 ),
               ),
             ),
             Positioned(
-              left: 16,
-              top: 0,
-              bottom: 0,
+              left: 14,
+              right: 14,
+              bottom: 14,
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'ZAPATILLAS',
+                  Text(
+                    card.label.toUpperCase(),
                     style: TextStyle(
-                      color: AppColors.gold,
-                      fontSize: 11,
+                      color: Colors.white,
+                      fontSize: fontSize,
                       fontWeight: FontWeight.w900,
-                      letterSpacing: 1.8,
+                      letterSpacing: 0.8,
                     ),
                   ),
+                  const SizedBox(height: 3),
                   Text(
                     card.copy,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.82),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
@@ -947,112 +984,124 @@ class _WideCategoryTile extends StatelessWidget {
 }
 
 class _CyberWowBanner extends StatelessWidget {
-  const _CyberWowBanner({required this.onTap});
+  const _CyberWowBanner({
+    required this.onTapHombre,
+    required this.onTapMujer,
+  });
 
-  final VoidCallback onTap;
+  final VoidCallback onTapHombre;
+  final VoidCallback onTapMujer;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: GestureDetector(
-        onTap: onTap,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: Stack(
-            children: [
-              SizedBox(
-                height: 152,
-                width: double.infinity,
-                child: Image.asset(
-                  'assets/images/cyber-wow-campaign-mobile-ai.png',
-                  fit: BoxFit.cover,
-                  errorBuilder: (ctx, error, stackTrace) => Container(
-                    color: AppColors.black,
-                    child: const Center(
-                      child: Text(
-                        'CYBER WOW',
-                        style: TextStyle(
-                          color: AppColors.gold,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 3,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Container(
-                height: 152,
+    return SizedBox(
+      height: 200,
+      width: double.infinity,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(color: AppColors.black),
+          Image.asset(
+            'assets/images/cyber-wow-campaign-ai.png',
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            errorBuilder: (ctx, error, stackTrace) =>
+                Container(color: AppColors.black),
+          ),
+          // Overlay oscuro uniforme para legibilidad sin tapar la imagen
+          Container(color: Colors.black.withValues(alpha: 0.46)),
+          // Glow dorado sutil centrado-abajo (igual que la web)
+          Positioned(
+            bottom: 20,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: Container(
+                width: 260,
+                height: 100,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: RadialGradient(
                     colors: [
-                      Colors.black.withValues(alpha: 0.10),
-                      Colors.black.withValues(alpha: 0.62),
+                      const Color(0xFFC9A227).withValues(alpha: 0.28),
+                      Colors.transparent,
                     ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
                   ),
                 ),
               ),
-              const Positioned(
-                left: 16,
-                bottom: 18,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+          ),
+          // Contenido centrado: título + dos botones
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'CYBER WOW',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 44,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 5,
+                  height: 0.9,
+                ),
+              ),
+              const SizedBox(height: 28),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
                   children: [
-                    Text(
-                      'CYBER WOW',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.4,
+                    Expanded(
+                      child: _CyberCtaButton(
+                        label: 'CYBER HOMBRE',
+                        onTap: onTapHombre,
                       ),
                     ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Descuentos activos con stock real',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _CyberCtaButton(
+                        label: 'CYBER MUJER',
+                        onTap: onTapMujer,
                       ),
                     ),
                   ],
                 ),
               ),
-              Positioned(
-                right: 16,
-                top: 0,
-                bottom: 0,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.gold,
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: const Text(
-                      'Ver ofertas',
-                      style: TextStyle(
-                        color: AppColors.black,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ],
+          ),
+        ],
+      ),
+    ).animate().fadeIn(delay: 100.ms);
+  }
+}
+
+class _CyberCtaButton extends StatelessWidget {
+  const _CyberCtaButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 52,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.62),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.0,
           ),
         ),
       ),
-    ).animate().fadeIn(delay: 100.ms);
+    );
   }
 }
 
@@ -1064,25 +1113,11 @@ class _VerticalCampaigns extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: [
-          Expanded(
-            child: _CampaignCard(
-              campaign: campaigns[0],
-              onTap: () => onTap(campaigns[0].category),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _CampaignCard(
-              campaign: campaigns[1],
-              onTap: () => onTap(campaigns[1].category),
-            ),
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        _CampaignCard(campaign: campaigns[0], onTap: onTap),
+        _CampaignCard(campaign: campaigns[1], onTap: onTap),
+      ],
     ).animate().fadeIn(delay: 150.ms);
   }
 }
@@ -1091,71 +1126,99 @@ class _CampaignCard extends StatelessWidget {
   const _CampaignCard({required this.campaign, required this.onTap});
 
   final _Campaign campaign;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 620,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            campaign.asset,
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            errorBuilder: (ctx, error, stackTrace) =>
+                Container(color: AppColors.black),
+          ),
+          // Gradiente de abajo hacia arriba para legibilidad del texto
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.black87, Colors.black38, Colors.transparent],
+                begin: Alignment.bottomCenter,
+                end: Alignment.topCenter,
+                stops: [0.0, 0.45, 1.0],
+              ),
+            ),
+          ),
+          // Contenido centrado vertical y horizontalmente
+          Positioned.fill(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      campaign.label.toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.0,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: 200,
+                      child: _CampaignButton(
+                        label: campaign.btnLabel.toUpperCase(),
+                        onTap: () => onTap(campaign.btnCategory),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CampaignButton extends StatelessWidget {
+  const _CampaignButton({required this.label, required this.onTap});
+
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          children: [
-            AspectRatio(
-              aspectRatio: 0.7,
-              child: Image.asset(
-                campaign.asset,
-                fit: BoxFit.cover,
-                errorBuilder: (ctx, error, stackTrace) =>
-                    Container(color: AppColors.black),
-              ),
-            ),
-            Positioned(
-              top: 10,
-              right: 10,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.gold,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  campaign.tag,
-                  style: const TextStyle(
-                    color: AppColors.black,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 0,
-              left: 0,
-              right: 0,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.black87, Colors.transparent],
-                    begin: Alignment.bottomCenter,
-                    end: Alignment.topCenter,
-                  ),
-                ),
-                child: Text(
-                  campaign.label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ),
-          ],
+      child: Container(
+        width: double.infinity,
+        height: 50,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.70)),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 2.0,
+          ),
         ),
       ),
     );
@@ -1185,21 +1248,21 @@ class _FeaturedSection extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 220,
+            height: 300,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: products.length,
               separatorBuilder: (ctx, index) => const SizedBox(width: 12),
               itemBuilder: (ctx, index) => SizedBox(
-                width: 150,
+                width: 185,
                 child: ProductCard(
                   product: products[index],
                   index: index,
                   compact: true,
-                  showWishlist: false,
-                  showAddToCart: false,
-                  showTypeLabel: false,
+                  showWishlist: true,
+                  showAddToCart: true,
+                  showTypeLabel: true,
                 ),
               ),
             ),

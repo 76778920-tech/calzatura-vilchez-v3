@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { fetchAllOrders, updateOrderStatus } from "@/domains/pedidos/services/orders";
+import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
 import type { Order, OrderStatus } from "@/types";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import toast from "react-hot-toast";
@@ -30,9 +31,15 @@ export default function AdminOrders() {
   const [filterEstado, setFilterEstado] = useState<string>("todos");
   const [previewImage, setPreviewImage] = useState<{ src: string; title: string; subtitle?: string } | null>(null);
 
-  useEffect(() => {
+  const loadOrders = useCallback(() => {
     fetchAllOrders().then(setOrders).finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  useOrdersRealtime(loadOrders);
 
   const handleStatusChange = async (orderId: string, estado: OrderStatus) => {
     try {

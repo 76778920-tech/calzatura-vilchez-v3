@@ -60,7 +60,9 @@ class AdminDashboardPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
+    final displayName = ref.watch(userDisplayNameProvider).valueOrNull ?? '';
+    final roleAsync = ref.watch(userRoleProvider);
+    final role = roleAsync.valueOrNull ?? 'admin';
     final kpisAsync = ref.watch(adminKpisProvider);
     final ordersAsync = ref.watch(adminRecentOrdersProvider);
 
@@ -98,21 +100,15 @@ class AdminDashboardPage extends ConsumerWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Text(
-                                    'Panel Administrativo',
-                                    style: TextStyle(
-                                      color: AppColors.gold,
+                                  Text(
+                                    displayName.isEmpty
+                                        ? 'Hola'
+                                        : 'Hola, $displayName',
+                                    style: const TextStyle(
+                                      color: Colors.white,
                                       fontSize: 18,
                                       fontWeight: FontWeight.w700,
                                       letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    user?.email ?? '',
-                                    style: const TextStyle(
-                                      color: Colors.white54,
-                                      fontSize: 12,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -133,9 +129,11 @@ class AdminDashboardPage extends ConsumerWidget {
                                         ),
                                       ),
                                     ),
-                                    child: const Text(
-                                      'ADMINISTRADOR',
-                                      style: TextStyle(
+                                    child: Text(
+                                      role == 'trabajador'
+                                          ? 'TRABAJADOR'
+                                          : 'ADMINISTRADOR',
+                                      style: const TextStyle(
                                         color: AppColors.gold,
                                         fontSize: 10,
                                         fontWeight: FontWeight.w700,

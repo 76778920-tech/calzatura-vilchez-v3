@@ -1008,6 +1008,10 @@ export default function Header() {
                             <Package size={16} />
                             Mis Pedidos
                           </Link>
+                          <Link to={CLIENT_ROUTES.favorites} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
+                            <Heart size={16} />
+                            Favoritos
+                          </Link>
                           <Link to={CLIENT_ROUTES.profile} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
                             <User size={16} />
                             Mi Perfil

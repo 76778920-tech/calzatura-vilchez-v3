@@ -11,9 +11,10 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
-  # ── Autenticación (mismo Firebase que la web) ──────────────────────────────
+  # ── Autenticación y base de datos Firebase (mismo que la web) ───────────────
   firebase_core: ^3.13.1
   firebase_auth: ^5.5.2
+  cloud_firestore: ^5.6.6
 
   # ── Base de datos (mismo Supabase que la web) ──────────────────────────────
   supabase_flutter: ^2.9.1
@@ -38,6 +39,9 @@ dependencies:
   # ── Gráficas (IRE / revenue) ───────────────────────────────────────────────
   fl_chart: ^0.71.0
 
+  # ── Refresh ────────────────────────────────────────────────────────────────
+  custom_refresh_indicator: ^3.0.0
+
   # ── Utilidades ─────────────────────────────────────────────────────────────
   intl: ^0.20.2
   shared_preferences: ^2.5.3
@@ -54,6 +58,13 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   build_runner: ^2.4.15
   riverpod_generator: ^2.6.5
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/images/app_icon.png"
+  min_sdk_android: 21
 
 flutter:
   uses-material-design: true

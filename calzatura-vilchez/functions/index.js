@@ -736,6 +736,94 @@ exports.confirmCodOrder = onRequest(
   }
 );
 
+exports.favorites = onRequest(
+  { secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
+  async (req, res) => {
+    cors(req, res, async () => {
+      if (req.method === "OPTIONS") {
+        return res.status(204).send("");
+      }
+
+      try {
+        const decodedToken = await verifyFirebaseUser(req);
+        const supabase = getSupabaseAdmin();
+        const userId = decodedToken.uid;
+        const rawProductId = req.method === "GET" ? req.query.productId : req.body?.productId;
+        const productId = typeof rawProductId === "string" ? rawProductId.trim() : "";
+
+        if (req.method === "GET") {
+          if (productId) {
+            const { data, error } = await supabase
+              .from("favoritos")
+              .select("id")
+              .eq("userId", userId)
+              .eq("productId", productId)
+              .maybeSingle();
+            if (error) {
+              throw Object.assign(new Error("No se pudo consultar favoritos"), { status: 500 });
+            }
+            return res.status(200).json({ isFavorite: Boolean(data) });
+          }
+
+          const { data, error } = await supabase
+            .from("favoritos")
+            .select("productId")
+            .eq("userId", userId)
+            .order("creadoEn", { ascending: false });
+          if (error) {
+            throw Object.assign(new Error("No se pudieron consultar tus favoritos"), { status: 500 });
+          }
+          return res.status(200).json({ productIds: (data || []).map((item) => item.productId) });
+        }
+
+        if (req.method === "POST") {
+          if (!isNonEmptyString(productId, 120)) {
+            return res.status(400).json({ error: "Producto invalido" });
+          }
+
+          const { data: existing, error: readError } = await supabase
+            .from("favoritos")
+            .select("id")
+            .eq("userId", userId)
+            .eq("productId", productId)
+            .maybeSingle();
+          if (readError) {
+            throw Object.assign(new Error("No se pudo consultar favoritos"), { status: 500 });
+          }
+          if (!existing) {
+            const { error } = await supabase.from("favoritos").insert({
+              userId,
+              productId,
+              creadoEn: new Date().toISOString(),
+            });
+            if (error) {
+              throw Object.assign(new Error("No se pudo guardar favorito"), { status: 500 });
+            }
+          }
+          return res.status(200).json({ success: true });
+        }
+
+        if (req.method === "DELETE") {
+          let query = supabase.from("favoritos").delete().eq("userId", userId);
+          if (productId) {
+            query = query.eq("productId", productId);
+          }
+          const { error } = await query;
+          if (error) {
+            throw Object.assign(new Error("No se pudo eliminar favorito"), { status: 500 });
+          }
+          return res.status(200).json({ success: true });
+        }
+
+        return res.status(405).json({ error: "Metodo no permitido" });
+      } catch (error) {
+        console.error("Favorites error:", error);
+        return res.status(error.status || 500).json({ error: publicError(error) });
+      }
+    });
+  }
+);
+
 const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
 
 exports.aiAdminProxy = onRequest(

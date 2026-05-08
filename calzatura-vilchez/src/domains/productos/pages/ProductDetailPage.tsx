@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ShoppingCart,
@@ -17,6 +17,7 @@ import type { Product } from "@/types";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { getProductColors } from "@/utils/colors";
 import { getAvailableSizes, getSizeStock } from "@/utils/stock";
+import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import toast from "react-hot-toast";
 
@@ -36,9 +37,10 @@ export default function ProductDetailPage() {
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  useEffect(() => {
-    if (!id) return;
-    fetchPublicProductById(id)
+  const loadProduct = useCallback((showLoader = false) => {
+    if (!id) return Promise.resolve();
+    if (showLoader) setLoading(true);
+    return fetchPublicProductById(id)
       .then(async (p) => {
         setProduct(p);
         setSelectedImageIndex(0);
@@ -62,8 +64,18 @@ export default function ProductDetailPage() {
           setFamilySiblings([]);
         }
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (showLoader) setLoading(false);
+      });
   }, [id]);
+
+  useEffect(() => {
+    queueMicrotask(() => void loadProduct(true));
+  }, [loadProduct]);
+
+  useProductsRealtime(() => {
+    void loadProduct(false);
+  });
 
   const availableColors = product ? getProductColors(product) : [];
   const availableSizes = product ? getAvailableSizes(product) : [];
@@ -92,8 +104,15 @@ export default function ProductDetailPage() {
     ) % productImages.length);
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
+    const visibleProduct = await fetchPublicProductById(product.id);
+    if (!visibleProduct) {
+      setProduct(null);
+      setFamilySiblings([]);
+      toast.error("Este producto ya no está disponible en tienda");
+      return;
+    }
     if (availableSizes.length && !selectedTalla) {
       toast.error("Selecciona una talla");
       return;
@@ -102,7 +121,7 @@ export default function ProductDetailPage() {
       toast.error("No hay stock suficiente para esa talla");
       return;
     }
-    addItem(product, quantity, selectedTalla || undefined, selectedColor || undefined);
+    addItem(visibleProduct, quantity, selectedTalla || undefined, selectedColor || undefined);
     toast.success("Producto agregado al carrito");
   };
 

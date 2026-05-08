@@ -1,7 +1,13 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { CartProvider } from "@/domains/carrito/context/CartContext";
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
 import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "./routes/paths";
@@ -118,6 +124,7 @@ export default function App() {
   return (
     <CartProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <Toaster
           position="top-right"
           toastOptions={{
