@@ -12,19 +12,29 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
+from models.campaign import detect_campaign
 from models.demand import build_daily_sales_by_product, get_stock_alerts, get_weekly_chart, predict_demand
 from models.revenue import forecast_revenue
 from models.risk import compute_ire, compute_ire_proyectado
 from services.supabase_client import (
+    fetch_campana_detail,
+    fetch_campanas_recientes,
     fetch_completed_orders,
     fetch_daily_sales,
     fetch_ire_historial,
     fetch_product_codes,
     fetch_products,
     get_client,
+    get_last_campana_activa,
     load_modelo_estado,
+    save_campana_detectada,
+    save_campana_feedback,
+    save_campana_metrica_diaria,
+    save_campana_productos,
     save_ire_historial,
     save_modelo_estado,
+    update_campana_admin_feedback,
+    update_campana_estado,
 )
 
 load_dotenv()
@@ -531,3 +541,208 @@ def model_metrics(request: Request):
         "evaluaciones": evaluated,
         "nota": "MAE: error absoluto medio en unidades/día por producto. MAPE: error porcentual medio relativo al valor real.",
     }
+
+
+@app.get("/api/predict/campaign-detection")
+@limiter.limit("20/minute")
+def campaign_detection(
+    request: Request,
+    recent_days: int = Query(default=7, ge=3, le=14, description="Días recientes a evaluar"),
+    baseline_days: int = Query(default=60, ge=30, le=120, description="Días de historial para baseline"),
+):
+    """
+    Detecta automáticamente si el negocio está en período de campaña.
+    Usa uplift ajustado por día de semana, z-score, mediana robusta y
+    desglose por categoría. Persiste eventos en campanas_detectadas (Supabase).
+
+    Ciclo de vida:
+        observando → inicio → activa → finalizando → finalizada
+                                     ↘ en_riesgo_stock ↗
+    """
+    _require_service_auth(request, "ai-service/main.py:campaign_detection")
+
+    lookback = baseline_days + recent_days + 7
+    daily_sales, _, products, _ = _load_data(lookback_days=lookback)
+
+    result = detect_campaign(
+        daily_sales=daily_sales,
+        products=products,
+        recent_days=recent_days,
+        baseline_days=baseline_days,
+    )
+
+    # Persistir evento y avanzar ciclo de vida (fire-and-forget, no bloquea respuesta)
+    try:
+        last = get_last_campana_activa()
+        today_iso = date.today().isoformat()
+        metricas  = result.get("metricas", {})
+        cierre    = result.get("cierre_estado")  # "finalizando" | "finalizada" | None
+
+        if result["campaign_detected"]:
+            if last is None:
+                # ── Nuevo evento: primera vez que se detecta campaña ──────────
+                evento = {
+                    "fecha_deteccion":                  today_iso,
+                    "fecha_inicio":                     today_iso,
+                    "nivel":                            result["nivel"],
+                    "scope":                            result.get("scope"),
+                    "foco_tipo":                        result.get("foco_tipo"),
+                    "foco_nombre":                      result.get("foco_nombre"),
+                    "foco_uplift":                      result.get("foco_uplift"),
+                    "tipo_sugerido":                    result["tipo_sugerido"],
+                    "categorias_afectadas":             result["categorias_afectadas"],
+                    "uplift_ratio":                     metricas.get("uplift_ratio"),
+                    "z_score":                          metricas.get("z_score"),
+                    "confidence_pct":                   result["confidence_pct"],
+                    "estado":                           "inicio",
+                    "metricas":                         metricas,
+                    "recomendacion":                    result["recomendacion"],
+                    "impacto_estimado_soles":           result.get("impacto_estimado_soles"),
+                    "impacto_estimado_soles_focalizado": result.get("impacto_estimado_soles_focalizado"),
+                }
+                saved = save_campana_detectada(evento)
+                campana_id = saved.get("id") if saved else None
+                result["evento_id"]     = campana_id
+                result["evento_estado"] = "inicio"
+            else:
+                campana_id = last["id"]
+                # ── Campaña existente: avanzar estado ────────────────────────
+                new_estado = last["estado"]
+                if last["estado"] in ("observando", "inicio"):
+                    new_estado = "activa"
+                    update_campana_estado(campana_id, new_estado)
+                elif last["estado"] == "finalizando":
+                    # Las ventas volvieron a subir → campaña se reanuda
+                    new_estado = "activa"
+                    update_campana_estado(campana_id, new_estado)
+
+                result["evento_id"]            = campana_id
+                result["evento_estado"]        = new_estado
+                result["fecha_inicio_campaña"] = last.get("fecha_deteccion")
+
+        else:
+            # ── Sin campaña activa ────────────────────────────────────────────
+            campana_id = None
+            if last is not None:
+                campana_id = last["id"]
+                if cierre == "finalizada" or last["estado"] == "finalizando":
+                    # Cooldown completo → cerrar definitivamente
+                    update_campana_estado(
+                        campana_id, "finalizada",
+                        fecha_fin=today_iso,
+                        impacto_estimado_soles=result.get("impacto_estimado_soles"),
+                    )
+                    result["evento_id"]     = campana_id
+                    result["evento_estado"] = "finalizada"
+                    result["mensaje"] += (
+                        f" La campaña iniciada el {last.get('fecha_deteccion')} ha finalizado."
+                    )
+                else:
+                    # Primer día bajo umbral → modo cooldown
+                    update_campana_estado(campana_id, "finalizando")
+                    result["evento_id"]     = campana_id
+                    result["evento_estado"] = "finalizando"
+
+        # ── Métricas diarias (persiste una fila por campaña+fecha) ───────────
+        if campana_id and metricas:
+            try:
+                save_campana_metrica_diaria(campana_id, {
+                    "fecha":            today_iso,
+                    "ventas_unidades":  metricas.get("actual_sum", 0),
+                    "ventas_soles":     metricas.get("ventas_soles_recientes", 0),
+                    "uplift_ratio":     metricas.get("uplift_ratio"),
+                    "z_score":          metricas.get("z_score"),
+                })
+            except Exception:
+                pass
+
+        # ── Top productos reales ──────────────────────────────────────────────
+        if campana_id and result.get("top_productos"):
+            try:
+                productos_payload = [
+                    {
+                        "producto_id":      p["producto_id"],
+                        "nombre":           p["nombre"],
+                        "categoria":        p["categoria"],
+                        "uplift_ratio":     p["uplift_ratio"],
+                        "ventas_recientes": p["ventas_recientes"],
+                        "ventas_baseline":  p["ventas_baseline"],
+                        "stock_actual":     p.get("stock_actual"),
+                    }
+                    for p in result["top_productos"][:5]
+                ]
+                save_campana_productos(campana_id, productos_payload)
+            except Exception:
+                pass
+
+    except Exception as persist_err:
+        result["_persist_warning"] = str(persist_err)
+
+    return result
+
+
+# ── Campaign admin endpoints ──────────────────────────────────────────────────
+
+class FeedbackPayload(BaseModel):
+    campana_id: int
+    accion: str                      # confirmar | descartar | nota
+    nota: str | None = None
+    admin_email: str | None = None
+
+
+@app.get("/api/campaign/active")
+@limiter.limit("30/minute")
+def campaign_active(request: Request):
+    """
+    Devuelve la campaña activa más reciente con top_productos para el panel admin.
+    Incluye historial de las últimas 10 campañas detectadas.
+    """
+    _require_service_auth(request, "api/campaign/active")
+    try:
+        last   = get_last_campana_activa()
+        detail = fetch_campana_detail(last["id"]) if last else None
+        historial = fetch_campanas_recientes(limit=10)
+        return {
+            "status":   "ok",
+            "activa":   detail,
+            "historial": historial,
+        }
+    except Exception as error:
+        _raise_http_error(error)
+
+
+@app.post("/api/campaign/feedback")
+@limiter.limit("20/minute")
+def campaign_feedback(request: Request, payload: FeedbackPayload):
+    """
+    Registra feedback del administrador sobre una campaña detectada.
+    accion: 'confirmar' | 'descartar' | 'nota'
+    """
+    _require_service_auth(request, "api/campaign/feedback")
+    try:
+        confirmada = None
+        if payload.accion == "confirmar":
+            confirmada = True
+        elif payload.accion == "descartar":
+            confirmada = False
+
+        # Registrar en tabla de historial de feedback
+        save_campana_feedback(
+            campana_id=payload.campana_id,
+            accion=payload.accion,
+            nota=payload.nota,
+            admin_email=payload.admin_email,
+        )
+        # Actualizar campo principal si es confirmar/descartar
+        if confirmada is not None:
+            update_campana_admin_feedback(
+                campana_id=payload.campana_id,
+                confirmada=confirmada,
+                nota=payload.nota,
+            )
+            if not confirmada:
+                update_campana_estado(payload.campana_id, "descartada")
+
+        return {"status": "ok", "campana_id": payload.campana_id, "accion": payload.accion}
+    except Exception as error:
+        _raise_http_error(error)

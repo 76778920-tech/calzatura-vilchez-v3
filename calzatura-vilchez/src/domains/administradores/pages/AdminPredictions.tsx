@@ -226,15 +226,55 @@ function loadPref<T extends number>(key: string, valid: T[], fallback: T): T {
   const v = Number(localStorage.getItem(key));
   return (valid as number[]).includes(v) ? (v as T) : fallback;
 }
-type PredictionTab = "resumen" | "ire" | "ventas" | "finanzas" | "ranking" | "modelo" | "asistente";
+type PredictionTab = "resumen" | "ire" | "ventas" | "finanzas" | "ranking" | "modelo" | "asistente" | "campanas";
 type RankingPeriod = 7 | 15 | 30;
+
+interface CampanaTopProducto {
+  producto_id: string;
+  nombre: string;
+  categoria: string;
+  uplift_ratio: number;
+  uplift_pct: number;
+  ventas_recientes: number;
+  ventas_baseline: number;
+  stock_actual: number | null;
+  impacto_soles?: number;
+}
+
+interface CampanaDetectada {
+  id: number;
+  fecha_deteccion: string;
+  fecha_inicio: string | null;
+  fecha_fin: string | null;
+  nivel: string;
+  scope: "global" | "focalizada" | null;
+  foco_tipo: "global" | "categoria" | "producto" | null;
+  foco_nombre: string | null;
+  foco_uplift: number | null;
+  tipo_sugerido: string | null;
+  estado: string;
+  uplift_ratio: number | null;
+  confidence_pct: number | null;
+  impacto_estimado_soles: number | null;
+  impacto_estimado_soles_focalizado: number | null;
+  recomendacion: string | null;
+  confirmada_por_admin: boolean | null;
+  admin_nota: string | null;
+  top_productos_detalle?: CampanaTopProducto[];
+}
+
+interface CampanaActiveResponse {
+  status: string;
+  activa: CampanaDetectada | null;
+  historial: CampanaDetectada[];
+}
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
 
-const TAB_SEQUENCE: PredictionTab[] = ["resumen", "ire", "ventas", "finanzas", "ranking", "modelo", "asistente"];
+const TAB_SEQUENCE: PredictionTab[] = ["resumen", "ire", "ventas", "finanzas", "ranking", "modelo", "asistente", "campanas"];
 
 const IRE_NIVEL_LABELS: Record<string, string> = {
   bajo: "Bajo", moderado: "Moderado", alto: "Alto", critico: "Crítico",
@@ -1867,6 +1907,10 @@ export default function AdminPredictions() {
   const [modelMetricsLoading, setModelMetricsLoading] = useState(false);
   const [ireHistorialFetched, setIreHistorialFetched] = useState(false);
   const [aiWarnings, setAiWarnings] = useState<string[]>([]);
+  const [campanaData, setCampanaData] = useState<CampanaActiveResponse | null>(null);
+  const [campanaLoading, setCampanaLoading] = useState(false);
+  const [campanaFetched, setCampanaFetched] = useState(false);
+  const [campanaFeedbackLoading, setCampanaFeedbackLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const changeTab = useCallback((nextTab: PredictionTab) => {
@@ -1947,6 +1991,33 @@ export default function AdminPredictions() {
     setIreHistorialFetched(true);
   }, []);
 
+  const loadCampana = useCallback(async () => {
+    setCampanaLoading(true);
+    try {
+      const res = await fetchAI("/api/campaign/active");
+      if (res.ok) setCampanaData(await res.json());
+    } catch { /* silencioso */ }
+    setCampanaFetched(true);
+    setCampanaLoading(false);
+  }, []);
+
+  const submitCampanaFeedback = useCallback(async (
+    campanaId: number,
+    accion: "confirmar" | "descartar" | "nota",
+    nota?: string,
+  ) => {
+    setCampanaFeedbackLoading(true);
+    try {
+      await fetchAI("/api/campaign/feedback", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ campana_id: campanaId, accion, nota }),
+      });
+      await loadCampana(); // refresh after action
+    } catch { /* silencioso */ }
+    setCampanaFeedbackLoading(false);
+  }, [loadCampana]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => void load(horizon, history), 0);
     return () => window.clearTimeout(timer);
@@ -1963,10 +2034,13 @@ export default function AdminPredictions() {
     if ((activeTab === "resumen" || activeTab === "ire") && !ireHistorialFetched) {
       timers.push(window.setTimeout(() => void loadIreHistorial(), 0));
     }
+    if (activeTab === "campanas" && !campanaFetched && !campanaLoading) {
+      timers.push(window.setTimeout(() => void loadCampana(), 0));
+    }
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
     };
-  }, [activeTab, weeklyChartFetched, weeklyChartLoading, modelMetricsFetched, modelMetricsLoading, modeloMeta, loadWeeklyChart, loadModelMetrics, ireHistorialFetched, loadIreHistorial]);
+  }, [activeTab, weeklyChartFetched, weeklyChartLoading, modelMetricsFetched, modelMetricsLoading, modeloMeta, loadWeeklyChart, loadModelMetrics, ireHistorialFetched, loadIreHistorial, campanaFetched, campanaLoading, loadCampana]);
 
   const refreshPredictions = useCallback(async () => {
     setWeeklyChartFetched(false);
@@ -2373,6 +2447,12 @@ export default function AdminPredictions() {
         </button>
         <button type="button" role="tab" aria-selected={activeTab === "asistente"} className={`pred-tab ${activeTab === "asistente" ? "active" : ""}`} onClick={() => changeTab("asistente")}>
           Asistente
+        </button>
+        <button type="button" role="tab" aria-selected={activeTab === "campanas"} className={`pred-tab ${activeTab === "campanas" ? "active" : ""}`} onClick={() => changeTab("campanas")}>
+          Campañas IA
+          {campanaData?.activa && (
+            <span className="pred-tab-count pred-tab-count-alert">!</span>
+          )}
         </button>
       </nav>
 
@@ -3568,6 +3648,307 @@ export default function AdminPredictions() {
             />
             </section>
           </div>
+        </motion.div>
+      )}
+
+      {/* ── Pestaña: Campañas IA ─────────────────────────────── */}
+      {activeTab === "campanas" && (
+        <motion.div
+          key="tab-campanas"
+          className="pred-tab-panel"
+          initial={{ opacity: 0, x: tabDirection >= 0 ? 54 : -54, y: 18, filter: "blur(8px)" }}
+          animate={{ opacity: 1, x: 0, y: 0, filter: "blur(0px)" }}
+          transition={{ duration: 0.38, ease: "easeOut" }}
+        >
+          {campanaLoading && (
+            <div style={{ textAlign: "center", padding: "2.5rem 0", opacity: 0.7 }}>
+              Consultando inteligencia comercial…
+            </div>
+          )}
+
+          {!campanaLoading && !campanaFetched && (
+            <div style={{ textAlign: "center", padding: "2rem" }}>
+              <button className="pred-btn" onClick={() => void loadCampana()}>
+                Consultar campañas detectadas
+              </button>
+            </div>
+          )}
+
+          {!campanaLoading && campanaFetched && campanaData && (() => {
+            const NIVEL_COLOR: Record<string, string> = {
+              alta: "critico", media: "alto", baja: "moderado", normal: "bajo", observando: "moderado",
+            };
+            const NIVEL_LABEL: Record<string, string> = {
+              alta: "Alta demanda", media: "Campaña activa", baja: "Actividad elevada",
+              normal: "Normal", observando: "En observación",
+            };
+            const ESTADO_LABEL: Record<string, string> = {
+              inicio: "Inicio", activa: "Activa", finalizando: "Finalizando",
+              en_riesgo_stock: "Riesgo stock", finalizada: "Finalizada",
+              descartada: "Descartada", observando: "En observación",
+            };
+
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+
+                {/* ── Sin campaña activa ── */}
+                {!campanaData.activa && (
+                  <div className="ire-hero ire-hero-bajo" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
+                    <div className="ire-label">Estado de campañas</div>
+                    <p style={{ margin: 0, fontWeight: 600, fontSize: "1.05rem" }}>Sin campaña activa en este momento</p>
+                    <p style={{ margin: 0, opacity: 0.75, fontSize: "0.9rem" }}>
+                      El sistema monitorea ventas en tiempo real. Se registrará automáticamente cuando detecte actividad elevada o focalizada.
+                    </p>
+                    <button className="pred-btn" onClick={() => void loadCampana()} style={{ marginTop: "0.25rem" }}>
+                      Actualizar
+                    </button>
+                  </div>
+                )}
+
+                {/* ── Campaña activa ── */}
+                {campanaData.activa && (() => {
+                  const c = campanaData.activa!;
+                  const nc = NIVEL_COLOR[c.nivel] ?? "moderado";
+                  return (
+                    <>
+                      {/* Hero */}
+                      <div className={`ire-hero ire-hero-${nc}`} style={{ flexWrap: "wrap", gap: "1rem" }}>
+                        <div className="ire-left" style={{ flex: "1 1 280px" }}>
+                          <div className="ire-label" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+                            <span>Campaña detectada</span>
+                            {c.scope && (
+                              <span style={{
+                                fontSize: "0.7rem", fontWeight: 700, padding: "0.15rem 0.5rem",
+                                borderRadius: "999px", background: "rgba(255,255,255,0.2)",
+                                textTransform: "uppercase", letterSpacing: "0.05em",
+                              }}>
+                                {c.scope === "focalizada"
+                                  ? `Focalizada · ${c.foco_tipo ?? "segmento"}`
+                                  : "Alcance global"}
+                              </span>
+                            )}
+                            {c.foco_nombre && (
+                              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>— {c.foco_nombre}</span>
+                            )}
+                          </div>
+
+                          <div className="ire-score-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
+                            <span className={`ire-nivel ire-nivel-${nc}`}>
+                              {NIVEL_LABEL[c.nivel] ?? c.nivel}
+                            </span>
+                            {c.confidence_pct != null && (
+                              <span style={{ fontSize: "0.9rem", opacity: 0.8 }}>
+                                Confianza {c.confidence_pct}%
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Metrics */}
+                          <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
+                            {c.uplift_ratio != null && (
+                              <div>
+                                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Uplift</div>
+                                <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{c.uplift_ratio.toFixed(2)}×</div>
+                              </div>
+                            )}
+                            {(c.impacto_estimado_soles ?? 0) > 0 && (
+                              <div>
+                                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Impacto global</div>
+                                <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
+                                  S/ {(c.impacto_estimado_soles ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                                </div>
+                              </div>
+                            )}
+                            {(c.impacto_estimado_soles_focalizado ?? 0) > 0 && (
+                              <div>
+                                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Impacto focalizado</div>
+                                <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
+                                  S/ {(c.impacto_estimado_soles_focalizado ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                                </div>
+                              </div>
+                            )}
+                            <div>
+                              <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Estado</div>
+                              <div style={{ fontWeight: 600 }}>{ESTADO_LABEL[c.estado] ?? c.estado}</div>
+                            </div>
+                            {c.fecha_inicio && (
+                              <div>
+                                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Desde</div>
+                                <div style={{ fontWeight: 600 }}>{c.fecha_inicio}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Confirm / Discard */}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", minWidth: "152px" }}>
+                          {c.confirmada_por_admin == null ? (
+                            <>
+                              <button
+                                className="pred-btn"
+                                disabled={campanaFeedbackLoading}
+                                onClick={() => void submitCampanaFeedback(c.id, "confirmar")}
+                                style={{ background: "#22c55e", color: "#fff", border: "none", fontWeight: 600, padding: "0.55rem 1rem" }}
+                              >
+                                {campanaFeedbackLoading ? "…" : "✓ Confirmar"}
+                              </button>
+                              <button
+                                className="pred-btn"
+                                disabled={campanaFeedbackLoading}
+                                onClick={() => void submitCampanaFeedback(c.id, "descartar")}
+                                style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.28)", fontWeight: 600, padding: "0.55rem 1rem" }}
+                              >
+                                {campanaFeedbackLoading ? "…" : "✗ Descartar"}
+                              </button>
+                            </>
+                          ) : (
+                            <div style={{
+                              padding: "0.6rem 0.9rem", borderRadius: "0.5rem", fontWeight: 600, fontSize: "0.85rem",
+                              background: c.confirmada_por_admin ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)",
+                            }}>
+                              {c.confirmada_por_admin ? "✓ Confirmada" : "✗ Descartada"}
+                              {c.admin_nota && (
+                                <p style={{ margin: "0.3rem 0 0", opacity: 0.8, fontSize: "0.78rem", fontWeight: 400 }}>
+                                  {c.admin_nota}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          <button
+                            className="pred-btn"
+                            style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem", opacity: 0.7 }}
+                            onClick={() => void loadCampana()}
+                          >
+                            Actualizar
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Recommendation */}
+                      {c.recomendacion && (
+                        <div className="pred-warning" style={{
+                          background: "rgba(234,179,8,0.07)",
+                          border: "1px solid rgba(234,179,8,0.28)",
+                          borderRadius: "0.75rem", padding: "0.85rem 1rem",
+                          fontSize: "0.9rem", lineHeight: 1.6,
+                        }}>
+                          <strong>Recomendación · </strong>{c.recomendacion}
+                        </div>
+                      )}
+
+                      {/* Top products */}
+                      {c.top_productos_detalle && c.top_productos_detalle.length > 0 && (
+                        <section>
+                          <h3 className="pred-section-title" style={{ marginBottom: "0.65rem" }}>
+                            Top productos con mayor actividad
+                          </h3>
+                          <div className="pred-table-wrapper">
+                            <table className="admin-table pred-table">
+                              <thead>
+                                <tr>
+                                  <th>Producto</th>
+                                  <th>Categoría</th>
+                                  <th>Uplift</th>
+                                  <th>Ventas recientes</th>
+                                  <th>Ventas esperadas</th>
+                                  <th>Stock</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {c.top_productos_detalle.map((p) => (
+                                  <tr
+                                    key={p.producto_id}
+                                    className={p.stock_actual === 0 ? "pred-row-alert" : ""}
+                                  >
+                                    <td style={{ fontWeight: 600 }}>{p.nombre}</td>
+                                    <td>{p.categoria}</td>
+                                    <td>
+                                      <span className={`pred-estado-badge ${p.uplift_ratio >= 2 ? "critico" : p.uplift_ratio >= 1.5 ? "alerta" : ""}`}>
+                                        {p.uplift_ratio.toFixed(2)}×
+                                      </span>
+                                    </td>
+                                    <td>{p.ventas_recientes.toFixed(1)} uds</td>
+                                    <td>{p.ventas_baseline.toFixed(1)} uds</td>
+                                    <td style={{
+                                      fontWeight: 600,
+                                      color: p.stock_actual === 0 ? "#ef4444"
+                                        : (p.stock_actual ?? 999) < 5 ? "#f59e0b"
+                                        : undefined,
+                                    }}>
+                                      {p.stock_actual ?? "—"}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+                      )}
+                    </>
+                  );
+                })()}
+
+                {/* ── Historial ── */}
+                {campanaData.historial.length > 0 && (
+                  <section>
+                    <h3 className="pred-section-title" style={{ marginBottom: "0.65rem" }}>
+                      Historial de campañas detectadas
+                    </h3>
+                    <div className="pred-table-wrapper">
+                      <table className="admin-table pred-table">
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Nivel</th>
+                            <th>Scope</th>
+                            <th>Foco</th>
+                            <th>Uplift</th>
+                            <th>Impacto S/</th>
+                            <th>Estado</th>
+                            <th>Admin</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {campanaData.historial.map((h) => {
+                            const nivelBadge: Record<string, string> = {
+                              alta: "critico", media: "alerta", baja: "alerta",
+                            };
+                            const impacto = h.scope === "focalizada" && (h.impacto_estimado_soles_focalizado ?? 0) > 0
+                              ? h.impacto_estimado_soles_focalizado ?? 0
+                              : h.impacto_estimado_soles ?? 0;
+                            return (
+                              <tr key={h.id}>
+                                <td>{h.fecha_deteccion}</td>
+                                <td>
+                                  <span className={`pred-estado-badge ${nivelBadge[h.nivel] ?? ""}`}>
+                                    {h.nivel}
+                                  </span>
+                                </td>
+                                <td>{h.scope ?? "—"}</td>
+                                <td style={{ fontSize: "0.83rem" }}>
+                                  {h.foco_nombre ? `${h.foco_tipo}: ${h.foco_nombre}` : "—"}
+                                </td>
+                                <td>{h.uplift_ratio != null ? `${h.uplift_ratio.toFixed(2)}×` : "—"}</td>
+                                <td>{impacto > 0 ? `S/ ${impacto.toLocaleString("es-PE", { minimumFractionDigits: 2 })}` : "—"}</td>
+                                <td>{ESTADO_LABEL[h.estado] ?? h.estado}</td>
+                                <td style={{ fontSize: "0.8rem", opacity: 0.85 }}>
+                                  {h.confirmada_por_admin === true
+                                    ? "✓ Confirmada"
+                                    : h.confirmada_por_admin === false
+                                    ? "✗ Descartada"
+                                    : "Pendiente"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                )}
+              </div>
+            );
+          })()}
         </motion.div>
       )}
     </div>
