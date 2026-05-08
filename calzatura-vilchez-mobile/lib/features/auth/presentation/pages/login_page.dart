@@ -27,6 +27,99 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
+  Future<void> _forgotPassword() async {
+    final emailCtrl = TextEditingController(text: _emailCtrl.text.trim());
+    final formKey = GlobalKey<FormState>();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Recuperar contraseña',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Te enviaremos un enlace para restablecer tu contraseña.',
+                style: TextStyle(color: Colors.white60, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  labelText: 'Correo electrónico',
+                  labelStyle: const TextStyle(color: Colors.white54),
+                  prefixIcon: const Icon(Icons.email_outlined, color: Colors.white54, size: 20),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.07),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.gold, width: 1.5),
+                  ),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
+                  final valid = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim());
+                  if (!valid) return 'Correo inválido';
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) Navigator.pop(ctx, true);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.gold,
+              foregroundColor: AppColors.black,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text('Enviar', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final ok = await ref
+        .read(authNotifierProvider.notifier)
+        .resetPassword(emailCtrl.text);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(
+        ok
+            ? 'Correo enviado. Revisa tu bandeja de entrada.'
+            : ref.read(authNotifierProvider).error?.toString() ?? 'Error al enviar',
+      ),
+      backgroundColor: ok ? Colors.green.shade800 : AppColors.error,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final ok = await ref
@@ -181,7 +274,22 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               return null;
                             },
                           ),
-                          const SizedBox(height: 28),
+                          const SizedBox(height: 12),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: GestureDetector(
+                              onTap: _forgotPassword,
+                              child: const Text(
+                                '¿Olvidaste tu contraseña?',
+                                style: TextStyle(
+                                  color: AppColors.gold,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
                           SizedBox(
                             width: double.infinity,
                             height: 52,

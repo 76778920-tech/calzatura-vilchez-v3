@@ -130,6 +130,29 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
 
   Future<void> signOut() => _repo.signOut();
 
+  Future<bool> resetPassword(String email) async {
+    try {
+      await _repo.resetPassword(email.trim());
+      return true;
+    } on FirebaseAuthException catch (e) {
+      state = AsyncError(_mapResetError(e), StackTrace.current);
+      return false;
+    }
+  }
+
+  String _mapResetError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+        return 'No existe una cuenta con ese correo.';
+      case 'invalid-email':
+        return 'Correo electrónico inválido.';
+      case 'too-many-requests':
+        return 'Demasiados intentos. Intenta más tarde.';
+      default:
+        return e.message ?? 'No se pudo enviar el correo.';
+    }
+  }
+
   String _mapError(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
