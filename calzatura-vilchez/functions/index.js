@@ -875,11 +875,34 @@ exports.aiAdminProxy = onRequest(
           }
           upstreamUrl = `${base}/api/cache/invalidate`;
           method = "POST";
+        } else if (op === "campaignActive") {
+          upstreamUrl = `${base}/api/campaign/active`;
+        } else if (op === "campaignFeedback") {
+          if (req.method !== "POST") {
+            return res.status(405).json({ error: "Metodo no permitido" });
+          }
+          upstreamUrl = `${base}/api/campaign/feedback`;
+          method = "POST";
+        } else if (op === "campaignDetection") {
+          const recentDays  = parseInt(String(req.query.recent_days  ?? "7"),  10);
+          const baselineDays = parseInt(String(req.query.baseline_days ?? "60"), 10);
+          if (!Number.isFinite(recentDays)  || recentDays  < 3  || recentDays  > 14)  return res.status(400).json({ error: "recent_days invalido" });
+          if (!Number.isFinite(baselineDays) || baselineDays < 30 || baselineDays > 120) return res.status(400).json({ error: "baseline_days invalido" });
+          upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${recentDays}&baseline_days=${baselineDays}`;
         } else {
           return res.status(400).json({ error: "op invalido" });
         }
 
-        const upstream = await fetch(upstreamUrl, { method, headers: serviceAuth, signal });
+        // campaignFeedback needs to forward the request body
+        const upstreamBody = (method === "POST" && op === "campaignFeedback")
+          ? JSON.stringify(req.body)
+          : undefined;
+        const upstreamHeaders = {
+          ...serviceAuth,
+          ...(upstreamBody ? { "Content-Type": "application/json" } : {}),
+        };
+
+        const upstream = await fetch(upstreamUrl, { method, headers: upstreamHeaders, body: upstreamBody, signal });
         const text = await upstream.text();
         const ct = upstream.headers.get("content-type") || "application/json; charset=utf-8";
 

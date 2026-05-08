@@ -300,7 +300,7 @@ def fetch_campana_detail(campana_id: int) -> dict | None:
         campana = rows[0]
         # Enrich with top products
         prods = _query(_CAMP_PRODUCTOS_TABLE, {
-            "select":    "producto_id,nombre,categoria,uplift_ratio,ventas_recientes,ventas_baseline,stock_actual",
+            "select":    "producto_id,nombre,categoria,uplift_ratio,ventas_recientes,ventas_baseline,stock_actual,impacto_soles",
             "campana_id": f"eq.{campana_id}",
             "order":     "uplift_ratio.desc",
             "limit":     "10",

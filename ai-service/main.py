@@ -771,6 +771,7 @@ def campaign_detection(
                         "ventas_recientes": p["ventas_recientes"],
                         "ventas_baseline":  p["ventas_baseline"],
                         "stock_actual":     p.get("stock_actual"),
+                        "impacto_soles":    p.get("impacto_soles"),
                     }
                     for p in result["top_productos"][:5]
                 ]
