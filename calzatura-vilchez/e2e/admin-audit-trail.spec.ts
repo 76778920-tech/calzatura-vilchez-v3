@@ -174,11 +174,11 @@ test.describe("admin → rastro de auditoría", () => {
     // Navegar al panel de productos y crear uno
     await page.goto("/admin/productos");
     await page.waitForLoadState("domcontentloaded");
+    // Esperar a que el guard de autenticación resuelva y la página se renderice
+    await expect(page.locator("h1.admin-page-title", { hasText: /Productos/ })).toBeVisible({ timeout: 20_000 });
 
-    const createBtn = page.getByRole("button", { name: /nuevo producto|agregar producto|crear producto/i }).first();
-    if (!(await createBtn.isVisible({ timeout: 5_000 }).catch(() => false))) {
-      test.skip(true, "Botón de crear producto no encontrado en esta versión del admin");
-    }
+    const createBtn = page.getByRole("button", { name: /producto nuevo|nuevo producto|agregar producto|crear producto/i }).first();
+    await expect(createBtn).toBeVisible({ timeout: 10_000 });
     await createBtn.click();
 
     // Esperar que se haya llamado al INSERT en auditoria
