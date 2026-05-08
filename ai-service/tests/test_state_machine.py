@@ -232,3 +232,114 @@ class TestCierreCampana:
         result = _result(detected=False, nivel="normal")
         _run(result, last=_last(estado="finalizando"))
         assert "2026-05-01" in result["mensaje"]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 4. decide_next_state — función verdaderamente pura (sin mocks)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestDecideNextState:
+    """
+    Prueba decide_next_state directamente — ningún mock necesario.
+    Solo verifica el dict de decisión; no toca BD ni muta result.
+    """
+
+    def test_nueva_sin_riesgo_action_save_new_inicio(self):
+        d = main.decide_next_state(_result(detected=True, riesgo=False), None, TODAY_ISO, _metricas())
+        assert d["action"] == "save_new"
+        assert d["estado_inicial"] == "inicio"
+        assert d["evento"]["estado"] == "inicio"
+
+    def test_nueva_con_riesgo_action_save_new_en_riesgo(self):
+        d = main.decide_next_state(_result(detected=True, riesgo=True), None, TODAY_ISO, _metricas())
+        assert d["action"] == "save_new"
+        assert d["estado_inicial"] == "en_riesgo_stock"
+        assert d["evento"]["estado"] == "en_riesgo_stock"
+
+    def test_no_detectada_sin_last_es_noop(self):
+        d = main.decide_next_state(_result(detected=False), None, TODAY_ISO, _metricas())
+        assert d["action"] == "noop"
+        assert d["campana_id"] is None
+
+    def test_activa_con_riesgo_new_estado_en_riesgo(self):
+        d = main.decide_next_state(
+            _result(detected=True, riesgo=True), _last(estado="activa"), TODAY_ISO, _metricas()
+        )
+        assert d["action"] == "update_estado"
+        assert d["new_estado"] == "en_riesgo_stock"
+        assert d["prev_estado"] == "activa"
+
+    def test_activa_sin_riesgo_new_estado_igual_prev(self):
+        d = main.decide_next_state(
+            _result(detected=True, riesgo=False), _last(estado="activa"), TODAY_ISO, _metricas()
+        )
+        assert d["new_estado"] == "activa"
+        assert d["prev_estado"] == "activa"
+
+    def test_en_riesgo_sin_riesgo_new_estado_activa(self):
+        d = main.decide_next_state(
+            _result(detected=True, riesgo=False), _last(estado="en_riesgo_stock"), TODAY_ISO, _metricas()
+        )
+        assert d["new_estado"] == "activa"
+        assert d["prev_estado"] == "en_riesgo_stock"
+
+    def test_en_riesgo_con_riesgo_new_estado_igual_prev(self):
+        d = main.decide_next_state(
+            _result(detected=True, riesgo=True), _last(estado="en_riesgo_stock"), TODAY_ISO, _metricas()
+        )
+        assert d["new_estado"] == "en_riesgo_stock"
+        assert d["prev_estado"] == "en_riesgo_stock"
+
+    def test_descartada_new_estado_igual_prev(self):
+        d = main.decide_next_state(
+            _result(detected=True, riesgo=False), _last(estado="descartada"), TODAY_ISO, _metricas()
+        )
+        assert d["new_estado"] == "descartada"
+        assert d["prev_estado"] == "descartada"
+
+    def test_no_detectada_activa_new_estado_finalizando(self):
+        d = main.decide_next_state(
+            _result(detected=False), _last(estado="activa"), TODAY_ISO, _metricas()
+        )
+        assert d["new_estado"] == "finalizando"
+        assert d["mensaje_suffix"] is None
+
+    def test_no_detectada_finalizando_new_estado_finalizada_con_fecha_fin(self):
+        d = main.decide_next_state(
+            _result(detected=False), _last(estado="finalizando"), TODAY_ISO, _metricas()
+        )
+        assert d["new_estado"] == "finalizada"
+        assert "fecha_fin" in d["update_kwargs"]
+        assert d["update_kwargs"]["fecha_fin"] == TODAY_ISO
+
+    def test_no_detectada_cierre_finalizada_new_estado_finalizada(self):
+        d = main.decide_next_state(
+            _result(detected=False, cierre="finalizada"), _last(estado="activa"), TODAY_ISO, _metricas()
+        )
+        assert d["new_estado"] == "finalizada"
+
+    def test_evento_nuevo_contiene_campos_requeridos(self):
+        d = main.decide_next_state(_result(detected=True, riesgo=False), None, TODAY_ISO, _metricas())
+        for campo in ("fecha_deteccion", "nivel", "estado", "metricas", "tipo_sugerido"):
+            assert campo in d["evento"], f"Falta '{campo}' en evento"
+
+    def test_finalizando_mensaje_suffix_contiene_fecha(self):
+        d = main.decide_next_state(
+            _result(detected=False), _last(estado="finalizando"), TODAY_ISO, _metricas()
+        )
+        assert d["mensaje_suffix"] is not None
+        assert "2026-05-01" in d["mensaje_suffix"]
+
+    @pytest.mark.parametrize("prev", ["observando", "inicio", "finalizando"])
+    def test_prev_sin_riesgo_new_estado_activa(self, prev):
+        d = main.decide_next_state(
+            _result(detected=True, riesgo=False), _last(estado=prev), TODAY_ISO, _metricas()
+        )
+        assert d["new_estado"] == "activa"
+
+    @pytest.mark.parametrize("prev", ["observando", "inicio", "finalizando"])
+    def test_prev_con_riesgo_new_estado_en_riesgo(self, prev):
+        d = main.decide_next_state(
+            _result(detected=True, riesgo=True), _last(estado=prev), TODAY_ISO, _metricas()
+        )
+        assert d["new_estado"] == "en_riesgo_stock"

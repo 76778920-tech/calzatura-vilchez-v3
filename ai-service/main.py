@@ -543,99 +543,171 @@ def model_metrics(request: Request):
     }
 
 
+def decide_next_state(
+    result: dict,
+    last: dict | None,
+    today_iso: str,
+    metricas: dict,
+) -> dict:
+    """
+    Pure function: computes what DB operations are needed and what fields to
+    propagate into result. Does NOT touch the database.
+
+    Returned dict keys:
+      action          "save_new" | "update_estado" | "noop"
+      evento          dict for save_campana_detectada  (save_new only)
+      estado_inicial  str                              (save_new only)
+      campana_id      int                              (update_estado only)
+      new_estado      str                              (update_estado only)
+      prev_estado     str                              (update_estado only)
+      update_kwargs   dict  extra kwargs for update_campana_estado
+      fecha_inicio_campana  str | None
+      mensaje_suffix  str | None  appended to result["mensaje"]
+    """
+    cierre = result.get("cierre_estado")
+
+    if result["campaign_detected"]:
+        riesgo = result.get("riesgo_stock", False)
+
+        if last is None:
+            estado_inicial = "en_riesgo_stock" if riesgo else "inicio"
+            evento = {
+                "fecha_deteccion":                   today_iso,
+                "fecha_inicio":                      today_iso,
+                "nivel":                             result["nivel"],
+                "scope":                             result.get("scope"),
+                "foco_tipo":                         result.get("foco_tipo"),
+                "foco_nombre":                       result.get("foco_nombre"),
+                "foco_uplift":                       result.get("foco_uplift"),
+                "tipo_sugerido":                     result["tipo_sugerido"],
+                "categorias_afectadas":              result["categorias_afectadas"],
+                "uplift_ratio":                      metricas.get("uplift_ratio"),
+                "z_score":                           metricas.get("z_score"),
+                "confidence_pct":                    result["confidence_pct"],
+                "estado":                            estado_inicial,
+                "metricas":                          metricas,
+                "recomendacion":                     result["recomendacion"],
+                "impacto_estimado_soles":            result.get("impacto_estimado_soles"),
+                "impacto_estimado_soles_focalizado": result.get("impacto_estimado_soles_focalizado"),
+            }
+            return {
+                "action":              "save_new",
+                "evento":              evento,
+                "estado_inicial":      estado_inicial,
+                "campana_id":          None,
+                "new_estado":          None,
+                "prev_estado":         None,
+                "update_kwargs":       {},
+                "fecha_inicio_campana": None,
+                "mensaje_suffix":      None,
+            }
+
+        prev = last["estado"]
+        if prev in ("observando", "inicio", "finalizando", "activa"):
+            new_estado = "en_riesgo_stock" if riesgo else "activa"
+        elif prev == "en_riesgo_stock":
+            new_estado = "activa" if not riesgo else "en_riesgo_stock"
+        else:
+            new_estado = prev  # descartada u otro terminal
+
+        return {
+            "action":              "update_estado",
+            "evento":              None,
+            "estado_inicial":      None,
+            "campana_id":          last["id"],
+            "new_estado":          new_estado,
+            "prev_estado":         prev,
+            "update_kwargs":       {},
+            "fecha_inicio_campana": last.get("fecha_deteccion"),
+            "mensaje_suffix":      None,
+        }
+
+    # campaign_detected=False
+    if last is None:
+        return {
+            "action":              "noop",
+            "evento":              None,
+            "estado_inicial":      None,
+            "campana_id":          None,
+            "new_estado":          None,
+            "prev_estado":         None,
+            "update_kwargs":       {},
+            "fecha_inicio_campana": None,
+            "mensaje_suffix":      None,
+        }
+
+    if cierre == "finalizada" or last["estado"] == "finalizando":
+        return {
+            "action":              "update_estado",
+            "evento":              None,
+            "estado_inicial":      None,
+            "campana_id":          last["id"],
+            "new_estado":          "finalizada",
+            "prev_estado":         last["estado"],
+            "update_kwargs":       {
+                "fecha_fin":               today_iso,
+                "impacto_estimado_soles":  result.get("impacto_estimado_soles"),
+            },
+            "fecha_inicio_campana": None,
+            "mensaje_suffix":      (
+                f" La campaña iniciada el {last.get('fecha_deteccion')} ha finalizado."
+            ),
+        }
+
+    return {
+        "action":              "update_estado",
+        "evento":              None,
+        "estado_inicial":      None,
+        "campana_id":          last["id"],
+        "new_estado":          "finalizando",
+        "prev_estado":         last["estado"],
+        "update_kwargs":       {},
+        "fecha_inicio_campana": None,
+        "mensaje_suffix":      None,
+    }
+
+
+def apply_state_transition(decision: dict, result: dict) -> int | None:
+    """Executes DB side-effects from decide_next_state and mutates result."""
+    action     = decision["action"]
+    campana_id = None
+
+    if action == "save_new":
+        saved      = save_campana_detectada(decision["evento"])
+        campana_id = saved.get("id") if saved else None
+        result["evento_id"]     = campana_id
+        result["evento_estado"] = decision["estado_inicial"]
+
+    elif action == "update_estado":
+        campana_id  = decision["campana_id"]
+        new_estado  = decision["new_estado"]
+        prev_estado = decision["prev_estado"]
+
+        if new_estado != prev_estado:
+            update_campana_estado(campana_id, new_estado, **decision["update_kwargs"])
+
+        result["evento_id"]     = campana_id
+        result["evento_estado"] = new_estado
+
+        if decision["fecha_inicio_campana"]:
+            result["fecha_inicio_campaña"] = decision["fecha_inicio_campana"]
+
+        if decision["mensaje_suffix"]:
+            result["mensaje"] += decision["mensaje_suffix"]
+
+    # action == "noop": nothing to do
+    return campana_id
+
+
 def _advance_state(
     result: dict,
     last: dict | None,
     today_iso: str,
     metricas: dict,
 ) -> int | None:
-    """
-    Pure state-machine: decides which DB operations to perform and executes them.
-    Returns campana_id (int or None). Mutates result with evento_id/evento_estado.
-
-    Transitions:
-      campaign_detected=True, last=None            → save new event (inicio | en_riesgo_stock)
-      campaign_detected=True, last.estado=*        → update estado if changed
-      campaign_detected=False, last.estado=activa  → finalizando
-      campaign_detected=False, last.estado=finaliz → finalizada
-    """
-    cierre = result.get("cierre_estado")
-    campana_id: int | None = None
-
-    if result["campaign_detected"]:
-        riesgo = result.get("riesgo_stock", False)
-
-        if last is None:
-            # ── Nuevo evento ──────────────────────────────────────────────────
-            estado_inicial = "en_riesgo_stock" if riesgo else "inicio"
-            evento = {
-                "fecha_deteccion":                  today_iso,
-                "fecha_inicio":                     today_iso,
-                "nivel":                            result["nivel"],
-                "scope":                            result.get("scope"),
-                "foco_tipo":                        result.get("foco_tipo"),
-                "foco_nombre":                      result.get("foco_nombre"),
-                "foco_uplift":                      result.get("foco_uplift"),
-                "tipo_sugerido":                    result["tipo_sugerido"],
-                "categorias_afectadas":             result["categorias_afectadas"],
-                "uplift_ratio":                     metricas.get("uplift_ratio"),
-                "z_score":                          metricas.get("z_score"),
-                "confidence_pct":                   result["confidence_pct"],
-                "estado":                           estado_inicial,
-                "metricas":                         metricas,
-                "recomendacion":                    result["recomendacion"],
-                "impacto_estimado_soles":           result.get("impacto_estimado_soles"),
-                "impacto_estimado_soles_focalizado": result.get("impacto_estimado_soles_focalizado"),
-            }
-            saved = save_campana_detectada(evento)
-            campana_id = saved.get("id") if saved else None
-            result["evento_id"]     = campana_id
-            result["evento_estado"] = estado_inicial
-
-        else:
-            campana_id = last["id"]
-            # ── Campaña existente: avanzar estado ────────────────────────────
-            # Transiciones:
-            #   observando/inicio/finalizando → en_riesgo_stock | activa
-            #   activa                        → en_riesgo_stock (si stock critico)
-            #   en_riesgo_stock               → activa (si stock se normalizó)
-            #   descartada / terminal         → sin cambio
-            prev = last["estado"]
-            if prev in ("observando", "inicio", "finalizando", "activa"):
-                new_estado = "en_riesgo_stock" if riesgo else "activa"
-            elif prev == "en_riesgo_stock":
-                new_estado = "activa" if not riesgo else "en_riesgo_stock"
-            else:
-                new_estado = prev  # descartada u otro estado terminal
-
-            if new_estado != prev:
-                update_campana_estado(campana_id, new_estado)
-
-            result["evento_id"]            = campana_id
-            result["evento_estado"]        = new_estado
-            result["fecha_inicio_campaña"] = last.get("fecha_deteccion")
-
-    else:
-        # ── Sin campaña activa ────────────────────────────────────────────────
-        if last is not None:
-            campana_id = last["id"]
-            if cierre == "finalizada" or last["estado"] == "finalizando":
-                update_campana_estado(
-                    campana_id, "finalizada",
-                    fecha_fin=today_iso,
-                    impacto_estimado_soles=result.get("impacto_estimado_soles"),
-                )
-                result["evento_id"]     = campana_id
-                result["evento_estado"] = "finalizada"
-                result["mensaje"] += (
-                    f" La campaña iniciada el {last.get('fecha_deteccion')} ha finalizado."
-                )
-            else:
-                update_campana_estado(campana_id, "finalizando")
-                result["evento_id"]     = campana_id
-                result["evento_estado"] = "finalizando"
-
-    return campana_id
+    """Thin wrapper: decide then apply."""
+    decision = decide_next_state(result, last, today_iso, metricas)
+    return apply_state_transition(decision, result)
 
 
 @app.get("/api/predict/campaign-detection")
