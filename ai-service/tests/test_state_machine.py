@@ -1,8 +1,9 @@
 """
 Tests unitarios de la máquina de estados del ciclo de vida de campaña.
 
-Testa _advance_state directamente (función pura extraída de campaign_detection)
-con mocks de save_campana_detectada y update_campana_estado.
+Testa decide_next_state como función pura (sin mocks) y
+_advance_state / apply_state_transition con mocks de
+save_campana_detectada y update_campana_estado.
 Sin FastAPI TestClient, sin auth, sin rate limiter — solo la lógica de transición.
 
 Transiciones cubiertas:
