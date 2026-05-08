@@ -4,22 +4,23 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 /**
- * Rechaza builds de producción donde el bearer token quedaría expuesto en el bundle.
- * Si VITE_AI_SERVICE_BEARER_TOKEN está definido sin VITE_AI_ADMIN_PROXY_URL,
- * el token viaja en claro en el JS descargado por el navegador.
+ * Rechaza cualquier build donde VITE_AI_SERVICE_BEARER_TOKEN esté presente.
+ * Vite incrusta LITERALMENTE todos los VITE_* en el bundle en tiempo de build,
+ * independientemente de si el runtime usa el proxy — el token queda visible en
+ * el JS descargado por el navegador aunque el proxy esté activo.
+ * El token del servicio IA solo debe vivir en Firebase Secret (server-side).
  */
 const aiSecurityCheck: Plugin = {
   name: 'ai-security-check',
   configResolved(config) {
     if (config.command !== 'build') return
-    const proxyUrl   = process.env.VITE_AI_ADMIN_PROXY_URL?.trim()
     const bearerToken = process.env.VITE_AI_SERVICE_BEARER_TOKEN?.trim()
-    if (bearerToken && !proxyUrl) {
+    if (bearerToken) {
       throw new Error(
-        '\n[SEGURIDAD] VITE_AI_SERVICE_BEARER_TOKEN está definido sin VITE_AI_ADMIN_PROXY_URL.\n' +
-        'El token quedaría expuesto en el bundle de producción.\n' +
-        'Define VITE_AI_ADMIN_PROXY_URL para activar el proxy seguro (Cloud Function),\n' +
-        'o elimina VITE_AI_SERVICE_BEARER_TOKEN del entorno de build.',
+        '\n[SEGURIDAD] VITE_AI_SERVICE_BEARER_TOKEN no debe existir en builds frontend.\n' +
+        'Vite lo incrusta en el bundle aunque el proxy esté activo, exponiéndolo al navegador.\n' +
+        'El token solo debe estar en Firebase Secret (AI_SERVICE_BEARER_TOKEN) — server-side.\n' +
+        'Elimina VITE_AI_SERVICE_BEARER_TOKEN del entorno de build y de .env.local.',
       )
     }
   },
