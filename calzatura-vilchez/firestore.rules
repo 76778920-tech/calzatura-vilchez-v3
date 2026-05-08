@@ -339,6 +339,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Carrito: cada usuario lee/escribe el suyo
+    match /carts/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
     // Usuarios: cada uno lee/escribe el suyo; admin lee todos
     match /usuarios/{userId} {
       allow read: if isOwner(userId) || isAdmin();

@@ -101,4 +101,27 @@ class Product {
   String get precioOriginalFormatted => 'S/ ${precio.toStringAsFixed(2)}';
 
   int stockDeTalla(String talla) => tallaStock?[talla] ?? 0;
+
+  Map<String, dynamic> toMap() => {
+        'id': id,
+        'nombre': nombre,
+        'precio': precio,
+        'descripcion': descripcion,
+        'imagen': imagen,
+        'imagenes': imagenes,
+        'stock': stock,
+        'categoria': categoria,
+        'color': color,
+        'tallas': tallas,
+        'tallaStock': tallaStock,
+        'marca': marca,
+        'tipoCalzado': tipoCalzado,
+        'estilo': estilo,
+        'material': material,
+        'activo': activo,
+        'destacado': destacado,
+        'descuento': descuento,
+        'campana': campana,
+        'familiaId': familiaId,
+      };
 }

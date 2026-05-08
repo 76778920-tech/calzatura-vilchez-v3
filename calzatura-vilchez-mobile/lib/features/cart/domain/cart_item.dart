@@ -23,4 +23,18 @@ class CartItem {
       color: color ?? this.color,
     );
   }
+
+  Map<String, dynamic> toMap() => {
+        'product': product.toMap(),
+        'quantity': quantity,
+        'talla': talla,
+        'color': color,
+      };
+
+  factory CartItem.fromMap(Map<String, dynamic> map) => CartItem(
+        product: Product.fromJson(map['product'] as Map<String, dynamic>),
+        quantity: (map['quantity'] as num).toInt(),
+        talla: map['talla'] as String?,
+        color: map['color'] as String?,
+      );
 }

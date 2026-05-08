@@ -1,7 +1,10 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { CartItem, Product } from "@/types";
 import { getSizeStock } from "@/utils/stock";
+import { useAuth } from "@/domains/usuarios/context/AuthContext";
+import { db } from "@/firebase/config";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
 interface CartContextType {
   items: CartItem[];
@@ -33,64 +36,120 @@ const CART_STORAGE_KEY = "calzatura_cart";
 const ENVIO = 0;
 
 export function CartProvider({ children }: { children: ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>(() => {
-    try {
-      const stored = localStorage.getItem(CART_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  });
+  const { user } = useAuth();
+  const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
+  const userUidRef = useRef<string | null>(null);
 
   useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items));
-  }, [items]);
+    userUidRef.current = user?.uid ?? null;
+  }, [user?.uid]);
 
-  const addItem = (product: Product, quantity = 1, talla?: string, color?: string) => {
-    setItems((prev) => {
-      const available = getSizeStock(product, talla);
-      const existing = prev.find(
-        (i) => i.product.id === product.id && i.talla === talla && i.color === color
-      );
-      if (existing) {
-        return prev.map((i) =>
-          i.product.id === product.id && i.talla === talla && i.color === color
-            ? { ...i, quantity: Math.min(available, i.quantity + quantity) }
-            : i
-        );
+  // Firestore para usuarios autenticados, localStorage para invitados
+  useEffect(() => {
+    if (!user) {
+      try {
+        const stored = localStorage.getItem(CART_STORAGE_KEY);
+        setItems(stored ? (JSON.parse(stored) as CartItem[]) : []);
+      } catch {
+        setItems([]);
       }
-      return [...prev, { product, quantity: Math.min(available, quantity), talla, color }];
-    });
-    setIsOpen(true);
-  };
-
-  const removeItem = (productId: string, talla?: string, color?: string) => {
-    setItems((prev) =>
-      prev.filter((i) => !(i.product.id === productId && i.talla === talla && i.color === color))
-    );
-  };
-
-  const updateQuantity = (productId: string, quantity: number, talla?: string, color?: string) => {
-    if (quantity <= 0) {
-      removeItem(productId, talla, color);
       return;
     }
-    setItems((prev) =>
-      prev.map((i) =>
-        i.product.id === productId && i.talla === talla && i.color === color
-          ? { ...i, quantity: Math.min(getSizeStock(i.product, talla), quantity) }
-          : i
-      )
+
+    const cartRef = doc(db, "carts", user.uid);
+    const unsubscribe = onSnapshot(
+      cartRef,
+      (snap) => {
+        if (snap.exists()) {
+          setItems((snap.data().items as CartItem[]) ?? []);
+        } else {
+          // Primera sesión: migrar carrito de invitado si existe
+          const stored = localStorage.getItem(CART_STORAGE_KEY);
+          const localItems: CartItem[] = stored ? (JSON.parse(stored) as CartItem[]) : [];
+          setItems(localItems);
+          if (localItems.length > 0) {
+            void setDoc(cartRef, { items: localItems }).catch(console.error);
+            localStorage.removeItem(CART_STORAGE_KEY);
+          }
+        }
+      },
+      (error) => console.error("[CartContext] Firestore error:", error)
     );
-  };
 
-  const clearCart = () => setItems([]);
+    return () => unsubscribe();
+  }, [user?.uid]);
 
-  const subtotal = items.reduce(
-    (acc, i) => acc + i.product.precio * i.quantity,
-    0
+  const persistItems = useCallback((newItems: CartItem[]) => {
+    if (userUidRef.current) {
+      void setDoc(doc(db, "carts", userUidRef.current), { items: newItems }).catch(
+        (e) => console.error("[CartContext] persist error:", e)
+      );
+    } else {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(newItems));
+    }
+  }, []);
+
+  const addItem = useCallback(
+    (product: Product, quantity = 1, talla?: string, color?: string) => {
+      setItems((prev) => {
+        const available = getSizeStock(product, talla);
+        const existing = prev.find(
+          (i) => i.product.id === product.id && i.talla === talla && i.color === color
+        );
+        const newItems = existing
+          ? prev.map((i) =>
+              i.product.id === product.id && i.talla === talla && i.color === color
+                ? { ...i, quantity: Math.min(available, i.quantity + quantity) }
+                : i
+            )
+          : [...prev, { product, quantity: Math.min(available, quantity), talla, color }];
+        persistItems(newItems);
+        return newItems;
+      });
+      setIsOpen(true);
+    },
+    [persistItems]
   );
+
+  const removeItem = useCallback(
+    (productId: string, talla?: string, color?: string) => {
+      setItems((prev) => {
+        const newItems = prev.filter(
+          (i) => !(i.product.id === productId && i.talla === talla && i.color === color)
+        );
+        persistItems(newItems);
+        return newItems;
+      });
+    },
+    [persistItems]
+  );
+
+  const updateQuantity = useCallback(
+    (productId: string, quantity: number, talla?: string, color?: string) => {
+      if (quantity <= 0) {
+        removeItem(productId, talla, color);
+        return;
+      }
+      setItems((prev) => {
+        const newItems = prev.map((i) =>
+          i.product.id === productId && i.talla === talla && i.color === color
+            ? { ...i, quantity: Math.min(getSizeStock(i.product, talla), quantity) }
+            : i
+        );
+        persistItems(newItems);
+        return newItems;
+      });
+    },
+    [persistItems, removeItem]
+  );
+
+  const clearCart = useCallback(() => {
+    setItems([]);
+    persistItems([]);
+  }, [persistItems]);
+
+  const subtotal = items.reduce((acc, i) => acc + i.product.precio * i.quantity, 0);
   const total = subtotal + (items.length > 0 ? ENVIO : 0);
   const itemCount = items.reduce((acc, i) => acc + i.quantity, 0);
 
