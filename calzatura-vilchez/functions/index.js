@@ -889,6 +889,8 @@ exports.aiAdminProxy = onRequest(
           if (!Number.isFinite(recentDays)  || recentDays  < 3  || recentDays  > 14)  return res.status(400).json({ error: "recent_days invalido" });
           if (!Number.isFinite(baselineDays) || baselineDays < 30 || baselineDays > 120) return res.status(400).json({ error: "baseline_days invalido" });
           upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${recentDays}&baseline_days=${baselineDays}`;
+        } else if (op === "learningStats") {
+          upstreamUrl = `${base}/api/campaign/learning-stats`;
         } else {
           return res.status(400).json({ error: "op invalido" });
         }

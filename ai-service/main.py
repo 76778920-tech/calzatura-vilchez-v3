@@ -863,3 +863,67 @@ def campaign_feedback(request: Request, payload: FeedbackPayload):
         return {"status": "ok", "campana_id": payload.campana_id, "accion": payload.accion}
     except Exception as error:
         _raise_http_error(error)
+
+
+@app.get("/api/campaign/learning-stats")
+@limiter.limit("30/minute")
+def campaign_learning_stats(request: Request):
+    """
+    Estadisticas de aprendizaje por feedback del admin.
+    Devuelve conteos por scope, precision, umbrales base y umbrales activos aprendidos.
+    """
+    _require_service_auth(request, "api/campaign/learning-stats")
+    try:
+        from models.campaign import (
+            MIN_FEEDBACK_SAMPLES,
+            UPLIFT_ALTA, UPLIFT_MEDIA, UPLIFT_BAJA,
+        )
+        fb_stats = fetch_campana_feedback_stats()
+        learned  = _compute_feedback_adjustments(fb_stats) if fb_stats else {}
+
+        def _precision(confirmadas: int, descartadas: int) -> float | None:
+            total = confirmadas + descartadas
+            if total < MIN_FEEDBACK_SAMPLES:
+                return None
+            return round(confirmadas / total * 100, 1)
+
+        g_conf  = fb_stats.get("global_confirmadas",     0)
+        g_desc  = fb_stats.get("global_descartadas",     0)
+        f_conf  = fb_stats.get("focalizada_confirmadas", 0)
+        f_desc  = fb_stats.get("focalizada_descartadas", 0)
+
+        return {
+            "status": "ok",
+            "min_feedback_samples": MIN_FEEDBACK_SAMPLES,
+            "conteos": {
+                "global":    {"confirmadas": g_conf, "descartadas": g_desc, "total": g_conf + g_desc},
+                "focalizada": {"confirmadas": f_conf, "descartadas": f_desc, "total": f_conf + f_desc},
+            },
+            "precision_pct": {
+                "global":    _precision(g_conf, g_desc),
+                "focalizada": _precision(f_conf, f_desc),
+            },
+            "umbrales_base": {
+                "uplift_alta":       UPLIFT_ALTA,
+                "uplift_media":      UPLIFT_MEDIA,
+                "uplift_baja":       UPLIFT_BAJA,
+                "uplift_focalizada": UPLIFT_MEDIA,
+            },
+            "umbrales_activos": learned if learned else {
+                "uplift_alta":       UPLIFT_ALTA,
+                "uplift_media":      UPLIFT_MEDIA,
+                "uplift_baja":       UPLIFT_BAJA,
+                "uplift_focalizada": UPLIFT_MEDIA,
+            },
+            "aprendizaje_activo": bool(learned and any(
+                learned.get(k) != base
+                for k, base in [
+                    ("uplift_alta",       UPLIFT_ALTA),
+                    ("uplift_media",      UPLIFT_MEDIA),
+                    ("uplift_baja",       UPLIFT_BAJA),
+                    ("uplift_focalizada", UPLIFT_MEDIA),
+                ]
+            )),
+        }
+    except Exception as error:
+        _raise_http_error(error)

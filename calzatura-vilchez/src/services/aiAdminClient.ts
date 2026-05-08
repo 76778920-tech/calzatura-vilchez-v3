@@ -63,6 +63,10 @@ function toProxyUrl(pathAndQuery: string): string {
     u.searchParams.forEach((val, key) => q.set(key, val));
     return `${PROXY_URL!.replace(/\/$/, "")}?${q.toString()}`;
   }
+  if (u.pathname === "/api/campaign/learning-stats") {
+    q.set("op", "learningStats");
+    return `${PROXY_URL!.replace(/\/$/, "")}?${q.toString()}`;
+  }
 
   throw new Error(`Ruta de IA no permitida en proxy: ${u.pathname}`);
 }

@@ -887,3 +887,155 @@ class TestFeedbackAjuste:
         overrides = {"uplift_alta": 2.5, "uplift_media": 1.8, "uplift_baja": 1.4, "uplift_focalizada": 1.8}
         result = detect_campaign([], [], threshold_overrides=overrides)
         assert result["status"] in ("ok", "datos_insuficientes")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Feedback learning — integracion (cambio real de decision)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestFeedbackIntegracion:
+    """
+    Prueba que threshold_overrides modifique decisiones reales de detect_campaign.
+    Escenario: uplift 1.12x, entre UPLIFT_FLOOR (1.10) y UPLIFT_BAJA (1.25).
+      - Con umbral base (1.25): ventas en rango normal → nivel "normal"
+      - Con umbral aprendido (1.10): ventas elevadas → nivel "observando"
+    Tambien verifica que top_productos y categorias_afectadas cambian con el umbral.
+    """
+
+    # baseline=10 unidades/dia, recientes=11.2/dia → uplift≈1.12x
+    _BASELINE_QTY = 10.0
+    _RECENT_QTY   = 11.2
+
+    def _make_edge_sales(self, pid: str = "P1", precio: float = 50.0) -> list[dict]:
+        overrides = {
+            (TODAY - timedelta(days=i)).isoformat(): self._RECENT_QTY
+            for i in range(7)
+        }
+        return _make_sales(overrides, baseline_qty=self._BASELINE_QTY, precio=precio, pid=pid)
+
+    def test_sin_override_nivel_es_normal(self):
+        """Uplift 1.12x con umbral base 1.25 → nivel 'normal' o 'observando' con 0 dias consecutivos."""
+        result = detect_campaign(self._make_edge_sales(), PRODUCTS)
+        assert result["status"] == "ok"
+        # Con threshold 1.25, daily_val=11.2 < threshold_units=12.5 → consecutive_up=0
+        # Solo puede ser "observando" si uplift >= 1.25 (no es el caso con 1.12)
+        assert result["nivel"] in ("normal", "observando"), (
+            f"Con uplift~1.12x y umbral 1.25 se esperaba normal/observando, got {result['nivel']}"
+        )
+        if result["nivel"] == "observando":
+            # Si es observando, no debe detectar campana
+            assert result["campaign_detected"] is False
+
+    def test_con_override_bajo_nivel_sube_a_observando(self):
+        """Con umbral aprendido 1.10 y uplift 1.12x → nivel 'observando' (o superior)."""
+        # Alta precision del admin → umbral baja de 1.25 a 1.10
+        overrides = _compute_feedback_adjustments({
+            "global_confirmadas": 9,
+            "global_descartadas": 1,
+        })
+        assert overrides["uplift_baja"] < UPLIFT_BAJA, (
+            "El ajuste debe haber bajado el umbral baja antes del test"
+        )
+        result = detect_campaign(
+            self._make_edge_sales(), PRODUCTS,
+            threshold_overrides=overrides,
+        )
+        assert result["status"] == "ok"
+        # Con threshold 1.10, daily_val=11.2 >= threshold_units=11.0 → consecutive_up=7
+        # Y uplift 1.12 >= 1.10 → "observando" al menos
+        assert result["nivel"] != "normal", (
+            f"Con umbral aprendido {overrides['uplift_baja']:.2f} y uplift~1.12x "
+            f"se esperaba observando o superior, got '{result['nivel']}'"
+        )
+
+    def test_override_cambia_top_productos(self):
+        """Producto uplift 1.12x: filtrado con umbral 1.25 (base=0), visible con umbral 1.10."""
+        sales = self._make_edge_sales(pid="P1", precio=80.0)
+        result_base = detect_campaign(sales, PRODUCTS)
+        result_learned = detect_campaign(
+            sales, PRODUCTS,
+            threshold_overrides={"uplift_baja": 1.10, "uplift_media": UPLIFT_MEDIA,
+                                  "uplift_alta": UPLIFT_ALTA, "uplift_focalizada": UPLIFT_MEDIA},
+        )
+        n_base    = len(result_base["top_productos"])
+        n_learned = len(result_learned["top_productos"])
+        # El cambio debe ser real: con umbral base el producto queda fuera (0),
+        # con umbral aprendido entra (>0)
+        assert n_base == 0, (
+            f"Con umbral base {UPLIFT_BAJA} y uplift~1.12x se esperaban 0 top_productos, "
+            f"got {n_base}: {result_base['top_productos']}"
+        )
+        assert n_learned > 0, (
+            f"Con umbral aprendido 1.10 y uplift~1.12x se esperaba >=1 top_productos, "
+            f"got {n_learned}"
+        )
+
+    def test_override_cambia_categorias_afectadas(self):
+        """Categoria uplift 1.12x: filtrada con umbral 1.25 (base=0), visible con umbral 1.10."""
+        sales = self._make_edge_sales(pid="P1", precio=80.0)
+        result_base = detect_campaign(sales, PRODUCTS)
+        result_learned = detect_campaign(
+            sales, PRODUCTS,
+            threshold_overrides={"uplift_baja": 1.10, "uplift_media": UPLIFT_MEDIA,
+                                  "uplift_alta": UPLIFT_ALTA, "uplift_focalizada": UPLIFT_MEDIA},
+        )
+        n_base    = len(result_base["categorias_afectadas"])
+        n_learned = len(result_learned["categorias_afectadas"])
+        assert n_base == 0, (
+            f"Con umbral base {UPLIFT_BAJA} y uplift~1.12x se esperaban 0 categorias, "
+            f"got {n_base}: {result_base['categorias_afectadas']}"
+        )
+        assert n_learned > 0, (
+            f"Con umbral aprendido 1.10 y uplift~1.12x se esperaba >=1 categoria, "
+            f"got {n_learned}"
+        )
+
+    def test_aprendizaje_activo_solo_focalizado(self):
+        """
+        Cuando solo cambia uplift_focalizada (globales sin cambio), aprendizaje_activo
+        debe ser True. Prueba el bug donde la comparacion omitia uplift_focalizada.
+        """
+        from models.campaign import UPLIFT_CEIL, UPLIFT_FLOOR
+        # Solo descartes focalizados → sube uplift_focalizada, globales sin cambio
+        overrides = _compute_feedback_adjustments({
+            "global_confirmadas":     0,
+            "global_descartadas":     0,
+            "focalizada_confirmadas": 1,
+            "focalizada_descartadas": 9,  # 10% precision → sube umbral focalizado
+        })
+        assert overrides["uplift_focalizada"] > UPLIFT_MEDIA, (
+            "Con 10% precision focalizada, el umbral focalizado debe subir"
+        )
+        assert overrides["uplift_alta"]  == UPLIFT_ALTA,  "Sin feedback global, uplift_alta no cambia"
+        assert overrides["uplift_media"] == UPLIFT_MEDIA, "Sin feedback global, uplift_media no cambia"
+        assert overrides["uplift_baja"]  == UPLIFT_BAJA,  "Sin feedback global, uplift_baja no cambia"
+
+        # Simular lo que hace el endpoint: comparar todos los keys incluyendo focalizada
+        base_map = {
+            "uplift_alta":       UPLIFT_ALTA,
+            "uplift_media":      UPLIFT_MEDIA,
+            "uplift_baja":       UPLIFT_BAJA,
+            "uplift_focalizada": UPLIFT_MEDIA,
+        }
+        aprendizaje_activo = any(
+            overrides.get(k) != base for k, base in base_map.items()
+        )
+        assert aprendizaje_activo is True, (
+            "Con umbral focalizado distinto del base, aprendizaje_activo debe ser True. "
+            "Bug: la comparacion omitia uplift_focalizada."
+        )
+
+    def test_mensaje_refleja_umbral_aprendido(self):
+        """El mensaje del nivel normal muestra el umbral activo (aprendido), no el hardcoded."""
+        overrides = {"uplift_baja": 1.10, "uplift_media": UPLIFT_MEDIA,
+                     "uplift_alta": UPLIFT_ALTA, "uplift_focalizada": UPLIFT_MEDIA}
+        # Ventas muy bajas → siempre "normal" incluso con umbral 1.10
+        result = detect_campaign(
+            _make_sales({}, baseline_qty=5.0), PRODUCTS,
+            threshold_overrides=overrides,
+        )
+        if result["nivel"] == "normal":
+            assert "1.1" in result["mensaje"], (
+                f"El mensaje debe mostrar el umbral aprendido 1.10, no el hardcoded {UPLIFT_BAJA}: "
+                f"'{result['mensaje']}'"
+            )

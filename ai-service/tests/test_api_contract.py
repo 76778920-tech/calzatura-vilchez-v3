@@ -155,3 +155,114 @@ def test_ire_historial_propaga_error_controlado(monkeypatch):
 
     assert response.status_code == 500
     assert response.json()["detail"] == "supabase 500"
+
+
+# ── /api/campaign/learning-stats ─────────────────────────────────────────────
+
+def _learning_client(monkeypatch, fake_stats: dict) -> TestClient:
+    monkeypatch.setattr(main, "_AI_SERVICE_BEARER_TOKEN", "test-token")
+    monkeypatch.setattr(main, "fetch_campana_feedback_stats", lambda: fake_stats)
+    return TestClient(main.app)
+
+
+def test_learning_stats_contrato_http(monkeypatch):
+    """El endpoint devuelve todos los campos del contrato cuando hay datos."""
+    client = _learning_client(monkeypatch, {
+        "global_confirmadas": 8, "global_descartadas": 2,
+        "focalizada_confirmadas": 3, "focalizada_descartadas": 7,
+    })
+
+    response = client.get(
+        "/api/campaign/learning-stats",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert isinstance(body["min_feedback_samples"], int)
+    assert set(body["conteos"]) == {"global", "focalizada"}
+    assert set(body["conteos"]["global"]) == {"confirmadas", "descartadas", "total"}
+    assert set(body["precision_pct"]) == {"global", "focalizada"}
+    assert set(body["umbrales_base"]) == {"uplift_alta", "uplift_media", "uplift_baja", "uplift_focalizada"}
+    assert set(body["umbrales_activos"]) == {"uplift_alta", "uplift_media", "uplift_baja", "uplift_focalizada"}
+    assert isinstance(body["aprendizaje_activo"], bool)
+
+
+def test_learning_stats_requiere_auth(monkeypatch):
+    """Sin token devuelve 401."""
+    monkeypatch.setattr(main, "_AI_SERVICE_BEARER_TOKEN", "test-token")
+    client = TestClient(main.app)
+
+    response = client.get("/api/campaign/learning-stats")
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Unauthorized"
+
+
+def test_learning_stats_sin_feedback_aprendizaje_inactivo(monkeypatch):
+    """Sin feedback registrado, aprendizaje_activo=False y umbrales_activos == umbrales_base."""
+    client = _learning_client(monkeypatch, {})
+
+    body = client.get(
+        "/api/campaign/learning-stats",
+        headers={"Authorization": "Bearer test-token"},
+    ).json()
+
+    assert body["aprendizaje_activo"] is False
+    assert body["umbrales_activos"] == body["umbrales_base"]
+    assert body["precision_pct"]["global"] is None
+    assert body["precision_pct"]["focalizada"] is None
+
+
+def test_learning_stats_solo_focalizada_activa_aprendizaje_activo(monkeypatch):
+    """
+    Solo feedback focalizado con baja precision → uplift_focalizada sube.
+    aprendizaje_activo debe ser True aunque los umbrales globales no cambien.
+    """
+    client = _learning_client(monkeypatch, {
+        "global_confirmadas": 0,   "global_descartadas": 0,
+        "focalizada_confirmadas": 1, "focalizada_descartadas": 9,
+    })
+
+    body = client.get(
+        "/api/campaign/learning-stats",
+        headers={"Authorization": "Bearer test-token"},
+    ).json()
+
+    assert body["umbrales_activos"]["uplift_alta"]  == body["umbrales_base"]["uplift_alta"],  "global no cambia"
+    assert body["umbrales_activos"]["uplift_media"] == body["umbrales_base"]["uplift_media"], "global no cambia"
+    assert body["umbrales_activos"]["uplift_baja"]  == body["umbrales_base"]["uplift_baja"],  "global no cambia"
+    assert body["umbrales_activos"]["uplift_focalizada"] > body["umbrales_base"]["uplift_focalizada"], \
+        "baja precision focalizada debe subir el umbral"
+    assert body["aprendizaje_activo"] is True, \
+        "aprendizaje_activo debe ser True cuando solo cambia uplift_focalizada"
+
+
+def test_learning_stats_precision_global_correcta(monkeypatch):
+    """8 confirm + 2 desc → precision global = 80.0%."""
+    client = _learning_client(monkeypatch, {
+        "global_confirmadas": 8, "global_descartadas": 2,
+    })
+
+    body = client.get(
+        "/api/campaign/learning-stats",
+        headers={"Authorization": "Bearer test-token"},
+    ).json()
+
+    assert body["precision_pct"]["global"] == 80.0
+    assert body["conteos"]["global"]["total"] == 10
+
+
+def test_learning_stats_supabase_error_devuelve_500(monkeypatch):
+    """Si fetch_campana_feedback_stats lanza excepcion, el endpoint devuelve 500."""
+    monkeypatch.setattr(main, "_AI_SERVICE_BEARER_TOKEN", "test-token")
+    monkeypatch.setattr(main, "fetch_campana_feedback_stats", lambda: (_ for _ in ()).throw(RuntimeError("db down")))
+    client = TestClient(main.app)
+
+    response = client.get(
+        "/api/campaign/learning-stats",
+        headers={"Authorization": "Bearer test-token"},
+    )
+
+    assert response.status_code == 500

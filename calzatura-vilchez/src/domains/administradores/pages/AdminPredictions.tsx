@@ -269,6 +269,27 @@ interface CampanaActiveResponse {
   historial: CampanaDetectada[];
 }
 
+interface LearningStatsScope {
+  confirmadas: number;
+  descartadas: number;
+  total: number;
+}
+interface LearningStatsUmbrales {
+  uplift_alta: number;
+  uplift_media: number;
+  uplift_baja: number;
+  uplift_focalizada: number;
+}
+interface LearningStats {
+  status: string;
+  min_feedback_samples: number;
+  conteos: { global: LearningStatsScope; focalizada: LearningStatsScope };
+  precision_pct: { global: number | null; focalizada: number | null };
+  umbrales_base: LearningStatsUmbrales;
+  umbrales_activos: LearningStatsUmbrales;
+  aprendizaje_activo: boolean;
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -1911,6 +1932,8 @@ export default function AdminPredictions() {
   const [campanaLoading, setCampanaLoading] = useState(false);
   const [campanaFetched, setCampanaFetched] = useState(false);
   const [campanaFeedbackLoading, setCampanaFeedbackLoading] = useState(false);
+  const [learningStats, setLearningStats] = useState<LearningStats | null>(null);
+  const [learningStatsFetched, setLearningStatsFetched] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const changeTab = useCallback((nextTab: PredictionTab) => {
@@ -2001,6 +2024,14 @@ export default function AdminPredictions() {
     setCampanaLoading(false);
   }, []);
 
+  const loadLearningStats = useCallback(async () => {
+    try {
+      const res = await fetchAI("/api/campaign/learning-stats");
+      if (res.ok) setLearningStats(await res.json());
+    } catch { /* silencioso — panel complementario */ }
+    setLearningStatsFetched(true);
+  }, []);
+
   const submitCampanaFeedback = useCallback(async (
     campanaId: number,
     accion: "confirmar" | "descartar" | "nota",
@@ -2013,10 +2044,12 @@ export default function AdminPredictions() {
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ campana_id: campanaId, accion, nota }),
       });
-      await loadCampana(); // refresh after action
+      // Refrescar campaña y estadísticas de aprendizaje en paralelo
+      await Promise.all([loadCampana(), loadLearningStats()]);
+      setLearningStatsFetched(true);
     } catch { /* silencioso */ }
     setCampanaFeedbackLoading(false);
-  }, [loadCampana]);
+  }, [loadCampana, loadLearningStats]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(horizon, history), 0);
@@ -2037,10 +2070,13 @@ export default function AdminPredictions() {
     if (activeTab === "campanas" && !campanaFetched && !campanaLoading) {
       timers.push(window.setTimeout(() => void loadCampana(), 0));
     }
+    if (activeTab === "campanas" && !learningStatsFetched) {
+      timers.push(window.setTimeout(() => void loadLearningStats(), 0));
+    }
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
     };
-  }, [activeTab, weeklyChartFetched, weeklyChartLoading, modelMetricsFetched, modelMetricsLoading, modeloMeta, loadWeeklyChart, loadModelMetrics, ireHistorialFetched, loadIreHistorial, campanaFetched, campanaLoading, loadCampana]);
+  }, [activeTab, weeklyChartFetched, weeklyChartLoading, modelMetricsFetched, modelMetricsLoading, modeloMeta, loadWeeklyChart, loadModelMetrics, ireHistorialFetched, loadIreHistorial, campanaFetched, campanaLoading, loadCampana, learningStatsFetched, loadLearningStats]);
 
   const refreshPredictions = useCallback(async () => {
     setWeeklyChartFetched(false);
@@ -4015,6 +4051,111 @@ export default function AdminPredictions() {
               </div>
             );
           })()}
+
+          {/* ── Panel de aprendizaje por feedback (independiente de campanaData) ── */}
+          {learningStats && (
+            <section className="dash-card" style={{ padding: "1.25rem 1.5rem", marginTop: "1.25rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem" }}>
+                <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700 }}>
+                  Aprendizaje por feedback del admin
+                </h3>
+                <span
+                  style={{
+                    padding: "0.2rem 0.65rem",
+                    borderRadius: "1rem",
+                    fontSize: "0.78rem",
+                    fontWeight: 700,
+                    background: learningStats.aprendizaje_activo ? "var(--color-exito, #22c55e)" : "var(--color-borde, #334155)",
+                    color: learningStats.aprendizaje_activo ? "#fff" : "var(--color-texto-suave, #94a3b8)",
+                  }}
+                >
+                  {learningStats.aprendizaje_activo ? "Activo" : "Sin ajuste aún"}
+                </span>
+              </div>
+
+              {/* Conteos y precisión por scope */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1.1rem" }}>
+                {(["global", "focalizada"] as const).map((scope) => {
+                  const cnt  = learningStats.conteos[scope];
+                  const prec = learningStats.precision_pct[scope];
+                  const lbl  = scope === "global" ? "Campañas globales" : "Campañas focalizadas";
+                  const precColor = prec == null
+                    ? "var(--color-texto-suave, #94a3b8)"
+                    : prec >= 75 ? "var(--color-exito, #22c55e)"
+                    : prec <  40 ? "var(--color-critico, #ef4444)"
+                    :              "var(--color-alerta, #f59e0b)";
+                  return (
+                    <div key={scope} style={{ background: "var(--color-fondo-card, #1e293b)", borderRadius: "0.6rem", padding: "0.75rem 1rem" }}>
+                      <div style={{ fontSize: "0.78rem", opacity: 0.7, marginBottom: "0.3rem" }}>{lbl}</div>
+                      <div style={{ display: "flex", gap: "1.25rem", alignItems: "baseline" }}>
+                        <span style={{ fontSize: "0.88rem" }}>
+                          <strong style={{ color: "var(--color-exito, #22c55e)" }}>{cnt.confirmadas}</strong> confirm.
+                          {" / "}
+                          <strong style={{ color: "var(--color-critico, #ef4444)" }}>{cnt.descartadas}</strong> desc.
+                        </span>
+                        <span style={{ fontSize: "1rem", fontWeight: 700, color: precColor }}>
+                          {prec != null ? `${prec}%` : `<${learningStats.min_feedback_samples} muestras`}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Comparativa de umbrales base vs activos */}
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid var(--color-borde, #334155)", opacity: 0.7 }}>
+                      <th style={{ textAlign: "left",   padding: "0.35rem 0.5rem", fontWeight: 600 }}>Umbral</th>
+                      <th style={{ textAlign: "center", padding: "0.35rem 0.5rem", fontWeight: 600 }}>Base</th>
+                      <th style={{ textAlign: "center", padding: "0.35rem 0.5rem", fontWeight: 600 }}>Activo</th>
+                      <th style={{ textAlign: "center", padding: "0.35rem 0.5rem", fontWeight: 600 }}>Cambio</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(
+                      [
+                        ["uplift_alta",       "Alta demanda"],
+                        ["uplift_media",      "Campaña media"],
+                        ["uplift_baja",       "Señal baja"],
+                        ["uplift_focalizada", "Focalizada"],
+                      ] as [keyof LearningStatsUmbrales, string][]
+                    ).map(([key, lbl]) => {
+                      const base   = learningStats.umbrales_base[key];
+                      const activo = learningStats.umbrales_activos[key];
+                      const diff   = activo - base;
+                      const diffColor = diff < -0.001
+                        ? "var(--color-exito, #22c55e)"
+                        : diff > 0.001
+                        ? "var(--color-alerta, #f59e0b)"
+                        : "var(--color-texto-suave, #94a3b8)";
+                      return (
+                        <tr key={key} style={{ borderBottom: "1px solid var(--color-borde, #334155)" }}>
+                          <td style={{ padding: "0.4rem 0.5rem" }}>{lbl}</td>
+                          <td style={{ textAlign: "center", padding: "0.4rem 0.5rem", opacity: 0.65 }}>{base.toFixed(2)}×</td>
+                          <td style={{ textAlign: "center", padding: "0.4rem 0.5rem", fontWeight: activo !== base ? 700 : 400 }}>
+                            {activo.toFixed(2)}×
+                          </td>
+                          <td style={{ textAlign: "center", padding: "0.4rem 0.5rem", color: diffColor, fontWeight: 600 }}>
+                            {Math.abs(diff) < 0.001
+                              ? "—"
+                              : `${diff > 0 ? "+" : ""}${diff.toFixed(2)}`}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {!learningStats.aprendizaje_activo && (
+                <p style={{ margin: "0.85rem 0 0", fontSize: "0.82rem", opacity: 0.65 }}>
+                  Se necesitan al menos {learningStats.min_feedback_samples} acciones de feedback por scope para activar el ajuste de umbrales.
+                </p>
+              )}
+            </section>
+          )}
         </motion.div>
       )}
     </div>

@@ -265,17 +265,19 @@ def detect_campaign(
     z = (actual_sum - expected_dow_sum) / (std_floor * (n_recent ** 0.5))
 
     # ── Consistency ──────────────────────────────────────────────────────────
-    threshold_units  = max(bs["mean"] * UPLIFT_BAJA, 0.01)
+    threshold_units  = max(bs["mean"] * _uplift_baja, 0.01)
     consecutive_up   = _consecutive_elevated_days(raw_global, dates_recent, threshold_units)
     consecutive_down = _consecutive_normal_days(raw_global, dates_recent, threshold_units)
 
     # ── Categories & products (before nivel — needed for focused detection) ──
     affected_cats = _compute_category_uplift(
         raw_by_cat, raw_by_cat_soles, dates_baseline, dates_recent,
+        uplift_threshold=_uplift_baja,
     )
     top_productos = _compute_product_uplift(
         raw_by_product, raw_by_prod_soles, product_meta, product_stock,
         dates_baseline, dates_recent,
+        uplift_threshold=_uplift_baja,
     )
 
     # ── Campaign level (global → focused fallback) ────────────────────────────
@@ -341,7 +343,7 @@ def detect_campaign(
     riesgo_stock = campaign_detected and bool(_prods_sin_stock or _prods_criticos)
 
     # ── Composite confidence ──────────────────────────────────────────────────
-    c_uplift = min(max((uplift - 1.0) / (UPLIFT_ALTA - 1.0), 0.0), 1.0)
+    c_uplift = min(max((uplift - 1.0) / (_uplift_alta - 1.0), 0.0), 1.0)
     c_z      = min(max(z / (Z_ALTA * 2.0), 0.0), 1.0)
     c_cons   = min(consecutive_up / max(MIN_CONSISTENT_DAYS * 3, 1), 1.0)
     if scope == "focalizada":
@@ -349,7 +351,7 @@ def detect_campaign(
             affected_cats[0]["uplift_ratio"]  if affected_cats  else 0.0,
             top_productos[0]["uplift_ratio"] if top_productos else 0.0,
         )
-        c_uplift = max(c_uplift, min((best_focused - 1.0) / (UPLIFT_ALTA - 1.0), 1.0))
+        c_uplift = max(c_uplift, min((best_focused - 1.0) / (_uplift_alta - 1.0), 1.0))
     confidence = round((0.40 * c_uplift + 0.35 * c_z + 0.25 * c_cons) * 100, 1)
 
     # ── Global economic impact ────────────────────────────────────────────────
@@ -384,7 +386,7 @@ def detect_campaign(
 
     # ── Messages ──────────────────────────────────────────────────────────────
     recomendacion = _build_recommendation(nivel, uplift, affected_cats, top_productos, tipo_sugerido, scope, n_recent)
-    mensaje       = _build_message(nivel, label, uplift, z, confidence, affected_cats, consecutive_up, scope)
+    mensaje       = _build_message(nivel, label, uplift, z, confidence, affected_cats, consecutive_up, scope, uplift_baja=_uplift_baja)
 
     return {
         "status":             "ok",
@@ -477,6 +479,7 @@ def _compute_category_uplift(
     raw_by_cat_soles: dict,
     dates_baseline: list[str],
     dates_recent: list[str],
+    uplift_threshold: float = UPLIFT_BAJA,
 ) -> list[dict]:
     """Category uplift using sums (not medians). Includes per-category economic impact."""
     affected: list[dict] = []
@@ -492,7 +495,7 @@ def _compute_category_uplift(
         if cat_exp_sum <= 0:
             continue
         cat_uplift = cat_rec_sum / cat_exp_sum
-        if cat_uplift < UPLIFT_BAJA:
+        if cat_uplift < uplift_threshold:
             continue
 
         # Economic impact for this category
@@ -523,6 +526,7 @@ def _compute_product_uplift(
     product_stock: dict,
     dates_baseline: list[str],
     dates_recent: list[str],
+    uplift_threshold: float = UPLIFT_BAJA,
 ) -> list[dict]:
     """Top 10 real products with individual uplift, stock, and soles impact."""
     results: list[dict] = []
@@ -538,7 +542,7 @@ def _compute_product_uplift(
         if prod_exp_sum <= 0:
             continue
         prod_uplift = prod_rec_sum / prod_exp_sum
-        if prod_uplift < UPLIFT_BAJA:
+        if prod_uplift < uplift_threshold:
             continue
 
         soles_bs    = _fill_zeros(raw_by_prod_soles.get(pid, {}), dates_baseline)
@@ -564,7 +568,8 @@ def _compute_product_uplift(
 
 
 def _build_message(
-    nivel, label, uplift, z, confidence, affected_cats, consecutive_up, scope
+    nivel, label, uplift, z, confidence, affected_cats, consecutive_up, scope,
+    uplift_baja: float = UPLIFT_BAJA,
 ) -> str:
     if nivel in ("normal", "observando"):
         if nivel == "observando" and scope == "focalizada":
@@ -581,7 +586,7 @@ def _build_message(
             )
         return (
             f"Ventas dentro del rango historico normal. "
-            f"Uplift actual: {uplift:.2f}x (umbral: {UPLIFT_BAJA}x). "
+            f"Uplift actual: {uplift:.2f}x (umbral: {uplift_baja}x). "
             "No se detecta campana activa."
         )
     if scope == "focalizada":
