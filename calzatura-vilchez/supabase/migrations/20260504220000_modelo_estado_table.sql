@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS "modeloEstado" (
 -- Solo el service role puede leer/escribir estado del modelo
 ALTER TABLE "modeloEstado" ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "service_role_only_modelo_estado" ON "modeloEstado";
+
 CREATE POLICY "service_role_only_modelo_estado"
   ON "modeloEstado"
   FOR ALL

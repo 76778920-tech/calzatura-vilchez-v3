@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import toast from "react-hot-toast";
 import { db } from "@/firebase/config";
-import { toggleFavoriteProduct } from "@/domains/clientes/services/favorites";
+import { fetchFavoriteProductIds, toggleFavoriteProduct } from "@/domains/clientes/services/favorites";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 
 interface FavoritesContextType {
@@ -35,6 +35,24 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       });
       return;
+    }
+
+    if (import.meta.env.VITE_E2E === "true") {
+      queueMicrotask(() => setLoading(true));
+      let active = true;
+      fetchFavoriteProductIds(user.uid)
+        .then((ids) => {
+          if (!active) return;
+          setFavoriteIds(new Set(ids));
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("[FavoritesContext] E2E favorites error:", error);
+          if (active) setLoading(false);
+        });
+      return () => {
+        active = false;
+      };
     }
 
     queueMicrotask(() => setLoading(true));

@@ -33,6 +33,7 @@ import { capitalizeWords } from "@/utils/colors";
 import { categoryLabel } from "@/utils/labels";
 import { sumSizeStock } from "@/utils/stock";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
+import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import {
   compressImageFile,
   isCloudinaryImageUrl,
@@ -241,6 +242,8 @@ export default function AdminProducts() {
     const timer = window.setTimeout(load, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useProductsRealtime(load);
 
   useEffect(() => {
     if (!colorPaletteOpen) return undefined;

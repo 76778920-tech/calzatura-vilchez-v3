@@ -16,11 +16,11 @@ ALTER TABLE fabricantes
 
 -- 3. Poblar hashes desde los datos existentes
 UPDATE usuarios
-SET dni_hash = encode(digest(trim(dni), 'sha256'), 'hex')
+SET dni_hash = encode(extensions.digest(convert_to(trim(dni), 'UTF8'), 'sha256'), 'hex')
 WHERE dni IS NOT NULL AND dni <> '' AND dni_hash IS NULL;
 
 UPDATE fabricantes
-SET dni_hash = encode(digest(trim(dni), 'sha256'), 'hex')
+SET dni_hash = encode(extensions.digest(convert_to(trim(dni), 'UTF8'), 'sha256'), 'hex')
 WHERE dni IS NOT NULL AND dni <> '' AND dni_hash IS NULL;
 
 -- 4. Índice para búsqueda rápida por hash (sin exponer el DNI original)
@@ -34,7 +34,7 @@ LANGUAGE sql
 IMMUTABLE
 STRICT
 AS $$
-  SELECT encode(digest(trim(p_dni), 'sha256'), 'hex');
+  SELECT encode(extensions.digest(convert_to(trim(p_dni), 'UTF8'), 'sha256'), 'hex');
 $$;
 
 -- 6. Vista que enmascara el DNI para consultas de solo lectura

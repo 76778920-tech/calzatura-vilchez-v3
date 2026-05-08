@@ -2,30 +2,39 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/supabase/client";
 
 /**
- * Suscribe al canal Realtime de Supabase para la tabla `productos`.
- * Cuando se detecta INSERT, UPDATE o DELETE, llama a `onProductChange`.
- * El canal se cierra automáticamente al desmontar el componente.
- *
- * Requiere que la tabla esté incluida en la publicación `supabase_realtime`
- * (ya aplicado vía migración 20260505160000_enable_realtime_productos.sql).
+ * Suscribe al canal Realtime de Supabase para productos y sus metadatos
+ * administrativos (`productos`, `productoCodigos`, `productoFinanzas`).
  */
 export function useProductsRealtime(onProductChange: () => void): void {
-  // useRef evita re-suscribirse cuando el callback cambia de referencia
   const callbackRef = useRef(onProductChange);
+  const debounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     callbackRef.current = onProductChange;
   }, [onProductChange]);
 
   useEffect(() => {
+    const handleChange = () => {
+      if (debounceRef.current !== null) {
+        window.clearTimeout(debounceRef.current);
+      }
+      debounceRef.current = window.setTimeout(() => {
+        callbackRef.current();
+        debounceRef.current = null;
+      }, 300);
+    };
     const channel = supabase
       .channel(`productos-rt-${Date.now()}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "productos" }, () => {
-        callbackRef.current();
-      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "productos" }, handleChange)
+      .on("postgres_changes", { event: "*", schema: "public", table: "productoCodigos" }, handleChange)
+      .on("postgres_changes", { event: "*", schema: "public", table: "productoFinanzas" }, handleChange)
       .subscribe();
 
     return () => {
+      if (debounceRef.current !== null) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
       supabase.removeChannel(channel);
     };
   }, []);

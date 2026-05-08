@@ -35,29 +35,50 @@ const CartContext = createContext<CartContextType>({
 const CART_STORAGE_KEY = "calzatura_cart";
 const ENVIO = 0;
 
+function cartStorageKey(userUid?: string | null) {
+  return import.meta.env.VITE_E2E === "true" && userUid
+    ? `${CART_STORAGE_KEY}:${userUid}`
+    : CART_STORAGE_KEY;
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const userUid = user?.uid ?? null;
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const userUidRef = useRef<string | null>(null);
 
   useEffect(() => {
-    userUidRef.current = user?.uid ?? null;
-  }, [user?.uid]);
+    userUidRef.current = userUid;
+  }, [userUid]);
 
   // Firestore para usuarios autenticados, localStorage para invitados
   useEffect(() => {
-    if (!user) {
-      try {
-        const stored = localStorage.getItem(CART_STORAGE_KEY);
-        setItems(stored ? (JSON.parse(stored) as CartItem[]) : []);
-      } catch {
-        setItems([]);
-      }
+    if (!userUid) {
+      queueMicrotask(() => {
+        try {
+          const stored = localStorage.getItem(cartStorageKey());
+          setItems(stored ? (JSON.parse(stored) as CartItem[]) : []);
+        } catch {
+          setItems([]);
+        }
+      });
       return;
     }
 
-    const cartRef = doc(db, "carts", user.uid);
+    if (import.meta.env.VITE_E2E === "true") {
+      queueMicrotask(() => {
+        try {
+          const stored = localStorage.getItem(cartStorageKey(userUid));
+          setItems(stored ? (JSON.parse(stored) as CartItem[]) : []);
+        } catch {
+          setItems([]);
+        }
+      });
+      return;
+    }
+
+    const cartRef = doc(db, "carts", userUid);
     const unsubscribe = onSnapshot(
       cartRef,
       (snap) => {
@@ -78,15 +99,19 @@ export function CartProvider({ children }: { children: ReactNode }) {
     );
 
     return () => unsubscribe();
-  }, [user?.uid]);
+  }, [userUid]);
 
   const persistItems = useCallback((newItems: CartItem[]) => {
     if (userUidRef.current) {
+      if (import.meta.env.VITE_E2E === "true") {
+        localStorage.setItem(cartStorageKey(userUidRef.current), JSON.stringify(newItems));
+        return;
+      }
       void setDoc(doc(db, "carts", userUidRef.current), { items: newItems }).catch(
         (e) => console.error("[CartContext] persist error:", e)
       );
     } else {
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(newItems));
+      localStorage.setItem(cartStorageKey(), JSON.stringify(newItems));
     }
   }, []);
 

@@ -288,7 +288,10 @@ test.describe("admin productos → tallas y stock — edición + persistencia", 
 
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
-    await page.waitForLoadState("networkidle");
+    await page.getByRole("button", { name: /producto nuevo/i }).waitFor({
+      state: "visible",
+      timeout: 10_000,
+    });
 
     // Abrir modal de creación
     await page.getByRole("button", { name: /producto nuevo/i }).click();
