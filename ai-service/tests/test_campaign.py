@@ -550,6 +550,113 @@ class TestCamposV3:
         result = detect_campaign(_make_sales({}, baseline_qty=2.0), PRODUCTS)
         assert result["confidence_pct"] < 20.0
 
+    def test_riesgo_stock_en_resultado(self):
+        """El campo riesgo_stock siempre existe en el resultado."""
+        result = detect_campaign(_make_sales({}), PRODUCTS)
+        assert "riesgo_stock" in result
+        assert isinstance(result["riesgo_stock"], bool)
+        assert "productos_sin_stock" in result
+        assert "productos_stock_critico" in result
+
+
+# ── 11. Estado en_riesgo_stock automático ─────────────────────────────────────
+
+class TestRiesgoStock:
+    """
+    Verifica que detect_campaign marque riesgo_stock=True cuando la campaña
+    está activa y hay productos sin stock o con stock < ventas_recientes.
+    """
+
+    def _spike_products(self, stock_p1: int) -> list[dict]:
+        return [
+            {"id": "P1", "categoria": "deportivos", "nombre": "Runner Pro", "stock": stock_p1},
+            {"id": "P2", "categoria": "casual",     "nombre": "Casual Base", "stock": 50},
+        ]
+
+    def _spike_sales(self, baseline_qty=5.0, spike_qty=20.0, precio=90.0):
+        """Genera pico de 3 días que activa campaña global."""
+        overrides = {
+            TODAY.isoformat():                       spike_qty,
+            (TODAY - timedelta(days=1)).isoformat(): spike_qty,
+            (TODAY - timedelta(days=2)).isoformat(): spike_qty,
+        }
+        return _make_sales(overrides, baseline_qty=baseline_qty, precio=precio, pid="P1")
+
+    # ── riesgo_stock=False cuando no hay campaña ──────────────────────────────
+
+    def test_sin_campana_riesgo_stock_false(self):
+        result = detect_campaign(_make_sales({}), PRODUCTS)
+        assert result["riesgo_stock"] is False
+
+    # ── riesgo_stock=False cuando campaña activa con stock OK ─────────────────
+
+    def test_campana_activa_stock_ok_no_riesgo(self):
+        # stock=50, ventas_rec≈60 (3 días × 20) → stock < ventas_rec → critico en realidad
+        # Usamos spike pequeño para que stock sea suficiente: baseline=5, spike=10, stock=100
+        overrides = {
+            TODAY.isoformat():                       10.0,
+            (TODAY - timedelta(days=1)).isoformat(): 10.0,
+            (TODAY - timedelta(days=2)).isoformat(): 10.0,
+        }
+        sales = _make_sales(overrides, baseline_qty=2.0, precio=50.0, pid="P1")
+        prods = [
+            {"id": "P1", "categoria": "deportivos", "nombre": "Runner Pro", "stock": 200},
+            {"id": "P2", "categoria": "casual",     "nombre": "Casual Base", "stock": 50},
+        ]
+        result = detect_campaign(sales, prods)
+        if result["campaign_detected"]:
+            assert result["riesgo_stock"] is False, (
+                f"Con stock=200 y ventas_rec≈30, no debe haber riesgo. "
+                f"productos_criticos={result['productos_stock_critico']}"
+            )
+
+    # ── riesgo_stock=True cuando stock=0 y campaña activa ────────────────────
+
+    def test_sin_stock_con_campana_activa_es_riesgo(self):
+        # _make_sales pone nombre="Zapato test" en las ventas, que es lo que
+        # product_meta registra. El catálogo products[] solo da stock y categoría.
+        sales = self._spike_sales()
+        prods = self._spike_products(stock_p1=0)  # sin stock
+        result = detect_campaign(sales, prods)
+        if result["campaign_detected"]:
+            assert result["riesgo_stock"] is True, (
+                "Stock=0 durante campaña activa debe marcar riesgo_stock=True"
+            )
+            assert len(result["productos_sin_stock"]) > 0, (
+                "productos_sin_stock debe tener al menos un elemento"
+            )
+
+    # ── riesgo_stock=True cuando stock < ventas_recientes ────────────────────
+
+    def test_stock_critico_con_campana_activa_es_riesgo(self):
+        # spike de 20/día × 3 días → ventas_recientes≈60; stock=5 < 60 → critico
+        sales = self._spike_sales(spike_qty=20.0)
+        prods = self._spike_products(stock_p1=5)
+        result = detect_campaign(sales, prods)
+        if result["campaign_detected"]:
+            assert result["riesgo_stock"] is True, (
+                f"stock=5 < ventas_rec≈60 debe ser critico. "
+                f"top_productos={result['top_productos'][:1]}"
+            )
+            assert len(result["productos_stock_critico"]) > 0, (
+                "productos_stock_critico debe tener al menos un elemento"
+            )
+
+    # ── productos_sin_stock y productos_stock_critico son listas ─────────────
+
+    def test_campos_riesgo_son_listas(self):
+        result = detect_campaign(_make_sales({}), PRODUCTS)
+        assert isinstance(result["productos_sin_stock"], list)
+        assert isinstance(result["productos_stock_critico"], list)
+
+    # ── datos insuficientes → riesgo_stock=False ──────────────────────────────
+
+    def test_datos_insuficientes_riesgo_false(self):
+        result = detect_campaign([], PRODUCTS)
+        assert result["riesgo_stock"] is False
+        assert result["productos_sin_stock"] == []
+        assert result["productos_stock_critico"] == []
+
 
 # ── 10. Recomendación inteligente ─────────────────────────────────────────────
 

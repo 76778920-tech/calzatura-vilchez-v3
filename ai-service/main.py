@@ -579,8 +579,11 @@ def campaign_detection(
         cierre    = result.get("cierre_estado")  # "finalizando" | "finalizada" | None
 
         if result["campaign_detected"]:
+            riesgo = result.get("riesgo_stock", False)
+
             if last is None:
                 # ── Nuevo evento: primera vez que se detecta campaña ──────────
+                estado_inicial = "en_riesgo_stock" if riesgo else "inicio"
                 evento = {
                     "fecha_deteccion":                  today_iso,
                     "fecha_inicio":                     today_iso,
@@ -594,7 +597,7 @@ def campaign_detection(
                     "uplift_ratio":                     metricas.get("uplift_ratio"),
                     "z_score":                          metricas.get("z_score"),
                     "confidence_pct":                   result["confidence_pct"],
-                    "estado":                           "inicio",
+                    "estado":                           estado_inicial,
                     "metricas":                         metricas,
                     "recomendacion":                    result["recomendacion"],
                     "impacto_estimado_soles":           result.get("impacto_estimado_soles"),
@@ -603,17 +606,26 @@ def campaign_detection(
                 saved = save_campana_detectada(evento)
                 campana_id = saved.get("id") if saved else None
                 result["evento_id"]     = campana_id
-                result["evento_estado"] = "inicio"
+                result["evento_estado"] = estado_inicial
             else:
                 campana_id = last["id"]
                 # ── Campaña existente: avanzar estado ────────────────────────
-                new_estado = last["estado"]
-                if last["estado"] in ("observando", "inicio"):
-                    new_estado = "activa"
-                    update_campana_estado(campana_id, new_estado)
-                elif last["estado"] == "finalizando":
-                    # Las ventas volvieron a subir → campaña se reanuda
-                    new_estado = "activa"
+                # Transiciones:
+                #   observando/inicio   → en_riesgo_stock | activa
+                #   activa              → en_riesgo_stock (si stock critico)
+                #   en_riesgo_stock     → activa (si stock se normalizó)
+                #   finalizando         → en_riesgo_stock | activa (rebote)
+                prev = last["estado"]
+                if prev in ("observando", "inicio", "finalizando"):
+                    new_estado = "en_riesgo_stock" if riesgo else "activa"
+                elif prev == "activa":
+                    new_estado = "en_riesgo_stock" if riesgo else "activa"
+                elif prev == "en_riesgo_stock":
+                    new_estado = "activa" if not riesgo else "en_riesgo_stock"
+                else:
+                    new_estado = prev  # descartada u otro estado terminal → no tocar
+
+                if new_estado != prev:
                     update_campana_estado(campana_id, new_estado)
 
                 result["evento_id"]            = campana_id

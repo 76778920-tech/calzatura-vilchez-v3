@@ -260,6 +260,23 @@ def detect_campaign(
 
     campaign_detected = nivel not in ("normal", "observando")
 
+    # ── Stock risk: active campaign with zero/critical stock products ─────────
+    # A product is "critico" when its current stock won't cover another period
+    # of equal demand (stock < ventas_recientes). Computed regardless of nivel
+    # so main.py can transition en_riesgo_stock ↔ activa automatically.
+    _prods_sin_stock = [
+        p["nombre"] for p in top_productos
+        if (p.get("stock_actual") or 0) == 0
+    ]
+    _prods_criticos = [
+        p["nombre"] for p in top_productos
+        if p.get("stock_actual") is not None
+        and p["stock_actual"] > 0
+        and p.get("ventas_recientes", 0) > 0
+        and p["stock_actual"] < p["ventas_recientes"]
+    ]
+    riesgo_stock = campaign_detected and bool(_prods_sin_stock or _prods_criticos)
+
     # ── Composite confidence ──────────────────────────────────────────────────
     c_uplift = min(max((uplift - 1.0) / (UPLIFT_ALTA - 1.0), 0.0), 1.0)
     c_z      = min(max(z / (Z_ALTA * 2.0), 0.0), 1.0)
@@ -315,6 +332,9 @@ def detect_campaign(
         "foco_nombre":        foco_nombre,
         "foco_uplift":        foco_uplift,
         "cierre_estado":      cierre_estado,
+        "riesgo_stock":       riesgo_stock,
+        "productos_sin_stock":     _prods_sin_stock,
+        "productos_stock_critico": _prods_criticos,
         "tipo_sugerido":      tipo_sugerido,
         "confidence_pct":     confidence,
         "mensaje":            mensaje,
@@ -365,6 +385,9 @@ def _insufficient_data(
         "foco_nombre":        None,
         "foco_uplift":        None,
         "cierre_estado":      None,
+        "riesgo_stock":       False,
+        "productos_sin_stock":     [],
+        "productos_stock_critico": [],
         "tipo_sugerido":      None,
         "confidence_pct":     0.0,
         "mensaje": (
