@@ -14,7 +14,6 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
 
   final String? _userId;
   StreamSubscription<DocumentSnapshot>? _sub;
-  bool _ignoreNextSnapshot = false;
 
   void _subscribe() {
     if (_userId == null) return;
@@ -22,25 +21,29 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
         .collection('carts')
         .doc(_userId)
         .snapshots()
-        .listen((snap) {
-      if (_ignoreNextSnapshot) {
-        _ignoreNextSnapshot = false;
-        return;
-      }
-      if (snap.exists) {
+        .listen(
+      (snap) {
+        if (!snap.exists) {
+          state = [];
+          return;
+        }
         final raw = snap.data()?['items'] as List<dynamic>? ?? [];
         state = raw
             .map((e) => CartItem.fromMap(e as Map<String, dynamic>))
             .toList();
-      }
-    });
+      },
+      onError: (error, stackTrace) {
+        // Mantener el estado actual en memoria si falla el stream temporalmente.
+      },
+    );
   }
 
-  Future<void> _save() async {
+  void _save() {
     if (_userId == null) return;
-    _ignoreNextSnapshot = true;
-    await FirebaseFirestore.instance.collection('carts').doc(_userId).set({
+    FirebaseFirestore.instance.collection('carts').doc(_userId).set({
       'items': state.map((item) => item.toMap()).toList(),
+    }).catchError((_) {
+      // El estado local ya se actualizó; el snapshot remoto reconciliará si hay red.
     });
   }
 
