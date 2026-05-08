@@ -19,8 +19,10 @@ from models.campaign import (
     FINALIZANDO_COOLDOWN,
     MIN_BASELINE_DAYS,
     MIN_CONSISTENT_DAYS,
+    UPLIFT_ALTA,
     UPLIFT_BAJA,
     UPLIFT_MEDIA,
+    _build_recommendation,
     _date_range,
     detect_campaign,
 )
@@ -547,3 +549,160 @@ class TestCamposV3:
     def test_confidence_baja_sin_campana(self):
         result = detect_campaign(_make_sales({}, baseline_qty=2.0), PRODUCTS)
         assert result["confidence_pct"] < 20.0
+
+
+# ── 10. Recomendación inteligente ─────────────────────────────────────────────
+
+class TestRecomendacionInteligente:
+    """
+    Valida que _build_recommendation use datos reales de stock, uplift e impacto.
+    Los tests llaman directamente a _build_recommendation para control total.
+    """
+
+    # Helpers de datos de prueba
+    _CAT_ALTA = [{"categoria": "deportivos", "uplift_ratio": 2.5, "impacto_soles": 900}]
+    _CAT_MEDIA = [{"categoria": "casual", "uplift_ratio": 1.6, "impacto_soles": 300}]
+
+    def _prod(self, nombre, uplift, stock, ventas_rec=10.0, impacto=500.0):
+        return {
+            "nombre": nombre,
+            "uplift_ratio": uplift,
+            "stock_actual": stock,
+            "ventas_recientes": ventas_rec,
+            "ventas_baseline": ventas_rec / uplift,
+            "impacto_soles": impacto,
+        }
+
+    # ── normal/observando nunca genera recomendación ──────────────────────────
+
+    def test_normal_sin_recomendacion(self):
+        rec = _build_recommendation("normal", 1.0, [], [], None, None)
+        assert rec is None
+
+    def test_observando_sin_recomendacion(self):
+        rec = _build_recommendation("observando", 1.3, self._CAT_MEDIA, [], None, "focalizada")
+        assert rec is None
+
+    # ── stock_actual=0 → alerta "sin stock" ───────────────────────────────────
+
+    def test_sin_stock_aparece_en_recomendacion(self):
+        productos = [self._prod("Runner Pro", 2.8, stock=0, ventas_rec=15)]
+        rec = _build_recommendation("alta", 2.8, self._CAT_ALTA, productos, "cyber-wow", "global")
+        assert rec is not None
+        assert "Sin stock" in rec or "sin stock" in rec.lower()
+        assert "Runner Pro" in rec
+
+    # ── stock < ventas_recientes → stock critico → Reponer urgente ────────────
+
+    def test_stock_critico_genera_reponer_urgente(self):
+        # ventas_rec=20, stock=5 < 20 → critico
+        productos = [self._prod("Runner Pro", 2.8, stock=5, ventas_rec=20, impacto=780)]
+        rec = _build_recommendation("alta", 2.8, self._CAT_ALTA, productos, "cyber-wow", "global")
+        assert rec is not None
+        assert "Runner Pro" in rec
+        assert "urgente" in rec.lower() or "Reponer" in rec
+        assert "780" in rec or "S/" in rec  # impacto económico mencionado
+
+    # ── stock < ventas_recientes*2 → stock bajo → Reponer (sin urgente) ───────
+
+    def test_stock_bajo_genera_reponer_sin_urgente(self):
+        # ventas_rec=10, stock=15 → bajo (1.5x, < 2x)
+        productos = [self._prod("Clásico Cuero", 1.8, stock=15, ventas_rec=10, impacto=400)]
+        rec = _build_recommendation("media", 1.8, self._CAT_MEDIA, productos, "outlet", "global")
+        assert rec is not None
+        assert "Clásico Cuero" in rec
+        assert "Reponer" in rec
+        assert "bajo" in rec.lower()
+
+    # ── nivel=alta + stock OK → NO aplicar descuento ─────────────────────────
+
+    def test_alta_rotacion_nivel_alta_no_descuento(self):
+        # ventas_rec=10, stock=50 → ok (5x >= 2x); uplift=UPLIFT_ALTA+
+        productos = [self._prod("Sport Max", UPLIFT_ALTA, stock=50, ventas_rec=10)]
+        rec = _build_recommendation("alta", UPLIFT_ALTA, self._CAT_ALTA, productos, "cyber-wow", "global")
+        assert rec is not None
+        assert "no aplicar descuento" in rec.lower() or "organica" in rec.lower()
+
+    # ── nivel=media + stock OK → evaluar promocion ────────────────────────────
+
+    def test_alta_rotacion_nivel_media_sugiere_promocion(self):
+        productos = [self._prod("Casual Plus", UPLIFT_MEDIA, stock=40, ventas_rec=8)]
+        rec = _build_recommendation("media", UPLIFT_MEDIA, self._CAT_MEDIA, productos, "outlet", "global")
+        assert rec is not None
+        assert "promocion" in rec.lower() or "momentum" in rec.lower()
+
+    # ── campaña focalizada → menciona la categoría ────────────────────────────
+
+    def test_focalizada_menciona_categoria(self):
+        cats = [{"categoria": "escolar", "uplift_ratio": 3.0, "impacto_soles": 600}]
+        productos = [self._prod("Escolar Pro", 3.0, stock=20, ventas_rec=12, impacto=600)]
+        rec = _build_recommendation("baja", 1.1, cats, productos, "campana-focalizada", "focalizada")
+        assert rec is not None
+        assert "escolar" in rec.lower()
+
+    # ── focalizada sin affected_cats → usa top_productos ─────────────────────
+
+    def test_focalizada_sin_cats_usa_producto(self):
+        productos = [self._prod("Escolar Pro", 3.0, stock=20, ventas_rec=12)]
+        rec = _build_recommendation("baja", 1.1, [], productos, "campana-focalizada", "focalizada")
+        assert rec is not None
+        assert "Escolar Pro" in rec or "focaliz" in rec.lower()
+
+    # ── tipo cyber-wow + nivel alta → coordinar fabricantes ──────────────────
+
+    def test_cyber_wow_menciona_fabricantes(self):
+        productos = [self._prod("Max Runner", UPLIFT_ALTA, stock=5, ventas_rec=20)]
+        rec = _build_recommendation("alta", UPLIFT_ALTA, self._CAT_ALTA, productos, "cyber-wow", "global")
+        assert rec is not None
+        assert "fabricante" in rec.lower() or "banner" in rec.lower() or "urgente" in rec.lower()
+
+    # ── tipo outlet → menciona liquidacion/descuento ─────────────────────────
+
+    def test_outlet_menciona_descuento(self):
+        # stock OK: ventas_rec=5, stock=30 → ok
+        productos = [self._prod("Clásico Suela", UPLIFT_MEDIA, stock=30, ventas_rec=5)]
+        rec = _build_recommendation("media", UPLIFT_MEDIA, self._CAT_MEDIA, productos, "outlet", "global")
+        assert rec is not None
+        assert "descuento" in rec.lower() or "liquidar" in rec.lower() or "outlet" in rec.lower()
+
+    # ── integración end-to-end: recomendación con datos reales de detect_campaign ─
+
+    def test_e2e_recomendacion_con_stock_critico(self):
+        """
+        Stock bajo en el producto que genera el pico →
+        detect_campaign debe retornar recomendación con nombre real y stock.
+        El nombre del producto en la recomendación proviene del campo 'nombre'
+        de las ventas (product_meta), no del catálogo products[].
+        """
+        productos_e2e = [
+            {"id": "P1", "categoria": "deportivos", "nombre": "Runner Pro", "stock": 3},
+            {"id": "P2", "categoria": "casual",     "nombre": "Casual Base", "stock": 50},
+        ]
+        recent_start    = TODAY - timedelta(days=6)
+        baseline_end_e  = recent_start - timedelta(days=1)
+        baseline_start_e = baseline_end_e - timedelta(days=59)
+        all_dates = _date_range(baseline_start_e, TODAY)
+        recent_set = set(_date_range(recent_start, TODAY))
+
+        sales = []
+        for d in all_dates:
+            # P1 "Runner Pro": baseline 5/día, pico 20/día en últimos 3 días
+            qty_p1 = 20.0 if d in {
+                TODAY.isoformat(),
+                (TODAY - timedelta(days=1)).isoformat(),
+                (TODAY - timedelta(days=2)).isoformat(),
+            } else 5.0
+            sales.append({"fecha": d, "cantidad": qty_p1, "productId": "P1",
+                          "devuelto": False, "precioVenta": 90, "nombre": "Runner Pro"})
+            # P2 "Casual Base": ventas uniformes
+            sales.append({"fecha": d, "cantidad": 3.0, "productId": "P2",
+                          "devuelto": False, "precioVenta": 60, "nombre": "Casual Base"})
+
+        result = detect_campaign(sales, productos_e2e)
+        if result["campaign_detected"]:
+            rec = result["recomendacion"]
+            assert rec is not None, "Campaña detectada debe tener recomendación"
+            assert "Runner Pro" in rec, f"Recomendación debe mencionar el producto afectado: {rec}"
+            assert any(kw in rec.lower() for kw in ("reponer", "stock", "urgente")), (
+                f"Con stock crítico debe mencionar reposición: {rec}"
+            )

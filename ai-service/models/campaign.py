@@ -303,7 +303,7 @@ def detect_campaign(
         foco_uplift = round(uplift, 3)
 
     # ── Messages ──────────────────────────────────────────────────────────────
-    recomendacion = _build_recommendation(nivel, uplift, affected_cats, top_productos, tipo_sugerido, scope)
+    recomendacion = _build_recommendation(nivel, uplift, affected_cats, top_productos, tipo_sugerido, scope, n_recent)
     mensaje       = _build_message(nivel, label, uplift, z, confidence, affected_cats, consecutive_up, scope)
 
     return {
@@ -518,46 +518,141 @@ def _build_message(
 
 
 def _build_recommendation(
-    nivel, uplift, affected_cats, top_productos, tipo, scope
+    nivel: str,
+    uplift: float,
+    affected_cats: list[dict],
+    top_productos: list[dict],
+    tipo: str | None,
+    scope: str | None,
+    n_recent: int = 7,
 ) -> str | None:
+    """
+    Smart recommendation using real stock, uplift and economic impact per product.
+    Priority order: sin_stock > critico > bajo > ok_alta_rotacion > strategic_advice.
+    """
     if nivel in ("normal", "observando"):
         return None
 
-    if tipo == "campana-focalizada":
-        best_cat  = affected_cats[0]["categoria"] if affected_cats else None
-        best_prod = top_productos[0]["nombre"]    if top_productos else None
-        focus_str = f"categoria '{best_cat}'" if best_cat else f"producto '{best_prod}'"
-        focus_up  = (
-            affected_cats[0]["uplift_ratio"] if best_cat
-            else (top_productos[0]["uplift_ratio"] if best_prod else uplift)
-        )
-        return (
-            f"Campana focalizada detectada en {focus_str} ({focus_up:.1f}x su promedio). "
-            "Acciones: (1) Verificar stock de los productos afectados. "
-            "(2) Evaluar si hay campana externa activa en ese segmento. "
-            "(3) Monitorear si el pico se extiende a otras categorias en los proximos dias."
+    # ── Classify products by stock health ────────────────────────────────────
+    # sin_stock  : stock == 0 or None  → ventas perdidas activas
+    # critico    : stock < ventas_recientes  → no sobrevive otro periodo igual
+    # bajo       : stock < ventas_recientes * 2  → agota en ~2 periodos
+    # ok_alta    : stock OK + uplift >= UPLIFT_MEDIA  → rotan bien, cuidado con descuento
+
+    sin_stock: list[str] = []
+    critico:   list[dict] = []
+    bajo:      list[dict] = []
+    ok_alta:   list[dict] = []
+
+    for prod in top_productos[:6]:
+        nombre     = prod.get("nombre", "Producto")
+        prod_up    = prod.get("uplift_ratio", 0.0)
+        stock      = prod.get("stock_actual")
+        impacto    = prod.get("impacto_soles", 0.0) or 0.0
+        ventas_rec = prod.get("ventas_recientes", 0.0) or 0.0
+
+        if stock is None or stock == 0:
+            sin_stock.append(nombre)
+        elif ventas_rec > 0 and stock < ventas_rec:
+            critico.append({"nombre": nombre, "uplift": prod_up, "impacto": impacto, "stock": stock})
+        elif ventas_rec > 0 and stock < ventas_rec * 2:
+            bajo.append({"nombre": nombre, "uplift": prod_up, "impacto": impacto, "stock": stock})
+        elif prod_up >= UPLIFT_MEDIA:
+            ok_alta.append({"nombre": nombre, "uplift": prod_up, "impacto": impacto, "stock": stock})
+
+    parts: list[str] = []
+
+    # ── 1. Sin stock → alerta de ventas perdidas ──────────────────────────────
+    if sin_stock:
+        names = " y ".join(sin_stock[:2]) + (" y otros" if len(sin_stock) > 2 else "")
+        parts.append(f"Sin stock: {names} — ventas perdidas activas, reponer de inmediato")
+
+    # ── 2. Stock critico → reposicion urgente con detalle ────────────────────
+    for p in critico[:2]:
+        imp_str = f", impacto S/ {p['impacto']:.0f}" if p["impacto"] > 0 else ""
+        parts.append(
+            f"Reponer urgente {p['nombre']}: "
+            f"stock {p['stock']} u., uplift {p['uplift']:.1f}x{imp_str}"
         )
 
-    cats    = [c["categoria"] for c in affected_cats[:3]]
-    cat_str = ", ".join(cats) if cats else "todos los productos"
-    if nivel == "alta":
-        return (
-            f"Pico de demanda tipo {tipo or 'alta'} ({uplift:.1f}x el promedio). "
-            f"Categorias mas activas: {cat_str}. "
-            "Acciones: (1) Revisar stock critico tallas 38-42. "
-            "(2) Activar banner promocional. "
-            "(3) Coordinar reposicion urgente con fabricantes. "
-            "(4) Habilitar alertas de agotamiento en panel admin."
+    # ── 3. Stock bajo → reposicion preventiva ────────────────────────────────
+    for p in bajo[:2]:
+        imp_str = f", impacto S/ {p['impacto']:.0f}" if p["impacto"] > 0 else ""
+        parts.append(
+            f"Reponer {p['nombre']}: stock bajo ({p['stock']} u.), "
+            f"uplift {p['uplift']:.1f}x{imp_str}"
         )
-    if nivel == "media":
-        return (
-            f"Actividad elevada ({uplift:.1f}x el promedio). Categorias: {cat_str}. "
-            "Acciones: (1) Verificar stock en categorias activas. "
-            "(2) Evaluar campana externa activa. "
-            "(3) Monitorear evolucion los proximos 3 dias."
+
+    # ── 4. Alta rotacion con stock OK → consejo de descuento ─────────────────
+    if ok_alta:
+        p = ok_alta[0]
+        if nivel == "alta":
+            parts.append(
+                f"{p['nombre']} rota {p['uplift']:.1f}x — "
+                "no aplicar descuento adicional, la demanda es organica y el margen no lo necesita"
+            )
+        elif nivel in ("media", "baja"):
+            imp_str = f" (S/ {p['impacto']:.0f} sobre lo esperado)" if p["impacto"] > 0 else ""
+            parts.append(
+                f"{p['nombre']} con uplift {p['uplift']:.1f}x{imp_str} — "
+                "evaluar promocion activa para sostener el momentum"
+            )
+
+    # ── 5. Consejo estrategico segun tipo de campana ──────────────────────────
+    if tipo == "campana-focalizada":
+        if affected_cats:
+            focus = f"categoria '{affected_cats[0]['categoria']}'"
+            cat_up = affected_cats[0]["uplift_ratio"]
+            parts.append(
+                f"Campana focalizada en {focus} ({cat_up:.1f}x): "
+                "monitorear si el pico se extiende a otras categorias en los proximos 3 dias"
+            )
+        elif top_productos:
+            focus = top_productos[0]["nombre"]
+            parts.append(
+                f"Pico focalizado en '{focus}': verificar si hay campana externa activa "
+                "en ese segmento (redes sociales, influencer, feria)"
+            )
+
+    elif tipo in ("cyber-wow", None) and nivel == "alta":
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else "los productos mas vendidos"
+        parts.append(
+            f"Demanda alta en {cat_str}: coordinar reposicion con fabricantes "
+            "y activar banner promocional antes de que se agote el stock"
         )
-    return (
-        f"Pico leve ({uplift:.1f}x el promedio). Categorias: {cat_str}. "
-        "Acciones: (1) Verificar stock preventivamente. "
-        "(2) Mantener monitoreo activo."
-    )
+
+    elif tipo == "outlet":
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else "categorias activas"
+        parts.append(
+            f"Contexto outlet activo en {cat_str}: "
+            "aprovechar para liquidar modelos de temporada anterior con descuento controlado"
+        )
+
+    elif tipo == "nueva-temporada":
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else "categorias activas"
+        parts.append(
+            f"Inicio de temporada en {cat_str}: "
+            "asegurar stock de modelos nuevos y actualizar el catalogo visible en tienda"
+        )
+
+    elif nivel == "media" and not parts:
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else "categorias activas"
+        parts.append(
+            f"Actividad elevada en {cat_str} ({uplift:.1f}x): "
+            "verificar stock y monitorear evolucion los proximos 3 dias"
+        )
+
+    # ── Fallback si no hay productos con datos suficientes ───────────────────
+    if not parts:
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else "general"
+        return (
+            f"Actividad {nivel} detectada en {cat_str} ({uplift:.1f}x el promedio historico). "
+            "Revisar stock de los productos mas vendidos y mantener monitoreo activo."
+        )
+
+    return " | ".join(parts) + "."
