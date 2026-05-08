@@ -1,10 +1,32 @@
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vitest/config'
+import { defineConfig, type Plugin } from 'vitest/config'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
+/**
+ * Rechaza builds de producción donde el bearer token quedaría expuesto en el bundle.
+ * Si VITE_AI_SERVICE_BEARER_TOKEN está definido sin VITE_AI_ADMIN_PROXY_URL,
+ * el token viaja en claro en el JS descargado por el navegador.
+ */
+const aiSecurityCheck: Plugin = {
+  name: 'ai-security-check',
+  configResolved(config) {
+    if (config.command !== 'build') return
+    const proxyUrl   = process.env.VITE_AI_ADMIN_PROXY_URL?.trim()
+    const bearerToken = process.env.VITE_AI_SERVICE_BEARER_TOKEN?.trim()
+    if (bearerToken && !proxyUrl) {
+      throw new Error(
+        '\n[SEGURIDAD] VITE_AI_SERVICE_BEARER_TOKEN está definido sin VITE_AI_ADMIN_PROXY_URL.\n' +
+        'El token quedaría expuesto en el bundle de producción.\n' +
+        'Define VITE_AI_ADMIN_PROXY_URL para activar el proxy seguro (Cloud Function),\n' +
+        'o elimina VITE_AI_SERVICE_BEARER_TOKEN del entorno de build.',
+      )
+    }
+  },
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), aiSecurityCheck],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
