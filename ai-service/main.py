@@ -40,7 +40,7 @@ from services.supabase_client import (
 load_dotenv()
 
 limiter = Limiter(key_func=get_remote_address)
-app = FastAPI(title="Calzatura Vilchez AI Service", version="1.1.0")
+app = FastAPI(title="Calzatura Vilchez AI Service", version="1.2.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
