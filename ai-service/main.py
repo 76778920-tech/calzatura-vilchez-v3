@@ -13,6 +13,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
 from models.campaign import detect_campaign, _compute_feedback_adjustments
+from services.firebase_verifier import is_firebase_admin
 from models.demand import build_daily_sales_by_product, get_stock_alerts, get_weekly_chart, predict_demand
 from models.revenue import forecast_revenue
 from models.risk import compute_ire, compute_ire_proyectado
@@ -106,11 +107,16 @@ def _require_service_auth(request: Request, location: str) -> None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     token = auth_header.split(" ", 1)[1].strip()
-    if not _AI_SERVICE_BEARER_TOKEN:
-        raise HTTPException(status_code=503, detail="Auth not configured")
 
-    if token != _AI_SERVICE_BEARER_TOKEN:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    # Vía 1: bearer token interno (Supabase cron, scripts server-side).
+    if _AI_SERVICE_BEARER_TOKEN and token == _AI_SERVICE_BEARER_TOKEN:
+        return
+
+    # Vía 2: Firebase ID token del panel admin (Option B — sin proxy ni Cloud Function).
+    if is_firebase_admin(token):
+        return
+
+    raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 @app.on_event("startup")

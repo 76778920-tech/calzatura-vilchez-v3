@@ -1,8 +1,10 @@
 from datetime import date, timedelta
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
 import main
+from services.firebase_verifier import is_firebase_admin
 
 
 def _sales_rows(days: int = 35) -> list[dict]:
@@ -266,3 +268,68 @@ def test_learning_stats_supabase_error_devuelve_500(monkeypatch):
     )
 
     assert response.status_code == 500
+
+
+# ── Firebase ID token auth (Option B) ────────────────────────────────────────
+
+def test_firebase_token_valido_permite_acceso(monkeypatch):
+    """Un Firebase ID token de admin valido pasa _require_service_auth."""
+    monkeypatch.setattr(main, "_AI_SERVICE_BEARER_TOKEN", "")
+    monkeypatch.setattr(main, "is_firebase_admin", lambda token: token == "firebase-id-token-admin")
+    monkeypatch.setattr(main, "fetch_campana_feedback_stats", lambda: {})
+    client = TestClient(main.app)
+
+    response = client.get(
+        "/api/campaign/learning-stats",
+        headers={"Authorization": "Bearer firebase-id-token-admin"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+
+
+def test_firebase_token_no_admin_devuelve_401(monkeypatch):
+    """Un Firebase ID token de usuario no-admin devuelve 401."""
+    monkeypatch.setattr(main, "_AI_SERVICE_BEARER_TOKEN", "")
+    monkeypatch.setattr(main, "is_firebase_admin", lambda token: False)
+    client = TestClient(main.app)
+
+    response = client.get(
+        "/api/campaign/learning-stats",
+        headers={"Authorization": "Bearer firebase-id-token-not-admin"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_bearer_token_sigue_funcionando_junto_con_firebase(monkeypatch):
+    """El bearer token interno convive con el nuevo path Firebase (no regresion)."""
+    monkeypatch.setattr(main, "_AI_SERVICE_BEARER_TOKEN", "internal-token")
+    monkeypatch.setattr(main, "is_firebase_admin", lambda token: False)
+    monkeypatch.setattr(main, "fetch_campana_feedback_stats", lambda: {})
+    client = TestClient(main.app)
+
+    response = client.get(
+        "/api/campaign/learning-stats",
+        headers={"Authorization": "Bearer internal-token"},
+    )
+
+    assert response.status_code == 200
+
+
+def test_sin_token_devuelve_401(monkeypatch):
+    """Sin header Authorization devuelve 401."""
+    monkeypatch.setattr(main, "_AI_SERVICE_BEARER_TOKEN", "internal-token")
+    monkeypatch.setattr(main, "is_firebase_admin", lambda token: False)
+    client = TestClient(main.app)
+
+    response = client.get("/api/campaign/learning-stats")
+
+    assert response.status_code == 401
+
+
+def test_is_firebase_admin_rechaza_token_invalido():
+    """is_firebase_admin retorna False ante cualquier token malformado (no lanza)."""
+    assert is_firebase_admin("not-a-jwt") is False
+    assert is_firebase_admin("") is False
+    assert is_firebase_admin("a.b.c") is False
