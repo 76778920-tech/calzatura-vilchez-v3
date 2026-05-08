@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { CartProvider } from "@/domains/carrito/context/CartContext";
+import { FavoritesProvider } from "@/domains/clientes/context/FavoritesContext";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -122,35 +123,39 @@ function Storefront() {
 
 export default function App() {
   return (
-    <CartProvider>
-      <BrowserRouter>
-        <ScrollToTop />
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: { fontFamily: "var(--font-sans)", fontSize: "14px" },
-          }}
-        />
-        <Suspense fallback={<PageLoader />}>
-          <Routes>
-            <Route
-              path={ADMIN_ROUTES.root}
-              element={<AreaRoute area="administradores"><AdminLayout /></AreaRoute>}
-            >
-              <Route index element={<AdminDashboard />} />
-              <Route path="productos" element={<AdminProducts />} />
-              <Route path="pedidos" element={<AdminOrders />} />
-              <Route path="ventas" element={<AdminSales />} />
-              <Route path="usuarios" element={<AdminUsers />} />
-              <Route path="fabricantes" element={<AdminManufacturers />} />
-              <Route path="predicciones" element={<AdminPredictions />} />
-              <Route path="datos" element={<AdminData />} />
-            </Route>
-            <Route path="/*" element={<Storefront />} />
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </CartProvider>
+    <BrowserRouter>
+      <ScrollToTop />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: { fontFamily: "var(--font-sans)", fontSize: "14px" },
+        }}
+      />
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route
+            path={ADMIN_ROUTES.root}
+            element={<AreaRoute area="administradores"><AdminLayout /></AreaRoute>}
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="productos" element={<AdminProducts />} />
+            <Route path="pedidos" element={<AdminOrders />} />
+            <Route path="ventas" element={<AdminSales />} />
+            <Route path="usuarios" element={<AdminUsers />} />
+            <Route path="fabricantes" element={<AdminManufacturers />} />
+            <Route path="predicciones" element={<AdminPredictions />} />
+            <Route path="datos" element={<AdminData />} />
+          </Route>
+          <Route path="/*" element={
+            <CartProvider>
+              <FavoritesProvider>
+                <Storefront />
+              </FavoritesProvider>
+            </CartProvider>
+          } />
+        </Routes>
+      </Suspense>
+    </BrowserRouter>
   );
 }

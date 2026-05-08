@@ -3,7 +3,6 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import App from "./App.tsx";
 import { AuthProvider } from "@/domains/usuarios/context/AuthContext";
-import { FavoritesProvider } from "@/domains/clientes/context/FavoritesContext";
 import { AppErrorBoundary } from "./components/layout/AppErrorBoundary";
 import { installChunkErrorRecovery } from "./utils/chunkRecovery";
 
@@ -13,9 +12,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AppErrorBoundary>
       <AuthProvider>
-        <FavoritesProvider>
-          <App />
-        </FavoritesProvider>
+        <App />
       </AuthProvider>
     </AppErrorBoundary>
   </StrictMode>
