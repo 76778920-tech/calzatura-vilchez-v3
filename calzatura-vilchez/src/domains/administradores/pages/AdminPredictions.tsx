@@ -3709,8 +3709,68 @@ export default function AdminPredictions() {
                 {campanaData.activa && (() => {
                   const c = campanaData.activa!;
                   const nc = NIVEL_COLOR[c.nivel] ?? "moderado";
+
+                  // Timeline de estados del ciclo de vida
+                  const TIMELINE_STEPS = [
+                    { key: "inicio",          label: "Inicio" },
+                    { key: "activa",          label: "Activa" },
+                    { key: "en_riesgo_stock", label: "Riesgo stock", side: true },
+                    { key: "finalizando",     label: "Finalizando" },
+                    { key: "finalizada",      label: "Finalizada" },
+                  ];
+                  const mainSteps = TIMELINE_STEPS.filter((s) => !s.side);
+                  const mainOrder = mainSteps.map((s) => s.key);
+                  const currentIdx = mainOrder.indexOf(
+                    c.estado === "en_riesgo_stock" ? "activa" : c.estado,
+                  );
+
                   return (
                     <>
+                      {/* Timeline de ciclo de vida */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 0, padding: "0.65rem 0.25rem", overflowX: "auto" }}>
+                        {mainSteps.map((step, i) => {
+                          const isDone    = i < currentIdx;
+                          const isCurrent = i === currentIdx;
+                          const isRiesgo  = c.estado === "en_riesgo_stock" && step.key === "activa";
+                          const color = isRiesgo
+                            ? "#f59e0b"
+                            : isCurrent ? "#6366f1"
+                            : isDone    ? "#22c55e"
+                            : "rgba(255,255,255,0.18)";
+                          const labelColor = (isCurrent || isRiesgo) ? "#fff" : isDone ? "#22c55e" : "rgba(255,255,255,0.45)";
+                          return (
+                            <div key={step.key} style={{ display: "flex", alignItems: "center", flex: i < mainSteps.length - 1 ? 1 : undefined, minWidth: 0 }}>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem", minWidth: "4.5rem" }}>
+                                <div style={{
+                                  width: 28, height: 28, borderRadius: "50%",
+                                  background: color, border: `2px solid ${color}`,
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  fontSize: "0.75rem", fontWeight: 700, color: "#fff",
+                                  flexShrink: 0,
+                                }}>
+                                  {isDone ? "✓" : i + 1}
+                                </div>
+                                <span style={{ fontSize: "0.68rem", color: labelColor, textAlign: "center", whiteSpace: "nowrap" }}>
+                                  {isRiesgo ? "Riesgo stock" : step.label}
+                                </span>
+                              </div>
+                              {i < mainSteps.length - 1 && (
+                                <div style={{
+                                  flex: 1, height: 2, margin: "0 0.15rem", marginBottom: "1.1rem",
+                                  background: i < currentIdx ? "#22c55e" : "rgba(255,255,255,0.15)",
+                                  minWidth: "1.5rem",
+                                }} />
+                              )}
+                            </div>
+                          );
+                        })}
+                        {c.estado === "descartada" && (
+                          <span style={{ fontSize: "0.8rem", color: "#ef4444", fontWeight: 600, marginLeft: "0.75rem" }}>
+                            ✗ Descartada
+                          </span>
+                        )}
+                      </div>
+
                       {/* Hero */}
                       <div className={`ire-hero ire-hero-${nc}`} style={{ flexWrap: "wrap", gap: "1rem" }}>
                         <div className="ire-left" style={{ flex: "1 1 280px" }}>
@@ -3851,6 +3911,7 @@ export default function AdminPredictions() {
                                   <th>Uplift</th>
                                   <th>Ventas recientes</th>
                                   <th>Ventas esperadas</th>
+                                  <th>Impacto S/</th>
                                   <th>Stock</th>
                                 </tr>
                               </thead>
@@ -3869,6 +3930,11 @@ export default function AdminPredictions() {
                                     </td>
                                     <td>{p.ventas_recientes.toFixed(1)} uds</td>
                                     <td>{p.ventas_baseline.toFixed(1)} uds</td>
+                                    <td style={{ fontWeight: 600, color: (p.impacto_soles ?? 0) > 0 ? "#22c55e" : undefined }}>
+                                      {(p.impacto_soles ?? 0) > 0
+                                        ? `S/ ${(p.impacto_soles!).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                        : "—"}
+                                    </td>
                                     <td style={{
                                       fontWeight: 600,
                                       color: p.stock_actual === 0 ? "#ef4444"

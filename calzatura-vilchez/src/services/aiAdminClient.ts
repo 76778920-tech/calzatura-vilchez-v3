@@ -50,6 +50,19 @@ function toProxyUrl(pathAndQuery: string): string {
     q.set("op", "cacheInvalidate");
     return `${PROXY_URL!.replace(/\/$/, "")}?${q.toString()}`;
   }
+  if (u.pathname === "/api/campaign/active") {
+    q.set("op", "campaignActive");
+    return `${PROXY_URL!.replace(/\/$/, "")}?${q.toString()}`;
+  }
+  if (u.pathname === "/api/campaign/feedback") {
+    q.set("op", "campaignFeedback");
+    return `${PROXY_URL!.replace(/\/$/, "")}?${q.toString()}`;
+  }
+  if (u.pathname === "/api/predict/campaign-detection") {
+    q.set("op", "campaignDetection");
+    u.searchParams.forEach((val, key) => q.set(key, val));
+    return `${PROXY_URL!.replace(/\/$/, "")}?${q.toString()}`;
+  }
 
   throw new Error(`Ruta de IA no permitida en proxy: ${u.pathname}`);
 }
