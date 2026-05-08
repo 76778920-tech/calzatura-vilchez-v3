@@ -12,12 +12,13 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 
-from models.campaign import detect_campaign
+from models.campaign import detect_campaign, _compute_feedback_adjustments
 from models.demand import build_daily_sales_by_product, get_stock_alerts, get_weekly_chart, predict_demand
 from models.revenue import forecast_revenue
 from models.risk import compute_ire, compute_ire_proyectado
 from services.supabase_client import (
     fetch_campana_detail,
+    fetch_campana_feedback_stats,
     fetch_campanas_recientes,
     fetch_completed_orders,
     fetch_daily_sales,
@@ -731,12 +732,24 @@ def campaign_detection(
     lookback = baseline_days + recent_days + 7
     daily_sales, _, products, _ = _load_data(lookback_days=lookback)
 
+    # Load feedback-learned thresholds (fire-and-forget; defaults to constants on error)
+    threshold_overrides: dict | None = None
+    try:
+        fb_stats = fetch_campana_feedback_stats()
+        if fb_stats:
+            threshold_overrides = _compute_feedback_adjustments(fb_stats)
+    except Exception:
+        pass
+
     result = detect_campaign(
         daily_sales=daily_sales,
         products=products,
         recent_days=recent_days,
         baseline_days=baseline_days,
+        threshold_overrides=threshold_overrides,
     )
+    if threshold_overrides:
+        result["threshold_overrides"] = threshold_overrides
 
     # Persistir evento y avanzar ciclo de vida (fire-and-forget, no bloquea respuesta)
     try:

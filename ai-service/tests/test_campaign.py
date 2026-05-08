@@ -23,6 +23,7 @@ from models.campaign import (
     UPLIFT_BAJA,
     UPLIFT_MEDIA,
     _build_recommendation,
+    _compute_feedback_adjustments,
     _date_range,
     detect_campaign,
 )
@@ -813,3 +814,76 @@ class TestRecomendacionInteligente:
             assert any(kw in rec.lower() for kw in ("reponer", "stock", "urgente")), (
                 f"Con stock crítico debe mencionar reposición: {rec}"
             )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Feedback learning — _compute_feedback_adjustments (función pura)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class TestFeedbackAjuste:
+    """
+    Prueba _compute_feedback_adjustments directamente.
+    Sin mocks: es una función pura que recibe conteos y devuelve umbrales.
+    """
+
+    def test_sin_datos_devuelve_constantes_base(self):
+        d = _compute_feedback_adjustments({})
+        assert d["uplift_alta"]       == UPLIFT_ALTA
+        assert d["uplift_media"]      == UPLIFT_MEDIA
+        assert d["uplift_baja"]       == UPLIFT_BAJA
+        assert d["uplift_focalizada"] == UPLIFT_MEDIA
+
+    def test_pocos_casos_no_ajusta(self):
+        # 4 casos < MIN_FEEDBACK_SAMPLES (5) → sin cambio
+        d = _compute_feedback_adjustments({"global_confirmadas": 1, "global_descartadas": 3})
+        assert d["uplift_alta"]  == UPLIFT_ALTA
+        assert d["uplift_media"] == UPLIFT_MEDIA
+
+    def test_muchos_descartes_sube_umbral_global(self):
+        # 2 confirmadas, 8 descartadas → precision 20% < 40% → sube
+        d = _compute_feedback_adjustments({"global_confirmadas": 2, "global_descartadas": 8})
+        assert d["uplift_alta"]  > UPLIFT_ALTA
+        assert d["uplift_media"] > UPLIFT_MEDIA
+        assert d["uplift_baja"]  > UPLIFT_BAJA
+
+    def test_alta_precision_baja_umbral_global(self):
+        # 9 confirmadas, 1 descartada → precision 90% > 75% → baja
+        d = _compute_feedback_adjustments({"global_confirmadas": 9, "global_descartadas": 1})
+        assert d["uplift_alta"]  < UPLIFT_ALTA
+        assert d["uplift_media"] < UPLIFT_MEDIA
+
+    def test_precision_intermedia_no_ajusta(self):
+        # 6 confirmadas, 4 descartadas → precision 60% (entre 40% y 75%) → sin cambio
+        d = _compute_feedback_adjustments({"global_confirmadas": 6, "global_descartadas": 4})
+        assert d["uplift_alta"]  == UPLIFT_ALTA
+        assert d["uplift_media"] == UPLIFT_MEDIA
+
+    def test_ajuste_focalizada_independiente_del_global(self):
+        # global OK, focalizada con muchos descartes
+        d = _compute_feedback_adjustments({
+            "global_confirmadas":     9, "global_descartadas": 1,
+            "focalizada_confirmadas": 1, "focalizada_descartadas": 9,
+        })
+        assert d["uplift_alta"]       < UPLIFT_ALTA       # global bajó
+        assert d["uplift_focalizada"] > UPLIFT_MEDIA      # focalizada subió
+
+    def test_thresholds_nunca_superan_ceil(self):
+        # Aunque hubiera infinitos descartes, tope en UPLIFT_CEIL
+        from models.campaign import UPLIFT_CEIL
+        d = _compute_feedback_adjustments({"global_confirmadas": 0, "global_descartadas": 100})
+        assert d["uplift_alta"]  <= UPLIFT_CEIL
+        assert d["uplift_media"] <= UPLIFT_CEIL
+
+    def test_thresholds_nunca_bajan_del_floor(self):
+        # Con infinitas confirmaciones, no baja del UPLIFT_FLOOR
+        from models.campaign import UPLIFT_FLOOR
+        d = _compute_feedback_adjustments({"global_confirmadas": 100, "global_descartadas": 0})
+        assert d["uplift_alta"]  >= UPLIFT_FLOOR
+        assert d["uplift_media"] >= UPLIFT_FLOOR
+        assert d["uplift_baja"]  >= UPLIFT_FLOOR
+
+    def test_detect_campaign_acepta_threshold_overrides(self):
+        # Smoke test: detect_campaign no falla con overrides inyectados
+        overrides = {"uplift_alta": 2.5, "uplift_media": 1.8, "uplift_baja": 1.4, "uplift_focalizada": 1.8}
+        result = detect_campaign([], [], threshold_overrides=overrides)
+        assert result["status"] in ("ok", "datos_insuficientes")

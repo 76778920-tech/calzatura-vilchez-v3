@@ -31,6 +31,62 @@ Z_ALTA  = 2.0
 Z_MEDIA = 1.5
 Z_BAJA  = 1.0
 
+# ── Feedback learning ─────────────────────────────────────────────────────────
+
+MIN_FEEDBACK_SAMPLES = 5     # minimum cases before adjusting thresholds
+THRESHOLD_STEP       = 0.15  # uplift delta per adjustment cycle
+UPLIFT_FLOOR         = 1.10  # no threshold will ever go below this
+UPLIFT_CEIL          = 3.00  # no threshold will ever exceed this
+
+
+def _compute_feedback_adjustments(stats: dict) -> dict:
+    """
+    Pure function: given feedback counts by scope, returns adjusted uplift
+    thresholds to pass as threshold_overrides to detect_campaign.
+
+    stats keys (all optional, default 0):
+      global_confirmadas, global_descartadas
+      focalizada_confirmadas, focalizada_descartadas
+
+    Adjustment rules (per scope):
+      precision < 40%  (too many false positives) → raise thresholds by THRESHOLD_STEP
+      precision > 75%  (high hit rate)            → lower thresholds by THRESHOLD_STEP
+      < MIN_FEEDBACK_SAMPLES or 40-75%            → no change
+
+    Returns:
+      uplift_alta, uplift_media, uplift_baja  (global scope adjustments)
+      uplift_focalizada                       (focalizada scope adjustment)
+    """
+    def _delta(confirmadas: int, descartadas: int) -> float:
+        total = confirmadas + descartadas
+        if total < MIN_FEEDBACK_SAMPLES:
+            return 0.0
+        precision = confirmadas / total
+        if precision < 0.40:
+            return +THRESHOLD_STEP
+        if precision > 0.75:
+            return -THRESHOLD_STEP
+        return 0.0
+
+    d_global = _delta(
+        int(stats.get("global_confirmadas",     0)),
+        int(stats.get("global_descartadas",     0)),
+    )
+    d_foc = _delta(
+        int(stats.get("focalizada_confirmadas", 0)),
+        int(stats.get("focalizada_descartadas", 0)),
+    )
+
+    def _clamp(base: float, delta: float) -> float:
+        return round(max(UPLIFT_FLOOR, min(UPLIFT_CEIL, base + delta)), 2)
+
+    return {
+        "uplift_alta":       _clamp(UPLIFT_ALTA,  d_global),
+        "uplift_media":      _clamp(UPLIFT_MEDIA, d_global),
+        "uplift_baja":       _clamp(UPLIFT_BAJA,  d_global),
+        "uplift_focalizada": _clamp(UPLIFT_MEDIA, d_foc),
+    }
+
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -109,7 +165,14 @@ def detect_campaign(
     products: list[dict],
     recent_days: int = 7,
     baseline_days: int = 60,
+    threshold_overrides: dict | None = None,
 ) -> dict:
+    # Apply feedback-learned thresholds; fall back to module constants.
+    _uplift_alta  = (threshold_overrides or {}).get("uplift_alta",       UPLIFT_ALTA)
+    _uplift_media = (threshold_overrides or {}).get("uplift_media",      UPLIFT_MEDIA)
+    _uplift_baja  = (threshold_overrides or {}).get("uplift_baja",       UPLIFT_BAJA)
+    _uplift_foc   = (threshold_overrides or {}).get("uplift_focalizada", UPLIFT_MEDIA)
+
     today = date.today()
 
     # Exact windows: N days means exactly N calendar days.
@@ -218,16 +281,16 @@ def detect_campaign(
     # ── Campaign level (global → focused fallback) ────────────────────────────
     scope: str | None = None
 
-    if uplift >= UPLIFT_ALTA and z >= Z_ALTA and consecutive_up >= MIN_CONSISTENT_DAYS:
+    if uplift >= _uplift_alta and z >= Z_ALTA and consecutive_up >= MIN_CONSISTENT_DAYS:
         nivel, tipo_sugerido, scope = "alta",  "cyber-wow",     "global"
         label = "Campana de alta demanda"
-    elif uplift >= UPLIFT_MEDIA and z >= Z_MEDIA and consecutive_up >= MIN_CONSISTENT_DAYS:
+    elif uplift >= _uplift_media and z >= Z_MEDIA and consecutive_up >= MIN_CONSISTENT_DAYS:
         nivel, tipo_sugerido, scope = "media", "outlet",         "global"
         label = "Posible campana activa"
-    elif uplift >= UPLIFT_BAJA and z >= Z_BAJA and consecutive_up >= MIN_CONSISTENT_DAYS:
+    elif uplift >= _uplift_baja and z >= Z_BAJA and consecutive_up >= MIN_CONSISTENT_DAYS:
         nivel, tipo_sugerido, scope = "baja",  "nueva-temporada", "global"
         label = "Actividad elevada / posible inicio de temporada"
-    elif uplift >= UPLIFT_BAJA and consecutive_up >= 1:
+    elif uplift >= _uplift_baja and consecutive_up >= 1:
         nivel, tipo_sugerido, scope = "observando", None, "global"
         label = "Senal emergente - en observacion"
     else:
@@ -239,14 +302,14 @@ def detect_campaign(
         best_prod_u = top_productos[0]["uplift_ratio"] if top_productos else 0.0
         best_focused = max(best_cat_u, best_prod_u)
 
-        if best_focused >= UPLIFT_MEDIA:
+        if best_focused >= _uplift_foc:
             nivel, tipo_sugerido, scope = "baja", "campana-focalizada", "focalizada"
             focus_name = (
                 affected_cats[0]["categoria"] if best_cat_u >= best_prod_u
                 else top_productos[0]["nombre"]
             )
             label = f"Campana focalizada en '{focus_name}'"
-        elif best_focused >= UPLIFT_BAJA:
+        elif best_focused >= _uplift_baja:
             nivel, tipo_sugerido, scope = "observando", None, "focalizada"
             label = "Senal focalizada emergente - en observacion"
 

@@ -287,6 +287,37 @@ def fetch_campanas_recientes(limit: int = 10) -> list[dict]:
         return []
 
 
+def fetch_campana_feedback_stats() -> dict:
+    """
+    Agrega conteos de confirmaciones y descartes por scope (últimas 100 con feedback).
+    Devuelve dict con claves global_confirmadas, global_descartadas,
+    focalizada_confirmadas, focalizada_descartadas.
+    """
+    try:
+        rows = _query(_CAMPANAS_TABLE, {
+            "select":                "scope,confirmada_por_admin",
+            "confirmada_por_admin":  "not.is.null",
+            "order":                 "fecha_deteccion.desc",
+            "limit":                 "100",
+        })
+        stats: dict = {
+            "global_confirmadas":     0,
+            "global_descartadas":     0,
+            "focalizada_confirmadas": 0,
+            "focalizada_descartadas": 0,
+        }
+        for row in rows:
+            scope = row.get("scope") or "global"
+            key   = scope if scope in ("global", "focalizada") else "global"
+            if row.get("confirmada_por_admin") is True:
+                stats[f"{key}_confirmadas"] += 1
+            elif row.get("confirmada_por_admin") is False:
+                stats[f"{key}_descartadas"] += 1
+        return stats
+    except Exception:
+        return {}
+
+
 def fetch_campana_detail(campana_id: int) -> dict | None:
     """Detalle completo de una campaña incluyendo top_productos y metricas."""
     try:
