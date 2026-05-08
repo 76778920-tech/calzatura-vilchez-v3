@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { ensureVerifiedUserProfile, loginUser } from "@/domains/usuarios/services/auth";
+import { ensureVerifiedUserProfile, loginUser, resetPassword } from "@/domains/usuarios/services/auth";
 import { isSuperAdminEmail } from "@/config/security";
 import { getPostLoginRedirect } from "@/routes/redirects";
 import { PUBLIC_ROUTES } from "@/routes/paths";
@@ -17,6 +17,28 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const handleForgotPassword = async () => {
+    const target = email.trim();
+    if (!target) {
+      toast.error("Ingresa tu correo primero");
+      return;
+    }
+    const emailErr = validateEmailFormat(target);
+    if (emailErr) {
+      toast.error(emailErr);
+      return;
+    }
+    try {
+      await resetPassword(target);
+      toast.success("Correo enviado. Revisa tu bandeja de entrada.");
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code === "auth/user-not-found") toast.error("No existe una cuenta con ese correo.");
+      else if (code === "auth/too-many-requests") toast.error("Demasiados intentos. Intenta más tarde.");
+      else toast.error("No se pudo enviar el correo.");
+    }
+  };
 
   const handleLogin = async (e: { preventDefault(): void }) => {
     e.preventDefault();
@@ -115,6 +137,16 @@ export default function Login() {
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+          </div>
+
+          <div style={{ textAlign: "right", marginTop: "-4px" }}>
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontSize: "13px", fontWeight: 600, padding: 0 }}
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
           </div>
 
           <button type="submit" disabled={loading} className="btn-primary btn-full">

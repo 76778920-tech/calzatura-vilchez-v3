@@ -3,6 +3,7 @@ import {
   deleteUser,
   reload,
   sendEmailVerification,
+  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -185,6 +186,10 @@ export async function loginUser(email: string, password: string) {
 
 export async function logoutUser() {
   await signOut(auth);
+}
+
+export async function resetPassword(email: string): Promise<void> {
+  await sendPasswordResetEmail(auth, email.trim());
 }
 
 export async function deleteOwnAccount(): Promise<void> {
