@@ -58,6 +58,18 @@ async function goToProductDetail(page: Page, productId: string) {
   await expect(page.locator("main.detail-page")).toBeVisible({ timeout: 20_000 });
 }
 
+async function waitForCartPersistence(page: Page) {
+  await page.waitForFunction(() => {
+    try {
+      const raw = localStorage.getItem("calzatura_cart");
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) && parsed.length > 0;
+    } catch {
+      return false;
+    }
+  }, { timeout: 10_000 });
+}
+
 test.describe("carrito → validación de stock", () => {
   test.beforeEach(async ({ page }) => {
     page.on("pageerror", (err) =>
@@ -102,6 +114,7 @@ test.describe("carrito → validación de stock", () => {
 
     // Agregar el producto al carrito
     await addBtn.click();
+    await waitForCartPersistence(page);
 
     // Navegar al carrito
     await page.goto("/carrito");
@@ -181,6 +194,7 @@ test.describe("carrito → validación de stock", () => {
     }
 
     await addBtn.click();
+    await waitForCartPersistence(page);
 
     await page.goto("/carrito");
     await expect(page.getByRole("heading", { name: /Mi Carrito/i })).toBeVisible({ timeout: 15_000 });
