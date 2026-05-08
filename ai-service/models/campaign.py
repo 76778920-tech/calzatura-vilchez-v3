@@ -565,7 +565,7 @@ def _build_recommendation(
     # ── 1. Sin stock → alerta de ventas perdidas ──────────────────────────────
     if sin_stock:
         names = " y ".join(sin_stock[:2]) + (" y otros" if len(sin_stock) > 2 else "")
-        parts.append(f"Sin stock: {names} — ventas perdidas activas, reponer de inmediato")
+        parts.append(f"Sin stock: {names} - ventas perdidas activas, reponer de inmediato")
 
     # ── 2. Stock critico → reposicion urgente con detalle ────────────────────
     for p in critico[:2]:
@@ -588,13 +588,13 @@ def _build_recommendation(
         p = ok_alta[0]
         if nivel == "alta":
             parts.append(
-                f"{p['nombre']} rota {p['uplift']:.1f}x — "
+                f"{p['nombre']} rota {p['uplift']:.1f}x - "
                 "no aplicar descuento adicional, la demanda es organica y el margen no lo necesita"
             )
         elif nivel in ("media", "baja"):
             imp_str = f" (S/ {p['impacto']:.0f} sobre lo esperado)" if p["impacto"] > 0 else ""
             parts.append(
-                f"{p['nombre']} con uplift {p['uplift']:.1f}x{imp_str} — "
+                f"{p['nombre']} con uplift {p['uplift']:.1f}x{imp_str} - "
                 "evaluar promocion activa para sostener el momentum"
             )
 
