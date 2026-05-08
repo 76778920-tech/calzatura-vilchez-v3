@@ -15,6 +15,8 @@ services:
     depends_on:
       ai-service:
         condition: service_started
+      firebase-emulator:
+        condition: service_healthy
 
   ai-service:
     build:
@@ -34,5 +36,31 @@ services:
       timeout: 5s
       retries: 3
 
+  firebase-emulator:
+    build:
+      context: .
+      dockerfile: firebase-emulator/Dockerfile
+    container_name: calzatura-firebase-emulator
+    ports:
+      - "4000:4000"
+      - "5001:5001"
+      - "9099:9099"
+    environment:
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      AI_SERVICE_URL: ${AI_SERVICE_URL}
+      AI_SERVICE_BEARER_TOKEN: ${AI_SERVICE_BEARER_TOKEN}
+    volumes:
+      - emulator_data:/workspace/emulator-data
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:4000"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
 volumes:
   frontend_node_modules:
+  emulator_data:

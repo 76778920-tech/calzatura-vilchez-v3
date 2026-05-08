@@ -1,0 +1,185 @@
+name: CI Integration — Calzatura Vilchez (main only, secrets reales)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ── Job 1: Lint + Tests + Coverage + Build con secrets reales ────────────────
+  quality:
+    name: Calidad + Build (secrets reales)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: calzatura-vilchez
+
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: calzatura-vilchez/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Pruebas unitarias (Vitest)
+        run: npm test
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+
+      - name: Cobertura de código (Vitest Coverage)
+        run: npm run test:coverage
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+
+      - name: Subir reporte de cobertura (HTML)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-integration
+          path: calzatura-vilchez/coverage/
+          retention-days: 30
+
+      - name: Verificar tipos TypeScript
+        run: npm run typecheck
+
+      - name: Compilar proyecto (Vite build)
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+          VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
+          VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
+          VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
+          VITE_AI_SERVICE_BEARER_TOKEN: ${{ secrets.VITE_AI_SERVICE_BEARER_TOKEN }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+
+  # ── Job 2: AI Service con validación real de Supabase ────────────────────────
+  ai-service:
+    name: AI Service + Schema Supabase (real)
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ai-service
+
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v5
+
+      - name: Configurar Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai-service/requirements.txt
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Pruebas backend IA (pytest)
+        run: pytest
+
+      - name: Verificar esquema real ireHistorial en Supabase
+        run: python scripts/verify_ire_historial_schema.py --write-probe
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+  # ── Job 3: E2E Playwright con credenciales reales ────────────────────────────
+  e2e:
+    name: E2E Playwright — Integración real
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: calzatura-vilchez
+
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v5
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: calzatura-vilchez/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Obtener versión de Playwright
+        id: pw-version
+        run: |
+          unset NO_COLOR FORCE_COLOR
+          echo "version=$(node -e "console.log(require('./node_modules/@playwright/test/package.json').version)")" >> $GITHUB_OUTPUT
+
+      - name: Caché de navegadores Playwright
+        id: pw-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: pw-browsers-${{ steps.pw-version.outputs.version }}
+
+      - name: Instalar Chromium + dependencias del sistema (primera vez)
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: node scripts/run-playwright.mjs install --with-deps chromium
+
+      - name: Instalar dependencias del sistema (cache hit)
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: node scripts/run-playwright.mjs install-deps chromium
+
+      - name: Ejecutar pruebas E2E
+        run: npm run test:e2e
+        env:
+          CI: "true"
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+          VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
+          VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
+          VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
+          VITE_AI_SERVICE_BEARER_TOKEN: ${{ secrets.VITE_AI_SERVICE_BEARER_TOKEN }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+
+      - name: Subir reporte Playwright (siempre)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-integration
+          path: calzatura-vilchez/playwright-report/
+          retention-days: 30
