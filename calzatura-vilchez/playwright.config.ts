@@ -30,6 +30,11 @@ export default defineConfig({
     timeout: 120_000,
     // VITE_E2E=true activa browserLocalPersistence en Firebase, de modo
     // que admin.json (localStorage) sea leído en lugar del IndexedDB.
-    env: { VITE_E2E: "true" },
+    env: {
+      VITE_E2E: "true",
+      // E2E mockea las rutas directas del servicio IA. Evita heredar el proxy
+      // real desde GitHub Actions, porque eso salta los page.route("**/api/**").
+      VITE_AI_ADMIN_PROXY_URL: "",
+    },
   },
 });

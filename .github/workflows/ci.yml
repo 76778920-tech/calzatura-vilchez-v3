@@ -114,13 +114,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: ai-service/requirements.txt
+          cache-dependency-path: ai-service/requirements-dev.txt
 
       - name: Instalar dependencias
-        run: pip install -r requirements.txt
+        run: python -m pip install -r requirements-dev.txt
 
       - name: Pruebas backend IA (pytest)
-        run: pytest
+        run: python -m pytest
 
       - name: Verificar esquema real ireHistorial en Supabase si hay secretos
         run: |

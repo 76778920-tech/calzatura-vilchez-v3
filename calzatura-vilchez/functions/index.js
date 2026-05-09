@@ -869,6 +869,12 @@ exports.aiAdminProxy = onRequest(
           upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
         } else if (op === "modelMetrics") {
           upstreamUrl = `${base}/api/model/metrics`;
+        } else if (op === "ireHistorial") {
+          const days = parseInt(String(req.query.days ?? "30"), 10);
+          if (!Number.isFinite(days) || days < 1 || days > 365) {
+            return res.status(400).json({ error: "days invalido" });
+          }
+          upstreamUrl = `${base}/api/ire/historial?days=${encodeURIComponent(days)}`;
         } else if (op === "cacheInvalidate") {
           if (req.method !== "POST") {
             return res.status(405).json({ error: "Metodo no permitido" });

@@ -19,7 +19,7 @@ import { PromptInputBox, type PromptPanelQuickAction } from "@/components/ui/ai-
 import { aiAdminFetch, wakeAIService } from "@/services/aiAdminClient";
 
 // Render en plan gratuito puede tardar ~20-30 s en cold start.
-const AI_FETCH_TIMEOUT_MS = 45_000;
+const AI_FETCH_TIMEOUT_MS = 90_000;
 
 /** `pathAndQuery` p. ej. `/api/predict/combined?horizon=30&history=120` (véase `aiAdminClient`). */
 async function fetchAI(pathAndQuery: string, options?: RequestInit): Promise<Response> {

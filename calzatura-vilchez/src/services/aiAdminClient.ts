@@ -45,6 +45,11 @@ function toProxyUrl(pathAndQuery: string): string {
     q.set("op", "modelMetrics");
     return `${PROXY_URL!.replace(/\/$/, "")}?${q.toString()}`;
   }
+  if (u.pathname === "/api/ire/historial") {
+    q.set("op", "ireHistorial");
+    u.searchParams.forEach((val, key) => q.set(key, val));
+    return `${PROXY_URL!.replace(/\/$/, "")}?${q.toString()}`;
+  }
   if (u.pathname === "/api/cache/invalidate") {
     q.set("op", "cacheInvalidate");
     return `${PROXY_URL!.replace(/\/$/, "")}?${q.toString()}`;
