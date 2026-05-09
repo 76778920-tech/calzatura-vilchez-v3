@@ -5,6 +5,10 @@ function normalizeCode(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 40);
 }
 
+function isExpectedMockedConflict(text: string): boolean {
+  return /Failed to load resource: the server responded with a status of 409 \(Conflict\)/.test(text);
+}
+
 async function getExistingCodes(page: Page) {
   const codes = await page.locator(".admin-code-badge").allInnerTexts();
   return codes
@@ -102,6 +106,7 @@ test.describe("admin productos → guardas de código único", () => {
     });
     page.on("console", (msg) => {
       if (msg.type() === "error") {
+        if (isExpectedMockedConflict(msg.text())) return;
         console.log(`[admin-code-guards] browser console error -> ${msg.text()}`);
       }
     });
