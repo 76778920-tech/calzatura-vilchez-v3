@@ -25,35 +25,56 @@ flowchart TB
 
 ## 2. Descomposición del código (mapa físico)
 
-| Ruta | Dominio | Responsabilidad |
-|------|---------|-----------------|
-| `src/domains/publico/` | Público | Home, landings, login |
-| `src/domains/productos/` | Productos | Catálogo, detalle, admin productos |
-| `src/domains/carrito/` | Carrito | Contexto carrito, checkout |
-| `src/domains/pedidos/` | Pedidos | Creación, historial, admin |
-| `src/domains/clientes/` | Clientes | Favoritos |
-| `src/domains/ventas/` | Ventas | Ventas diarias, finanzas, admin |
-| `src/domains/administradores/` | Admin | AdminData, predicciones, etc. |
-| `src/domains/usuarios/` | Usuarios | Auth context, perfiles |
-| `src/domains/fabricantes/` | Fabricantes | CRUD fabricantes |
-| `src/supabase/client.ts` | Infra | Cliente Supabase |
-| `src/firebase/config.ts` | Infra | Firebase app + auth |
+### 2.1 Dominios (`src/domains/`)
+
+| Ruta | Estado | Responsabilidad |
+|------|--------|-----------------|
+| `src/domains/publico/` | Implementado | Home, landings (CyberWow, Club Calzado), login, registro, verificación de email, páginas informativas |
+| `src/domains/productos/` | Implementado | Catálogo, detalle, admin productos, variantes, familias |
+| `src/domains/carrito/` | Implementado | Contexto carrito, checkout |
+| `src/domains/pedidos/` | Implementado | Creación, historial, admin |
+| `src/domains/clientes/` | Implementado | Favoritos |
+| `src/domains/ventas/` | Implementado | Ventas diarias, finanzas, admin |
+| `src/domains/administradores/` | Implementado | AdminData, predicciones IA, auditoría, campañas |
+| `src/domains/usuarios/` | Implementado | Auth context, perfiles |
+| `src/domains/fabricantes/` | Implementado | CRUD fabricantes |
+| `src/domains/trabajadores/` | **Sin implementar** | Reservado para gestión de trabajadores — directorio presente pero vacío; fuera del alcance actual |
+
+### 2.2 Infraestructura transversal
+
+| Ruta | Responsabilidad |
+|------|-----------------|
+| `src/supabase/client.ts` | Cliente Supabase (PostgREST + Realtime) |
+| `src/firebase/config.ts` | Firebase app + auth |
+| `src/services/aiAdminClient.ts` | Cliente HTTP hacia el servicio IA con autenticación Firebase ID token |
+| `src/hooks/useProductsRealtime.ts` | Supabase Realtime — recarga productos, códigos y finanzas con debounce 300 ms |
+| `src/hooks/useFavoritesRealtime.ts` | Supabase Realtime — recarga favoritos del usuario |
+| `src/hooks/useOrdersRealtime.ts` | Supabase Realtime — recarga pedidos en tiempo real |
+| `src/hooks/useThemeMode.ts` | Modo claro/oscuro persistido en localStorage |
+| `src/utils/` | 12 utilidades: stock, colores, email, familias, importación, imágenes, etc. |
+| `src/security/accessControl.ts` | Lógica de control de acceso por rol |
 
 ## 3. Modelo de datos (Supabase)
 
-### 3.1 Tablas principales (derivado de migraciones)
+### 3.1 Tablas principales (derivado de 27 migraciones)
 
 | Tabla | Propósito |
 |-------|-----------|
 | `productos` | Catálogo, stock, taxonomía comercial, `familiaId`, `campana`, flags importación |
 | `productoCodigos` | Código único por producto + `actualizadoEn` |
 | `productoFinanzas` | Márgenes y precios sugeridos |
-| `pedidos` | Órdenes de compra |
-| `usuarios` | Perfil extendido y rol |
-| `favoritos` | Relación usuario–producto |
-| `ventasDiarias` | Movimientos de venta |
-| `fabricantes` | Proveedores |
-| `auditoria` | Registro de acciones admin |
+| `pedidos` | Órdenes de compra con `pagadoEn`, `canal` y `stripeSessionId` |
+| `usuarios` | Perfil extendido y rol (`admin`, `trabajador`, `cliente`) |
+| `favoritos` | Relación usuario–producto (Supabase Realtime habilitado) |
+| `ventasDiarias` | Movimientos de venta por canal (`tienda` / `web`) |
+| `fabricantes` | Proveedores con hash de DNI protegido |
+| `auditoria` | Registro de acciones admin con retención de 2 años |
+| `ireHistorial` | Historial longitudinal del IRE: score, nivel, dimensiones, versión, fórmula, variables, detalle |
+| `modeloEstado` | Estado del modelo IA persistido entre reinicios (training_meta, data_hash) |
+| `campanas_detectadas` | Campañas comerciales detectadas automáticamente por el modelo IA |
+| `campana_productos` | Productos asociados a cada campaña con `impacto_soles` estimado |
+| `campana_metricas_diarias` | Métricas diarias de desempeño por campaña |
+| `campana_feedback` | Feedback del administrador sobre campañas detectadas (confirmar/rechazar) |
 
 ### 3.2 RPC críticos
 
@@ -74,12 +95,12 @@ flowchart TB
 
 | Amenaza | Mitigación en diseño |
 |---------|----------------------|
-| Suplantación | Firebase Auth + control de rol en UI y datos |
-| Manipulación de datos | RPC/triggers; validación servidor |
-| Repudio | `auditoria` + timestamps |
-| Divulgación | HTTPS, no secretos en cliente |
-| Denegación de servicio | Rate limit Supabase/Firewall *(completar si aplica)* |
-| Elevación de privilegio | Roles en `usuarios`, rutas protegidas |
+| Suplantación | Firebase Auth en UI + `firebase_verifier.py` en el servicio IA (verifica Firebase ID token sin service account, solo con `FIREBASE_PROJECT_ID`) |
+| Manipulación de datos | RPC/triggers PostgreSQL; validación servidor; CHECK constraints |
+| Repudio | Tabla `auditoria` + timestamps; trigger `trg_audit_pedido_insert` |
+| Divulgación | HTTPS en todos los servicios; secretos solo en variables de entorno; `VITE_AI_SERVICE_BEARER_TOKEN` bloqueado en build por guard en `vite.config.ts` |
+| Denegación de servicio | `slowapi` (rate limiting por IP) en el servicio IA FastAPI |
+| Elevación de privilegio | Roles en `usuarios`; rutas protegidas por `accessControl.ts`; `SUPERADMIN_EMAILS` verificado en cada request al servicio IA |
 
 ### 4.2 Datos personales
 

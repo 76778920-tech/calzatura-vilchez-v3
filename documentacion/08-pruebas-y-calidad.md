@@ -12,12 +12,15 @@
 
 ### 1.2 Alcance de pruebas
 
-| Tipo | Herramienta / método | Ubicación en repo |
-|------|----------------------|-------------------|
-| Unitarias / integración ligera | Vitest | `src/__tests__/`, `vitest.config.ts` |
-| E2E UI | Playwright | `e2e/*.spec.ts`, `playwright.config.ts` |
-| Manuales | Checklist | `plantillas/PL-03-registro-ejecucion-prueba.md` |
-| Exploratorias | Sesión guiada | Acta en anexo |
+| Tipo | Herramienta / método | Ubicación en repo | Nº de archivos |
+|------|----------------------|-------------------|----------------|
+| Unitarias / integración ligera (frontend) | Vitest | `src/__tests__/` + `src/utils/emailValidation.test.ts` | 16 archivos |
+| E2E UI | Playwright (Chromium) | `e2e/*.spec.ts`, `playwright.config.ts` | 27 archivos |
+| Unitarias / integración (servicio IA) | Pytest | `ai-service/tests/` | 7 suites |
+| Manuales | Checklist | `plantillas/PL-03-registro-ejecucion-prueba.md` | — |
+| Exploratorias | Sesión guiada | Acta en anexo | — |
+
+**Instalación de dependencias de prueba Python:** `pip install -r ai-service/requirements-dev.txt` (incluye pytest y pytest-asyncio; separadas de `requirements.txt` para no desplegar herramientas de testing en producción).
 
 ### 1.3 Criterios de entrada/salida por fase de prueba
 

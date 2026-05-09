@@ -110,29 +110,40 @@ Si el nivel del IRE no cambia ante estos escenarios, el índice es estable. Si c
 
 ## 6. Modelado
 
-El módulo usa dos familias de salida:
+El módulo usa cuatro componentes de salida:
 
-| Componente | Modelo / regla | Salida |
-|------------|----------------|--------|
-| Demanda por producto | Random Forest con fallback a promedio móvil ponderado | predicción diaria, semanal, horizonte, riesgo de agotamiento. |
-| Ingresos | Forecast por tendencia reciente y estacionalidad por dia de semana | ingresos proyectados, tendencia y confianza. |
-| IRE | Índice compuesto basado en reglas explicables | score 0-100, nivel, variables, fórmula y detalle. |
+| Componente | Archivo | Modelo / regla | Salida |
+|------------|---------|----------------|--------|
+| Demanda por producto | `models/demand.py` | Random Forest con fallback a promedio móvil ponderado | predicción diaria, semanal, horizonte, riesgo de agotamiento. |
+| Ingresos | `models/revenue.py` | Forecast por tendencia reciente y estacionalidad por dia de semana | ingresos proyectados, tendencia y confianza. |
+| IRE | `models/risk.py` | Índice compuesto basado en reglas explicables | score 0-100, nivel, variables, fórmula y detalle. |
+| Predicción de campañas | `models/campaign.py` | Random Forest + reglas de feedback adaptativo | campaña activa detectada, productos foco, impacto estimado en soles, métricas de aprendizaje. |
 
 El IRE no es un clasificador supervisado entrenado con etiquetas de crisis; es una capa de decision explicable construida sobre predicciones de demanda e ingresos.
+
+El modelo de campañas detecta automáticamente campañas comerciales activas (CyberWow, Navidad, etc.) a partir del comportamiento de ventas y permite al administrador confirmar o rechazar la detección, generando feedback que ajusta futuras predicciones.
 
 ## 7. Validación
 
 ### 7.1 Validación automatizada en repositorio
 
-| Aspecto | Prueba |
-|---------|--------|
-| Pesos agregados | Los pesos suman 1.0. |
-| Rango del score | El IRE permanece entre 0 y 100. |
-| Umbrales | Bajo, moderado, alto y crítico respetan los cortes definidos. |
-| Escenarios deterministas | Casos favorables producen bajo; casos extremos producen crítico. |
-| Proyección | El IRE proyectado no produce stock negativo y aumenta con horizontes más largos cuando corresponde. |
-| Contribuciones | La suma de contribuciones por variable coincide con el score final. |
-| Historial | El guardado extendido y el fallback compatible se validan con mocks. |
+| Aspecto | Archivo de prueba | Prueba |
+|---------|-------------------|--------|
+| Pesos agregados IRE | `tests/test_risk.py` | Los pesos suman 1.0. |
+| Rango del score | `tests/test_risk.py` | El IRE permanece entre 0 y 100. |
+| Umbrales | `tests/test_risk.py` | Bajo, moderado, alto y crítico respetan los cortes definidos. |
+| Escenarios deterministas | `tests/test_risk.py` | Casos favorables producen bajo; casos extremos producen crítico. |
+| Proyección | `tests/test_risk.py` | El IRE proyectado no produce stock negativo y aumenta con horizontes más largos cuando corresponde. |
+| Contribuciones | `tests/test_risk.py` | La suma de contribuciones por variable coincide con el score final. |
+| Historial | `tests/test_risk.py` | El guardado extendido y el fallback compatible se validan con mocks. |
+| Demanda por producto | `tests/test_demand.py` | Predicción diaria, semanal y riesgo de agotamiento. |
+| Ingresos | `tests/test_revenue.py` | Forecast, tendencia y confianza. |
+| Campañas | `tests/test_campaign.py` | Detección de campaña, feedback adaptativo, productos foco, impacto en soles. |
+| Máquina de estados de campaña | `tests/test_state_machine.py` | Transiciones de estado (pendiente → activa → cerrada → archivada) y guardas. |
+| Contrato de API | `tests/test_api_contract.py` | Respuestas de todos los endpoints respetan el esquema definido. |
+| Cliente Supabase | `tests/test_supabase_client.py` | Lectura y escritura de datos con mocks de la BD. |
+
+**Métricas de evaluación del modelo de demanda:** ver `ai-service/evaluation_report_2026-04-27.txt` (generado por `ai-service/evaluate.py`). Incluye MAPE, RMSE y cobertura por producto sobre datos históricos reales.
 
 ### 7.2 Validación pendiente si se desea calibración predictiva
 
@@ -149,10 +160,16 @@ Sin etiquetas, la validación defendible es de consistencia interna, sensibilida
 
 | Elemento | Implementacion |
 |----------|----------------|
-| Endpoint principal | `GET /api/predict/combined?horizon={H}&history={D}` |
-| Historial | `GET /api/ire/historial?days={N}` |
-| Pantalla | `calzatura-vilchez/src/domains/administradores/pages/AdminPredictions.tsx` |
-| Persistencia | `save_ire_historial` en `ai-service/services/supabase_client.py` |
+| Endpoint principal (IRE + demanda + ingresos) | `GET /api/predict/combined?horizon={H}&history={D}` |
+| Historial IRE | `GET /api/ire/historial?days={N}` |
+| Detección de campaña | `GET /api/predict/campaign-detection?horizon={H}` |
+| Campaña activa | `GET /api/campaign/active` |
+| Feedback de campaña | `POST /api/campaign/feedback` |
+| Estadísticas de aprendizaje | `GET /api/campaign/learning-stats` |
+| Pantalla admin | `calzatura-vilchez/src/domains/administradores/pages/AdminPredictions.tsx` |
+| Persistencia IRE | `save_ire_historial` en `ai-service/services/supabase_client.py` |
+| Persistencia campañas | `save_campana_detectada`, `save_campana_productos`, `save_campana_feedback` en `ai-service/services/supabase_client.py` |
+| Autenticación de endpoints | `ai-service/services/firebase_verifier.py` — verifica Firebase ID token del administrador sin service account (solo `FIREBASE_PROJECT_ID` como variable de entorno). |
 
 ## 9. Limitaciones y sesgos
 
