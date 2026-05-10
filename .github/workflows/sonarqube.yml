@@ -64,7 +64,7 @@ jobs:
 
       - name: Generar cobertura IA (pytest XML)
         working-directory: ai-service
-        run: python -m pytest --cov=main --cov=models --cov=services --cov-report=xml:coverage.xml
+        run: python -m pytest --cov=. --cov-config=.coveragerc --cov-report=xml:coverage.xml
 
       - name: Generar informe Bandit (JSON para SonarQube)
         working-directory: ai-service

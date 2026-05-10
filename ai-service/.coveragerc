@@ -1,0 +1,12 @@
+# Cobertura unificada para Sonar (un solo <source> en coverage.xml).
+# Varias banderas --cov= provocaban varias raíces y ambigüedad de __init__.py.
+[run]
+branch = false
+omit =
+    tests/*
+    */tests/*
+
+[report]
+omit =
+    tests/*
+    */tests/*
