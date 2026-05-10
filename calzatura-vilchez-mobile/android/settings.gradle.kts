@@ -24,4 +24,13 @@ plugins {
     id("com.google.gms.google-services") version "4.4.4" apply false
 }
 
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
 include(":app")

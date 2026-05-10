@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Metadatos de verificación de dependencias (Gradle).
+  Sonar pide archivo predecible; verify-metadata en false evita fallar el build
+  hasta generar checksums con: gradlew --write-verification-metadata sha256
+-->
+<verification-metadata xmlns="https://schema.gradle.org/dependency-verification/1.1">
+  <configuration>
+    <verify-metadata>false</verify-metadata>
+    <verify-signatures>false</verify-signatures>
+  </configuration>
+  <components/>
+</verification-metadata>

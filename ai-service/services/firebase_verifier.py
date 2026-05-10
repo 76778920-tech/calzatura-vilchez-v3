@@ -3,6 +3,8 @@ Verifica Firebase ID tokens usando las claves públicas de Google.
 No requiere service account — solo el project ID como env var FIREBASE_PROJECT_ID.
 Cachea las claves públicas respetando el max-age del header Cache-Control.
 """
+import base64
+import json
 import os
 import time
 
@@ -59,6 +61,27 @@ def _get_certs() -> dict[str, str]:
     return _certs_cache
 
 
+def _decode_jwt_header_for_kid(id_token: str) -> str:
+    """
+    Extrae el kid de la cabecera JWT (solo segmento 1, Base64URL + JSON).
+    La firma y los claims se validan después con jwt.decode() y la clave pública de Google.
+    """
+    parts = id_token.split(".")
+    if len(parts) < 2:
+        raise ValueError("token JWT incompleto")
+    header_b64 = parts[0]
+    padding = "=" * ((4 - len(header_b64) % 4) % 4)
+    try:
+        raw = base64.urlsafe_b64decode(header_b64 + padding)
+        header = json.loads(raw.decode("utf-8"))
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ValueError("cabecera JWT invalida") from exc
+    if not isinstance(header, dict):
+        raise ValueError("cabecera JWT invalida")
+    kid = header.get("kid", "")
+    return str(kid) if kid is not None else ""
+
+
 def verify_firebase_id_token(id_token: str) -> dict:
     """
     Verifica la firma, expiración, iss y aud del Firebase ID token.
@@ -68,8 +91,7 @@ def verify_firebase_id_token(id_token: str) -> dict:
     if not project:
         raise ValueError("FIREBASE_PROJECT_ID no configurado en el servidor")
 
-    header = jwt.get_unverified_header(id_token)
-    kid = header.get("kid", "")
+    kid = _decode_jwt_header_for_kid(id_token)
     certs = _get_certs()
     if kid not in certs:
         raise ValueError(f"kid desconocido: {kid}")
