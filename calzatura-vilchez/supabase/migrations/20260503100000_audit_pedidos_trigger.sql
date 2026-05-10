@@ -27,28 +27,21 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO auditoria (
-    accion,
-    entidad,
-    "entidadId",
-    "entidadNombre",
-    detalle,
-    "usuarioUid",
-    "usuarioEmail",
-    "realizadoEn"
-  ) VALUES (
+  -- Columnas en orden físico de auditoria; camelCase de pedidos vía to_jsonb(NEW) (sin "..." en SQL).
+  INSERT INTO auditoria VALUES (
+    DEFAULT,
     'crear',
     'pedido',
     NEW.id,
     '#' || upper(right(NEW.id, 8)),
     jsonb_build_object(
-      'total',       NEW.total,
-      'metodoPago',  NEW."metodoPago",
-      'estado',      NEW.estado,
-      'source',      'db_trigger'
+      'total', NEW.total,
+      'metodoPago', (to_jsonb(NEW) ->> 'metodoPago'),
+      'estado', NEW.estado,
+      'source', 'db_trigger'
     ),
-    NEW."userId",
-    NEW."userEmail",
+    (to_jsonb(NEW) ->> 'userId'),
+    (to_jsonb(NEW) ->> 'userEmail'),
     to_char(now() AT TIME ZONE 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')
   );
   RETURN NEW;

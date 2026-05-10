@@ -3,10 +3,10 @@ import os
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
-from typing import Any
+from typing import Annotated, Any
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Body, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -94,7 +94,7 @@ class IreHistorialResponse(BaseModel):
     days: int
 
 
-def _request_context(request: Request) -> dict:
+def _request_context(request: Annotated[Request, None]) -> dict:
     return {
         "method": request.method,
         "path": request.url.path,
@@ -104,7 +104,7 @@ def _request_context(request: Request) -> dict:
     }
 
 
-def _require_service_auth(request: Request, location: str) -> None:
+def _require_service_auth(request: Annotated[Request, None], location: str) -> None:
     auth_header = request.headers.get("authorization") or ""
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -209,7 +209,7 @@ def health():
 
 
 @app.get("/api/debug/supabase")
-def debug_supabase(request: Request):
+def debug_supabase(request: Annotated[Request, None]):
     """Diagnose Supabase connection — use only to troubleshoot."""
     _require_service_auth(request, "ai-service/main.py:debug_supabase")
     result: dict = {
@@ -229,9 +229,9 @@ def debug_supabase(request: Request):
 @app.get("/api/predict/demand")
 @limiter.limit("20/minute")
 def demand_prediction(
-    request: Request,
-    horizon: int = Query(default=30, ge=7, le=90, description="Dias a predecir (7-90)"),
-    history: int = Query(default=90, ge=14, le=365, description="Dias de historial a usar"),
+    request: Annotated[Request, None],
+    horizon: Annotated[int, Query(ge=7, le=90, description="Dias a predecir (7-90)")] = 30,
+    history: Annotated[int, Query(ge=14, le=365, description="Dias de historial a usar")] = 90,
 ):
     """Predicts product demand for the next horizon days."""
     try:
@@ -290,9 +290,9 @@ def demand_prediction(
 @app.get("/api/predict/combined")
 @limiter.limit("20/minute")
 def combined_prediction(
-    request: Request,
-    horizon: int = Query(default=30, ge=7, le=90, description="Dias a predecir (7-90)"),
-    history: int = Query(default=120, ge=30, le=365, description="Dias de historial a usar"),
+    request: Annotated[Request, None],
+    horizon: Annotated[int, Query(ge=7, le=90, description="Dias a predecir (7-90)")] = 30,
+    history: Annotated[int, Query(ge=30, le=365, description="Dias de historial a usar")] = 120,
 ):
     """
     Returns demand predictions and revenue forecast in a single response.
@@ -374,8 +374,8 @@ def combined_prediction(
 @app.get("/api/ire/historial", response_model=IreHistorialResponse)
 @limiter.limit("30/minute")
 def ire_historial(
-    request: Request,
-    days: int = Query(default=30, ge=7, le=90, description="Días de historial a retornar"),
+    request: Annotated[Request, None],
+    days: Annotated[int, Query(ge=7, le=90, description="Días de historial a retornar")] = 30,
 ):
     """Devuelve el historial de IRE de los últimos N días."""
     _require_service_auth(request, "api/ire/historial")
@@ -389,8 +389,10 @@ def ire_historial(
 @app.get("/api/predict/stock-alert")
 @limiter.limit("20/minute")
 def stock_alerts(
-    request: Request,
-    days_threshold: int = Query(default=14, ge=1, le=60, description="Alertar si se agota en N días"),
+    request: Annotated[Request, None],
+    days_threshold: Annotated[
+        int, Query(ge=1, le=60, description="Alertar si se agota en N días")
+    ] = 14,
 ):
     """Returns products predicted to run out of stock within the requested threshold."""
     try:
@@ -418,9 +420,9 @@ def stock_alerts(
 @app.get("/api/predict/revenue")
 @limiter.limit("20/minute")
 def revenue_prediction(
-    request: Request,
-    horizon: int = Query(default=30, ge=7, le=90, description="Dias a proyectar"),
-    history: int = Query(default=120, ge=30, le=365, description="Dias historicos a usar"),
+    request: Annotated[Request, None],
+    horizon: Annotated[int, Query(ge=7, le=90, description="Dias a proyectar")] = 30,
+    history: Annotated[int, Query(ge=30, le=365, description="Dias historicos a usar")] = 120,
 ):
     """Returns future revenue forecast for the next week and month."""
     try:
@@ -440,8 +442,8 @@ def revenue_prediction(
 @app.get("/api/sales/weekly-chart")
 @limiter.limit("20/minute")
 def weekly_chart(
-    request: Request,
-    weeks: int = Query(default=8, ge=2, le=24, description="Número de semanas"),
+    request: Annotated[Request, None],
+    weeks: Annotated[int, Query(ge=2, le=24, description="Número de semanas")] = 8,
 ):
     """Returns weekly sales volume for the last weeks."""
     try:
@@ -456,7 +458,7 @@ def weekly_chart(
 
 @app.post("/api/cache/invalidate")
 @limiter.limit("5/minute")
-def invalidate_cache(request: Request):
+def invalidate_cache(request: Annotated[Request, None]):
     """Force a cache refresh on the next request."""
     _require_service_auth(request, "ai-service/main.py:invalidate_cache")
     _cache["expires_at"] = 0.0
@@ -466,7 +468,7 @@ def invalidate_cache(request: Request):
 
 @app.get("/api/model/info")
 @limiter.limit("20/minute")
-def model_info(request: Request):
+def model_info(request: Annotated[Request, None]):
     """
     Returns training metadata from the last predict_demand call.
     Includes: reproducibility fields (data_hash, random_state, sklearn_version),
@@ -484,7 +486,7 @@ def model_info(request: Request):
 
 @app.get("/api/model/metrics")
 @limiter.limit("20/minute")
-def model_metrics(request: Request):
+def model_metrics(request: Annotated[Request, None]):
     """
     Retrospective error metrics: compares past predictions (from _prediction_log)
     against actual sales once the prediction horizon has elapsed.
@@ -728,9 +730,11 @@ def _advance_state(
 @app.get("/api/predict/campaign-detection")
 @limiter.limit("20/minute")
 def campaign_detection(
-    request: Request,
-    recent_days: int = Query(default=7, ge=3, le=14, description="Días recientes a evaluar"),
-    baseline_days: int = Query(default=60, ge=30, le=120, description="Días de historial para baseline"),
+    request: Annotated[Request, None],
+    recent_days: Annotated[int, Query(ge=3, le=14, description="Días recientes a evaluar")] = 7,
+    baseline_days: Annotated[
+        int, Query(ge=30, le=120, description="Días de historial para baseline")
+    ] = 60,
 ):
     """
     Detecta automáticamente si el negocio está en período de campaña.
@@ -823,7 +827,7 @@ class FeedbackPayload(BaseModel):
 
 @app.get("/api/campaign/active")
 @limiter.limit("30/minute")
-def campaign_active(request: Request):
+def campaign_active(request: Annotated[Request, None]):
     """
     Devuelve la campaña activa más reciente con top_productos para el panel admin.
     Incluye historial de las últimas 10 campañas detectadas.
@@ -844,7 +848,10 @@ def campaign_active(request: Request):
 
 @app.post("/api/campaign/feedback")
 @limiter.limit("20/minute")
-def campaign_feedback(request: Request, payload: FeedbackPayload):
+def campaign_feedback(
+    request: Annotated[Request, None],
+    payload: Annotated[FeedbackPayload, Body()],
+):
     """
     Registra feedback del administrador sobre una campaña detectada.
     accion: 'confirmar' | 'descartar' | 'nota'
@@ -881,7 +888,7 @@ def campaign_feedback(request: Request, payload: FeedbackPayload):
 
 @app.get("/api/campaign/learning-stats")
 @limiter.limit("30/minute")
-def campaign_learning_stats(request: Request):
+def campaign_learning_stats(request: Annotated[Request, None]):
     """
     Estadisticas de aprendizaje por feedback del admin.
     Devuelve conteos por scope, precision, umbrales base y umbrales activos aprendidos.
