@@ -11,6 +11,11 @@ _HEADERS: dict | None = None
 
 _AUDIT_FALLBACK_STATUS_CODES = {400, 404, 406, 409, 422}
 
+# Prefer headers (PostgREST) — constantes para evitar literales duplicados (Sonar).
+_PREFER_RESOLUTION_MERGE_DUPLICATES_MINIMAL = "resolution=merge-duplicates,return=minimal"
+_PREFER_RETURN_MINIMAL = "return=minimal"
+_ORDER_FECHA_DETECCION_DESC = "fecha_deteccion.desc"
+
 
 def _get_headers() -> tuple[str, dict]:
     global _SUPABASE_URL, _HEADERS
@@ -108,7 +113,7 @@ def save_ire_historial(ire: dict) -> None:
             f"{url}/rest/v1/ireHistorial?on_conflict=fecha",
             headers={
                 **headers,
-                "Prefer": "resolution=merge-duplicates,return=minimal",
+                "Prefer": _PREFER_RESOLUTION_MERGE_DUPLICATES_MINIMAL,
             },
             json=payload,
             timeout=10,
@@ -141,7 +146,7 @@ def save_modelo_estado(training_meta: dict) -> None:
     }
     requests.post(
         f"{url}/rest/v1/modeloEstado?on_conflict=id",
-        headers={**headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
+        headers={**headers, "Prefer": _PREFER_RESOLUTION_MERGE_DUPLICATES_MINIMAL},
         json=payload,
         timeout=10,
     )
@@ -196,7 +201,7 @@ def update_campana_estado(
         payload["impacto_estimado_soles"] = impacto_estimado_soles
     requests.patch(
         f"{url}/rest/v1/{_CAMPANAS_TABLE}?id=eq.{campana_id}",
-        headers={**headers, "Prefer": "return=minimal"},
+        headers={**headers, "Prefer": _PREFER_RETURN_MINIMAL},
         json=payload,
         timeout=10,
     )
@@ -208,7 +213,7 @@ def get_last_campana_activa() -> dict | None:
         rows = _query(_CAMPANAS_TABLE, {
             "select": "id,fecha_deteccion,fecha_inicio,nivel,tipo_sugerido,estado,uplift_ratio",
             "estado": "in.(inicio,activa,finalizando,en_riesgo_stock,observando)",
-            "order": "fecha_deteccion.desc",
+            "order": _ORDER_FECHA_DETECCION_DESC,
             "limit": "1",
         })
         return rows[0] if rows else None
@@ -222,7 +227,7 @@ def save_campana_metrica_diaria(campana_id: int, metrica: dict) -> None:
     payload = {"campana_id": campana_id, **metrica}
     requests.post(
         f"{url}/rest/v1/{_CAMP_METRICAS_TABLE}?on_conflict=campana_id,fecha",
-        headers={**headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
+        headers={**headers, "Prefer": _PREFER_RESOLUTION_MERGE_DUPLICATES_MINIMAL},
         json=payload,
         timeout=10,
     )
@@ -236,7 +241,7 @@ def save_campana_productos(campana_id: int, productos: list[dict]) -> None:
     payload = [{"campana_id": campana_id, **p} for p in productos]
     requests.post(
         f"{url}/rest/v1/{_CAMP_PRODUCTOS_TABLE}?on_conflict=campana_id,producto_id",
-        headers={**headers, "Prefer": "resolution=merge-duplicates,return=minimal"},
+        headers={**headers, "Prefer": _PREFER_RESOLUTION_MERGE_DUPLICATES_MINIMAL},
         json=payload,
         timeout=10,
     )
@@ -248,7 +253,7 @@ def save_campana_feedback(campana_id: int, accion: str, **kwargs) -> None:
     payload = {"campana_id": campana_id, "accion": accion, **kwargs}
     requests.post(
         f"{url}/rest/v1/{_CAMP_FEEDBACK_TABLE}",
-        headers={**headers, "Prefer": "return=minimal"},
+        headers={**headers, "Prefer": _PREFER_RETURN_MINIMAL},
         json=payload,
         timeout=10,
     )
@@ -266,7 +271,7 @@ def update_campana_admin_feedback(
         payload["admin_nota"] = nota
     requests.patch(
         f"{url}/rest/v1/{_CAMPANAS_TABLE}?id=eq.{campana_id}",
-        headers={**headers, "Prefer": "return=minimal"},
+        headers={**headers, "Prefer": _PREFER_RETURN_MINIMAL},
         json=payload,
         timeout=10,
     )
@@ -283,7 +288,7 @@ def fetch_campanas_recientes(limit: int = 10) -> list[dict]:
                 "impacto_estimado_soles_focalizado,recomendacion,"
                 "confirmada_por_admin,admin_nota"
             ),
-            "order": "fecha_deteccion.desc",
+            "order": _ORDER_FECHA_DETECCION_DESC,
             "limit": str(limit),
         })
     except Exception:
@@ -300,7 +305,7 @@ def fetch_campana_feedback_stats() -> dict:
         rows = _query(_CAMPANAS_TABLE, {
             "select":                "scope,confirmada_por_admin",
             "confirmada_por_admin":  "not.is.null",
-            "order":                 "fecha_deteccion.desc",
+            "order":                 _ORDER_FECHA_DETECCION_DESC,
             "limit":                 "100",
         })
         stats: dict = {

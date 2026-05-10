@@ -194,5 +194,5 @@ export async function fetchCategories(): Promise<string[]> {
   if (error) throw error;
   const cats = new Set<string>();
   (data ?? []).forEach((d) => { if (d.categoria) cats.add(d.categoria); });
-  return Array.from(cats).sort();
+  return Array.from(cats).sort((a, b) => a.localeCompare(b, "es", { sensitivity: "base" }));
 }

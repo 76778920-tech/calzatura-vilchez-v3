@@ -110,6 +110,99 @@ def _clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> float:
     return max(lo, min(hi, value))
 
 
+def _ire_stock_risk_and_counts(
+    with_history: list[dict], total: int
+) -> tuple[float, int, int, int, int]:
+    criticos = sum(1 for p in with_history if p.get("nivel_riesgo") == "critico")
+    atencion = sum(1 for p in with_history if p.get("nivel_riesgo") == "atencion")
+    vigilancia = sum(1 for p in with_history if p.get("nivel_riesgo") == "vigilancia")
+    sin_stock = sum(
+        1
+        for p in with_history
+        if p.get("stock_actual", 0) == 0 and p.get("consumo_estimado_diario", 0) > 0
+    )
+    if total > 0:
+        stock_risk = _clamp(
+            (criticos / total) * 100 * 1.00
+            + (atencion / total) * 100 * 0.55
+            + (vigilancia / total) * 100 * 0.25
+            + (sin_stock / total) * 100 * 0.20
+        )
+    else:
+        stock_risk = 40.0
+    return stock_risk, criticos, atencion, vigilancia, sin_stock
+
+
+def _ire_revenue_risk(revenue: dict | None) -> float:
+    if not revenue or not revenue.get("summary"):
+        return 45.0
+    summary = revenue["summary"]
+    tendencia = summary.get("tendencia", "estable")
+    crecimiento_pct = float(summary.get("crecimiento_estimado_pct", 0) or 0)
+    confianza = float(summary.get("confianza", 50) or 50)
+
+    if tendencia == "bajando":
+        base_rev = _clamp(55 + min(35, abs(crecimiento_pct) * 1.5))
+    elif tendencia == "estable":
+        base_rev = 28.0
+    else:
+        base_rev = _clamp(max(5.0, 18.0 - crecimiento_pct * 0.4))
+
+    confidence_penalty = (100.0 - confianza) * 0.18
+    return _clamp(base_rev + confidence_penalty)
+
+
+def _ire_demand_risk_and_counts(
+    with_history: list[dict], total: int
+) -> tuple[float, int, int, int]:
+    bajando = sum(1 for p in with_history if p.get("tendencia") == "bajando")
+    alta_sin_stock = sum(
+        1 for p in with_history if p.get("alta_demanda") and p.get("stock_actual", 0) < 5
+    )
+    drift_alto = sum(1 for p in with_history if (p.get("drift_score") or 0) > 0.6)
+    if total > 0:
+        demand_risk = _clamp(
+            (bajando / total) * 65 + (alta_sin_stock / total) * 80 + (drift_alto / total) * 30
+        )
+    else:
+        demand_risk = 25.0
+    return demand_risk, bajando, alta_sin_stock, drift_alto
+
+
+def _ire_nivel_descripcion(ire: int) -> tuple[str, str]:
+    if ire <= 25:
+        return (
+            "bajo",
+            (
+                "El negocio opera con riesgo controlado. "
+                "Los indicadores de stock, ingresos y demanda se encuentran dentro de parámetros normales."
+            ),
+        )
+    if ire <= 50:
+        return (
+            "moderado",
+            (
+                "Existen señales de riesgo que requieren monitoreo activo. "
+                "Tome acciones preventivas en los productos con alertas de stock o demanda en descenso."
+            ),
+        )
+    if ire <= 75:
+        return (
+            "alto",
+            (
+                "Riesgo empresarial elevado. Se recomienda intervención inmediata en el inventario crítico "
+                "y revisión de la estrategia de precios para frenar la caída de ingresos."
+            ),
+        )
+    return (
+        "critico",
+        (
+            "Estado crítico. El negocio enfrenta riesgo severo de pérdida de ingresos y agotamiento "
+            "de productos clave. Requiere decisiones urgentes de reposición y estrategia comercial."
+        ),
+    )
+
+
 def compute_ire(predictions: list[dict], revenue: dict | None) -> dict:
     """
     Returns an IRE dict:
@@ -122,87 +215,20 @@ def compute_ire(predictions: list[dict], revenue: dict | None) -> dict:
     with_history = [p for p in predictions if not p.get("sin_historial")]
     total = len(with_history)
 
-    # ── Dimensión 1: Riesgo de stock (40 %) ─────────────────────────────────
-    criticos   = sum(1 for p in with_history if p.get("nivel_riesgo") == "critico")
-    atencion   = sum(1 for p in with_history if p.get("nivel_riesgo") == "atencion")
-    vigilancia = sum(1 for p in with_history if p.get("nivel_riesgo") == "vigilancia")
-    sin_stock  = sum(1 for p in with_history if p.get("stock_actual", 0) == 0 and p.get("consumo_estimado_diario", 0) > 0)
+    stock_risk, criticos, atencion, vigilancia, sin_stock = _ire_stock_risk_and_counts(
+        with_history, total
+    )
+    revenue_risk = _ire_revenue_risk(revenue)
+    demand_risk, bajando, alta_sin_stock, drift_alto = _ire_demand_risk_and_counts(
+        with_history, total
+    )
 
-    if total > 0:
-        stock_risk = _clamp(
-            (criticos   / total) * 100 * 1.00 +
-            (atencion   / total) * 100 * 0.55 +
-            (vigilancia / total) * 100 * 0.25 +
-            (sin_stock  / total) * 100 * 0.20
+    ire = round(
+        _clamp(
+            stock_risk * PESO_STOCK + revenue_risk * PESO_INGRESOS + demand_risk * PESO_DEMANDA
         )
-    else:
-        stock_risk = 40.0
-
-    # ── Dimensión 2: Riesgo de ingresos (35 %) ──────────────────────────────
-    if revenue and revenue.get("summary"):
-        summary    = revenue["summary"]
-        tendencia  = summary.get("tendencia", "estable")
-        crecimiento_pct = float(summary.get("crecimiento_estimado_pct", 0) or 0)
-        confianza  = float(summary.get("confianza", 50) or 50)
-
-        if tendencia == "bajando":
-            base_rev = _clamp(55 + min(35, abs(crecimiento_pct) * 1.5))
-        elif tendencia == "estable":
-            base_rev = 28.0
-        else:
-            base_rev = _clamp(max(5.0, 18.0 - crecimiento_pct * 0.4))
-
-        # Low confidence raises risk
-        confidence_penalty = (100.0 - confianza) * 0.18
-        revenue_risk = _clamp(base_rev + confidence_penalty)
-    else:
-        revenue_risk = 45.0
-
-    # ── Dimensión 3: Riesgo de demanda (25 %) ───────────────────────────────
-    bajando             = sum(1 for p in with_history if p.get("tendencia") == "bajando")
-    alta_sin_stock      = sum(1 for p in with_history if p.get("alta_demanda") and p.get("stock_actual", 0) < 5)
-    drift_alto          = sum(1 for p in with_history if (p.get("drift_score") or 0) > 0.6)
-
-    if total > 0:
-        demand_risk = _clamp(
-            (bajando        / total) * 65 +
-            (alta_sin_stock / total) * 80 +
-            (drift_alto     / total) * 30
-        )
-    else:
-        demand_risk = 25.0
-
-    # ── Score compuesto ──────────────────────────────────────────────────────
-    ire = round(_clamp(
-        stock_risk   * PESO_STOCK +
-        revenue_risk * PESO_INGRESOS +
-        demand_risk  * PESO_DEMANDA
-    ))
-
-    if ire <= 25:
-        nivel = "bajo"
-        descripcion = (
-            "El negocio opera con riesgo controlado. "
-            "Los indicadores de stock, ingresos y demanda se encuentran dentro de parámetros normales."
-        )
-    elif ire <= 50:
-        nivel = "moderado"
-        descripcion = (
-            "Existen señales de riesgo que requieren monitoreo activo. "
-            "Tome acciones preventivas en los productos con alertas de stock o demanda en descenso."
-        )
-    elif ire <= 75:
-        nivel = "alto"
-        descripcion = (
-            "Riesgo empresarial elevado. Se recomienda intervención inmediata en el inventario crítico "
-            "y revisión de la estrategia de precios para frenar la caída de ingresos."
-        )
-    else:
-        nivel = "critico"
-        descripcion = (
-            "Estado crítico. El negocio enfrenta riesgo severo de pérdida de ingresos y agotamiento "
-            "de productos clave. Requiere decisiones urgentes de reposición y estrategia comercial."
-        )
+    )
+    nivel, descripcion = _ire_nivel_descripcion(ire)
 
     raw_dimension_values = {
         "riesgo_stock": stock_risk,

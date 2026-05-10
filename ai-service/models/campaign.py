@@ -31,6 +31,9 @@ Z_ALTA  = 2.0
 Z_MEDIA = 1.5
 Z_BAJA  = 1.0
 
+# Texto de respaldo en recomendaciones (evita literal duplicado — Sonar).
+CATEGORIAS_ACTIVAS_LABEL = "categorias activas"
+
 # ── Feedback learning ─────────────────────────────────────────────────────────
 
 MIN_FEEDBACK_SAMPLES = 5     # minimum cases before adjusting thresholds
@@ -158,6 +161,104 @@ def _consecutive_normal_days(
     return count
 
 
+def _aggregate_sales_for_campaign(
+    daily_sales: list[dict],
+    product_category: dict[str, str],
+    product_stock: dict[str, int],
+) -> tuple[
+    dict[str, float],
+    dict[str, float],
+    dict[str, dict[str, float]],
+    dict[str, dict[str, float]],
+    dict[str, dict[str, float]],
+    dict[str, dict[str, float]],
+    dict[str, dict],
+]:
+    """Acumula ventas por dimensión para la detección de campaña."""
+    raw_global: dict[str, float] = defaultdict(float)
+    raw_global_soles: dict[str, float] = defaultdict(float)
+    raw_by_cat: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    raw_by_cat_soles: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    raw_by_product: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    raw_by_prod_soles: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
+    product_meta: dict[str, dict] = {}
+
+    for sale in daily_sales:
+        if sale.get("devuelto"):
+            continue
+        fecha = _norm_date(sale.get("fecha", ""))
+        qty = _safe_float(sale.get("cantidad", 0))
+        precio = _safe_float(sale.get("precioVenta", 0))
+        pid = str(sale.get("productId", ""))
+        nombre = str(sale.get("nombre", ""))
+        if not fecha or qty <= 0:
+            continue
+        soles = qty * precio
+        raw_global[fecha] += qty
+        raw_global_soles[fecha] += soles
+        cat = product_category.get(pid, "sin_categoria")
+        raw_by_cat[cat][fecha] += qty
+        raw_by_cat_soles[cat][fecha] += soles
+        raw_by_product[pid][fecha] += qty
+        raw_by_prod_soles[pid][fecha] += soles
+        if pid not in product_meta:
+            product_meta[pid] = {"nombre": nombre, "categoria": cat}
+
+    return (
+        raw_global,
+        raw_global_soles,
+        raw_by_cat,
+        raw_by_cat_soles,
+        raw_by_product,
+        raw_by_prod_soles,
+        product_meta,
+    )
+
+
+def _classify_campaign_signal(
+    uplift: float,
+    z: float,
+    consecutive_up: int,
+    affected_cats: list[dict],
+    top_productos: list[dict],
+    *,
+    uplift_alta: float,
+    uplift_media: float,
+    uplift_baja: float,
+    uplift_focalizada: float,
+) -> tuple[str, str | None, str | None, str]:
+    """Devuelve (nivel, tipo_sugerido, scope, label) según umbrales globales y detección focalizada."""
+    scope: str | None = None
+
+    if uplift >= uplift_alta and z >= Z_ALTA and consecutive_up >= MIN_CONSISTENT_DAYS:
+        return "alta", "cyber-wow", "global", "Campana de alta demanda"
+    if uplift >= uplift_media and z >= Z_MEDIA and consecutive_up >= MIN_CONSISTENT_DAYS:
+        return "media", "outlet", "global", "Posible campana activa"
+    if uplift >= uplift_baja and z >= Z_BAJA and consecutive_up >= MIN_CONSISTENT_DAYS:
+        return "baja", "nueva-temporada", "global", "Actividad elevada / posible inicio de temporada"
+    if uplift >= uplift_baja and consecutive_up >= 1:
+        return "observando", None, "global", "Senal emergente - en observacion"
+
+    nivel, tipo_sugerido = "normal", None
+    label = "Ventas dentro del rango historico normal"
+
+    best_cat_u = affected_cats[0]["uplift_ratio"] if affected_cats else 0.0
+    best_prod_u = top_productos[0]["uplift_ratio"] if top_productos else 0.0
+    best_focused = max(best_cat_u, best_prod_u)
+
+    if best_focused >= uplift_focalizada:
+        focus_name = (
+            affected_cats[0]["categoria"]
+            if best_cat_u >= best_prod_u
+            else top_productos[0]["nombre"]
+        )
+        return "baja", "campana-focalizada", "focalizada", f"Campana focalizada en '{focus_name}'"
+    if best_focused >= uplift_baja:
+        return "observando", None, "focalizada", "Senal focalizada emergente - en observacion"
+
+    return nivel, tipo_sugerido, scope, label
+
+
 # ── Core detection ───────────────────────────────────────────────────────────
 
 def detect_campaign(
@@ -194,34 +295,15 @@ def detect_campaign(
     }
 
     # ── Accumulate sales ─────────────────────────────────────────────────────
-    raw_global:        dict[str, float] = defaultdict(float)
-    raw_global_soles:  dict[str, float] = defaultdict(float)
-    raw_by_cat:        dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
-    raw_by_cat_soles:  dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
-    raw_by_product:    dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
-    raw_by_prod_soles: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
-    product_meta:      dict[str, dict]  = {}
-
-    for sale in daily_sales:
-        if sale.get("devuelto"):
-            continue
-        fecha  = _norm_date(sale.get("fecha", ""))
-        qty    = _safe_float(sale.get("cantidad", 0))
-        precio = _safe_float(sale.get("precioVenta", 0))
-        pid    = str(sale.get("productId", ""))
-        nombre = str(sale.get("nombre", ""))
-        if not fecha or qty <= 0:
-            continue
-        soles = qty * precio
-        raw_global[fecha]          += qty
-        raw_global_soles[fecha]    += soles
-        cat = product_category.get(pid, "sin_categoria")
-        raw_by_cat[cat][fecha]       += qty
-        raw_by_cat_soles[cat][fecha] += soles
-        raw_by_product[pid][fecha]   += qty
-        raw_by_prod_soles[pid][fecha] += soles
-        if pid not in product_meta:
-            product_meta[pid] = {"nombre": nombre, "categoria": cat}
+    (
+        raw_global,
+        raw_global_soles,
+        raw_by_cat,
+        raw_by_cat_soles,
+        raw_by_product,
+        raw_by_prod_soles,
+        product_meta,
+    ) = _aggregate_sales_for_campaign(daily_sales, product_category, product_stock)
 
     baseline_vals = _fill_zeros(raw_global, dates_baseline)
     recent_vals   = _fill_zeros(raw_global, dates_recent)
@@ -281,39 +363,17 @@ def detect_campaign(
     )
 
     # ── Campaign level (global → focused fallback) ────────────────────────────
-    scope: str | None = None
-
-    if uplift >= _uplift_alta and z >= Z_ALTA and consecutive_up >= MIN_CONSISTENT_DAYS:
-        nivel, tipo_sugerido, scope = "alta",  "cyber-wow",     "global"
-        label = "Campana de alta demanda"
-    elif uplift >= _uplift_media and z >= Z_MEDIA and consecutive_up >= MIN_CONSISTENT_DAYS:
-        nivel, tipo_sugerido, scope = "media", "outlet",         "global"
-        label = "Posible campana activa"
-    elif uplift >= _uplift_baja and z >= Z_BAJA and consecutive_up >= MIN_CONSISTENT_DAYS:
-        nivel, tipo_sugerido, scope = "baja",  "nueva-temporada", "global"
-        label = "Actividad elevada / posible inicio de temporada"
-    elif uplift >= _uplift_baja and consecutive_up >= 1:
-        nivel, tipo_sugerido, scope = "observando", None, "global"
-        label = "Senal emergente - en observacion"
-    else:
-        nivel, tipo_sugerido = "normal", None
-        label = "Ventas dentro del rango historico normal"
-
-        # Focused detection: one category or product is spiking
-        best_cat_u  = affected_cats[0]["uplift_ratio"]  if affected_cats  else 0.0
-        best_prod_u = top_productos[0]["uplift_ratio"] if top_productos else 0.0
-        best_focused = max(best_cat_u, best_prod_u)
-
-        if best_focused >= _uplift_foc:
-            nivel, tipo_sugerido, scope = "baja", "campana-focalizada", "focalizada"
-            focus_name = (
-                affected_cats[0]["categoria"] if best_cat_u >= best_prod_u
-                else top_productos[0]["nombre"]
-            )
-            label = f"Campana focalizada en '{focus_name}'"
-        elif best_focused >= _uplift_baja:
-            nivel, tipo_sugerido, scope = "observando", None, "focalizada"
-            label = "Senal focalizada emergente - en observacion"
+    nivel, tipo_sugerido, scope, label = _classify_campaign_signal(
+        uplift,
+        z,
+        consecutive_up,
+        affected_cats,
+        top_productos,
+        uplift_alta=_uplift_alta,
+        uplift_media=_uplift_media,
+        uplift_baja=_uplift_baja,
+        uplift_focalizada=_uplift_foc,
+    )
 
     # ── Close state (check finalizada before finalizando) ────────────────────
     cierre_estado = None
@@ -608,6 +668,67 @@ def _build_message(
     )
 
 
+def _append_recommendation_strategic_blocks(
+    parts: list[str],
+    tipo: str | None,
+    nivel: str,
+    uplift: float,
+    affected_cats: list[dict],
+    top_productos: list[dict],
+) -> None:
+    """Añade consejos según tipo de campaña (muta `parts` in-place)."""
+    if tipo == "campana-focalizada":
+        if affected_cats:
+            focus = f"categoria '{affected_cats[0]['categoria']}'"
+            cat_up = affected_cats[0]["uplift_ratio"]
+            parts.append(
+                f"Campana focalizada en {focus} ({cat_up:.1f}x): "
+                "monitorear si el pico se extiende a otras categorias en los proximos 3 dias"
+            )
+        elif top_productos:
+            focus = top_productos[0]["nombre"]
+            parts.append(
+                f"Pico focalizado en '{focus}': verificar si hay campana externa activa "
+                "en ese segmento (redes sociales, influencer, feria)"
+            )
+        return
+
+    if tipo in ("cyber-wow", None) and nivel == "alta":
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else "los productos mas vendidos"
+        parts.append(
+            f"Demanda alta en {cat_str}: coordinar reposicion con fabricantes "
+            "y activar banner promocional antes de que se agote el stock"
+        )
+        return
+
+    if tipo == "outlet":
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else CATEGORIAS_ACTIVAS_LABEL
+        parts.append(
+            f"Contexto outlet activo en {cat_str}: "
+            "aprovechar para liquidar modelos de temporada anterior con descuento controlado"
+        )
+        return
+
+    if tipo == "nueva-temporada":
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else CATEGORIAS_ACTIVAS_LABEL
+        parts.append(
+            f"Inicio de temporada en {cat_str}: "
+            "asegurar stock de modelos nuevos y actualizar el catalogo visible en tienda"
+        )
+        return
+
+    if nivel == "media" and not parts:
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else CATEGORIAS_ACTIVAS_LABEL
+        parts.append(
+            f"Actividad elevada en {cat_str} ({uplift:.1f}x): "
+            "verificar stock y monitorear evolucion los proximos 3 dias"
+        )
+
+
 def _build_recommendation(
     nivel: str,
     uplift: float,
@@ -689,53 +810,9 @@ def _build_recommendation(
                 "evaluar promocion activa para sostener el momentum"
             )
 
-    # ── 5. Consejo estrategico segun tipo de campana ──────────────────────────
-    if tipo == "campana-focalizada":
-        if affected_cats:
-            focus = f"categoria '{affected_cats[0]['categoria']}'"
-            cat_up = affected_cats[0]["uplift_ratio"]
-            parts.append(
-                f"Campana focalizada en {focus} ({cat_up:.1f}x): "
-                "monitorear si el pico se extiende a otras categorias en los proximos 3 dias"
-            )
-        elif top_productos:
-            focus = top_productos[0]["nombre"]
-            parts.append(
-                f"Pico focalizado en '{focus}': verificar si hay campana externa activa "
-                "en ese segmento (redes sociales, influencer, feria)"
-            )
-
-    elif tipo in ("cyber-wow", None) and nivel == "alta":
-        cats = [c["categoria"] for c in affected_cats[:2]]
-        cat_str = " y ".join(cats) if cats else "los productos mas vendidos"
-        parts.append(
-            f"Demanda alta en {cat_str}: coordinar reposicion con fabricantes "
-            "y activar banner promocional antes de que se agote el stock"
-        )
-
-    elif tipo == "outlet":
-        cats = [c["categoria"] for c in affected_cats[:2]]
-        cat_str = " y ".join(cats) if cats else "categorias activas"
-        parts.append(
-            f"Contexto outlet activo en {cat_str}: "
-            "aprovechar para liquidar modelos de temporada anterior con descuento controlado"
-        )
-
-    elif tipo == "nueva-temporada":
-        cats = [c["categoria"] for c in affected_cats[:2]]
-        cat_str = " y ".join(cats) if cats else "categorias activas"
-        parts.append(
-            f"Inicio de temporada en {cat_str}: "
-            "asegurar stock de modelos nuevos y actualizar el catalogo visible en tienda"
-        )
-
-    elif nivel == "media" and not parts:
-        cats = [c["categoria"] for c in affected_cats[:2]]
-        cat_str = " y ".join(cats) if cats else "categorias activas"
-        parts.append(
-            f"Actividad elevada en {cat_str} ({uplift:.1f}x): "
-            "verificar stock y monitorear evolucion los proximos 3 dias"
-        )
+    _append_recommendation_strategic_blocks(
+        parts, tipo, nivel, uplift, affected_cats, top_productos
+    )
 
     # ── Fallback si no hay productos con datos suficientes ───────────────────
     if not parts:

@@ -120,41 +120,27 @@ export function materialIsAllowed(material = "") {
   return MATERIAL_PRESETS.includes(normalized as (typeof MATERIAL_PRESETS)[number]);
 }
 
-export function validateCommercialProductDraft(draft: CommercialDraft): string[] {
-  const errors: string[] = [];
-  const categoria = normalizeAdminCategory(draft.categoria || "");
-  const tipoCalzado = draft.tipoCalzado?.trim() || "";
+function pushEstiloValidationErrors(
+  draft: CommercialDraft,
+  errors: string[],
+  tipoCalzado: string,
+): void {
   const estilo = draft.estilo?.trim() || "";
-  const material = draft.material?.trim() || "";
-
-  if (!draft.categoria || !CATEGORY_SIZES[categoria]) {
-    errors.push("Selecciona una categoría comercial válida.");
-  }
-
-  if (!tipoCalzado) {
-    errors.push("Selecciona el tipo de calzado.");
-  } else if (!footwearTypesForCategory(categoria).includes(tipoCalzado)) {
-    errors.push("El tipo de calzado no corresponde a la categoría seleccionada.");
-  }
-
-  if (estilo) {
-    const pieces = estilo.split(",").map((s) => s.trim()).filter(Boolean);
-    for (const piece of pieces) {
-      if (!STYLE_OPTIONS.includes(piece as (typeof STYLE_OPTIONS)[number])) {
-        errors.push(`El estilo "${piece}" no es un valor comercial permitido.`);
-        break;
-      }
-      if (!styleIsAllowedForType(tipoCalzado, piece)) {
-        errors.push(`El estilo "${piece}" no corresponde al tipo de calzado seleccionado.`);
-        break;
-      }
+  if (!estilo) return;
+  const pieces = estilo.split(",").map((s) => s.trim()).filter(Boolean);
+  for (const piece of pieces) {
+    if (!STYLE_OPTIONS.includes(piece as (typeof STYLE_OPTIONS)[number])) {
+      errors.push(`El estilo "${piece}" no es un valor comercial permitido.`);
+      break;
+    }
+    if (!styleIsAllowedForType(tipoCalzado, piece)) {
+      errors.push(`El estilo "${piece}" no corresponde al tipo de calzado seleccionado.`);
+      break;
     }
   }
+}
 
-  if (!materialIsAllowed(material)) {
-    errors.push("Selecciona un material permitido en la paleta comercial.");
-  }
-
+function pushPricingValidationErrors(draft: CommercialDraft, errors: string[]): void {
   if ((Number(draft.costoCompra) || 0) <= 0) {
     errors.push("Registra el costo real de compra.");
   }
@@ -180,6 +166,31 @@ export function validateCommercialProductDraft(draft: CommercialDraft): string[]
   } else if (precio < range.precioMinimo || precio > range.precioMaximo) {
     errors.push("El precio público debe quedar dentro del rango comercial calculado.");
   }
+}
+
+export function validateCommercialProductDraft(draft: CommercialDraft): string[] {
+  const errors: string[] = [];
+  const categoria = normalizeAdminCategory(draft.categoria || "");
+  const tipoCalzado = draft.tipoCalzado?.trim() || "";
+  const material = draft.material?.trim() || "";
+
+  if (!draft.categoria || !CATEGORY_SIZES[categoria]) {
+    errors.push("Selecciona una categoría comercial válida.");
+  }
+
+  if (!tipoCalzado) {
+    errors.push("Selecciona el tipo de calzado.");
+  } else if (!footwearTypesForCategory(categoria).includes(tipoCalzado)) {
+    errors.push("El tipo de calzado no corresponde a la categoría seleccionada.");
+  }
+
+  pushEstiloValidationErrors(draft, errors, tipoCalzado);
+
+  if (!materialIsAllowed(material)) {
+    errors.push("Selecciona un material permitido en la paleta comercial.");
+  }
+
+  pushPricingValidationErrors(draft, errors);
 
   return errors;
 }

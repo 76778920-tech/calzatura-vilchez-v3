@@ -34,6 +34,52 @@ def _clamp(value: float, minimum: float, maximum: float) -> float:
     return max(minimum, min(maximum, value))
 
 
+def _revenue_growth_rate(
+    recent_values: list[float],
+    prior_values: list[float],
+    recent_window: int,
+    prior_window: int,
+    overall_avg: float,
+) -> float:
+    recent_avg = sum(recent_values) / recent_window if recent_window else overall_avg
+    prior_avg = sum(prior_values) / prior_window if prior_window else recent_avg
+    if prior_avg > 0:
+        growth_rate = (recent_avg - prior_avg) / prior_avg
+    elif recent_avg > 0:
+        growth_rate = 0.12
+    else:
+        growth_rate = 0.0
+    return _clamp(growth_rate, -0.35, 0.35)
+
+
+def _build_revenue_forecast_rows(
+    horizon_days: int,
+    weekday_values_recent: dict[int, list[float]],
+    weekday_values_all: dict[int, list[float]],
+    overall_avg: float,
+    recent_avg: float,
+    growth_rate: float,
+) -> list[dict]:
+    forecast: list[dict] = []
+    today = date.today()
+    for step in range(1, horizon_days + 1):
+        current_date = today + timedelta(days=step)
+        weekday = current_date.weekday()
+        weekday_recent = weekday_values_recent.get(weekday, [])
+        weekday_all = weekday_values_all.get(weekday, [])
+        weekday_recent_avg = sum(weekday_recent) / len(weekday_recent) if weekday_recent else 0.0
+        weekday_all_avg = sum(weekday_all) / len(weekday_all) if weekday_all else 0.0
+        seasonal_base = (
+            weekday_recent_avg * 0.65 + weekday_all_avg * 0.2 + overall_avg * 0.15
+        )
+        if seasonal_base <= 0:
+            seasonal_base = recent_avg if recent_avg > 0 else overall_avg
+        trend_multiplier = 1 + (growth_rate * min(step, 30) / 30)
+        projected = round(max(0.0, seasonal_base * trend_multiplier), 2)
+        forecast.append({"fecha": current_date.isoformat(), "ingresos": projected})
+    return forecast
+
+
 def _build_date_range(history_days: int) -> list[str]:
     history_days = sanitize_int_for_range(
         history_days, default=120, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS
@@ -41,6 +87,40 @@ def _build_date_range(history_days: int) -> list[str]:
     today = date.today()
     start = today - timedelta(days=history_days - 1)
     return [(start + timedelta(days=i)).isoformat() for i in range(history_days)]
+
+
+def _accumulate_tienda_revenue(
+    daily_sales: list[dict],
+    revenue_by_date: dict[str, float],
+    date_range_set: set[str],
+) -> float:
+    tienda_total = 0.0
+    for sale in daily_sales:
+        if sale.get("canal") == "web":
+            continue
+        fecha = sale.get("fecha", "")
+        total = _safe_float(sale.get("total", 0))
+        if fecha and total > 0 and not sale.get("devuelto", False):
+            revenue_by_date[fecha] += total
+            if fecha in date_range_set:
+                tienda_total += total
+    return tienda_total
+
+
+def _accumulate_web_revenue(
+    completed_orders: list[dict],
+    revenue_by_date: dict[str, float],
+    date_range_set: set[str],
+) -> float:
+    web_total = 0.0
+    for order in completed_orders:
+        fecha = _iso_date(order.get("pagadoEn") or order.get("creadoEn"))
+        total = _safe_float(order.get("total", 0))
+        if fecha and total > 0:
+            revenue_by_date[fecha] += total
+            if fecha in date_range_set:
+                web_total += total
+    return web_total
 
 
 def build_daily_revenue_series(
@@ -62,25 +142,8 @@ def build_daily_revenue_series(
     date_range = _build_date_range(history_days)
     date_range_set = set(date_range)
 
-    for sale in daily_sales:
-        # canal='web' rows ya están en pedidos → excluir para evitar doble conteo
-        if sale.get("canal") == "web":
-            continue
-        fecha = sale.get("fecha", "")
-        total = _safe_float(sale.get("total", 0))
-        if fecha and total > 0 and not sale.get("devuelto", False):
-            revenue_by_date[fecha] += total
-            if fecha in date_range_set:
-                tienda_total += total
-
-    for order in completed_orders:
-        # pagadoEn = fecha real del pago (webhook); fallback a creadoEn para pedidos antiguos
-        fecha = _iso_date(order.get("pagadoEn") or order.get("creadoEn"))
-        total = _safe_float(order.get("total", 0))
-        if fecha and total > 0:
-            revenue_by_date[fecha] += total
-            if fecha in date_range_set:
-                web_total += total
+    tienda_total = _accumulate_tienda_revenue(daily_sales, revenue_by_date, date_range_set)
+    web_total = _accumulate_web_revenue(completed_orders, revenue_by_date, date_range_set)
 
     series = [
         {"fecha": d, "ingresos": round(revenue_by_date.get(d, 0.0), 2)}
@@ -125,15 +188,9 @@ def forecast_revenue(
     prior_values = values[-(recent_window + prior_window):-recent_window] if prior_window else []
 
     recent_avg = sum(recent_values) / recent_window if recent_window else overall_avg
-    prior_avg = sum(prior_values) / prior_window if prior_window else recent_avg
-
-    if prior_avg > 0:
-      growth_rate = (recent_avg - prior_avg) / prior_avg
-    elif recent_avg > 0:
-      growth_rate = 0.12
-    else:
-      growth_rate = 0.0
-    growth_rate = _clamp(growth_rate, -0.35, 0.35)
+    growth_rate = _revenue_growth_rate(
+        recent_values, prior_values, recent_window, prior_window, overall_avg
+    )
 
     weekday_values_recent: dict[int, list[float]] = defaultdict(list)
     weekday_values_all: dict[int, list[float]] = defaultdict(list)
@@ -144,28 +201,14 @@ def forecast_revenue(
         weekday = date.fromisoformat(point["fecha"]).weekday()
         weekday_values_recent[weekday].append(point["ingresos"])
 
-    forecast = []
-    today = date.today()
-    for step in range(1, horizon_days + 1):
-        current_date = today + timedelta(days=step)
-        weekday = current_date.weekday()
-        weekday_recent = weekday_values_recent.get(weekday, [])
-        weekday_all = weekday_values_all.get(weekday, [])
-        weekday_recent_avg = sum(weekday_recent) / len(weekday_recent) if weekday_recent else 0.0
-        weekday_all_avg = sum(weekday_all) / len(weekday_all) if weekday_all else 0.0
-        seasonal_base = (
-            weekday_recent_avg * 0.65
-            + weekday_all_avg * 0.2
-            + overall_avg * 0.15
-        )
-        if seasonal_base <= 0:
-            seasonal_base = recent_avg if recent_avg > 0 else overall_avg
-        trend_multiplier = 1 + (growth_rate * min(step, 30) / 30)
-        projected = round(max(0.0, seasonal_base * trend_multiplier), 2)
-        forecast.append({
-            "fecha": current_date.isoformat(),
-            "ingresos": projected,
-        })
+    forecast = _build_revenue_forecast_rows(
+        horizon_days,
+        weekday_values_recent,
+        weekday_values_all,
+        overall_avg,
+        recent_avg,
+        growth_rate,
+    )
 
     forecast_values = [point["ingresos"] for point in forecast]
     next_7_days = round(sum(forecast_values[:7]), 2)

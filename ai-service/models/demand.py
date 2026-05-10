@@ -382,6 +382,103 @@ def _heuristic_predict(
 # Main prediction entry point
 # ---------------------------------------------------------------------------
 
+
+def _init_sale_meta_from_sources(
+    daily_sales: list[dict],
+    completed_orders: list[dict],
+    product_map: dict[str, dict],
+) -> dict[str, dict]:
+    """Construye metadatos comerciales por productId a partir de ventas y pedidos."""
+    sale_meta: dict[str, dict] = {}
+    for sale in daily_sales:
+        pid = sale.get("productId", "")
+        if pid and pid not in sale_meta:
+            sale_meta[pid] = {
+                "nombre": sale.get("nombre", pid),
+                "categoria": sale.get("categoria", ""),
+                "precio": _safe_float(sale.get("precioVenta", 0)),
+                "codigo": sale.get("codigo", ""),
+                "campana": _normalize_campaign(sale.get("campana", "")),
+            }
+    for order in completed_orders:
+        for item in order.get("items", []):
+            product = item.get("product", {})
+            pid = product.get("id", "")
+            if pid and pid not in sale_meta:
+                sale_meta[pid] = {
+                    "nombre": product.get("nombre", pid),
+                    "categoria": product.get("categoria", ""),
+                    "precio": _safe_float(product.get("precio", 0)),
+                    "campana": _normalize_campaign(product.get("campana", "")),
+                }
+
+    for pid, product in product_map.items():
+        product_meta = sale_meta.setdefault(pid, {})
+        product_meta.setdefault("nombre", product.get("nombre", pid))
+        product_meta.setdefault("categoria", product.get("categoria", ""))
+        product_meta.setdefault("precio", _safe_float(product.get("precio", 0)))
+        product_meta["campana"] = _normalize_campaign(
+            product.get("campana", product_meta.get("campana", ""))
+        )
+    return sale_meta
+
+
+def _apply_demand_risk_flags(
+    recent_predictions: list[dict], horizon_days: int
+) -> list[dict]:
+    """Clasifica riesgo de stock / demanda sobre predicciones recientes."""
+    demand_values = [
+        p["consumo_estimado_diario"]
+        for p in recent_predictions
+        if p["consumo_estimado_diario"] > 0
+    ]
+    high_demand_threshold = _percentile(demand_values, 0.8)
+
+    predictions: list[dict] = []
+    for prediction in recent_predictions:
+        stock = prediction["stock_actual"]
+        daily_demand = prediction["consumo_estimado_diario"]
+        days_until_stockout = prediction["dias_hasta_agotarse"]
+        recent_acceleration = (
+            prediction["consumo_diario_7"] > 0
+            and (
+                prediction["consumo_diario_30"] == 0
+                or prediction["consumo_diario_7"] >= prediction["consumo_diario_30"] * 1.2
+            )
+        )
+        sustained_rotation = prediction["ventas_30_dias"] >= 6
+        high_demand = daily_demand > 0 and (
+            (high_demand_threshold > 0 and daily_demand >= high_demand_threshold)
+            or (recent_acceleration and sustained_rotation)
+            or prediction["ventas_7_dias"] >= 5
+        )
+
+        if daily_demand <= 0:
+            risk_level = "estable"
+        elif stock == 0 or days_until_stockout <= 7:
+            risk_level = "critico"
+        elif days_until_stockout <= 14:
+            risk_level = "atencion"
+        elif days_until_stockout <= 21:
+            risk_level = "vigilancia"
+        else:
+            risk_level = "estable"
+
+        stockout_risk = high_demand and (
+            (stock == 0 and daily_demand > 0)
+            or (0 < days_until_stockout <= horizon_days)
+        )
+
+        prediction["alta_demanda"] = high_demand
+        prediction["riesgo_agotamiento"] = stockout_risk
+        prediction["nivel_riesgo"] = risk_level
+        prediction["alerta_stock"] = daily_demand > 0 and (
+            stock == 0 or (0 < days_until_stockout <= horizon_days)
+        )
+        predictions.append(prediction)
+    return predictions
+
+
 def predict_demand(
     daily_sales: list[dict],
     completed_orders: list[dict],
@@ -421,37 +518,7 @@ def predict_demand(
     product_map = {p["id"]: p for p in products}
     codes_map: dict[str, str] = product_codes or {}
 
-    sale_meta: dict[str, dict] = {}
-    for sale in daily_sales:
-        pid = sale.get("productId", "")
-        if pid and pid not in sale_meta:
-            sale_meta[pid] = {
-                "nombre": sale.get("nombre", pid),
-                "categoria": sale.get("categoria", ""),
-                "precio": _safe_float(sale.get("precioVenta", 0)),
-                "codigo": sale.get("codigo", ""),
-                "campana": _normalize_campaign(sale.get("campana", "")),
-            }
-    for order in completed_orders:
-        for item in order.get("items", []):
-            product = item.get("product", {})
-            pid = product.get("id", "")
-            if pid and pid not in sale_meta:
-                sale_meta[pid] = {
-                    "nombre": product.get("nombre", pid),
-                    "categoria": product.get("categoria", ""),
-                    "precio": _safe_float(product.get("precio", 0)),
-                    "campana": _normalize_campaign(product.get("campana", "")),
-                }
-
-    for pid, product in product_map.items():
-        product_meta = sale_meta.setdefault(pid, {})
-        product_meta.setdefault("nombre", product.get("nombre", pid))
-        product_meta.setdefault("categoria", product.get("categoria", ""))
-        product_meta.setdefault("precio", _safe_float(product.get("precio", 0)))
-        product_meta["campana"] = _normalize_campaign(
-            product.get("campana", product_meta.get("campana", ""))
-        )
+    sale_meta = _init_sale_meta_from_sources(daily_sales, completed_orders, product_map)
 
     # Train global ML model once for all products
     ml_model, label_enc, campaign_enc, used_ml, training_meta = _train_global_model(
@@ -572,55 +639,7 @@ def predict_demand(
     # ---------------------------------------------------------------------------
     # Risk classification (unchanged)
     # ---------------------------------------------------------------------------
-    demand_values = [
-        p["consumo_estimado_diario"]
-        for p in recent_predictions
-        if p["consumo_estimado_diario"] > 0
-    ]
-    high_demand_threshold = _percentile(demand_values, 0.8)
-
-    predictions = []
-    for prediction in recent_predictions:
-        stock = prediction["stock_actual"]
-        daily_demand = prediction["consumo_estimado_diario"]
-        days_until_stockout = prediction["dias_hasta_agotarse"]
-        recent_acceleration = (
-            prediction["consumo_diario_7"] > 0
-            and (
-                prediction["consumo_diario_30"] == 0
-                or prediction["consumo_diario_7"] >= prediction["consumo_diario_30"] * 1.2
-            )
-        )
-        sustained_rotation = prediction["ventas_30_dias"] >= 6
-        high_demand = daily_demand > 0 and (
-            (high_demand_threshold > 0 and daily_demand >= high_demand_threshold)
-            or (recent_acceleration and sustained_rotation)
-            or prediction["ventas_7_dias"] >= 5
-        )
-
-        if daily_demand <= 0:
-            risk_level = "estable"
-        elif stock == 0 or days_until_stockout <= 7:
-            risk_level = "critico"
-        elif days_until_stockout <= 14:
-            risk_level = "atencion"
-        elif days_until_stockout <= 21:
-            risk_level = "vigilancia"
-        else:
-            risk_level = "estable"
-
-        stockout_risk = high_demand and (
-            (stock == 0 and daily_demand > 0)
-            or (0 < days_until_stockout <= horizon_days)
-        )
-
-        prediction["alta_demanda"] = high_demand
-        prediction["riesgo_agotamiento"] = stockout_risk
-        prediction["nivel_riesgo"] = risk_level
-        prediction["alerta_stock"] = daily_demand > 0 and (
-            stock == 0 or (0 < days_until_stockout <= horizon_days)
-        )
-        predictions.append(prediction)
+    predictions = _apply_demand_risk_flags(recent_predictions, horizon_days)
 
     # Products with no sales history
     for pid, product in product_map.items():
