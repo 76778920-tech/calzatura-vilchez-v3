@@ -6,6 +6,14 @@ recent trend plus weekday seasonality.
 from collections import defaultdict
 from datetime import date, timedelta
 
+from models.safe_limits import (
+    MAX_CHART_FORECAST_DAYS,
+    MAX_CHART_HISTORY_DAYS,
+    MAX_HISTORY_DAYS_FOR_LOOPS,
+    MAX_HORIZON_DAYS_FOR_LOOPS,
+    sanitize_int_for_range,
+)
+
 
 def _safe_float(value) -> float:
     try:
@@ -27,6 +35,9 @@ def _clamp(value: float, minimum: float, maximum: float) -> float:
 
 
 def _build_date_range(history_days: int) -> list[str]:
+    history_days = sanitize_int_for_range(
+        history_days, default=120, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS
+    )
     today = date.today()
     start = today - timedelta(days=history_days - 1)
     return [(start + timedelta(days=i)).isoformat() for i in range(history_days)]
@@ -42,6 +53,9 @@ def build_daily_revenue_series(
     tienda_total / web_total solo acumulan días dentro del window para ser
     consistentes con total_historical = sum(series[*].ingresos).
     """
+    history_days = sanitize_int_for_range(
+        history_days, default=120, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS
+    )
     revenue_by_date: dict[str, float] = defaultdict(float)
     tienda_total = 0.0
     web_total = 0.0
@@ -83,6 +97,18 @@ def forecast_revenue(
     chart_history_days: int = 21,
     chart_forecast_days: int = 14,
 ) -> dict:
+    history_days = sanitize_int_for_range(
+        history_days, default=120, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS
+    )
+    horizon_days = sanitize_int_for_range(
+        horizon_days, default=30, min_v=1, max_v=MAX_HORIZON_DAYS_FOR_LOOPS
+    )
+    chart_history_days = sanitize_int_for_range(
+        chart_history_days, default=21, min_v=1, max_v=MAX_CHART_HISTORY_DAYS
+    )
+    chart_forecast_days = sanitize_int_for_range(
+        chart_forecast_days, default=14, min_v=1, max_v=MAX_CHART_FORECAST_DAYS
+    )
     series, tienda_total, web_total = build_daily_revenue_series(
         daily_sales=daily_sales,
         completed_orders=completed_orders,

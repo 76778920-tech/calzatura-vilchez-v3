@@ -24,6 +24,13 @@ import sklearn
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
 
+from models.safe_limits import (
+    MAX_HISTORY_DAYS_FOR_LOOPS,
+    MAX_HORIZON_DAYS_FOR_LOOPS,
+    MAX_WEEKS_FOR_CHART,
+    sanitize_int_for_range,
+)
+
 # Minimum training rows (product × day pairs) to use the ML model.
 MIN_TRAIN_ROWS = 30
 SEASONAL_FEATURES = [
@@ -209,6 +216,9 @@ def _train_global_model(
     used_ml=False when data is insufficient; model is None in that case.
     training_meta always contains reproducibility and explainability fields.
     """
+    history_days = sanitize_int_for_range(
+        history_days, default=90, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS
+    )
     today = date.today()
     date_range_start = (today - timedelta(days=history_days - 1)).isoformat()
     date_range_end = today.isoformat()
@@ -323,6 +333,9 @@ def _ml_predict_horizon(
     Use the trained model to predict daily demand for the next horizon_days.
     Returns (estimated_daily_avg, total_predicted_units).
     """
+    horizon_days = sanitize_int_for_range(
+        horizon_days, default=30, min_v=1, max_v=MAX_HORIZON_DAYS_FOR_LOOPS
+    )
     today = date.today()
     try:
         cat_enc = int(le.transform([cat_raw or ""])[0])
@@ -353,6 +366,11 @@ def _heuristic_predict(
     horizon_days: int,
 ) -> tuple[float, float]:
     """Weighted moving average fallback: 70 % last-7d + 30 % last-30d."""
+    window_7 = sanitize_int_for_range(window_7, default=7, min_v=1, max_v=90)
+    window_30 = sanitize_int_for_range(window_30, default=30, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS)
+    horizon_days = sanitize_int_for_range(
+        horizon_days, default=30, min_v=1, max_v=MAX_HORIZON_DAYS_FOR_LOOPS
+    )
     avg_7 = sum(series[-window_7:]) / window_7 if window_7 else 0.0
     avg_30 = sum(series[-window_30:]) / window_30 if window_30 else 0.0
     estimated_daily = round((avg_7 * 0.7) + (avg_30 * 0.3), 2)
@@ -386,6 +404,12 @@ def predict_demand(
     explainability fields (feature_importances), and drift baseline
     (feature_stats) for production monitoring.
     """
+    history_days = sanitize_int_for_range(
+        history_days, default=90, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS
+    )
+    horizon_days = sanitize_int_for_range(
+        horizon_days, default=30, min_v=1, max_v=MAX_HORIZON_DAYS_FOR_LOOPS
+    )
     today = date.today()
     history_start = today - timedelta(days=history_days)
     date_range = [
@@ -669,6 +693,7 @@ def get_weekly_chart(
     weeks: int = 8,
 ) -> list[dict]:
     """Returns total units sold per week for the last `weeks` weeks."""
+    weeks = sanitize_int_for_range(weeks, default=8, min_v=1, max_v=MAX_WEEKS_FOR_CHART)
     today = date.today()
     sales_map = build_daily_sales_by_product(daily_sales, completed_orders)
 
