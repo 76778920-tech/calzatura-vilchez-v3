@@ -259,6 +259,217 @@ def _classify_campaign_signal(
     return nivel, tipo_sugerido, scope, label
 
 
+def _build_baseline_by_weekday(
+    raw_global: dict[str, float], dates_baseline: list[str]
+) -> dict[int, list[float]]:
+    baseline_by_weekday: dict[int, list[float]] = defaultdict(list)
+    for d_iso in dates_baseline:
+        baseline_by_weekday[date.fromisoformat(d_iso).weekday()].append(
+            raw_global.get(d_iso, 0.0)
+        )
+    return baseline_by_weekday
+
+
+def _sum_expected_dow(
+    baseline_by_weekday: dict[int, list[float]],
+    dates_recent: list[str],
+    bs_mean: float | None,
+) -> float:
+    return sum(
+        float(np.mean(baseline_by_weekday[date.fromisoformat(d).weekday()]))
+        if baseline_by_weekday.get(date.fromisoformat(d).weekday())
+        else (bs_mean or 0.0)
+        for d in dates_recent
+    )
+
+
+def _compute_uplift_and_z_metrics(
+    raw_global: dict[str, float],
+    dates_baseline: list[str],
+    dates_recent: list[str],
+    recent_vals: list[float],
+    bs: dict,
+    n_recent: int,
+    uplift_baja: float,
+) -> tuple[float, float, float, float, float, float, float, float]:
+    """Devuelve expected_dow_sum, actual_sum, expected_sum, sum_uplift, uplift, std_floor, z, threshold_units."""
+    baseline_by_weekday = _build_baseline_by_weekday(raw_global, dates_baseline)
+    expected_dow_sum = _sum_expected_dow(baseline_by_weekday, dates_recent, bs["mean"])
+    actual_sum = sum(recent_vals)
+    expected_sum = (bs["mean"] or 0.0) * n_recent
+    sum_uplift = actual_sum / expected_sum if expected_sum > 0 else 0.0
+    uplift = actual_sum / expected_dow_sum if expected_dow_sum > 0 else sum_uplift
+    std_floor = max(bs["std"], bs["mean"] * 0.1, 0.5)
+    z = (actual_sum - expected_dow_sum) / (std_floor * (n_recent ** 0.5))
+    threshold_units = max(bs["mean"] * uplift_baja, 0.01)
+    return expected_dow_sum, actual_sum, expected_sum, sum_uplift, uplift, std_floor, z, threshold_units
+
+
+def _compute_cierre_estado(nivel: str, consecutive_down: int) -> str | None:
+    if nivel != "normal":
+        return None
+    if consecutive_down >= FINALIZADA_COOLDOWN:
+        return "finalizada"
+    if consecutive_down >= FINALIZANDO_COOLDOWN:
+        return "finalizando"
+    return None
+
+
+def _stock_lists_from_top_productos(top_productos: list[dict]) -> tuple[list[str], list[str]]:
+    sin_stock = [p["nombre"] for p in top_productos if (p.get("stock_actual") or 0) == 0]
+    criticos = [
+        p["nombre"]
+        for p in top_productos
+        if p.get("stock_actual") is not None
+        and p["stock_actual"] > 0
+        and p.get("ventas_recientes", 0) > 0
+        and p["stock_actual"] < p["ventas_recientes"]
+    ]
+    return sin_stock, criticos
+
+
+def _confidence_pct_for_campaign(
+    uplift: float,
+    z: float,
+    consecutive_up: int,
+    scope: str | None,
+    affected_cats: list[dict],
+    top_productos: list[dict],
+    uplift_alta: float,
+) -> float:
+    c_uplift = min(max((uplift - 1.0) / (uplift_alta - 1.0), 0.0), 1.0)
+    c_z = min(max(z / (Z_ALTA * 2.0), 0.0), 1.0)
+    c_cons = min(consecutive_up / max(MIN_CONSISTENT_DAYS * 3, 1), 1.0)
+    if scope == "focalizada":
+        best_focused = max(
+            affected_cats[0]["uplift_ratio"] if affected_cats else 0.0,
+            top_productos[0]["uplift_ratio"] if top_productos else 0.0,
+        )
+        c_uplift = max(c_uplift, min((best_focused - 1.0) / (uplift_alta - 1.0), 1.0))
+    return round((0.40 * c_uplift + 0.35 * c_z + 0.25 * c_cons) * 100, 1)
+
+
+def _resolve_focus_and_impacto(
+    scope: str | None,
+    uplift: float,
+    affected_cats: list[dict],
+    top_productos: list[dict],
+) -> tuple[str | None, str | None, float | None, float]:
+    foco_tipo: str | None = None
+    foco_nombre: str | None = None
+    foco_uplift: float | None = None
+    impacto_focalizado = 0.0
+
+    if scope == "focalizada" and (affected_cats or top_productos):
+        best_cat_u = affected_cats[0]["uplift_ratio"] if affected_cats else 0.0
+        best_prod_u = top_productos[0]["uplift_ratio"] if top_productos else 0.0
+        if best_cat_u >= best_prod_u and affected_cats:
+            foco_tipo = "categoria"
+            foco_nombre = affected_cats[0]["categoria"]
+            foco_uplift = affected_cats[0]["uplift_ratio"]
+            impacto_focalizado = float(affected_cats[0].get("impacto_soles", 0.0))
+        elif top_productos:
+            foco_tipo = "producto"
+            foco_nombre = top_productos[0]["nombre"]
+            foco_uplift = top_productos[0]["uplift_ratio"]
+            impacto_focalizado = float(top_productos[0].get("impacto_soles", 0.0))
+    elif scope == "global":
+        foco_tipo = "global"
+        foco_nombre = None
+        foco_uplift = round(uplift, 3)
+
+    return foco_tipo, foco_nombre, foco_uplift, impacto_focalizado
+
+
+def _detect_campaign_success_payload(
+    *,
+    today: date,
+    recent_start: date,
+    baseline_start: date,
+    baseline_end: date,
+    n_recent: int,
+    dates_baseline: list[str],
+    bs: dict,
+    rec: dict,
+    consecutive_up: int,
+    consecutive_down: int,
+    nivel: str,
+    tipo_sugerido: str | None,
+    scope: str | None,
+    label: str,
+    campaign_detected: bool,
+    cierre_estado: str | None,
+    _prods_sin_stock: list[str],
+    _prods_criticos: list[str],
+    riesgo_stock: bool,
+    confidence: float,
+    mensaje: str,
+    recomendacion: str | None,
+    affected_cats: list[dict],
+    top_productos: list[dict],
+    uplift: float,
+    sum_uplift: float,
+    z: float,
+    actual_sum: float,
+    expected_sum: float,
+    expected_dow_sum: float,
+    actual_soles_sum: float,
+    expected_soles_sum: float,
+    impacto_soles: float,
+    impacto_focalizado: float,
+    foco_tipo: str | None,
+    foco_nombre: str | None,
+    foco_uplift: float | None,
+) -> dict:
+    return {
+        "status": "ok",
+        "campaign_detected": campaign_detected,
+        "nivel": nivel,
+        "scope": scope,
+        "foco_tipo": foco_tipo,
+        "foco_nombre": foco_nombre,
+        "foco_uplift": foco_uplift,
+        "cierre_estado": cierre_estado,
+        "riesgo_stock": riesgo_stock,
+        "productos_sin_stock": _prods_sin_stock,
+        "productos_stock_critico": _prods_criticos,
+        "tipo_sugerido": tipo_sugerido,
+        "confidence_pct": confidence,
+        "mensaje": mensaje,
+        "consistencia": {
+            "dias_consecutivos_elevados": consecutive_up,
+            "dias_consecutivos_normales": consecutive_down,
+            "minimo_requerido": MIN_CONSISTENT_DAYS,
+        },
+        "metricas": {
+            "baseline": bs,
+            "reciente": rec,
+            "uplift_ratio": round(uplift, 3),
+            "uplift_pct": round((uplift - 1) * 100, 1),
+            "sum_uplift": round(sum_uplift, 3),
+            "uplift_dow_ajustado": round(uplift, 3),
+            "z_score": round(z, 2),
+            "actual_sum": round(actual_sum, 2),
+            "expected_sum": round(expected_sum, 2),
+            "expected_dow_sum": round(expected_dow_sum, 2),
+            "ventas_soles_recientes": round(actual_soles_sum, 2),
+            "ventas_soles_esperadas": round(expected_soles_sum, 2),
+        },
+        "impacto_estimado_soles": impacto_soles,
+        "impacto_estimado_soles_focalizado": round(impacto_focalizado, 2),
+        "categorias_afectadas": affected_cats,
+        "top_productos": top_productos,
+        "recomendacion": recomendacion,
+        "ventanas": {
+            "reciente": f"{recent_start.isoformat()} -> {today.isoformat()} ({n_recent} dias)",
+            "baseline": (
+                f"{baseline_start.isoformat()} -> {baseline_end.isoformat()} "
+                f"({len(dates_baseline)} dias)"
+            ),
+        },
+    }
+
+
 # ── Core detection ───────────────────────────────────────────────────────────
 
 def detect_campaign(
@@ -316,39 +527,22 @@ def detect_campaign(
         )
 
     # ── Baseline stats ───────────────────────────────────────────────────────
-    bs  = _stats(baseline_vals)
+    bs = _stats(baseline_vals)
     rec = _stats(recent_vals)
 
-    # DOW table (baseline mean per weekday)
-    baseline_by_weekday: dict[int, list[float]] = defaultdict(list)
-    for d_iso in dates_baseline:
-        baseline_by_weekday[date.fromisoformat(d_iso).weekday()].append(
-            raw_global.get(d_iso, 0.0)
-        )
-
-    # ── DOW-adjusted expected sum (Fix: no per-day ratios) ───────────────────
-    # For each recent day we use the historical mean for that weekday as
-    # expected value, then sum. This avoids collapsing to 0 when several
-    # recent days have no sales.
-    expected_dow_sum = sum(
-        float(np.mean(baseline_by_weekday[date.fromisoformat(d).weekday()]))
-        if baseline_by_weekday.get(date.fromisoformat(d).weekday())
-        else (bs["mean"] or 0.0)
-        for d in dates_recent
+    (
+        expected_dow_sum,
+        actual_sum,
+        expected_sum,
+        sum_uplift,
+        uplift,
+        _std_floor,
+        z,
+        threshold_units,
+    ) = _compute_uplift_and_z_metrics(
+        raw_global, dates_baseline, dates_recent, recent_vals, bs, n_recent, _uplift_baja
     )
-
-    actual_sum   = sum(recent_vals)
-    expected_sum = (bs["mean"] or 0.0) * n_recent
-    sum_uplift   = actual_sum / expected_sum       if expected_sum > 0 else 0.0
-    uplift       = actual_sum / expected_dow_sum   if expected_dow_sum > 0 else sum_uplift
-
-    # ── Z-score (sum-based, DOW-adjusted) ────────────────────────────────────
-    std_floor = max(bs["std"], bs["mean"] * 0.1, 0.5)
-    z = (actual_sum - expected_dow_sum) / (std_floor * (n_recent ** 0.5))
-
-    # ── Consistency ──────────────────────────────────────────────────────────
-    threshold_units  = max(bs["mean"] * _uplift_baja, 0.01)
-    consecutive_up   = _consecutive_elevated_days(raw_global, dates_recent, threshold_units)
+    consecutive_up = _consecutive_elevated_days(raw_global, dates_recent, threshold_units)
     consecutive_down = _consecutive_normal_days(raw_global, dates_recent, threshold_units)
 
     # ── Categories & products (before nivel — needed for focused detection) ──
@@ -376,122 +570,72 @@ def detect_campaign(
     )
 
     # ── Close state (check finalizada before finalizando) ────────────────────
-    cierre_estado = None
-    if nivel == "normal":
-        if consecutive_down >= FINALIZADA_COOLDOWN:
-            cierre_estado = "finalizada"
-        elif consecutive_down >= FINALIZANDO_COOLDOWN:
-            cierre_estado = "finalizando"
+    cierre_estado = _compute_cierre_estado(nivel, consecutive_down)
 
     campaign_detected = nivel not in ("normal", "observando")
 
     # ── Stock risk: active campaign with zero/critical stock products ─────────
-    # A product is "critico" when its current stock won't cover another period
-    # of equal demand (stock < ventas_recientes). Computed regardless of nivel
-    # so main.py can transition en_riesgo_stock ↔ activa automatically.
-    _prods_sin_stock = [
-        p["nombre"] for p in top_productos
-        if (p.get("stock_actual") or 0) == 0
-    ]
-    _prods_criticos = [
-        p["nombre"] for p in top_productos
-        if p.get("stock_actual") is not None
-        and p["stock_actual"] > 0
-        and p.get("ventas_recientes", 0) > 0
-        and p["stock_actual"] < p["ventas_recientes"]
-    ]
+    _prods_sin_stock, _prods_criticos = _stock_lists_from_top_productos(top_productos)
     riesgo_stock = campaign_detected and bool(_prods_sin_stock or _prods_criticos)
 
     # ── Composite confidence ──────────────────────────────────────────────────
-    c_uplift = min(max((uplift - 1.0) / (_uplift_alta - 1.0), 0.0), 1.0)
-    c_z      = min(max(z / (Z_ALTA * 2.0), 0.0), 1.0)
-    c_cons   = min(consecutive_up / max(MIN_CONSISTENT_DAYS * 3, 1), 1.0)
-    if scope == "focalizada":
-        best_focused = max(
-            affected_cats[0]["uplift_ratio"]  if affected_cats  else 0.0,
-            top_productos[0]["uplift_ratio"] if top_productos else 0.0,
-        )
-        c_uplift = max(c_uplift, min((best_focused - 1.0) / (_uplift_alta - 1.0), 1.0))
-    confidence = round((0.40 * c_uplift + 0.35 * c_z + 0.25 * c_cons) * 100, 1)
+    confidence = _confidence_pct_for_campaign(
+        uplift, z, consecutive_up, scope, affected_cats, top_productos, _uplift_alta
+    )
 
     # ── Global economic impact ────────────────────────────────────────────────
     bs_soles           = _stats(_fill_zeros(raw_global_soles, dates_baseline))
     actual_soles_sum   = sum(_fill_zeros(raw_global_soles, dates_recent))
     expected_soles_sum = (bs_soles["mean"] or 0.0) * n_recent
-    impacto_soles      = round(max(actual_soles_sum - expected_soles_sum, 0.0), 2)
+    impacto_soles = round(max(actual_soles_sum - expected_soles_sum, 0.0), 2)
 
-    # ── Focused economic impact + focus fields ────────────────────────────────
-    foco_tipo: str | None    = None
-    foco_nombre: str | None  = None
-    foco_uplift: float | None = None
-    impacto_focalizado        = 0.0
-
-    if scope == "focalizada" and (affected_cats or top_productos):
-        best_cat_u  = affected_cats[0]["uplift_ratio"]  if affected_cats  else 0.0
-        best_prod_u = top_productos[0]["uplift_ratio"] if top_productos else 0.0
-        if best_cat_u >= best_prod_u and affected_cats:
-            foco_tipo     = "categoria"
-            foco_nombre   = affected_cats[0]["categoria"]
-            foco_uplift   = affected_cats[0]["uplift_ratio"]
-            impacto_focalizado = float(affected_cats[0].get("impacto_soles", 0.0))
-        elif top_productos:
-            foco_tipo     = "producto"
-            foco_nombre   = top_productos[0]["nombre"]
-            foco_uplift   = top_productos[0]["uplift_ratio"]
-            impacto_focalizado = float(top_productos[0].get("impacto_soles", 0.0))
-    elif scope == "global":
-        foco_tipo   = "global"
-        foco_nombre = None
-        foco_uplift = round(uplift, 3)
+    foco_tipo, foco_nombre, foco_uplift, impacto_focalizado = _resolve_focus_and_impacto(
+        scope, uplift, affected_cats, top_productos
+    )
 
     # ── Messages ──────────────────────────────────────────────────────────────
     recomendacion = _build_recommendation(nivel, uplift, affected_cats, top_productos, tipo_sugerido, scope, n_recent)
     mensaje       = _build_message(nivel, label, uplift, z, confidence, affected_cats, consecutive_up, scope, uplift_baja=_uplift_baja)
 
-    return {
-        "status":             "ok",
-        "campaign_detected":  campaign_detected,
-        "nivel":              nivel,
-        "scope":              scope,
-        "foco_tipo":          foco_tipo,
-        "foco_nombre":        foco_nombre,
-        "foco_uplift":        foco_uplift,
-        "cierre_estado":      cierre_estado,
-        "riesgo_stock":       riesgo_stock,
-        "productos_sin_stock":     _prods_sin_stock,
-        "productos_stock_critico": _prods_criticos,
-        "tipo_sugerido":      tipo_sugerido,
-        "confidence_pct":     confidence,
-        "mensaje":            mensaje,
-        "consistencia": {
-            "dias_consecutivos_elevados": consecutive_up,
-            "dias_consecutivos_normales": consecutive_down,
-            "minimo_requerido":          MIN_CONSISTENT_DAYS,
-        },
-        "metricas": {
-            "baseline":              bs,
-            "reciente":              rec,
-            "uplift_ratio":          round(uplift, 3),
-            "uplift_pct":            round((uplift - 1) * 100, 1),
-            "sum_uplift":            round(sum_uplift, 3),
-            "uplift_dow_ajustado":   round(uplift, 3),
-            "z_score":               round(z, 2),
-            "actual_sum":            round(actual_sum, 2),
-            "expected_sum":          round(expected_sum, 2),
-            "expected_dow_sum":      round(expected_dow_sum, 2),
-            "ventas_soles_recientes": round(actual_soles_sum, 2),
-            "ventas_soles_esperadas": round(expected_soles_sum, 2),
-        },
-        "impacto_estimado_soles":           impacto_soles,
-        "impacto_estimado_soles_focalizado": round(impacto_focalizado, 2),
-        "categorias_afectadas":             affected_cats,
-        "top_productos":                    top_productos,
-        "recomendacion":                    recomendacion,
-        "ventanas": {
-            "reciente": f"{recent_start.isoformat()} -> {today.isoformat()} ({n_recent} dias)",
-            "baseline": f"{baseline_start.isoformat()} -> {baseline_end.isoformat()} ({len(dates_baseline)} dias)",
-        },
-    }
+    return _detect_campaign_success_payload(
+        today=today,
+        recent_start=recent_start,
+        baseline_start=baseline_start,
+        baseline_end=baseline_end,
+        n_recent=n_recent,
+        dates_baseline=dates_baseline,
+        bs=bs,
+        rec=rec,
+        consecutive_up=consecutive_up,
+        consecutive_down=consecutive_down,
+        nivel=nivel,
+        tipo_sugerido=tipo_sugerido,
+        scope=scope,
+        label=label,
+        campaign_detected=campaign_detected,
+        cierre_estado=cierre_estado,
+        _prods_sin_stock=_prods_sin_stock,
+        _prods_criticos=_prods_criticos,
+        riesgo_stock=riesgo_stock,
+        confidence=confidence,
+        mensaje=mensaje,
+        recomendacion=recomendacion,
+        affected_cats=affected_cats,
+        top_productos=top_productos,
+        uplift=uplift,
+        sum_uplift=sum_uplift,
+        z=z,
+        actual_sum=actual_sum,
+        expected_sum=expected_sum,
+        expected_dow_sum=expected_dow_sum,
+        actual_soles_sum=actual_soles_sum,
+        expected_soles_sum=expected_soles_sum,
+        impacto_soles=impacto_soles,
+        impacto_focalizado=impacto_focalizado,
+        foco_tipo=foco_tipo,
+        foco_nombre=foco_nombre,
+        foco_uplift=foco_uplift,
+    )
 
 
 # ── Sub-functions ─────────────────────────────────────────────────────────────
@@ -668,6 +812,68 @@ def _build_message(
     )
 
 
+def _append_strategic_focalizada(
+    parts: list[str],
+    affected_cats: list[dict],
+    top_productos: list[dict],
+) -> None:
+    if affected_cats:
+        focus = f"categoria '{affected_cats[0]['categoria']}'"
+        cat_up = affected_cats[0]["uplift_ratio"]
+        parts.append(
+            f"Campana focalizada en {focus} ({cat_up:.1f}x): "
+            "monitorear si el pico se extiende a otras categorias en los proximos 3 dias"
+        )
+    elif top_productos:
+        focus = top_productos[0]["nombre"]
+        parts.append(
+            f"Pico focalizado en '{focus}': verificar si hay campana externa activa "
+            "en ese segmento (redes sociales, influencer, feria)"
+        )
+
+
+def _append_cyber_wow_high_demand_line(parts: list[str], affected_cats: list[dict]) -> None:
+    cats = [c["categoria"] for c in affected_cats[:2]]
+    cat_str = " y ".join(cats) if cats else "los productos mas vendidos"
+    parts.append(
+        f"Demanda alta en {cat_str}: coordinar reposicion con fabricantes "
+        "y activar banner promocional antes de que se agote el stock"
+    )
+
+
+def _append_strategic_outlet(parts: list[str], affected_cats: list[dict]) -> None:
+    cats = [c["categoria"] for c in affected_cats[:2]]
+    cat_str = " y ".join(cats) if cats else CATEGORIAS_ACTIVAS_LABEL
+    parts.append(
+        f"Contexto outlet activo en {cat_str}: "
+        "aprovechar para liquidar modelos de temporada anterior con descuento controlado"
+    )
+
+
+def _append_strategic_nueva_temporada(parts: list[str], affected_cats: list[dict]) -> None:
+    cats = [c["categoria"] for c in affected_cats[:2]]
+    cat_str = " y ".join(cats) if cats else CATEGORIAS_ACTIVAS_LABEL
+    parts.append(
+        f"Inicio de temporada en {cat_str}: "
+        "asegurar stock de modelos nuevos y actualizar el catalogo visible en tienda"
+    )
+
+
+def _append_strategic_media_fallback(
+    parts: list[str],
+    nivel: str,
+    uplift: float,
+    affected_cats: list[dict],
+) -> None:
+    if nivel == "media" and not parts:
+        cats = [c["categoria"] for c in affected_cats[:2]]
+        cat_str = " y ".join(cats) if cats else CATEGORIAS_ACTIVAS_LABEL
+        parts.append(
+            f"Actividad elevada en {cat_str} ({uplift:.1f}x): "
+            "verificar stock y monitorear evolucion los proximos 3 dias"
+        )
+
+
 def _append_recommendation_strategic_blocks(
     parts: list[str],
     tipo: str | None,
@@ -678,54 +884,91 @@ def _append_recommendation_strategic_blocks(
 ) -> None:
     """Añade consejos según tipo de campaña (muta `parts` in-place)."""
     if tipo == "campana-focalizada":
-        if affected_cats:
-            focus = f"categoria '{affected_cats[0]['categoria']}'"
-            cat_up = affected_cats[0]["uplift_ratio"]
-            parts.append(
-                f"Campana focalizada en {focus} ({cat_up:.1f}x): "
-                "monitorear si el pico se extiende a otras categorias en los proximos 3 dias"
-            )
-        elif top_productos:
-            focus = top_productos[0]["nombre"]
-            parts.append(
-                f"Pico focalizado en '{focus}': verificar si hay campana externa activa "
-                "en ese segmento (redes sociales, influencer, feria)"
-            )
+        _append_strategic_focalizada(parts, affected_cats, top_productos)
         return
 
     if tipo in ("cyber-wow", None) and nivel == "alta":
-        cats = [c["categoria"] for c in affected_cats[:2]]
-        cat_str = " y ".join(cats) if cats else "los productos mas vendidos"
-        parts.append(
-            f"Demanda alta en {cat_str}: coordinar reposicion con fabricantes "
-            "y activar banner promocional antes de que se agote el stock"
-        )
+        _append_cyber_wow_high_demand_line(parts, affected_cats)
         return
 
     if tipo == "outlet":
-        cats = [c["categoria"] for c in affected_cats[:2]]
-        cat_str = " y ".join(cats) if cats else CATEGORIAS_ACTIVAS_LABEL
-        parts.append(
-            f"Contexto outlet activo en {cat_str}: "
-            "aprovechar para liquidar modelos de temporada anterior con descuento controlado"
-        )
+        _append_strategic_outlet(parts, affected_cats)
         return
 
     if tipo == "nueva-temporada":
-        cats = [c["categoria"] for c in affected_cats[:2]]
-        cat_str = " y ".join(cats) if cats else CATEGORIAS_ACTIVAS_LABEL
-        parts.append(
-            f"Inicio de temporada en {cat_str}: "
-            "asegurar stock de modelos nuevos y actualizar el catalogo visible en tienda"
-        )
+        _append_strategic_nueva_temporada(parts, affected_cats)
         return
 
-    if nivel == "media" and not parts:
-        cats = [c["categoria"] for c in affected_cats[:2]]
-        cat_str = " y ".join(cats) if cats else CATEGORIAS_ACTIVAS_LABEL
+    _append_strategic_media_fallback(parts, nivel, uplift, affected_cats)
+
+
+def _bucket_products_by_stock_health(
+    top_productos: list[dict],
+) -> tuple[list[str], list[dict], list[dict], list[dict]]:
+    sin_stock: list[str] = []
+    critico: list[dict] = []
+    bajo: list[dict] = []
+    ok_alta: list[dict] = []
+    for prod in top_productos[:6]:
+        nombre = prod.get("nombre", "Producto")
+        prod_up = prod.get("uplift_ratio", 0.0)
+        stock = prod.get("stock_actual")
+        impacto = prod.get("impacto_soles", 0.0) or 0.0
+        ventas_rec = prod.get("ventas_recientes", 0.0) or 0.0
+
+        if stock is None or stock == 0:
+            sin_stock.append(nombre)
+        elif ventas_rec > 0 and stock < ventas_rec:
+            critico.append({"nombre": nombre, "uplift": prod_up, "impacto": impacto, "stock": stock})
+        elif ventas_rec > 0 and stock < ventas_rec * 2:
+            bajo.append({"nombre": nombre, "uplift": prod_up, "impacto": impacto, "stock": stock})
+        elif prod_up >= UPLIFT_MEDIA:
+            ok_alta.append({"nombre": nombre, "uplift": prod_up, "impacto": impacto, "stock": stock})
+    return sin_stock, critico, bajo, ok_alta
+
+
+def _append_sin_stock_recommendation(parts: list[str], sin_stock: list[str]) -> None:
+    if not sin_stock:
+        return
+    names = " y ".join(sin_stock[:2]) + (" y otros" if len(sin_stock) > 2 else "")
+    parts.append(f"Sin stock: {names} - ventas perdidas activas, reponer de inmediato")
+
+
+def _append_critico_stock_lines(parts: list[str], critico: list[dict]) -> None:
+    for p in critico[:2]:
+        imp_str = f", impacto S/ {p['impacto']:.0f}" if p["impacto"] > 0 else ""
         parts.append(
-            f"Actividad elevada en {cat_str} ({uplift:.1f}x): "
-            "verificar stock y monitorear evolucion los proximos 3 dias"
+            f"Reponer urgente {p['nombre']}: "
+            f"stock {p['stock']} u., uplift {p['uplift']:.1f}x{imp_str}"
+        )
+
+
+def _append_bajo_stock_lines(parts: list[str], bajo: list[dict]) -> None:
+    for p in bajo[:2]:
+        imp_str = f", impacto S/ {p['impacto']:.0f}" if p["impacto"] > 0 else ""
+        parts.append(
+            f"Reponer {p['nombre']}: stock bajo ({p['stock']} u.), "
+            f"uplift {p['uplift']:.1f}x{imp_str}"
+        )
+
+
+def _append_ok_alta_rotacion_lines(
+    parts: list[str], ok_alta: list[dict], nivel: str
+) -> None:
+    if not ok_alta:
+        return
+    p = ok_alta[0]
+    if nivel == "alta":
+        parts.append(
+            f"{p['nombre']} rota {p['uplift']:.1f}x - "
+            "no aplicar descuento adicional, la demanda es organica y el margen no lo necesita"
+        )
+        return
+    if nivel in ("media", "baja"):
+        imp_str = f" (S/ {p['impacto']:.0f} sobre lo esperado)" if p["impacto"] > 0 else ""
+        parts.append(
+            f"{p['nombre']} con uplift {p['uplift']:.1f}x{imp_str} - "
+            "evaluar promocion activa para sostener el momentum"
         )
 
 
@@ -751,64 +994,13 @@ def _build_recommendation(
     # bajo       : stock < ventas_recientes * 2  → agota en ~2 periodos
     # ok_alta    : stock OK + uplift >= UPLIFT_MEDIA  → rotan bien, cuidado con descuento
 
-    sin_stock: list[str] = []
-    critico:   list[dict] = []
-    bajo:      list[dict] = []
-    ok_alta:   list[dict] = []
-
-    for prod in top_productos[:6]:
-        nombre     = prod.get("nombre", "Producto")
-        prod_up    = prod.get("uplift_ratio", 0.0)
-        stock      = prod.get("stock_actual")
-        impacto    = prod.get("impacto_soles", 0.0) or 0.0
-        ventas_rec = prod.get("ventas_recientes", 0.0) or 0.0
-
-        if stock is None or stock == 0:
-            sin_stock.append(nombre)
-        elif ventas_rec > 0 and stock < ventas_rec:
-            critico.append({"nombre": nombre, "uplift": prod_up, "impacto": impacto, "stock": stock})
-        elif ventas_rec > 0 and stock < ventas_rec * 2:
-            bajo.append({"nombre": nombre, "uplift": prod_up, "impacto": impacto, "stock": stock})
-        elif prod_up >= UPLIFT_MEDIA:
-            ok_alta.append({"nombre": nombre, "uplift": prod_up, "impacto": impacto, "stock": stock})
+    sin_stock, critico, bajo, ok_alta = _bucket_products_by_stock_health(top_productos)
 
     parts: list[str] = []
-
-    # ── 1. Sin stock → alerta de ventas perdidas ──────────────────────────────
-    if sin_stock:
-        names = " y ".join(sin_stock[:2]) + (" y otros" if len(sin_stock) > 2 else "")
-        parts.append(f"Sin stock: {names} - ventas perdidas activas, reponer de inmediato")
-
-    # ── 2. Stock critico → reposicion urgente con detalle ────────────────────
-    for p in critico[:2]:
-        imp_str = f", impacto S/ {p['impacto']:.0f}" if p["impacto"] > 0 else ""
-        parts.append(
-            f"Reponer urgente {p['nombre']}: "
-            f"stock {p['stock']} u., uplift {p['uplift']:.1f}x{imp_str}"
-        )
-
-    # ── 3. Stock bajo → reposicion preventiva ────────────────────────────────
-    for p in bajo[:2]:
-        imp_str = f", impacto S/ {p['impacto']:.0f}" if p["impacto"] > 0 else ""
-        parts.append(
-            f"Reponer {p['nombre']}: stock bajo ({p['stock']} u.), "
-            f"uplift {p['uplift']:.1f}x{imp_str}"
-        )
-
-    # ── 4. Alta rotacion con stock OK → consejo de descuento ─────────────────
-    if ok_alta:
-        p = ok_alta[0]
-        if nivel == "alta":
-            parts.append(
-                f"{p['nombre']} rota {p['uplift']:.1f}x - "
-                "no aplicar descuento adicional, la demanda es organica y el margen no lo necesita"
-            )
-        elif nivel in ("media", "baja"):
-            imp_str = f" (S/ {p['impacto']:.0f} sobre lo esperado)" if p["impacto"] > 0 else ""
-            parts.append(
-                f"{p['nombre']} con uplift {p['uplift']:.1f}x{imp_str} - "
-                "evaluar promocion activa para sostener el momentum"
-            )
+    _append_sin_stock_recommendation(parts, sin_stock)
+    _append_critico_stock_lines(parts, critico)
+    _append_bajo_stock_lines(parts, bajo)
+    _append_ok_alta_rotacion_lines(parts, ok_alta, nivel)
 
     _append_recommendation_strategic_blocks(
         parts, tipo, nivel, uplift, affected_cats, top_productos

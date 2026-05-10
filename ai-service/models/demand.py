@@ -383,13 +383,9 @@ def _heuristic_predict(
 # ---------------------------------------------------------------------------
 
 
-def _init_sale_meta_from_sources(
-    daily_sales: list[dict],
-    completed_orders: list[dict],
-    product_map: dict[str, dict],
-) -> dict[str, dict]:
-    """Construye metadatos comerciales por productId a partir de ventas y pedidos."""
-    sale_meta: dict[str, dict] = {}
+def _merge_daily_sales_into_sale_meta(
+    daily_sales: list[dict], sale_meta: dict[str, dict]
+) -> None:
     for sale in daily_sales:
         pid = sale.get("productId", "")
         if pid and pid not in sale_meta:
@@ -400,6 +396,11 @@ def _init_sale_meta_from_sources(
                 "codigo": sale.get("codigo", ""),
                 "campana": _normalize_campaign(sale.get("campana", "")),
             }
+
+
+def _merge_order_items_into_sale_meta(
+    completed_orders: list[dict], sale_meta: dict[str, dict]
+) -> None:
     for order in completed_orders:
         for item in order.get("items", []):
             product = item.get("product", {})
@@ -412,6 +413,8 @@ def _init_sale_meta_from_sources(
                     "campana": _normalize_campaign(product.get("campana", "")),
                 }
 
+
+def _merge_product_map_defaults(product_map: dict[str, dict], sale_meta: dict[str, dict]) -> None:
     for pid, product in product_map.items():
         product_meta = sale_meta.setdefault(pid, {})
         product_meta.setdefault("nombre", product.get("nombre", pid))
@@ -420,7 +423,52 @@ def _init_sale_meta_from_sources(
         product_meta["campana"] = _normalize_campaign(
             product.get("campana", product_meta.get("campana", ""))
         )
+
+
+def _init_sale_meta_from_sources(
+    daily_sales: list[dict],
+    completed_orders: list[dict],
+    product_map: dict[str, dict],
+) -> dict[str, dict]:
+    """Construye metadatos comerciales por productId a partir de ventas y pedidos."""
+    sale_meta: dict[str, dict] = {}
+    _merge_daily_sales_into_sale_meta(daily_sales, sale_meta)
+    _merge_order_items_into_sale_meta(completed_orders, sale_meta)
+    _merge_product_map_defaults(product_map, sale_meta)
     return sale_meta
+
+
+def _high_demand_for_product(
+    prediction: dict, high_demand_threshold: float
+) -> bool:
+    daily_demand = prediction["consumo_estimado_diario"]
+    if daily_demand <= 0:
+        return False
+    recent_acceleration = (
+        prediction["consumo_diario_7"] > 0
+        and (
+            prediction["consumo_diario_30"] == 0
+            or prediction["consumo_diario_7"] >= prediction["consumo_diario_30"] * 1.2
+        )
+    )
+    sustained_rotation = prediction["ventas_30_dias"] >= 6
+    return bool(
+        (high_demand_threshold > 0 and daily_demand >= high_demand_threshold)
+        or (recent_acceleration and sustained_rotation)
+        or prediction["ventas_7_dias"] >= 5
+    )
+
+
+def _risk_level_for_stockout(stock: int, daily_demand: float, days_until_stockout: int) -> str:
+    if daily_demand <= 0:
+        return "estable"
+    if stock == 0 or days_until_stockout <= 7:
+        return "critico"
+    if days_until_stockout <= 14:
+        return "atencion"
+    if days_until_stockout <= 21:
+        return "vigilancia"
+    return "estable"
 
 
 def _apply_demand_risk_flags(
@@ -439,30 +487,9 @@ def _apply_demand_risk_flags(
         stock = prediction["stock_actual"]
         daily_demand = prediction["consumo_estimado_diario"]
         days_until_stockout = prediction["dias_hasta_agotarse"]
-        recent_acceleration = (
-            prediction["consumo_diario_7"] > 0
-            and (
-                prediction["consumo_diario_30"] == 0
-                or prediction["consumo_diario_7"] >= prediction["consumo_diario_30"] * 1.2
-            )
-        )
-        sustained_rotation = prediction["ventas_30_dias"] >= 6
-        high_demand = daily_demand > 0 and (
-            (high_demand_threshold > 0 and daily_demand >= high_demand_threshold)
-            or (recent_acceleration and sustained_rotation)
-            or prediction["ventas_7_dias"] >= 5
-        )
 
-        if daily_demand <= 0:
-            risk_level = "estable"
-        elif stock == 0 or days_until_stockout <= 7:
-            risk_level = "critico"
-        elif days_until_stockout <= 14:
-            risk_level = "atencion"
-        elif days_until_stockout <= 21:
-            risk_level = "vigilancia"
-        else:
-            risk_level = "estable"
+        high_demand = _high_demand_for_product(prediction, high_demand_threshold)
+        risk_level = _risk_level_for_stockout(stock, daily_demand, days_until_stockout)
 
         stockout_risk = high_demand and (
             (stock == 0 and daily_demand > 0)
@@ -477,6 +504,168 @@ def _apply_demand_risk_flags(
         )
         predictions.append(prediction)
     return predictions
+
+
+def _days_until_stockout_for_demand(stock: int, estimated_daily: float) -> int:
+    if stock == 0 and estimated_daily > 0:
+        return 0
+    if estimated_daily > 0:
+        return math.ceil(stock / estimated_daily)
+    return 999
+
+
+def _demand_trend_from_averages(avg_7: float, avg_30: float) -> str:
+    if avg_7 > 0 and (avg_30 == 0 or avg_7 >= avg_30 * 1.2):
+        return "subiendo"
+    if avg_30 > 0 and avg_7 <= avg_30 * 0.85:
+        return "bajando"
+    return "estable"
+
+
+def _demand_confidence_score(used_ml: bool, active_days: int, total_sold: float) -> int:
+    base_conf = 60 if used_ml else 35
+    return min(
+        100,
+        round(
+            base_conf
+            + (min(active_days, 30) / 30) * 25
+            + (min(total_sold, 60) / 60) * 15
+        ),
+    )
+
+
+def _prediction_row_no_sales_history(
+    pid: str,
+    product: dict,
+    codes_map: dict[str, str],
+) -> dict:
+    return {
+        "productId": pid,
+        "imagen": product.get("imagen") or "",
+        "codigo": codes_map.get(pid, ""),
+        "nombre": product.get("nombre", pid),
+        "categoria": product.get("categoria", ""),
+        "campana": _normalize_campaign(product.get("campana", "")),
+        "precio": _safe_float(product.get("precio", 0)),
+        "stock_actual": int(product.get("stock", 0)),
+        "prediccion_unidades": 0,
+        "prediccion_diaria": 0,
+        "prediccion_semanal": 0,
+        "total_vendido_historico": 0,
+        "promedio_diario_historico": 0,
+        "ventas_7_dias": 0,
+        "ventas_15_dias": 0,
+        "ventas_30_dias": 0,
+        "consumo_diario_7": 0,
+        "consumo_diario_30": 0,
+        "consumo_estimado_diario": 0,
+        "dias_hasta_agotarse": 999,
+        "fecha_quiebre_stock": None,
+        "tendencia": "estable",
+        "confianza": 0,
+        "modelo": "sin_datos",
+        "alta_demanda": False,
+        "riesgo_agotamiento": False,
+        "nivel_riesgo": "sin_historial",
+        "alerta_stock": False,
+        "sin_historial": True,
+    }
+
+
+def _prediction_row_with_sales_history(
+    pid: str,
+    day_sales: dict,
+    date_range: list[str],
+    *,
+    history_days: int,
+    horizon_days: int,
+    window_7: int,
+    window_15: int,
+    window_30: int,
+    used_ml: bool,
+    ml_model,
+    label_enc,
+    campaign_enc,
+    product: dict,
+    meta: dict,
+    codes_map: dict[str, str],
+    feature_stats: dict,
+) -> dict | None:
+    series = [day_sales.get(d, 0.0) for d in date_range]
+    total_sold = sum(series)
+    if total_sold <= 0:
+        return None
+
+    cat_raw = product.get("categoria") or meta.get("categoria") or ""
+    campaign_raw = _normalize_campaign(product.get("campana", meta.get("campana", "")))
+
+    if used_ml:
+        estimated_daily, predicted_units = _ml_predict_horizon(
+            ml_model, label_enc, campaign_enc, day_sales, cat_raw, campaign_raw, horizon_days
+        )
+    else:
+        estimated_daily, predicted_units = _heuristic_predict(
+            series, window_7, window_30, horizon_days
+        )
+
+    weekly = round(estimated_daily * 7, 1)
+    sales_7 = round(sum(series[-window_7:]), 1) if window_7 else 0.0
+    sales_15 = round(sum(series[-window_15:]), 1) if window_15 else 0.0
+    sales_30 = round(sum(series[-window_30:]), 1) if window_30 else 0.0
+    avg_7 = sales_7 / window_7 if window_7 else 0.0
+    avg_30 = sales_30 / window_30 if window_30 else 0.0
+    avg_daily_hist = total_sold / history_days
+    active_days = sum(1 for v in series if v > 0)
+
+    stock = int(product.get("stock", 0))
+    nombre = product.get("nombre") or meta.get("nombre", pid)
+    categoria = product.get("categoria") or meta.get("categoria", "")
+    imagen = product.get("imagen") or ""
+    raw_precio = product.get("precio")
+    precio = (
+        _safe_float(raw_precio)
+        if raw_precio is not None
+        else _safe_float(meta.get("precio", 0.0))
+    )
+    codigo = codes_map.get(pid) or meta.get("codigo", "")
+
+    days_until_stockout = _days_until_stockout_for_demand(stock, estimated_daily)
+    confidence = _demand_confidence_score(used_ml, active_days, total_sold)
+    trend = _demand_trend_from_averages(avg_7, avg_30)
+    drift = _drift_score(avg_7, avg_30, feature_stats)
+
+    return {
+        "productId": pid,
+        "imagen": imagen,
+        "codigo": codigo,
+        "nombre": nombre,
+        "categoria": categoria,
+        "campana": campaign_raw,
+        "precio": precio,
+        "stock_actual": stock,
+        "prediccion_unidades": predicted_units,
+        "prediccion_diaria": estimated_daily,
+        "prediccion_semanal": weekly,
+        "total_vendido_historico": round(total_sold, 1),
+        "promedio_diario_historico": round(avg_daily_hist, 2),
+        "ventas_7_dias": sales_7,
+        "ventas_15_dias": sales_15,
+        "ventas_30_dias": sales_30,
+        "consumo_diario_7": round(avg_7, 2),
+        "consumo_diario_30": round(avg_30, 2),
+        "consumo_estimado_diario": estimated_daily,
+        "dias_hasta_agotarse": min(days_until_stockout, 999),
+        "fecha_quiebre_stock": _stockout_date(days_until_stockout),
+        "tendencia": trend,
+        "confianza": confidence,
+        "modelo": "random_forest" if used_ml else "promedio_movil",
+        "drift_score": drift,
+        "alta_demanda": False,
+        "riesgo_agotamiento": False,
+        "nivel_riesgo": "estable",
+        "alerta_stock": False,
+        "sin_historial": False,
+    }
 
 
 def predict_demand(
@@ -534,107 +723,30 @@ def predict_demand(
     predicted_pids: set[str] = set()
 
     for pid, day_sales in sales_map.items():
-        series = [day_sales.get(d, 0.0) for d in date_range]
-        total_sold = sum(series)
-        if total_sold <= 0:
-            continue
-
         product = product_map.get(pid, {})
         meta = sale_meta.get(pid, {})
-        cat_raw = product.get("categoria") or meta.get("categoria") or ""
-        campaign_raw = _normalize_campaign(product.get("campana", meta.get("campana", "")))
-
-        # Choose prediction method
-        if used_ml:
-            estimated_daily, predicted_units = _ml_predict_horizon(
-                ml_model, label_enc, campaign_enc, day_sales, cat_raw, campaign_raw, horizon_days
-            )
-        else:
-            estimated_daily, predicted_units = _heuristic_predict(
-                series, window_7, window_30, horizon_days
-            )
-
-        weekly = round(estimated_daily * 7, 1)
-        sales_7 = round(sum(series[-window_7:]), 1) if window_7 else 0.0
-        sales_15 = round(sum(series[-window_15:]), 1) if window_15 else 0.0
-        sales_30 = round(sum(series[-window_30:]), 1) if window_30 else 0.0
-        avg_7 = sales_7 / window_7 if window_7 else 0.0
-        avg_30 = sales_30 / window_30 if window_30 else 0.0
-        avg_daily_hist = total_sold / history_days
-        active_days = sum(1 for v in series if v > 0)
-
-        stock = int(product.get("stock", 0))
-        nombre = product.get("nombre") or meta.get("nombre", pid)
-        categoria = product.get("categoria") or meta.get("categoria", "")
-        imagen = product.get("imagen") or ""
-        raw_precio = product.get("precio")
-        precio = (
-            _safe_float(raw_precio)
-            if raw_precio is not None
-            else _safe_float(meta.get("precio", 0.0))
+        row = _prediction_row_with_sales_history(
+            pid,
+            day_sales,
+            date_range,
+            history_days=history_days,
+            horizon_days=horizon_days,
+            window_7=window_7,
+            window_15=window_15,
+            window_30=window_30,
+            used_ml=used_ml,
+            ml_model=ml_model,
+            label_enc=label_enc,
+            campaign_enc=campaign_enc,
+            product=product,
+            meta=meta,
+            codes_map=codes_map,
+            feature_stats=feature_stats,
         )
-        codigo = codes_map.get(pid) or meta.get("codigo", "")
-
-        if stock == 0 and estimated_daily > 0:
-            days_until_stockout = 0
-        elif estimated_daily > 0:
-            days_until_stockout = math.ceil(stock / estimated_daily)
-        else:
-            days_until_stockout = 999
-
-        # Confidence: ML model starts at 60, heuristic at 35; both scale with data
-        base_conf = 60 if used_ml else 35
-        confidence = min(
-            100,
-            round(
-                base_conf
-                + (min(active_days, 30) / 30) * 25
-                + (min(total_sold, 60) / 60) * 15
-            ),
-        )
-
-        if avg_7 > 0 and (avg_30 == 0 or avg_7 >= avg_30 * 1.2):
-            trend = "subiendo"
-        elif avg_30 > 0 and avg_7 <= avg_30 * 0.85:
-            trend = "bajando"
-        else:
-            trend = "estable"
-
-        drift = _drift_score(avg_7, avg_30, feature_stats)
-
+        if row is None:
+            continue
         predicted_pids.add(pid)
-        recent_predictions.append({
-            "productId": pid,
-            "imagen": imagen,
-            "codigo": codigo,
-            "nombre": nombre,
-            "categoria": categoria,
-            "campana": campaign_raw,
-            "precio": precio,
-            "stock_actual": stock,
-            "prediccion_unidades": predicted_units,
-            "prediccion_diaria": estimated_daily,
-            "prediccion_semanal": weekly,
-            "total_vendido_historico": round(total_sold, 1),
-            "promedio_diario_historico": round(avg_daily_hist, 2),
-            "ventas_7_dias": sales_7,
-            "ventas_15_dias": sales_15,
-            "ventas_30_dias": sales_30,
-            "consumo_diario_7": round(avg_7, 2),
-            "consumo_diario_30": round(avg_30, 2),
-            "consumo_estimado_diario": estimated_daily,
-            "dias_hasta_agotarse": min(days_until_stockout, 999),
-            "fecha_quiebre_stock": _stockout_date(days_until_stockout),
-            "tendencia": trend,
-            "confianza": confidence,
-            "modelo": "random_forest" if used_ml else "promedio_movil",
-            "drift_score": drift,
-            "alta_demanda": False,
-            "riesgo_agotamiento": False,
-            "nivel_riesgo": "estable",
-            "alerta_stock": False,
-            "sin_historial": False,
-        })
+        recent_predictions.append(row)
 
     # ---------------------------------------------------------------------------
     # Risk classification (unchanged)
@@ -645,37 +757,7 @@ def predict_demand(
     for pid, product in product_map.items():
         if pid in predicted_pids:
             continue
-        predictions.append({
-            "productId": pid,
-            "imagen": product.get("imagen") or "",
-            "codigo": codes_map.get(pid, ""),
-            "nombre": product.get("nombre", pid),
-            "categoria": product.get("categoria", ""),
-            "campana": _normalize_campaign(product.get("campana", "")),
-            "precio": _safe_float(product.get("precio", 0)),
-            "stock_actual": int(product.get("stock", 0)),
-            "prediccion_unidades": 0,
-            "prediccion_diaria": 0,
-            "prediccion_semanal": 0,
-            "total_vendido_historico": 0,
-            "promedio_diario_historico": 0,
-            "ventas_7_dias": 0,
-            "ventas_15_dias": 0,
-            "ventas_30_dias": 0,
-            "consumo_diario_7": 0,
-            "consumo_diario_30": 0,
-            "consumo_estimado_diario": 0,
-            "dias_hasta_agotarse": 999,
-            "fecha_quiebre_stock": None,
-            "tendencia": "estable",
-            "confianza": 0,
-            "modelo": "sin_datos",
-            "alta_demanda": False,
-            "riesgo_agotamiento": False,
-            "nivel_riesgo": "sin_historial",
-            "alerta_stock": False,
-            "sin_historial": True,
-        })
+        predictions.append(_prediction_row_no_sales_history(pid, product, codes_map))
 
     risk_order = {"critico": 0, "atencion": 1, "vigilancia": 2, "estable": 3, "sin_historial": 4}
     predictions.sort(

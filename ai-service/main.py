@@ -46,26 +46,24 @@ logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address)
 
-_STD_OPENAPI_RESPONSES: dict[int, dict[str, str]] = {
-    401: {
-        "description": (
-            "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
-            "(token de servicio o ID token Firebase admin)."
-        ),
-    },
-    500: {"description": "Error interno del servicio al procesar la solicitud."},
-    503: {
-        "description": (
-            "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
-            "Reintentar más tarde."
-        ),
-    },
-}
-
 app = FastAPI(
     title="Calzatura Vilchez AI Service",
     version="1.2.0",
-    responses=_STD_OPENAPI_RESPONSES,
+    responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    },
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
@@ -229,7 +227,21 @@ def health():
     }
 
 
-@app.get("/api/debug/supabase")
+@app.get("/api/debug/supabase", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 def debug_supabase(request: Annotated[Request, None]):
     """Diagnose Supabase connection — use only to troubleshoot."""
     _require_service_auth(request, "ai-service/main.py:debug_supabase")
@@ -247,7 +259,21 @@ def debug_supabase(request: Annotated[Request, None]):
     return result
 
 
-@app.get("/api/predict/demand")
+@app.get("/api/predict/demand", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("20/minute")
 def demand_prediction(
     request: Annotated[Request, None],
@@ -308,7 +334,21 @@ def demand_prediction(
         _raise_http_error(error)
 
 
-@app.get("/api/predict/combined")
+@app.get("/api/predict/combined", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("20/minute")
 def combined_prediction(
     request: Annotated[Request, None],
@@ -392,7 +432,25 @@ def combined_prediction(
         _raise_http_error(error)
 
 
-@app.get("/api/ire/historial", response_model=IreHistorialResponse)
+@app.get(
+    "/api/ire/historial",
+    response_model=IreHistorialResponse,
+    responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    },
+)
 @limiter.limit("30/minute")
 def ire_historial(
     request: Annotated[Request, None],
@@ -407,7 +465,21 @@ def ire_historial(
         _raise_http_error(error)
 
 
-@app.get("/api/predict/stock-alert")
+@app.get("/api/predict/stock-alert", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("20/minute")
 def stock_alerts(
     request: Annotated[Request, None],
@@ -438,7 +510,21 @@ def stock_alerts(
         _raise_http_error(error)
 
 
-@app.get("/api/predict/revenue")
+@app.get("/api/predict/revenue", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("20/minute")
 def revenue_prediction(
     request: Annotated[Request, None],
@@ -460,7 +546,21 @@ def revenue_prediction(
         _raise_http_error(error)
 
 
-@app.get("/api/sales/weekly-chart")
+@app.get("/api/sales/weekly-chart", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("20/minute")
 def weekly_chart(
     request: Annotated[Request, None],
@@ -477,7 +577,21 @@ def weekly_chart(
         _raise_http_error(error)
 
 
-@app.post("/api/cache/invalidate")
+@app.post("/api/cache/invalidate", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("5/minute")
 def invalidate_cache(request: Annotated[Request, None]):
     """Force a cache refresh on the next request."""
@@ -487,7 +601,21 @@ def invalidate_cache(request: Annotated[Request, None]):
     return {"status": "cache invalidated"}
 
 
-@app.get("/api/model/info")
+@app.get("/api/model/info", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("20/minute")
 def model_info(request: Annotated[Request, None]):
     """
@@ -505,7 +633,21 @@ def model_info(request: Annotated[Request, None]):
     return {"status": "ok", **_model_registry}
 
 
-@app.get("/api/model/metrics")
+@app.get("/api/model/metrics", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("20/minute")
 def model_metrics(request: Annotated[Request, None]):
     """
@@ -758,7 +900,21 @@ def _advance_state(
     return apply_state_transition(decision, result)
 
 
-@app.get("/api/predict/campaign-detection")
+@app.get("/api/predict/campaign-detection", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("20/minute")
 def campaign_detection(
     request: Annotated[Request, None],
@@ -856,7 +1012,21 @@ class FeedbackPayload(BaseModel):
     admin_email: str | None = None
 
 
-@app.get("/api/campaign/active")
+@app.get("/api/campaign/active", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("30/minute")
 def campaign_active(request: Annotated[Request, None]):
     """
@@ -877,7 +1047,21 @@ def campaign_active(request: Annotated[Request, None]):
         _raise_http_error(error)
 
 
-@app.post("/api/campaign/feedback")
+@app.post("/api/campaign/feedback", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("20/minute")
 def campaign_feedback(
     request: Annotated[Request, None],
@@ -917,7 +1101,21 @@ def campaign_feedback(
         _raise_http_error(error)
 
 
-@app.get("/api/campaign/learning-stats")
+@app.get("/api/campaign/learning-stats", responses={
+        401: {
+            "description": (
+                "No autorizado: falta encabezado Authorization Bearer o el token no es válido "
+                "(token de servicio o ID token Firebase admin)."
+            ),
+        },
+        500: {"description": "Error interno del servicio al procesar la solicitud."},
+        503: {
+            "description": (
+                "Servicio temporalmente no disponible (p. ej. cuota Supabase o límite de tasa). "
+                "Reintentar más tarde."
+            ),
+        },
+    })
 @limiter.limit("30/minute")
 def campaign_learning_stats(request: Annotated[Request, None]):
     """
