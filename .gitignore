@@ -35,6 +35,12 @@ lib-cov
 
 # Coverage directory used by tools like istanbul
 coverage
+coverage.xml
+eslint-report.json
+bandit-report.json
+.coverage
+.scannerwork/
+**/.scannerwork/
 
 # nyc test coverage
 .nyc_output

@@ -105,7 +105,7 @@ def _season_flags(current_date: date) -> dict[str, int]:
 # ---------------------------------------------------------------------------
 
 def _data_hash(sales_map: dict, sale_meta: dict | None = None) -> str:
-    """Stable MD5 fingerprint of the training dataset and commercial context."""
+    """Stable fingerprint of the training dataset and commercial context."""
     sale_meta = sale_meta or {}
     key = "|".join(
         f"{pid}:"
@@ -114,7 +114,7 @@ def _data_hash(sales_map: dict, sale_meta: dict | None = None) -> str:
         f"{_normalize_campaign(sale_meta.get(pid, {}).get('campana'))}"
         for pid, day_sales in sorted(sales_map.items())
     )
-    return hashlib.md5(key.encode()).hexdigest()[:16]
+    return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 
 def _drift_score(lag_7: float, lag_30: float, feature_stats: dict) -> float:

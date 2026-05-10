@@ -1,7 +1,10 @@
 import os
+import logging
 from datetime import datetime, timedelta, timezone
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 _SUPABASE_URL: str | None = None
 _HEADERS: dict | None = None
@@ -151,7 +154,7 @@ def load_modelo_estado() -> dict | None:
         if rows:
             return rows[0].get("trainingMeta")
     except Exception:
-        pass
+        logger.debug("No se pudo cargar modeloEstado desde Supabase", exc_info=True)
     return None
 
 

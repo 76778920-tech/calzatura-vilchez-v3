@@ -1,5 +1,6 @@
 import time
 import os
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from typing import Any
@@ -40,6 +41,8 @@ from services.supabase_client import (
 )
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Calzatura Vilchez AI Service", version="1.2.0")
@@ -750,7 +753,7 @@ def campaign_detection(
         if fb_stats:
             threshold_overrides = _compute_feedback_adjustments(fb_stats)
     except Exception:
-        pass
+        logger.debug("No se pudieron cargar umbrales por feedback de campañas", exc_info=True)
 
     result = detect_campaign(
         daily_sales=daily_sales,
@@ -781,7 +784,7 @@ def campaign_detection(
                     "z_score":          metricas.get("z_score"),
                 })
             except Exception:
-                pass
+                logger.debug("No se pudo persistir métrica diaria de campaña", exc_info=True)
 
         # ── Top productos reales ──────────────────────────────────────────────
         if campana_id and result.get("top_productos"):
@@ -801,7 +804,7 @@ def campaign_detection(
                 ]
                 save_campana_productos(campana_id, productos_payload)
             except Exception:
-                pass
+                logger.debug("No se pudieron persistir productos de campaña", exc_info=True)
 
     except Exception as persist_err:
         result["_persist_warning"] = str(persist_err)

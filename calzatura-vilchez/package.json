@@ -9,6 +9,7 @@
     "typecheck": "node scripts/run-clean-env.mjs tsc -b",
     "quality": "npm run test && npm run lint && npm run typecheck && npm run build",
     "lint": "node scripts/run-clean-env.mjs eslint .",
+    "lint:report": "node scripts/run-clean-env.mjs eslint . -f json -o eslint-report.json",
     "preview": "node scripts/run-clean-env.mjs vite preview",
     "test": "node scripts/run-clean-env.mjs vitest run",
     "test:watch": "node scripts/run-clean-env.mjs vitest",
