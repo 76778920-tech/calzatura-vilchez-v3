@@ -91,6 +91,17 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # Ayuda a diagnosticar "Project not found": debe coincidir con SonarCloud → Project information → Project key
+      - name: Mostrar claves Sonar (sin SONAR_TOKEN)
+        if: steps.sonar-config.outputs.ready == 'true'
+        shell: bash
+        run: |
+          test -f sonar-project.properties
+          echo "=== Valores que leera sonar-scanner (raiz del repo) ==="
+          grep -E '^(sonar\.organization|sonar\.projectKey)=' sonar-project.properties || true
+          echo "=== Repositorio GitHub ==="
+          echo "GITHUB_REPOSITORY=${GITHUB_REPOSITORY:-}"
+
       - name: Ejecutar analisis SonarQube
         if: steps.sonar-config.outputs.ready == 'true'
         uses: SonarSource/sonarqube-scan-action@v8.0.0
