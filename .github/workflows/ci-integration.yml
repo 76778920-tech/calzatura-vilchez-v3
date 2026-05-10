@@ -102,7 +102,7 @@ jobs:
           cache-dependency-path: ai-service/requirements-dev.txt
 
       - name: Instalar dependencias
-        run: python -m pip install -r requirements-dev.txt
+        run: bash scripts/ci_install_python_deps.sh
 
       - name: Pruebas backend IA (pytest)
         run: python -m pytest

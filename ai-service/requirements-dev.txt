@@ -1,4 +1,6 @@
 -r requirements.txt
+# Al instalar en CI se usa scripts/ci_install_python_deps.sh (pins explícitos para Sonar).
+# Si cambias versiones aquí o en requirements.txt, actualiza ese script.
 pytest==8.3.5
 pytest-asyncio==0.24.0
 pytest-cov==6.0.0
