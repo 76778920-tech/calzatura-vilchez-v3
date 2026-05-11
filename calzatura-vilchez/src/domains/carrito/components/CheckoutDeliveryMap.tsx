@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -36,20 +36,17 @@ function FitBoundsToSignal({
   customerLng: number;
 }) {
   const map = useMap();
-  const customerRef = useRef({ customerLat, customerLng });
-  customerRef.current = { customerLat, customerLng };
 
   useEffect(() => {
     const id = window.requestAnimationFrame(() => {
       map.invalidateSize();
-      const { customerLat: clat, customerLng: clng } = customerRef.current;
-      map.fitBounds(L.latLngBounds([storeLat, storeLng], [clat, clng]), {
+      map.fitBounds(L.latLngBounds([storeLat, storeLng], [customerLat, customerLng]), {
         padding: [48, 48],
         maxZoom: 17,
       });
     });
     return () => window.cancelAnimationFrame(id);
-  }, [map, storeLat, storeLng, fitBoundsNonce]);
+  }, [map, storeLat, storeLng, customerLat, customerLng, fitBoundsNonce]);
   return null;
 }
 

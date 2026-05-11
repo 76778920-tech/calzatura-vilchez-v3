@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ShoppingBag, CreditCard, Truck, ChevronRight } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
@@ -67,7 +67,9 @@ export default function CheckoutPage() {
   const [mapFitNonce, setMapFitNonce] = useState(0);
 
   const selectedDeliveryRef = useRef<GeocodeCandidate | null>(null);
-  selectedDeliveryRef.current = selectedDelivery;
+  useEffect(() => {
+    selectedDeliveryRef.current = selectedDelivery;
+  }, [selectedDelivery]);
 
   const reverseGeocodeRequestId = useRef(0);
 
@@ -162,20 +164,24 @@ export default function CheckoutPage() {
       ctrl.abort();
       window.clearTimeout(timer);
     };
-  }, [mapSearchInput, orsEnabled]);
+  }, [mapSearchInput, orsEnabled, direccion.ciudad, direccion.distrito]);
 
   useEffect(() => {
     if (!orsEnabled || !selectedDelivery) {
-      setDeliveryQuote(null);
-      setDeliveryQuoteError("");
-      setDeliveryQuoteLoading(false);
+      startTransition(() => {
+        setDeliveryQuote(null);
+        setDeliveryQuoteError("");
+        setDeliveryQuoteLoading(false);
+      });
       return;
     }
     const lat = selectedDelivery.lat;
     const lng = selectedDelivery.lng;
     let cancelled = false;
-    setDeliveryQuoteLoading(true);
-    setDeliveryQuoteError("");
+    startTransition(() => {
+      setDeliveryQuoteLoading(true);
+      setDeliveryQuoteError("");
+    });
     void calculateDeliveryForCoordinates(lat, lng, selectedDeliveryRef.current?.label)
       .then((q) => {
         if (cancelled) return;
@@ -195,22 +201,22 @@ export default function CheckoutPage() {
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nueva cotización solo al cambiar coordenadas; la etiqueta se sincroniza en el efecto siguiente y vía ref en el fetch
   }, [orsEnabled, selectedDelivery?.lat, selectedDelivery?.lng]);
 
   useEffect(() => {
     if (!selectedDelivery?.label) return;
-    setDeliveryQuote((prev) => {
-      if (
-        !prev ||
-        prev.customerLat !== selectedDelivery.lat ||
-        prev.customerLng !== selectedDelivery.lng
-      ) {
-        return prev;
-      }
-      if (prev.label === selectedDelivery.label) return prev;
-      return { ...prev, label: selectedDelivery.label };
+    const sel = selectedDelivery;
+    startTransition(() => {
+      setDeliveryQuote((prev) => {
+        if (!prev || prev.customerLat !== sel.lat || prev.customerLng !== sel.lng) {
+          return prev;
+        }
+        if (prev.label === sel.label) return prev;
+        return { ...prev, label: sel.label };
+      });
     });
-  }, [selectedDelivery?.label, selectedDelivery?.lat, selectedDelivery?.lng]);
+  }, [selectedDelivery]);
 
   const pickCandidate = useCallback((c: GeocodeCandidate, refitMap: boolean) => {
     setSelectedDelivery(c);
