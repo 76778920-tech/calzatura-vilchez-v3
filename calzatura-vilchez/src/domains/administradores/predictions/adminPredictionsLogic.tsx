@@ -1,4 +1,5 @@
-﻿import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
+﻿/* eslint-disable react-refresh/only-export-components */
+import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import {
   AlertTriangle,
   CheckCircle,
