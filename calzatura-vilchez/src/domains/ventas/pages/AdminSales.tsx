@@ -72,6 +72,82 @@ function isDniLookupError(err: unknown) {
   return ["DNI_INVALID", "DNI_LOOKUP_NOT_CONFIGURED", "DNI_NOT_FOUND", "DNI_LOOKUP_FAILED"].includes(msg);
 }
 
+function messageForInvalidAddSaleLine(
+  selectedProduct: SaleProduct | undefined,
+  availableColors: string[],
+  selectedColor: string,
+  availableSizes: string[],
+  selectedTalla: string,
+  quantity: number,
+  availableForSelected: number,
+  salePrice: number
+): string | null {
+  if (!selectedProduct) return "Selecciona un producto";
+  if (!selectedProduct.finanzas) return "Este producto no tiene costo ni rango de venta registrado";
+  if (availableColors.length > 0 && !selectedColor) return "Selecciona un color";
+  if (availableSizes.length > 0 && !selectedTalla) return "Selecciona una talla";
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    return "La cantidad debe ser un número entero mayor a cero";
+  }
+  if (quantity > availableForSelected) return "La cantidad supera el stock disponible para esa talla";
+  const fin = selectedProduct.finanzas;
+  if (salePrice < fin.precioMinimo || salePrice > fin.precioMaximo) {
+    return "El precio debe estar dentro del rango mínimo y máximo";
+  }
+  return null;
+}
+
+async function insertPendingLinesAsDailySales(
+  pendingLines: PendingSaleLine[],
+  products: SaleProduct[],
+  date: string,
+  documentType: SaleDocumentType,
+  docNumber: string | undefined,
+  saleCustomer: SaleCustomer | undefined
+): Promise<void> {
+  await Promise.all(
+    pendingLines.map((line) => {
+      const product = products.find((p) => p.id === line.productId);
+      if (!product?.finanzas) throw new Error("Producto sin finanzas");
+      const total = saleLineTotal(line);
+      const costoTotal = product.finanzas.costoCompra * line.quantity;
+      return addDailySale({
+        productId: product.id,
+        codigo: product.codigo || "SIN-CODIGO",
+        nombre: product.nombre,
+        color: line.color || product.color || "",
+        talla: line.talla || undefined,
+        fecha: date,
+        cantidad: line.quantity,
+        precioVenta: line.salePrice,
+        total,
+        costoUnitario: product.finanzas.costoCompra,
+        costoTotal,
+        ganancia: total - costoTotal,
+        documentoTipo: documentType,
+        ...(docNumber ? { documentoNumero: docNumber } : {}),
+        ...(saleCustomer ? { cliente: saleCustomer } : {}),
+      });
+    })
+  );
+}
+
+async function decrementStockForPendingLines(pendingLines: PendingSaleLine[]): Promise<void> {
+  const linesByProduct = pendingLines.reduce<Record<string, PendingSaleLine[]>>((acc, line) => {
+    acc[line.productId] = [...(acc[line.productId] ?? []), line];
+    return acc;
+  }, {});
+
+  await Promise.all(
+    Object.entries(linesByProduct).map(([id, lines]) =>
+      decrementProductStock(
+        id,
+        lines.map((l) => ({ talla: l.talla || null, cantidad: l.quantity }))
+      )
+    )
+  );
+}
+
 export default function AdminSales() {
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [sales, setSales] = useState<DailySale[]>([]);
@@ -301,34 +377,21 @@ export default function AdminSales() {
   };
 
   const addLine = () => {
-    if (!selectedProduct) {
-      toast.error("Selecciona un producto");
+    const invalidMsg = messageForInvalidAddSaleLine(
+      selectedProduct,
+      availableColors,
+      selectedColor,
+      availableSizes,
+      selectedTalla,
+      quantity,
+      availableForSelected,
+      salePrice
+    );
+    if (invalidMsg) {
+      toast.error(invalidMsg);
       return;
     }
-    if (!selectedProduct.finanzas) {
-      toast.error("Este producto no tiene costo ni rango de venta registrado");
-      return;
-    }
-    if (availableColors.length > 0 && !selectedColor) {
-      toast.error("Selecciona un color");
-      return;
-    }
-    if (availableSizes.length > 0 && !selectedTalla) {
-      toast.error("Selecciona una talla");
-      return;
-    }
-    if (!Number.isInteger(quantity) || quantity <= 0) {
-      toast.error("La cantidad debe ser un número entero mayor a cero");
-      return;
-    }
-    if (quantity > availableForSelected) {
-      toast.error("La cantidad supera el stock disponible para esa talla");
-      return;
-    }
-    if (salePrice < selectedProduct.finanzas.precioMinimo || salePrice > selectedProduct.finanzas.precioMaximo) {
-      toast.error("El precio debe estar dentro del rango mínimo y máximo");
-      return;
-    }
+    if (!selectedProduct?.finanzas) return;
 
     setPendingLines((items) => [
       ...items,
@@ -381,45 +444,16 @@ export default function AdminSales() {
         setValidatedDni(person.dni);
       }
 
-      await Promise.all(
-        pendingLines.map((line) => {
-          const product = products.find((p) => p.id === line.productId);
-          if (!product?.finanzas) throw new Error("Producto sin finanzas");
-          const total = saleLineTotal(line);
-          const costoTotal = product.finanzas.costoCompra * line.quantity;
-          return addDailySale({
-            productId: product.id,
-            codigo: product.codigo || "SIN-CODIGO",
-            nombre: product.nombre,
-            color: line.color || product.color || "",
-            talla: line.talla || undefined,
-            fecha: date,
-            cantidad: line.quantity,
-            precioVenta: line.salePrice,
-            total,
-            costoUnitario: product.finanzas.costoCompra,
-            costoTotal,
-            ganancia: total - costoTotal,
-            documentoTipo: documentType,
-            ...(docNumber ? { documentoNumero: docNumber } : {}),
-            ...(saleCustomer ? { cliente: saleCustomer } : {}),
-          });
-        })
+      await insertPendingLinesAsDailySales(
+        pendingLines,
+        products,
+        date,
+        documentType,
+        docNumber,
+        saleCustomer
       );
 
-      const linesByProduct = pendingLines.reduce<Record<string, PendingSaleLine[]>>((acc, line) => {
-        acc[line.productId] = [...(acc[line.productId] ?? []), line];
-        return acc;
-      }, {});
-
-      await Promise.all(
-        Object.entries(linesByProduct).map(([id, lines]) =>
-          decrementProductStock(
-            id,
-            lines.map((l) => ({ talla: l.talla || null, cantidad: l.quantity }))
-          )
-        )
-      );
+      await decrementStockForPendingLines(pendingLines);
 
       toast.success("Ventas registradas");
       if (documentToIssue && docNumber && saleCustomer && documentPreview) {

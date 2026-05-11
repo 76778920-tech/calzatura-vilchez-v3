@@ -65,6 +65,50 @@ function slugifyRouteValue(value: string) {
     .replace(/^-+|-+$/g, "");
 }
 
+type CatalogRouteMenuTokens = {
+  pathname: string;
+  currentView: string;
+  currentBrand: string;
+  currentBrandSlug: string;
+  currentCampaign: string;
+  currentPromotion: string;
+  currentSearch: string;
+  currentType: string;
+  currentLine: string;
+  currentColor: string;
+  currentCategory: string;
+};
+
+function resolveCatalogRouteMenuId(tokens: CatalogRouteMenuTokens): string | null {
+  if (!isProductCatalogPath(tokens.pathname)) return null;
+  if (tokens.currentView === "marcas" || tokens.currentBrand || tokens.currentBrandSlug) {
+    return "marcas";
+  }
+  if (
+    tokens.currentCampaign === "cyber" ||
+    tokens.currentPromotion === "oferta" ||
+    tokens.currentPromotion === "destacados" ||
+    tokens.currentSearch.includes("cyber") ||
+    tokens.currentSearch.includes("oferta") ||
+    tokens.currentSearch.includes("destacado")
+  ) {
+    return "cyber";
+  }
+  const zapatillasHint =
+    tokens.currentLine === "zapatillas" ||
+    tokens.currentType === "zapatillas" ||
+    (tokens.currentColor === "blanco" &&
+      (tokens.currentLine === "zapatillas" ||
+        tokens.currentType === "zapatillas" ||
+        tokens.currentSearch.includes("zapatillas"))) ||
+    tokens.currentSearch.includes("zapatillas");
+  if (zapatillasHint) return "zapatillas";
+  if (tokens.currentCategory === "mujer") return "mujer";
+  if (tokens.currentCategory === "hombre") return "hombre";
+  if (tokens.currentCategory === "nino") return "infantil";
+  return null;
+}
+
 function buildProductsRoute(params: Record<string, string | undefined>) {
   return buildCatalogHref(params);
 }
@@ -700,45 +744,35 @@ export default function Header() {
   const currentColor = normalizeRouteToken(mergedCatalogParams.get("color"));
   const currentPromotion = normalizeRouteToken(mergedCatalogParams.get("promocion"));
 
-  const currentRouteMenuId = useMemo(() => {
-    if (!isProductCatalogPath(location.pathname)) return null;
-    if (currentView === "marcas" || currentBrand || currentBrandSlug) return "marcas";
-    if (
-      currentCampaign === "cyber" ||
-      currentPromotion === "oferta" ||
-      currentPromotion === "destacados" ||
-      currentSearch.includes("cyber") ||
-      currentSearch.includes("oferta") ||
-      currentSearch.includes("destacado")
-    ) {
-      return "cyber";
-    }
-    if (
-      currentLine === "zapatillas" ||
-      currentType === "zapatillas" ||
-      (currentColor === "blanco" &&
-        (currentLine === "zapatillas" || currentType === "zapatillas" || currentSearch.includes("zapatillas"))) ||
-      currentSearch.includes("zapatillas")
-    ) {
-      return "zapatillas";
-    }
-    if (currentCategory === "mujer") return "mujer";
-    if (currentCategory === "hombre") return "hombre";
-    if (currentCategory === "nino") return "infantil";
-    return null;
-  }, [
-    currentBrand,
-    currentBrandSlug,
-    currentCampaign,
-    currentCategory,
-    currentColor,
-    currentLine,
-    currentPromotion,
-    currentSearch,
-    currentType,
-    currentView,
-    location.pathname,
-  ]);
+  const currentRouteMenuId = useMemo(
+    () =>
+      resolveCatalogRouteMenuId({
+        pathname: location.pathname,
+        currentView,
+        currentBrand,
+        currentBrandSlug,
+        currentCampaign,
+        currentPromotion,
+        currentSearch,
+        currentType,
+        currentLine,
+        currentColor,
+        currentCategory,
+      }),
+    [
+      currentBrand,
+      currentBrandSlug,
+      currentCampaign,
+      currentCategory,
+      currentColor,
+      currentLine,
+      currentPromotion,
+      currentSearch,
+      currentType,
+      currentView,
+      location.pathname,
+    ]
+  );
 
   const isLinkCurrent = useMemo(() => {
     return (to: string) => {

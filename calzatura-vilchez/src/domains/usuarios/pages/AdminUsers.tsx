@@ -40,6 +40,44 @@ function roleLabel(role: UserRole) {
   return labels[role];
 }
 
+function userSearchBlob(user: UserProfile, orders: Order[]): string {
+  const role = normalizeRole(user.rol);
+  const orderCount = orders.filter((order) => order.userId === user.uid).length;
+  return [fullName(user), user.email, user.dni, user.telefono, roleLabel(role), String(orderCount)]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function userMatchesAdminFilters(
+  user: UserProfile,
+  orders: Order[],
+  term: string,
+  filter: UserFilter
+): boolean {
+  const searchable = userSearchBlob(user, orders);
+  const matchesSearch = term === "" || searchable.includes(term);
+  const matchesFilter = filter === "todos" || normalizeRole(user.rol) === filter;
+  return matchesSearch && matchesFilter;
+}
+
+function toastRoleUpdateFailure(err: unknown) {
+  const msg =
+    err instanceof Error
+      ? err.message
+      : typeof err === "object" && err && "message" in err
+        ? String((err as { message: unknown }).message)
+        : "";
+  const code =
+    typeof err === "object" && err && "code" in err ? String((err as { code: unknown }).code) : "";
+  const isPermissionError = code === "42501" || msg.toLowerCase().includes("row-level security");
+  if (isPermissionError) {
+    toast.error("Sin permisos para realizar esta operación.");
+  } else {
+    toast.error("No se pudo actualizar el rol");
+  }
+}
+
 export default function AdminUsers() {
   const { user: currentUser } = useAuth();
   const currentIsSuperAdmin = isSuperAdminEmail(currentUser?.email);
@@ -72,25 +110,7 @@ export default function AdminUsers() {
 
   const filteredUsers = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return users.filter((user) => {
-      const role = normalizeRole(user.rol);
-      const orderCount = orders.filter((order) => order.userId === user.uid).length;
-      const searchable = [
-        fullName(user),
-        user.email,
-        user.dni,
-        user.telefono,
-        roleLabel(role),
-        String(orderCount),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      const matchesSearch = term === "" || searchable.includes(term);
-      const matchesFilter = filter === "todos" || role === filter;
-      return matchesSearch && matchesFilter;
-    });
+    return users.filter((user) => userMatchesAdminFilters(user, orders, term, filter));
   }, [users, orders, searchTerm, filter]);
 
   const handleRoleChange = async (targetUser: UserProfile, nextRole: UserRole) => {
@@ -111,14 +131,7 @@ export default function AdminUsers() {
       );
       toast.success(`Rol actualizado a ${roleLabel(nextRole)}`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : (typeof err === "object" && err && "message" in err ? String((err as { message: unknown }).message) : "");
-      const code = typeof err === "object" && err && "code" in err ? String((err as { code: unknown }).code) : "";
-      const isPermissionError = code === "42501" || msg.toLowerCase().includes("row-level security");
-      if (isPermissionError) {
-        toast.error("Sin permisos para realizar esta operación.");
-      } else {
-        toast.error("No se pudo actualizar el rol");
-      }
+      toastRoleUpdateFailure(err);
     } finally {
       setSavingRoleId(null);
     }

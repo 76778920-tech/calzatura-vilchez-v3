@@ -167,34 +167,42 @@ export function productMatchesBrandSlug(product: Product, brandSlug: string) {
   return slugifyCatalogValue(product.marca ?? "") === slugifyCatalogValue(brandSlug);
 }
 
+function productMatchesColorTaxonomy(product: Product, value: string) {
+  const normalized = slugifyCatalogValue(value);
+  const colors = [product.color, ...getProductColors(product)]
+    .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
+    .map(slugifyCatalogValue);
+  return colors.some((color) => color.includes(normalized));
+}
+
+function productMatchesTipoOrLineaTaxonomy(product: Product, value: string) {
+  const normalized = slugifyCatalogValue(value);
+  const tipoValue = slugifyCatalogValue(product.tipoCalzado ?? "");
+  return tipoValue.includes(normalized);
+}
+
+function productMatchesPromocionTaxonomy(product: Product, value: string): boolean | undefined {
+  if (value === "destacados") return Boolean(product.destacado) && product.stock > 0;
+  if (value === "oferta") return (product.descuento ?? 0) > 0;
+  return undefined;
+}
+
 export function productMatchesTaxonomy(product: Product, key: TaxonomyKey, value: string) {
   if (!value.trim()) return true;
 
-  if (key === "color") {
-    const normalized = slugifyCatalogValue(value);
-    const colors = [product.color, ...getProductColors(product)]
-      .filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0)
-      .map(slugifyCatalogValue);
-    return colors.some((color) => color.includes(normalized));
-  }
-
+  if (key === "color") return productMatchesColorTaxonomy(product, value);
   if (key === "tipo" || key === "linea") {
-    const normalized = slugifyCatalogValue(value);
-    const tipoValue = slugifyCatalogValue(product.tipoCalzado ?? "");
-    if (tipoValue.includes(normalized)) return true;
+    if (productMatchesTipoOrLineaTaxonomy(product, value)) return true;
   }
-
   if (key === "estilo" && product.estilo) {
     return slugifyCatalogValue(product.estilo).includes(slugifyCatalogValue(value));
   }
-
   if (key === "campana" && product.campana) {
     if (slugifyCatalogValue(product.campana) === slugifyCatalogValue(value)) return true;
   }
-
   if (key === "promocion") {
-    if (value === "destacados") return Boolean(product.destacado) && product.stock > 0;
-    if (value === "oferta") return (product.descuento ?? 0) > 0;
+    const promo = productMatchesPromocionTaxonomy(product, value);
+    if (promo !== undefined) return promo;
   }
 
   return productMatchesAnySearch(product, getTaxonomyTerms(key, value));

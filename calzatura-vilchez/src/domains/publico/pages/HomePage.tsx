@@ -100,6 +100,24 @@ const HOME_CATEGORY_CARDS: HomeCategoryCard[] = [
   },
 ];
 
+function computeHomeCategoryCounts(products: Product[]) {
+  return HOME_CATEGORY_CARDS.reduce<Record<string, number>>((acc, category) => {
+    const match = category.match;
+    acc[category.slug] =
+      match.type === "category"
+        ? countProductsForCategory(products, match.value)
+        : products.filter((product) => productMatchesAnySearch(product, match.terms)).length;
+    return acc;
+  }, {});
+}
+
+function shouldResumeHeroCarouselAutoplay(
+  container: HTMLElement,
+  relatedTarget: EventTarget | null
+): boolean {
+  return !(relatedTarget instanceof Node) || !container.contains(relatedTarget);
+}
+
 const HOME_HERO_SLIDES: HomeHeroSlide[] = [
   {
     id: "mujer",
@@ -437,16 +455,7 @@ export default function HomePage() {
 
   const spotlightTotalPages = spotlightPages.length;
   const effectiveSpotlightPage = Math.min(spotlightPage, Math.max(spotlightTotalPages - 1, 0));
-  const categoryCounts = useMemo(() => {
-    return HOME_CATEGORY_CARDS.reduce<Record<string, number>>((acc, category) => {
-      const match = category.match;
-      acc[category.slug] =
-        match.type === "category"
-          ? countProductsForCategory(products, match.value)
-          : products.filter((product) => productMatchesAnySearch(product, match.terms)).length;
-      return acc;
-    }, {});
-  }, [products]);
+  const categoryCounts = useMemo(() => computeHomeCategoryCounts(products), [products]);
 
   return (
     <main className="home-page">
@@ -473,8 +482,7 @@ export default function HomePage() {
           onClickCapture={handleHeroClickCapture}
           onFocus={() => setIsHeroInteractionPaused(true)}
           onBlur={(event) => {
-            const nextFocused = event.relatedTarget;
-            if (!(nextFocused instanceof Node) || !event.currentTarget.contains(nextFocused)) {
+            if (shouldResumeHeroCarouselAutoplay(event.currentTarget, event.relatedTarget)) {
               setIsHeroInteractionPaused(false);
             }
           }}

@@ -145,6 +145,42 @@ function pickFacetForPath(filters: Record<string, string>): { key: CatalogPathFa
   return null;
 }
 
+type MergeCatalogSearchFn = (pathname: string, encodedInPath: Set<string>) => { pathname: string; search: string };
+
+function buildPrefixedShelfCanonical(
+  shelfBase: string,
+  filters: Record<string, string>,
+  pathEncodedKey: "campana" | "promocion",
+  mergeSearch: MergeCatalogSearchFn,
+): { pathname: string; search: string } {
+  const cat = filters.categoria && filters.categoria !== "todos" ? toPublicCategorySlug(filters.categoria) : "";
+  const facet = pickFacetForPath(filters);
+  const encoded = new Set<string>([pathEncodedKey]);
+  if (cat) {
+    encoded.add("categoria");
+    if (facet) encoded.add(facet.key);
+  }
+  if (!cat) return mergeSearch(shelfBase, encoded);
+  if (!facet) return mergeSearch(`${shelfBase}/${cat}`, encoded);
+  return mergeSearch(`${shelfBase}/${cat}/${facet.slug}`, encoded);
+}
+
+function buildDefaultProductsCanonical(
+  filters: Record<string, string>,
+  mergeSearch: MergeCatalogSearchFn,
+): { pathname: string; search: string } {
+  const cat = filters.categoria && filters.categoria !== "todos" ? toPublicCategorySlug(filters.categoria) : "";
+  const facet = pickFacetForPath(filters);
+  const encoded = new Set<string>();
+  if (cat) {
+    encoded.add("categoria");
+    if (facet) encoded.add(facet.key);
+  }
+  if (!cat) return mergeSearch(CATALOG_SHELF.products, encoded);
+  if (!facet) return mergeSearch(`${CATALOG_SHELF.products}/${cat}`, encoded);
+  return mergeSearch(`${CATALOG_SHELF.products}/${cat}/${facet.slug}`, encoded);
+}
+
 function recordFromSearchParams(sp: URLSearchParams): Record<string, string> {
   const o: Record<string, string> = {};
   sp.forEach((value, key) => {
@@ -189,56 +225,14 @@ export function buildCanonicalCatalogLocation(searchParams: URLSearchParams): { 
   }
 
   if (filters.campana === "nueva-temporada") {
-    const cat = filters.categoria && filters.categoria !== "todos" ? toPublicCategorySlug(filters.categoria) : "";
-    const facet = pickFacetForPath(filters);
-    const encoded = new Set<string>(["campana"]);
-    if (cat) {
-      encoded.add("categoria");
-      if (facet) encoded.add(facet.key);
-    }
-
-    if (!cat) {
-      return mergeSearch(CATALOG_SHELF.nuevaTemporada, encoded);
-    }
-    if (!facet) {
-      return mergeSearch(`${CATALOG_SHELF.nuevaTemporada}/${cat}`, encoded);
-    }
-    return mergeSearch(`${CATALOG_SHELF.nuevaTemporada}/${cat}/${facet.slug}`, encoded);
+    return buildPrefixedShelfCanonical(CATALOG_SHELF.nuevaTemporada, filters, "campana", mergeSearch);
   }
 
   if (filters.promocion === "oferta") {
-    const cat = filters.categoria && filters.categoria !== "todos" ? toPublicCategorySlug(filters.categoria) : "";
-    const facet = pickFacetForPath(filters);
-    const encoded = new Set<string>(["promocion"]);
-    if (cat) {
-      encoded.add("categoria");
-      if (facet) encoded.add(facet.key);
-    }
-
-    if (!cat) {
-      return mergeSearch(CATALOG_SHELF.outlet, encoded);
-    }
-    if (!facet) {
-      return mergeSearch(`${CATALOG_SHELF.outlet}/${cat}`, encoded);
-    }
-    return mergeSearch(`${CATALOG_SHELF.outlet}/${cat}/${facet.slug}`, encoded);
+    return buildPrefixedShelfCanonical(CATALOG_SHELF.outlet, filters, "promocion", mergeSearch);
   }
 
-  const cat = filters.categoria && filters.categoria !== "todos" ? toPublicCategorySlug(filters.categoria) : "";
-  const facet = pickFacetForPath(filters);
-  const encoded = new Set<string>();
-  if (cat) {
-    encoded.add("categoria");
-    if (facet) encoded.add(facet.key);
-  }
-
-  if (!cat) {
-    return mergeSearch(CATALOG_SHELF.products, encoded);
-  }
-  if (!facet) {
-    return mergeSearch(`${CATALOG_SHELF.products}/${cat}`, encoded);
-  }
-  return mergeSearch(`${CATALOG_SHELF.products}/${cat}/${facet.slug}`, encoded);
+  return buildDefaultProductsCanonical(filters, mergeSearch);
 }
 
 /**

@@ -413,75 +413,79 @@ function resolveColorBucket(colorStock, talla, quantity, preferredColor) {
   });
 }
 
+async function discountOrderItemStock(supabase, item) {
+  const productId = extractProductId(item);
+  const quantity = Number(item?.quantity || 0);
+  const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
+  const color = typeof item?.color === "string" ? item.color.trim() : "";
+
+  if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
+    throw new Error("Producto invalido al descontar stock");
+  }
+
+  const product = await fetchProductOrThrow(supabase, productId);
+  const currentTotalStock = deriveTotalStock(product);
+  const currentSizeStock = getSizeStock(product, talla || undefined, color || undefined);
+
+  if (currentTotalStock < quantity || currentSizeStock < quantity) {
+    throw new Error("Stock insuficiente al descontar");
+  }
+
+  const updates = {};
+
+  if (product.colorStock && talla) {
+    const colorStock = {
+      ...product.colorStock,
+    };
+    const colorKey = resolveColorBucket(colorStock, talla, quantity, color || undefined);
+
+    if (!colorKey) {
+      throw new Error("No se encontro stock de color para descontar");
+    }
+
+    colorStock[colorKey] = {
+      ...colorStock[colorKey],
+      [talla]: Math.max(0, Number(colorStock[colorKey][talla] || 0) - quantity),
+    };
+
+    updates.colorStock = colorStock;
+    updates.tallas = getAvailableSizes({ ...product, colorStock });
+    updates.stock = sumColorSizeStock(colorStock);
+  } else if (product.tallaStock && talla) {
+    const tallaStock = {
+      ...product.tallaStock,
+      [talla]: Math.max(0, Number(product.tallaStock[talla] || 0) - quantity),
+    };
+
+    updates.tallaStock = tallaStock;
+    updates.tallas = Object.keys(tallaStock)
+      .filter((size) => Number(tallaStock[size] || 0) > 0)
+      .sort((a, b) => Number(a) - Number(b));
+    updates.stock = sumSizeStock(tallaStock);
+  } else {
+    updates.stock = Math.max(0, Number(product.stock || 0) - quantity);
+  }
+
+  const { data, error } = await supabase
+    .from("productos")
+    .update(updates)
+    .eq("id", productId)
+    .eq("stock", currentTotalStock)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("No se pudo descontar stock");
+  }
+
+  if (!data) {
+    throw new Error("El stock cambio durante la operacion");
+  }
+}
+
 async function discountOrderStock(supabase, order) {
   for (const item of order.items || []) {
-    const productId = extractProductId(item);
-    const quantity = Number(item?.quantity || 0);
-    const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
-    const color = typeof item?.color === "string" ? item.color.trim() : "";
-
-    if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
-      throw new Error("Producto invalido al descontar stock");
-    }
-
-    const product = await fetchProductOrThrow(supabase, productId);
-    const currentTotalStock = deriveTotalStock(product);
-    const currentSizeStock = getSizeStock(product, talla || undefined, color || undefined);
-
-    if (currentTotalStock < quantity || currentSizeStock < quantity) {
-      throw new Error("Stock insuficiente al descontar");
-    }
-
-    const updates = {};
-
-    if (product.colorStock && talla) {
-      const colorStock = {
-        ...product.colorStock,
-      };
-      const colorKey = resolveColorBucket(colorStock, talla, quantity, color || undefined);
-
-      if (!colorKey) {
-        throw new Error("No se encontro stock de color para descontar");
-      }
-
-      colorStock[colorKey] = {
-        ...colorStock[colorKey],
-        [talla]: Math.max(0, Number(colorStock[colorKey][talla] || 0) - quantity),
-      };
-
-      updates.colorStock = colorStock;
-      updates.tallas = getAvailableSizes({ ...product, colorStock });
-      updates.stock = sumColorSizeStock(colorStock);
-    } else if (product.tallaStock && talla) {
-      const tallaStock = {
-        ...product.tallaStock,
-        [talla]: Math.max(0, Number(product.tallaStock[talla] || 0) - quantity),
-      };
-
-      updates.tallaStock = tallaStock;
-      updates.tallas = Object.keys(tallaStock)
-        .filter((size) => Number(tallaStock[size] || 0) > 0)
-        .sort((a, b) => Number(a) - Number(b));
-      updates.stock = sumSizeStock(tallaStock);
-    } else {
-      updates.stock = Math.max(0, Number(product.stock || 0) - quantity);
-    }
-
-    const { data, error } = await supabase
-      .from("productos")
-      .update(updates)
-      .eq("id", productId)
-      .eq("stock", currentTotalStock)
-      .select("id")
-      .maybeSingle();
-
-    if (error) {
-      throw new Error("No se pudo descontar stock");
-    }
-
-    if (!data) {
-      throw new Error("El stock cambio durante la operacion");
-    }
+    await discountOrderItemStock(supabase, item);
   }
 }
 
@@ -736,6 +740,75 @@ exports.confirmCodOrder = onRequest(
   }
 );
 
+async function favoritesGetOne(supabase, userId, productId, res) {
+  const { data, error } = await supabase
+    .from("favoritos")
+    .select("id")
+    .eq("userId", userId)
+    .eq("productId", productId)
+    .maybeSingle();
+  if (error) {
+    throw Object.assign(new Error("No se pudo consultar favoritos"), { status: 500 });
+  }
+  return res.status(200).json({ isFavorite: Boolean(data) });
+}
+
+async function favoritesGetAll(supabase, userId, res) {
+  const { data, error } = await supabase
+    .from("favoritos")
+    .select("productId")
+    .eq("userId", userId)
+    .order("creadoEn", { ascending: false });
+  if (error) {
+    throw Object.assign(new Error("No se pudieron consultar tus favoritos"), { status: 500 });
+  }
+  return res.status(200).json({ productIds: (data || []).map((item) => item.productId) });
+}
+
+async function favoritesHandleGet(supabase, userId, productId, res) {
+  if (productId) return favoritesGetOne(supabase, userId, productId, res);
+  return favoritesGetAll(supabase, userId, res);
+}
+
+async function favoritesHandlePost(supabase, userId, productId, res) {
+  if (!isNonEmptyString(productId, 120)) {
+    return res.status(400).json({ error: "Producto invalido" });
+  }
+
+  const { data: existing, error: readError } = await supabase
+    .from("favoritos")
+    .select("id")
+    .eq("userId", userId)
+    .eq("productId", productId)
+    .maybeSingle();
+  if (readError) {
+    throw Object.assign(new Error("No se pudo consultar favoritos"), { status: 500 });
+  }
+  if (!existing) {
+    const { error } = await supabase.from("favoritos").insert({
+      userId,
+      productId,
+      creadoEn: new Date().toISOString(),
+    });
+    if (error) {
+      throw Object.assign(new Error("No se pudo guardar favorito"), { status: 500 });
+    }
+  }
+  return res.status(200).json({ success: true });
+}
+
+async function favoritesHandleDelete(supabase, userId, productId, res) {
+  let query = supabase.from("favoritos").delete().eq("userId", userId);
+  if (productId) {
+    query = query.eq("productId", productId);
+  }
+  const { error } = await query;
+  if (error) {
+    throw Object.assign(new Error("No se pudo eliminar favorito"), { status: 500 });
+  }
+  return res.status(200).json({ success: true });
+}
+
 exports.favorites = onRequest(
   { secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
   async (req, res) => {
@@ -752,67 +825,15 @@ exports.favorites = onRequest(
         const productId = typeof rawProductId === "string" ? rawProductId.trim() : "";
 
         if (req.method === "GET") {
-          if (productId) {
-            const { data, error } = await supabase
-              .from("favoritos")
-              .select("id")
-              .eq("userId", userId)
-              .eq("productId", productId)
-              .maybeSingle();
-            if (error) {
-              throw Object.assign(new Error("No se pudo consultar favoritos"), { status: 500 });
-            }
-            return res.status(200).json({ isFavorite: Boolean(data) });
-          }
-
-          const { data, error } = await supabase
-            .from("favoritos")
-            .select("productId")
-            .eq("userId", userId)
-            .order("creadoEn", { ascending: false });
-          if (error) {
-            throw Object.assign(new Error("No se pudieron consultar tus favoritos"), { status: 500 });
-          }
-          return res.status(200).json({ productIds: (data || []).map((item) => item.productId) });
+          return favoritesHandleGet(supabase, userId, productId, res);
         }
 
         if (req.method === "POST") {
-          if (!isNonEmptyString(productId, 120)) {
-            return res.status(400).json({ error: "Producto invalido" });
-          }
-
-          const { data: existing, error: readError } = await supabase
-            .from("favoritos")
-            .select("id")
-            .eq("userId", userId)
-            .eq("productId", productId)
-            .maybeSingle();
-          if (readError) {
-            throw Object.assign(new Error("No se pudo consultar favoritos"), { status: 500 });
-          }
-          if (!existing) {
-            const { error } = await supabase.from("favoritos").insert({
-              userId,
-              productId,
-              creadoEn: new Date().toISOString(),
-            });
-            if (error) {
-              throw Object.assign(new Error("No se pudo guardar favorito"), { status: 500 });
-            }
-          }
-          return res.status(200).json({ success: true });
+          return favoritesHandlePost(supabase, userId, productId, res);
         }
 
         if (req.method === "DELETE") {
-          let query = supabase.from("favoritos").delete().eq("userId", userId);
-          if (productId) {
-            query = query.eq("productId", productId);
-          }
-          const { error } = await query;
-          if (error) {
-            throw Object.assign(new Error("No se pudo eliminar favorito"), { status: 500 });
-          }
-          return res.status(200).json({ success: true });
+          return favoritesHandleDelete(supabase, userId, productId, res);
         }
 
         return res.status(405).json({ error: "Metodo no permitido" });
@@ -825,6 +846,91 @@ exports.favorites = onRequest(
 );
 
 const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
+
+/**
+ * @returns {{ ok: true, upstreamUrl: string, method: string } | { ok: false, status?: number, error: string }}
+ */
+function resolveAiAdminUpstreamRequest(base, op, req) {
+  let upstreamUrl;
+  let method = "GET";
+
+  if (op === "combined") {
+    const horizon = parseInt(String(req.query.horizon ?? "30"), 10);
+    const history = parseInt(String(req.query.history ?? "120"), 10);
+    if (!Number.isFinite(horizon) || horizon < 7 || horizon > 90) {
+      return { ok: false, error: "horizon invalido" };
+    }
+    if (!Number.isFinite(history) || history < 30 || history > 365) {
+      return { ok: false, error: "history invalido" };
+    }
+    upstreamUrl = `${base}/api/predict/combined?horizon=${encodeURIComponent(horizon)}&history=${encodeURIComponent(history)}`;
+    return { ok: true, upstreamUrl, method };
+  }
+
+  if (op === "weeklyChart") {
+    const weeks = parseInt(String(req.query.weeks ?? "8"), 10);
+    if (!Number.isFinite(weeks) || weeks < 2 || weeks > 24) {
+      return { ok: false, error: "weeks invalido" };
+    }
+    upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
+    return { ok: true, upstreamUrl, method };
+  }
+
+  if (op === "modelMetrics") {
+    upstreamUrl = `${base}/api/model/metrics`;
+    return { ok: true, upstreamUrl, method };
+  }
+
+  if (op === "ireHistorial") {
+    const days = parseInt(String(req.query.days ?? "30"), 10);
+    if (!Number.isFinite(days) || days < 1 || days > 365) {
+      return { ok: false, error: "days invalido" };
+    }
+    upstreamUrl = `${base}/api/ire/historial?days=${encodeURIComponent(days)}`;
+    return { ok: true, upstreamUrl, method };
+  }
+
+  if (op === "cacheInvalidate") {
+    if (req.method !== "POST") {
+      return { ok: false, status: 405, error: "Metodo no permitido" };
+    }
+    upstreamUrl = `${base}/api/cache/invalidate`;
+    return { ok: true, upstreamUrl, method: "POST" };
+  }
+
+  if (op === "campaignActive") {
+    upstreamUrl = `${base}/api/campaign/active`;
+    return { ok: true, upstreamUrl, method };
+  }
+
+  if (op === "campaignFeedback") {
+    if (req.method !== "POST") {
+      return { ok: false, status: 405, error: "Metodo no permitido" };
+    }
+    upstreamUrl = `${base}/api/campaign/feedback`;
+    return { ok: true, upstreamUrl, method: "POST" };
+  }
+
+  if (op === "campaignDetection") {
+    const recentDays = parseInt(String(req.query.recent_days ?? "7"), 10);
+    const baselineDays = parseInt(String(req.query.baseline_days ?? "60"), 10);
+    if (!Number.isFinite(recentDays) || recentDays < 3 || recentDays > 14) {
+      return { ok: false, error: "recent_days invalido" };
+    }
+    if (!Number.isFinite(baselineDays) || baselineDays < 30 || baselineDays > 120) {
+      return { ok: false, error: "baseline_days invalido" };
+    }
+    upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${recentDays}&baseline_days=${baselineDays}`;
+    return { ok: true, upstreamUrl, method };
+  }
+
+  if (op === "learningStats") {
+    upstreamUrl = `${base}/api/campaign/learning-stats`;
+    return { ok: true, upstreamUrl, method };
+  }
+
+  return { ok: false, error: "op invalido" };
+}
 
 exports.aiAdminProxy = onRequest(
   {
@@ -848,58 +954,11 @@ exports.aiAdminProxy = onRequest(
         const serviceAuth = { Authorization: `Bearer ${AI_SERVICE_BEARER_TOKEN.value()}` };
         const signal = AbortSignal.timeout(AI_PROXY_UPSTREAM_TIMEOUT_MS);
 
-        let upstreamUrl;
-        let method = "GET";
-
-        if (op === "combined") {
-          const horizon = parseInt(String(req.query.horizon ?? "30"), 10);
-          const history = parseInt(String(req.query.history ?? "120"), 10);
-          if (!Number.isFinite(horizon) || horizon < 7 || horizon > 90) {
-            return res.status(400).json({ error: "horizon invalido" });
-          }
-          if (!Number.isFinite(history) || history < 30 || history > 365) {
-            return res.status(400).json({ error: "history invalido" });
-          }
-          upstreamUrl = `${base}/api/predict/combined?horizon=${encodeURIComponent(horizon)}&history=${encodeURIComponent(history)}`;
-        } else if (op === "weeklyChart") {
-          const weeks = parseInt(String(req.query.weeks ?? "8"), 10);
-          if (!Number.isFinite(weeks) || weeks < 2 || weeks > 24) {
-            return res.status(400).json({ error: "weeks invalido" });
-          }
-          upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
-        } else if (op === "modelMetrics") {
-          upstreamUrl = `${base}/api/model/metrics`;
-        } else if (op === "ireHistorial") {
-          const days = parseInt(String(req.query.days ?? "30"), 10);
-          if (!Number.isFinite(days) || days < 1 || days > 365) {
-            return res.status(400).json({ error: "days invalido" });
-          }
-          upstreamUrl = `${base}/api/ire/historial?days=${encodeURIComponent(days)}`;
-        } else if (op === "cacheInvalidate") {
-          if (req.method !== "POST") {
-            return res.status(405).json({ error: "Metodo no permitido" });
-          }
-          upstreamUrl = `${base}/api/cache/invalidate`;
-          method = "POST";
-        } else if (op === "campaignActive") {
-          upstreamUrl = `${base}/api/campaign/active`;
-        } else if (op === "campaignFeedback") {
-          if (req.method !== "POST") {
-            return res.status(405).json({ error: "Metodo no permitido" });
-          }
-          upstreamUrl = `${base}/api/campaign/feedback`;
-          method = "POST";
-        } else if (op === "campaignDetection") {
-          const recentDays  = parseInt(String(req.query.recent_days  ?? "7"),  10);
-          const baselineDays = parseInt(String(req.query.baseline_days ?? "60"), 10);
-          if (!Number.isFinite(recentDays)  || recentDays  < 3  || recentDays  > 14)  return res.status(400).json({ error: "recent_days invalido" });
-          if (!Number.isFinite(baselineDays) || baselineDays < 30 || baselineDays > 120) return res.status(400).json({ error: "baseline_days invalido" });
-          upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${recentDays}&baseline_days=${baselineDays}`;
-        } else if (op === "learningStats") {
-          upstreamUrl = `${base}/api/campaign/learning-stats`;
-        } else {
-          return res.status(400).json({ error: "op invalido" });
+        const resolved = resolveAiAdminUpstreamRequest(base, op, req);
+        if (!resolved.ok) {
+          return res.status(resolved.status ?? 400).json({ error: resolved.error });
         }
+        const { upstreamUrl, method } = resolved;
 
         // campaignFeedback needs to forward the request body
         const upstreamBody = (method === "POST" && op === "campaignFeedback")

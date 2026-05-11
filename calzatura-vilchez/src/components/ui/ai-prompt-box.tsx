@@ -349,6 +349,137 @@ const CustomDivider: React.FC = () => (
   </div>
 );
 
+function speechRecognitionErrorMessage(error: string): string {
+  if (error === "no-speech") return "No se detectó voz. Intenta de nuevo.";
+  if (error === "not-allowed") return "Permiso de micrófono denegado. Actívalo en el navegador.";
+  return "Error al procesar la voz. Intenta de nuevo.";
+}
+
+function buildPromptPayloadWithModePrefix(
+  input: string,
+  showSearch: boolean,
+  showThink: boolean,
+  showCanvas: boolean
+): string {
+  const prefix = showSearch ? "[Buscar: " : showThink ? "[Analizar: " : showCanvas ? "[Canvas: " : "";
+  return prefix ? `${prefix}${input}]` : input;
+}
+
+type PromptDefaultToolbarProps = {
+  showSearch: boolean;
+  showThink: boolean;
+  showCanvas: boolean;
+  setShowSearch: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowThink: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowCanvas: React.Dispatch<React.SetStateAction<boolean>>;
+  isRecording: boolean;
+  isLoading: boolean;
+  hasContent: boolean;
+  uploadInputRef: React.RefObject<HTMLInputElement | null>;
+  processFile: (file: File) => void;
+  onVoicePrimary: () => void;
+};
+
+function PromptInputDefaultToolbar({
+  showSearch,
+  showThink,
+  showCanvas,
+  setShowSearch,
+  setShowThink,
+  setShowCanvas,
+  isRecording,
+  isLoading,
+  hasContent,
+  uploadInputRef,
+  processFile,
+  onVoicePrimary,
+}: PromptDefaultToolbarProps) {
+  const toggleMode = (mode: "search" | "think") => {
+    if (mode === "search") {
+      setShowSearch((p) => !p);
+      setShowThink(false);
+    } else {
+      setShowThink((p) => !p);
+      setShowSearch(false);
+    }
+  };
+
+  return (
+    <>
+      <div className={cn("flex items-center gap-1 transition-opacity duration-300", isRecording ? "opacity-0 invisible h-0" : "opacity-100 visible")}>
+        <PromptInputAction tooltip="Subir imagen">
+          <button type="button" onClick={() => uploadInputRef.current?.click()}
+            className="flex h-8 w-8 text-[#9CA3AF] cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-gray-600/30 hover:text-[#D1D5DB]">
+            <Paperclip className="h-5 w-5" />
+            <input ref={uploadInputRef} type="file" className="hidden" accept="image/*"
+              onChange={(e) => { if (e.target.files?.[0]) processFile(e.target.files[0]); if (e.target) e.target.value = ""; }} />
+          </button>
+        </PromptInputAction>
+
+        <div className="flex items-center">
+          {(["search", "think", "canvas"] as const).map((mode, idx) => {
+            const configs = {
+              search: { active: showSearch, color: "#1EAEDB", Icon: Globe, label: "Buscar", onClick: () => toggleMode("search") },
+              think:  { active: showThink,  color: "#8B5CF6", Icon: BrainCog, label: "Analizar", onClick: () => toggleMode("think") },
+              canvas: { active: showCanvas, color: "#F97316", Icon: FolderCode, label: "Canvas", onClick: () => setShowCanvas((p) => !p) },
+            };
+            const { active, color, Icon, label, onClick } = configs[mode];
+            return (
+              <React.Fragment key={mode}>
+                {idx > 0 && <CustomDivider />}
+                <button type="button" onClick={onClick}
+                  className={cn("rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                    active ? `border-[${color}] text-[${color}]` : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
+                  )}
+                  style={active ? { background: `${color}26`, borderColor: color, color } : undefined}
+                >
+                  <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                    <motion.div
+                      animate={{ rotate: active ? 360 : 0, scale: active ? 1.1 : 1 }}
+                      whileHover={{ rotate: active ? 360 : 15, scale: 1.1 }}
+                      transition={{ type: "spring", stiffness: 260, damping: 25 }}
+                    >
+                      <Icon className="w-4 h-4" />
+                    </motion.div>
+                  </div>
+                  <AnimatePresence>
+                    {active && (
+                      <motion.span
+                        initial={{ width: 0, opacity: 0 }} animate={{ width: "auto", opacity: 1 }} exit={{ width: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="text-xs overflow-hidden whitespace-nowrap shrink-0"
+                      >
+                        {label}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </button>
+              </React.Fragment>
+            );
+          })}
+        </div>
+      </div>
+
+      <PromptInputAction tooltip={isLoading ? "Detener" : isRecording ? "Parar grabación" : hasContent ? "Enviar" : "Hablar"}>
+        <Button variant="default" size="icon"
+          className={cn("h-8 w-8 rounded-full transition-all duration-200",
+            isRecording ? "bg-transparent hover:bg-gray-600/30 text-red-500" :
+            hasContent  ? "bg-white hover:bg-white/80 text-[#1F2023]" :
+                          "bg-transparent hover:bg-gray-600/30 text-[#9CA3AF]"
+          )}
+          onClick={onVoicePrimary}
+          disabled={isLoading && !hasContent}
+        >
+          {isLoading   ? <Square className="h-4 w-4 fill-[#1F2023] animate-pulse" /> :
+           isRecording ? <StopCircle className="h-5 w-5 text-red-500" /> :
+           hasContent  ? <ArrowUp className="h-4 w-4 text-[#1F2023]" /> :
+                         <Mic className="h-5 w-5" />}
+        </Button>
+      </PromptInputAction>
+    </>
+  );
+}
+
 // ─── PromptInputBox (main export) ─────────────────────────────────────────────
 
 /** Acciones rápidas: un clic envía `prompt` al handler (p. ej. panel admin con datos locales). */
@@ -426,8 +557,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
 
   const handleSubmit = () => {
     if (!input.trim() && files.length === 0) return;
-    const prefix = showSearch ? "[Buscar: " : showThink ? "[Analizar: " : showCanvas ? "[Canvas: " : "";
-    onSend(prefix ? `${prefix}${input}]` : input, files);
+    onSend(buildPromptPayloadWithModePrefix(input, showSearch, showThink, showCanvas), files);
     setInput(""); setFiles([]); setFilePreviews({});
   };
 
@@ -456,13 +586,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
 
     recognition.onerror = (event: ISpeechRecognitionErrorEvent) => {
       setIsRecording(false);
-      if (event.error === "no-speech") {
-        setVoiceError("No se detectó voz. Intenta de nuevo.");
-      } else if (event.error === "not-allowed") {
-        setVoiceError("Permiso de micrófono denegado. Actívalo en el navegador.");
-      } else {
-        setVoiceError("Error al procesar la voz. Intenta de nuevo.");
-      }
+      setVoiceError(speechRecognitionErrorMessage(event.error));
       setTimeout(() => setVoiceError(null), 4000);
     };
 
@@ -478,11 +602,6 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
   };
 
   const hasContent = input.trim() !== "" || files.length > 0;
-
-  const toggleMode = (mode: "search" | "think") => {
-    if (mode === "search") { setShowSearch((p) => !p); setShowThink(false); }
-    else { setShowThink((p) => !p); setShowSearch(false); }
-  };
 
   const assignContainerRef = React.useCallback(
     (node: HTMLDivElement | null) => {
@@ -594,78 +713,24 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
               </div>
             </>
           ) : (
-            <>
-              <div className={cn("flex items-center gap-1 transition-opacity duration-300", isRecording ? "opacity-0 invisible h-0" : "opacity-100 visible")}>
-                <PromptInputAction tooltip="Subir imagen">
-                  <button type="button" onClick={() => uploadInputRef.current?.click()}
-                    className="flex h-8 w-8 text-[#9CA3AF] cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-gray-600/30 hover:text-[#D1D5DB]">
-                    <Paperclip className="h-5 w-5" />
-                    <input ref={uploadInputRef} type="file" className="hidden" accept="image/*"
-                      onChange={(e) => { if (e.target.files?.[0]) processFile(e.target.files[0]); if (e.target) e.target.value = ""; }} />
-                  </button>
-                </PromptInputAction>
-
-                <div className="flex items-center">
-                  {(["search", "think", "canvas"] as const).map((mode, idx) => {
-                    const configs = {
-                      search: { active: showSearch, color: "#1EAEDB", Icon: Globe, label: "Buscar", onClick: () => toggleMode("search") },
-                      think:  { active: showThink,  color: "#8B5CF6", Icon: BrainCog, label: "Analizar", onClick: () => toggleMode("think") },
-                      canvas: { active: showCanvas, color: "#F97316", Icon: FolderCode, label: "Canvas", onClick: () => setShowCanvas((p) => !p) },
-                    };
-                    const { active, color, Icon, label, onClick } = configs[mode];
-                    return (
-                      <React.Fragment key={mode}>
-                        {idx > 0 && <CustomDivider />}
-                        <button type="button" onClick={onClick}
-                          className={cn("rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                            active ? `border-[${color}] text-[${color}]` : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
-                          )}
-                          style={active ? { background: `${color}26`, borderColor: color, color } : undefined}
-                        >
-                          <div className="w-5 h-5 flex items-center justify-center shrink-0">
-                            <motion.div
-                              animate={{ rotate: active ? 360 : 0, scale: active ? 1.1 : 1 }}
-                              whileHover={{ rotate: active ? 360 : 15, scale: 1.1 }}
-                              transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                            >
-                              <Icon className="w-4 h-4" />
-                            </motion.div>
-                          </div>
-                          <AnimatePresence>
-                            {active && (
-                              <motion.span
-                                initial={{ width: 0, opacity: 0 }} animate={{ width: "auto", opacity: 1 }} exit={{ width: 0, opacity: 0 }}
-                                transition={{ duration: 0.2 }}
-                                className="text-xs overflow-hidden whitespace-nowrap shrink-0"
-                              >
-                                {label}
-                              </motion.span>
-                            )}
-                          </AnimatePresence>
-                        </button>
-                      </React.Fragment>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <PromptInputAction tooltip={isLoading ? "Detener" : isRecording ? "Parar grabación" : hasContent ? "Enviar" : "Hablar"}>
-                <Button variant="default" size="icon"
-                  className={cn("h-8 w-8 rounded-full transition-all duration-200",
-                    isRecording ? "bg-transparent hover:bg-gray-600/30 text-red-500" :
-                    hasContent  ? "bg-white hover:bg-white/80 text-[#1F2023]" :
-                                  "bg-transparent hover:bg-gray-600/30 text-[#9CA3AF]"
-                  )}
-                  onClick={() => { if (isRecording) stopVoiceRecording(); else if (hasContent) handleSubmit(); else startVoiceRecording(); }}
-                  disabled={isLoading && !hasContent}
-                >
-                  {isLoading   ? <Square className="h-4 w-4 fill-[#1F2023] animate-pulse" /> :
-                   isRecording ? <StopCircle className="h-5 w-5 text-red-500" /> :
-                   hasContent  ? <ArrowUp className="h-4 w-4 text-[#1F2023]" /> :
-                                 <Mic className="h-5 w-5" />}
-                </Button>
-              </PromptInputAction>
-            </>
+            <PromptInputDefaultToolbar
+              showSearch={showSearch}
+              showThink={showThink}
+              showCanvas={showCanvas}
+              setShowSearch={setShowSearch}
+              setShowThink={setShowThink}
+              setShowCanvas={setShowCanvas}
+              isRecording={isRecording}
+              isLoading={isLoading}
+              hasContent={hasContent}
+              uploadInputRef={uploadInputRef}
+              processFile={processFile}
+              onVoicePrimary={() => {
+                if (isRecording) stopVoiceRecording();
+                else if (hasContent) handleSubmit();
+                else startVoiceRecording();
+              }}
+            />
           )}
         </PromptInputActions>
       </PromptInput>
