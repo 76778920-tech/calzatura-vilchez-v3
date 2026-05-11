@@ -2775,6 +2775,93 @@ function PredictionsRankingTabPanel({
   );
 }
 
+function selectTopRiskAlertsForPanel(predictionsForView: Prediction[]): Prediction[] {
+  return predictionsForView
+    .filter((item) => !item.sin_historial && (item.alerta_stock || (item.stock_actual === 0 && item.alta_demanda)))
+    .sort((a, b) => {
+      if (a.stock_actual === 0 && b.stock_actual !== 0) return -1;
+      if (a.stock_actual !== 0 && b.stock_actual === 0) return 1;
+      return a.dias_hasta_agotarse - b.dias_hasta_agotarse;
+    })
+    .slice(0, 6);
+}
+
+function buildDistribucionInventarioFromView(predictionsForView: Prediction[]) {
+  const items = [
+    {
+      label: "Crítico",
+      count: predictionsForView.filter(
+        (item) => !item.sin_historial && (item.stock_actual === 0 || item.nivel_riesgo === "critico"),
+      ).length,
+      color: "#ef4444",
+    },
+    {
+      label: "Atención",
+      count: predictionsForView.filter((item) => !item.sin_historial && item.nivel_riesgo === "atencion").length,
+      color: "#f59e0b",
+    },
+    {
+      label: "Vigilancia",
+      count: predictionsForView.filter((item) => !item.sin_historial && item.nivel_riesgo === "vigilancia").length,
+      color: "#d97706",
+    },
+    {
+      label: "Estable",
+      count: predictionsForView.filter((item) => !item.sin_historial && item.nivel_riesgo === "estable").length,
+      color: "#10b981",
+    },
+    {
+      label: "Sin historial",
+      count: predictionsForView.filter((item) => item.sin_historial).length,
+      color: "var(--text-muted)",
+    },
+  ];
+
+  const max = Math.max(1, ...items.map((item) => item.count));
+  return items.map((item) => ({
+    ...item,
+    width: `${Math.max((item.count / max) * 100, item.count > 0 ? 12 : 0)}%`,
+  }));
+}
+
+function computePredictionCountKpis(predictionsForView: Prediction[]) {
+  const enRiesgo = predictionsForView.filter((item) => !item.sin_historial && item.alerta_stock).length;
+  const sinStock = predictionsForView.filter((item) => !item.sin_historial && item.stock_actual === 0).length;
+  const altaDemanda = predictionsForView.filter((item) => !item.sin_historial && item.alta_demanda).length;
+  const conHistorial = predictionsForView.filter((item) => !item.sin_historial).length;
+  const sinHistorial = predictionsForView.filter((item) => item.sin_historial).length;
+  const sobreStock = predictionsForView.filter((item) => !item.sin_historial && isOverstocked(item)).length;
+  const rotacionDebil = predictionsForView.filter((item) => !item.sin_historial && isSlowMoving(item)).length;
+  const conCobertura = predictionsForView.filter((item) => !item.sin_historial && item.dias_hasta_agotarse < 999);
+  const promedioCobertura = conCobertura.reduce(
+    (acc, item, _, arr) => acc + (item.dias_hasta_agotarse / Math.max(arr.length, 1)),
+    0,
+  );
+  return {
+    enRiesgo,
+    sinStock,
+    altaDemanda,
+    conHistorial,
+    sinHistorial,
+    sobreStock,
+    rotacionDebil,
+    promedioCobertura,
+  };
+}
+
+function selectProductoMotorPrediction(predictionsForView: Prediction[]): Prediction | null {
+  const sorted = [...predictionsForView]
+    .filter((item) => !item.sin_historial)
+    .sort((a, b) => b.consumo_estimado_diario - a.consumo_estimado_diario);
+  return sorted[0] ?? null;
+}
+
+async function fetchCombinedPredictionsJson(selectedHorizon: HorizonOption, selectedHistory: HistoryOption) {
+  const res = await fetchAI(`/api/predict/combined?horizon=${selectedHorizon}&history=${selectedHistory}`);
+  if (!res.ok) throw new Error("Error al conectar con el servicio de IA.");
+  return res.json();
+}
+
 export default function AdminPredictions() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [weeklyChart, setWeeklyChart] = useState<WeekPoint[]>([]);
@@ -2832,9 +2919,7 @@ export default function AdminPredictions() {
     setRevenueForecast(null);
     setAiWarnings([]);
     try {
-      const res = await fetchAI(`/api/predict/combined?horizon=${selectedHorizon}&history=${selectedHistory}`);
-      if (!res.ok) throw new Error("Error al conectar con el servicio de IA.");
-      const data = await res.json();
+      const data = await fetchCombinedPredictionsJson(selectedHorizon, selectedHistory);
       setPredictions(data.demand?.predictions ?? []);
       setModeloMeta(data.demand?.modelo_meta ?? null);
       setRevenueForecast(data.revenue ?? null);
@@ -2997,18 +3082,7 @@ export default function AdminPredictions() {
 
   const recomendaciones = useMemo(() => generarRecomendaciónes(predictionsForView), [predictionsForView]);
 
-  const riskAlerts = useMemo(
-    () =>
-      predictionsForView
-        .filter((item) => !item.sin_historial && (item.alerta_stock || (item.stock_actual === 0 && item.alta_demanda)))
-        .sort((a, b) => {
-          if (a.stock_actual === 0 && b.stock_actual !== 0) return -1;
-          if (a.stock_actual !== 0 && b.stock_actual === 0) return 1;
-          return a.dias_hasta_agotarse - b.dias_hasta_agotarse;
-        })
-        .slice(0, 6),
-    [predictionsForView]
-  );
+  const riskAlerts = useMemo(() => selectTopRiskAlertsForPanel(predictionsForView), [predictionsForView]);
 
   const porOrden = useMemo(
     () => sortPredictionsByAdminPriority(filterPredictionsBySearchQuery(predictionsForView, search)),
@@ -3024,22 +3098,19 @@ export default function AdminPredictions() {
   // Análisis ABC por ingreso histórico (A = 80%, B = 15%, C = 5%)
   const abcData = useMemo(() => buildAbcInventoryItems(predictionsForView), [predictionsForView]);
 
-  const enRiesgo = predictionsForView.filter((item) => !item.sin_historial && item.alerta_stock).length;
-  const sinStock = predictionsForView.filter((item) => !item.sin_historial && item.stock_actual === 0).length;
-  const altaDemanda = predictionsForView.filter((item) => !item.sin_historial && item.alta_demanda).length;
-  const conHistorial = predictionsForView.filter((item) => !item.sin_historial).length;
-  const sinHistorial = predictionsForView.filter((item) => item.sin_historial).length;
-  const sobreStock = predictionsForView.filter((item) => !item.sin_historial && isOverstocked(item)).length;
-  const rotacionDebil = predictionsForView.filter((item) => !item.sin_historial && isSlowMoving(item)).length;
-  const promedioCobertura = predictionsForView
-    .filter((item) => !item.sin_historial && item.dias_hasta_agotarse < 999)
-    .reduce((acc, item, _, arr) => acc + (item.dias_hasta_agotarse / Math.max(arr.length, 1)), 0);
+  const {
+    enRiesgo,
+    sinStock,
+    altaDemanda,
+    conHistorial,
+    sinHistorial,
+    sobreStock,
+    rotacionDebil,
+    promedioCobertura,
+  } = useMemo(() => computePredictionCountKpis(predictionsForView), [predictionsForView]);
 
   const productoMotor = useMemo(
-    () =>
-      [...predictionsForView]
-        .filter((item) => !item.sin_historial)
-        .sort((a, b) => b.consumo_estimado_diario - a.consumo_estimado_diario)[0] ?? null,
+    () => selectProductoMotorPrediction(predictionsForView),
     [predictionsForView],
   );
 
@@ -3073,41 +3144,10 @@ export default function AdminPredictions() {
     ],
   );
 
-  const distribucionInventario = useMemo(() => {
-    const items = [
-      {
-        label: "Crítico",
-        count: predictionsForView.filter((item) => !item.sin_historial && (item.stock_actual === 0 || item.nivel_riesgo === "critico")).length,
-        color: "#ef4444",
-      },
-      {
-        label: "Atención",
-        count: predictionsForView.filter((item) => !item.sin_historial && item.nivel_riesgo === "atencion").length,
-        color: "#f59e0b",
-      },
-      {
-        label: "Vigilancia",
-        count: predictionsForView.filter((item) => !item.sin_historial && item.nivel_riesgo === "vigilancia").length,
-        color: "#d97706",
-      },
-      {
-        label: "Estable",
-        count: predictionsForView.filter((item) => !item.sin_historial && item.nivel_riesgo === "estable").length,
-        color: "#10b981",
-      },
-      {
-        label: "Sin historial",
-        count: predictionsForView.filter((item) => item.sin_historial).length,
-        color: "var(--text-muted)",
-      },
-    ];
-
-    const max = Math.max(1, ...items.map((item) => item.count));
-    return items.map((item) => ({
-      ...item,
-      width: `${Math.max((item.count / max) * 100, item.count > 0 ? 12 : 0)}%`,
-    }));
-  }, [predictionsForView]);
+  const distribucionInventario = useMemo(
+    () => buildDistribucionInventarioFromView(predictionsForView),
+    [predictionsForView],
+  );
 
   const assistantContext = useMemo(
     () => buildAssistantContextV2(predictionsForView),

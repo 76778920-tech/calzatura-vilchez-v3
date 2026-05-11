@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ShoppingBag, CreditCard, Truck, ChevronRight } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
@@ -6,41 +6,17 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { createOrder } from "@/domains/pedidos/services/orders";
 import toast from "react-hot-toast";
 import type { Address } from "@/types";
-import { loadStripe } from "@stripe/stripe-js";
-import { formatPeruPhone, isValidPeruPhone, normalizePeruPhoneInput, peruPhoneError } from "@/utils/phone";
-import { DELIVERY_CONFIG } from "@/config/delivery";
+import { normalizePeruPhoneInput } from "@/utils/phone";
+import CheckoutDeliveryBox from "@/domains/carrito/components/CheckoutDeliveryBox";
+import { useCheckoutGeocodingEffects } from "@/domains/carrito/hooks/useCheckoutGeocodingEffects";
+import { redirectStripeCheckoutForOrder } from "@/domains/carrito/services/stripeCheckoutRedirect";
 import {
-  calculateDeliveryForCoordinates,
-  geocodeCheckoutFormSuggestions,
-  geocodeSearchBarSuggestions,
-  hasOpenRouteServiceKey,
-  reverseGeocodeLabel,
-  type DeliveryQuote,
-  type GeocodeCandidate,
-} from "@/services/deliveryOpenRoute";
-import CheckoutDeliveryMap from "@/domains/carrito/components/CheckoutDeliveryMap";
+  formatDireccionTelefonoForSubmit,
+  validateCheckoutDireccionStep,
+} from "@/domains/carrito/utils/checkoutDireccionValidation";
+import { checkoutEnvioSummaryLabel } from "@/domains/carrito/utils/checkoutEnvioSummaryLabel";
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? "";
-
-function buildAddressLine(d: Address): string {
-  return [d.direccion, d.distrito, d.ciudad].map((s) => s.trim()).filter(Boolean).join(", ");
-}
-
-const GEO_LAYER_HINT: Partial<Record<string, string>> = {
-  address: "Dirección (calle y número)",
-  street: "Calle",
-  venue: "Lugar / negocio",
-  neighbourhood: "Barrio",
-  borough: "Distrito o zona",
-  locality: "Ciudad (poco preciso)",
-  localadmin: "Zona administrativa",
-  region: "Región",
-};
-
-function geoLayerHint(layer?: string): string | null {
-  if (!layer) return null;
-  return GEO_LAYER_HINT[layer] ?? null;
-}
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart();
@@ -50,28 +26,6 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<"direccion" | "pago">("direccion");
   const [loading, setLoading] = useState(false);
   const [metodoPago, setMetodoPago] = useState<"stripe" | "contraentrega">("stripe");
-  const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
-  const [deliveryQuoteLoading, setDeliveryQuoteLoading] = useState(false);
-  const [deliveryQuoteError, setDeliveryQuoteError] = useState("");
-
-  const [addressSuggestions, setAddressSuggestions] = useState<GeocodeCandidate[]>([]);
-  const [addressSuggestLoading, setAddressSuggestLoading] = useState(false);
-  const [addressSuggestError, setAddressSuggestError] = useState("");
-
-  const [mapSearchInput, setMapSearchInput] = useState("");
-  const [searchSuggestions, setSearchSuggestions] = useState<GeocodeCandidate[]>([]);
-  const [searchSuggestLoading, setSearchSuggestLoading] = useState(false);
-  const [searchSuggestError, setSearchSuggestError] = useState("");
-
-  const [selectedDelivery, setSelectedDelivery] = useState<GeocodeCandidate | null>(null);
-  const [mapFitNonce, setMapFitNonce] = useState(0);
-
-  const selectedDeliveryRef = useRef<GeocodeCandidate | null>(null);
-  useEffect(() => {
-    selectedDeliveryRef.current = selectedDelivery;
-  }, [selectedDelivery]);
-
-  const reverseGeocodeRequestId = useRef(0);
 
   const [direccion, setDireccion] = useState<Address>({
     nombre: userProfile?.nombre?.split(" ")[0] ?? "",
@@ -83,175 +37,34 @@ export default function CheckoutPage() {
     referencia: "",
   });
 
-  const orsEnabled = hasOpenRouteServiceKey();
+  const geo = useCheckoutGeocodingEffects({ direccion });
+  const addressLineLen = geo.addressLine().length;
 
-  useEffect(() => {
-    if (!orsEnabled) {
-      return;
-    }
-    const ctrl = new AbortController();
-    const timer = window.setTimeout(() => {
-      const line = buildAddressLine(direccion);
-      if (line.length < 10) {
-        setAddressSuggestions([]);
-        setAddressSuggestError("");
-        setAddressSuggestLoading(false);
-        setSelectedDelivery(null);
-        setDeliveryQuote(null);
-        setDeliveryQuoteError("");
-        setDeliveryQuoteLoading(false);
-        return;
-      }
-      void (async () => {
-        setAddressSuggestLoading(true);
-        setAddressSuggestError("");
-        try {
-          const list = await geocodeCheckoutFormSuggestions({
-            direccion: direccion.direccion,
-            distrito: direccion.distrito,
-            ciudad: direccion.ciudad,
-          });
-          if (ctrl.signal.aborted) return;
-          setAddressSuggestions(list);
-        } catch (err) {
-          if (ctrl.signal.aborted) return;
-          setAddressSuggestions([]);
-          setAddressSuggestError(err instanceof Error ? err.message : "No se pudieron cargar sugerencias");
-        } finally {
-          if (!ctrl.signal.aborted) setAddressSuggestLoading(false);
-        }
-      })();
-    }, 550);
+  const checkoutTotal = subtotal + geo.envioMonto;
 
-    return () => {
-      ctrl.abort();
-      window.clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo dirección compuesta
-  }, [direccion.direccion, direccion.distrito, direccion.ciudad, orsEnabled]);
+  const envioSummaryText = useMemo(
+    () =>
+      checkoutEnvioSummaryLabel({
+        orsEnabled: geo.orsEnabled,
+        deliveryQuoteLoading: geo.deliveryQuoteLoading,
+        deliveryQuoteError: geo.deliveryQuoteError,
+        deliveryQuote: geo.deliveryQuote,
+      }),
+    [geo.deliveryQuote, geo.deliveryQuoteError, geo.deliveryQuoteLoading, geo.orsEnabled],
+  );
 
-  useEffect(() => {
-    if (!orsEnabled) return;
-    const ctrl = new AbortController();
-    const q = mapSearchInput.trim();
-    const timer = window.setTimeout(() => {
-      if (q.length < 3) {
-        setSearchSuggestions([]);
-        setSearchSuggestError("");
-        setSearchSuggestLoading(false);
-        return;
-      }
-      void (async () => {
-        setSearchSuggestLoading(true);
-        setSearchSuggestError("");
-        try {
-          const list = await geocodeSearchBarSuggestions(q, {
-            ciudad: direccion.ciudad,
-            distrito: direccion.distrito,
-          });
-          if (ctrl.signal.aborted) return;
-          setSearchSuggestions(list);
-        } catch (err) {
-          if (ctrl.signal.aborted) return;
-          setSearchSuggestions([]);
-          setSearchSuggestError(err instanceof Error ? err.message : "Error en la búsqueda");
-        } finally {
-          if (!ctrl.signal.aborted) setSearchSuggestLoading(false);
-        }
-      })();
-    }, 450);
-    return () => {
-      ctrl.abort();
-      window.clearTimeout(timer);
-    };
-  }, [mapSearchInput, orsEnabled, direccion.ciudad, direccion.distrito]);
-
-  useEffect(() => {
-    if (!orsEnabled || !selectedDelivery) {
-      startTransition(() => {
-        setDeliveryQuote(null);
-        setDeliveryQuoteError("");
-        setDeliveryQuoteLoading(false);
-      });
-      return;
-    }
-    const lat = selectedDelivery.lat;
-    const lng = selectedDelivery.lng;
-    let cancelled = false;
-    startTransition(() => {
-      setDeliveryQuoteLoading(true);
-      setDeliveryQuoteError("");
-    });
-    void calculateDeliveryForCoordinates(lat, lng, selectedDeliveryRef.current?.label)
-      .then((q) => {
-        if (cancelled) return;
-        setDeliveryQuote({
-          ...q,
-          label: selectedDeliveryRef.current?.label ?? q.label,
-        });
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setDeliveryQuote(null);
-        setDeliveryQuoteError(err instanceof Error ? err.message : "No se pudo calcular el envío");
-      })
-      .finally(() => {
-        if (!cancelled) setDeliveryQuoteLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nueva cotización solo al cambiar coordenadas; la etiqueta se sincroniza en el efecto siguiente y vía ref en el fetch
-  }, [orsEnabled, selectedDelivery?.lat, selectedDelivery?.lng]);
-
-  useEffect(() => {
-    if (!selectedDelivery?.label) return;
-    const sel = selectedDelivery;
-    startTransition(() => {
-      setDeliveryQuote((prev) => {
-        if (!prev || prev.customerLat !== sel.lat || prev.customerLng !== sel.lng) {
-          return prev;
-        }
-        if (prev.label === sel.label) return prev;
-        return { ...prev, label: sel.label };
-      });
-    });
-  }, [selectedDelivery]);
-
-  const pickCandidate = useCallback((c: GeocodeCandidate, refitMap: boolean) => {
-    setSelectedDelivery(c);
-    if (refitMap) setMapFitNonce((n) => n + 1);
-  }, []);
-
-  const onMapCustomerMove = useCallback((lat: number, lng: number) => {
-    const id = ++reverseGeocodeRequestId.current;
-    setSelectedDelivery({ lat, lng, label: "Ubicación en el mapa…" });
-    void (async () => {
-      let label: string | null = null;
-      try {
-        label = await reverseGeocodeLabel(lng, lat);
-      } catch {
-        label = null;
-      }
-      if (reverseGeocodeRequestId.current !== id) return;
-      setSelectedDelivery({ lat, lng, label: label ?? "Ubicación elegida en el mapa" });
-    })();
-  }, []);
-
-  const envioMonto = useMemo(() => {
-    if (!orsEnabled) return 0;
-    if (!deliveryQuote || deliveryQuote.isOutOfRange) return 0;
-    return deliveryQuote.cost;
-  }, [deliveryQuote, orsEnabled]);
-
-  const checkoutTotal = subtotal + envioMonto;
+  const pagoDisabledByDelivery =
+    geo.orsEnabled &&
+    (geo.deliveryQuoteLoading || !!geo.deliveryQuoteError || !geo.deliveryQuote || geo.deliveryQuote.isOutOfRange);
 
   if (items.length === 0) {
     return (
       <main className="empty-cart-page">
         <ShoppingBag size={72} className="empty-cart-icon" />
         <h2>Tu carrito está vacío</h2>
-        <Link to="/productos" className="btn-primary">Ver Productos</Link>
+        <Link to="/productos" className="btn-primary">
+          Ver Productos
+        </Link>
       </main>
     );
   }
@@ -260,47 +73,28 @@ export default function CheckoutPage() {
     return (
       <main className="empty-cart-page">
         <h2>Debes iniciar sesión para continuar</h2>
-        <Link to="/login" className="btn-primary">Iniciar Sesión</Link>
+        <Link to="/login" className="btn-primary">
+          Iniciar Sesión
+        </Link>
       </main>
     );
   }
 
   const handleDireccionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!direccion.direccion || !direccion.distrito || !direccion.telefono) {
-      toast.error("Completa todos los campos requeridos");
+    const err = validateCheckoutDireccionStep({
+      direccion,
+      orsEnabled: geo.orsEnabled,
+      selectedDelivery: geo.selectedDelivery,
+      deliveryQuoteLoading: geo.deliveryQuoteLoading,
+      deliveryQuoteError: geo.deliveryQuoteError,
+      deliveryQuote: geo.deliveryQuote,
+    });
+    if (err) {
+      toast.error(err);
       return;
     }
-    const phoneError = peruPhoneError(direccion.telefono);
-    if (phoneError || !isValidPeruPhone(direccion.telefono)) {
-      toast.error(phoneError ?? "Ingresa un teléfono válido");
-      return;
-    }
-    setDireccion((current) => ({
-      ...current,
-      telefono: formatPeruPhone(current.telefono),
-    }));
-    if (orsEnabled) {
-      const line = buildAddressLine(direccion);
-      if (line.length >= 10 && !selectedDelivery) {
-        toast.error("Elegí un punto de entrega: una sugerencia de la lista, una búsqueda o el mapa.");
-        return;
-      }
-      if (deliveryQuoteLoading) {
-        toast.error("Espera un momento: estamos calculando el costo de envío.");
-        return;
-      }
-      if (deliveryQuoteError) {
-        toast.error(deliveryQuoteError);
-        return;
-      }
-      if (!deliveryQuote || deliveryQuote.isOutOfRange) {
-        toast.error(
-          `No podemos entregar a esa dirección (máx. ${DELIVERY_CONFIG.maxDeliveryKm} km desde la tienda).`,
-        );
-        return;
-      }
-    }
+    setDireccion(formatDireccionTelefonoForSubmit(direccion));
     setStep("pago");
   };
 
@@ -312,38 +106,12 @@ export default function CheckoutPage() {
         direccion,
         metodoPago,
         notas: "",
-        envio: envioMonto,
+        envio: geo.envioMonto,
       });
 
       if (metodoPago === "stripe" && STRIPE_PK) {
-        const idToken = await user.getIdToken();
-        const stripe = await loadStripe(STRIPE_PK);
-        if (!stripe) throw new Error("Stripe no disponible");
-
-        const res = await fetch(
-          `https://us-central1-calzaturavilchez-ab17f.cloudfunctions.net/createCheckoutSession`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({ orderId }),
-          }
-        );
-
-        const payload = await res.json();
-        if (!res.ok) {
-          throw new Error(payload.error || "No se pudo iniciar Stripe Checkout");
-        }
-
-        const checkout = stripe as unknown as {
-          redirectToCheckout(args: { sessionId: string }): Promise<{ error?: Error }>;
-        };
-        const { error } = await checkout.redirectToCheckout({ sessionId: payload.sessionId });
-        if (error) throw error;
+        await redirectStripeCheckoutForOrder(user, orderId, STRIPE_PK);
       } else {
-        // Pago contra entrega — validar totales server-side antes de confirmar
         clearCart();
         navigate(`/pedido-exitoso/${orderId}`);
       }
@@ -359,7 +127,6 @@ export default function CheckoutPage() {
     <main className="checkout-page">
       <h1 className="checkout-title">Finalizar Compra</h1>
 
-      {/* Steps indicator */}
       <div className="checkout-steps">
         <div className={`step ${step === "direccion" ? "active" : "done"}`}>
           <span className="step-number">1</span>
@@ -373,7 +140,6 @@ export default function CheckoutPage() {
       </div>
 
       <div className="checkout-grid">
-        {/* Left: form */}
         <div className="checkout-form-area">
           {step === "direccion" && (
             <form onSubmit={handleDireccionSubmit} className="checkout-form">
@@ -442,10 +208,12 @@ export default function CheckoutPage() {
                 <input
                   type="tel"
                   value={direccion.telefono}
-                  onChange={(e) => setDireccion({
-                    ...direccion,
-                    telefono: normalizePeruPhoneInput(e.target.value),
-                  })}
+                  onChange={(e) =>
+                    setDireccion({
+                      ...direccion,
+                      telefono: normalizePeruPhoneInput(e.target.value),
+                    })
+                  }
                   required
                   inputMode="tel"
                   maxLength={15}
@@ -465,133 +233,28 @@ export default function CheckoutPage() {
                 />
               </div>
 
-              {orsEnabled && (
-                <div className="checkout-delivery-box">
-                  <p className="checkout-delivery-title">Envío (OpenRouteService)</p>
-                  <p className="checkout-delivery-muted checkout-delivery-intro">
-                    La lista prioriza direcciones y calles sobre solo «ciudad». Incluí en <strong>Dirección</strong> el
-                    nombre de la vía y el número (ej. Jr. Puno 245). Si no aparece tu puerta exacta, tocá el mapa o
-                    arrastrá el pin azul.
-                  </p>
-
-                  <div className="form-group checkout-delivery-search-group">
-                    <label>Buscar ubicación en el mapa</label>
-                    <input
-                      type="text"
-                      value={mapSearchInput}
-                      onChange={(e) => setMapSearchInput(e.target.value)}
-                      className="form-input"
-                      placeholder="Ej: Jr. Puno 123, Huancayo"
-                      autoComplete="street-address"
-                    />
-                    {searchSuggestLoading && (
-                      <p className="checkout-delivery-muted">Buscando…</p>
-                    )}
-                    {!searchSuggestLoading && searchSuggestError && (
-                      <p className="checkout-delivery-error">{searchSuggestError}</p>
-                    )}
-                    {!searchSuggestLoading && !searchSuggestError && searchSuggestions.length > 0 && (
-                      <ul className="checkout-delivery-suggest-list" role="listbox" aria-label="Resultados de búsqueda">
-                        {searchSuggestions.map((c, i) => (
-                          <li key={`s-${i}-${c.lat}-${c.lng}`}>
-                            <button
-                              type="button"
-                              className="checkout-delivery-suggest-btn"
-                              title={c.label}
-                              onClick={() => pickCandidate(c, true)}
-                            >
-                              <span className="checkout-delivery-suggest-label">{c.label}</span>
-                              {geoLayerHint(c.layer) ? (
-                                <span className="checkout-delivery-layer-hint">{geoLayerHint(c.layer)}</span>
-                              ) : null}
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-
-                  {buildAddressLine(direccion).length >= 10 && (
-                    <div className="checkout-delivery-suggest-block">
-                      <p className="checkout-delivery-subtitle">Sugerencias según tu dirección</p>
-                      {addressSuggestLoading && (
-                        <p className="checkout-delivery-muted">Cargando sugerencias…</p>
-                      )}
-                      {!addressSuggestLoading && addressSuggestError && (
-                        <p className="checkout-delivery-error">{addressSuggestError}</p>
-                      )}
-                      {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length === 0 && (
-                        <p className="checkout-delivery-muted">No hay resultados; probá el buscador de arriba.</p>
-                      )}
-                      {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length > 0 && (
-                        <ul className="checkout-delivery-suggest-list" role="listbox" aria-label="Sugerencias por dirección">
-                          {addressSuggestions.map((c, i) => (
-                            <li key={`a-${i}-${c.lat}-${c.lng}`}>
-                              <button
-                                type="button"
-                                className="checkout-delivery-suggest-btn"
-                                title={c.label}
-                                onClick={() => pickCandidate(c, true)}
-                              >
-                                <span className="checkout-delivery-suggest-label">{c.label}</span>
-                                {geoLayerHint(c.layer) ? (
-                                  <span className="checkout-delivery-layer-hint">{geoLayerHint(c.layer)}</span>
-                                ) : null}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
-                  )}
-
-                  {selectedDelivery && (
-                    <CheckoutDeliveryMap
-                      storeLat={DELIVERY_CONFIG.storeLat}
-                      storeLng={DELIVERY_CONFIG.storeLng}
-                      customerLat={selectedDelivery.lat}
-                      customerLng={selectedDelivery.lng}
-                      fitBoundsNonce={mapFitNonce}
-                      interactive
-                      onCustomerPositionChange={onMapCustomerMove}
-                    />
-                  )}
-
-                  {deliveryQuoteLoading && (
-                    <p className="checkout-delivery-muted">Calculando distancia y costo…</p>
-                  )}
-                  {!deliveryQuoteLoading && deliveryQuoteError && (
-                    <p className="checkout-delivery-error">{deliveryQuoteError}</p>
-                  )}
-                  {!deliveryQuoteLoading && !deliveryQuoteError && deliveryQuote && (
-                    <>
-                      <p className="checkout-delivery-line">
-                        Distancia aprox.: <strong>{deliveryQuote.distanceFormatted}</strong>
-                        {deliveryQuote.label ? (
-                          <span className="checkout-delivery-muted"> — {deliveryQuote.label}</span>
-                        ) : null}
-                      </p>
-                      {deliveryQuote.isOutOfRange ? (
-                        <p className="checkout-delivery-error">
-                          Fuera de zona de reparto (máximo {DELIVERY_CONFIG.maxDeliveryKm} km).
-                        </p>
-                      ) : deliveryQuote.isFreeDelivery ? (
-                        <p className="checkout-delivery-ok">Envío gratis en tu zona.</p>
-                      ) : (
-                        <p className="checkout-delivery-line">
-                          Costo de envío: <strong>{deliveryQuote.costFormatted}</strong>
-                        </p>
-                      )}
-                    </>
-                  )}
-
-                  {buildAddressLine(direccion).length < 10 && (
-                    <p className="checkout-delivery-muted">Completa dirección, distrito y ciudad para ver sugerencias de envío.</p>
-                  )}
-                </div>
+              {geo.orsEnabled && (
+                <CheckoutDeliveryBox
+                  addressLineLength={addressLineLen}
+                  mapSearchInput={geo.mapSearchInput}
+                  onMapSearchChange={geo.setMapSearchInput}
+                  searchSuggestLoading={geo.searchSuggestLoading}
+                  searchSuggestError={geo.searchSuggestError}
+                  searchSuggestions={geo.searchSuggestions}
+                  onPickCandidate={geo.pickCandidate}
+                  addressSuggestLoading={geo.addressSuggestLoading}
+                  addressSuggestError={geo.addressSuggestError}
+                  addressSuggestions={geo.addressSuggestions}
+                  selectedDelivery={geo.selectedDelivery}
+                  mapFitNonce={geo.mapFitNonce}
+                  onMapCustomerMove={geo.onMapCustomerMove}
+                  deliveryQuoteLoading={geo.deliveryQuoteLoading}
+                  deliveryQuoteError={geo.deliveryQuoteError}
+                  deliveryQuote={geo.deliveryQuote}
+                />
               )}
 
-              {!orsEnabled && (
+              {!geo.orsEnabled && (
                 <p className="checkout-delivery-muted">
                   Sin <code className="checkout-delivery-code">VITE_ORS_API_KEY</code>, el envío se registra como S/ 0.00
                   (configura la clave en <code className="checkout-delivery-code">.env.local</code> para cálculo automático).
@@ -647,9 +310,15 @@ export default function CheckoutPage() {
               </div>
 
               <div className="checkout-confirm-address">
-                <p><strong>Entregar en:</strong></p>
-                <p>{direccion.nombre} {direccion.apellido}</p>
-                <p>{direccion.direccion}, {direccion.distrito}, {direccion.ciudad}</p>
+                <p>
+                  <strong>Entregar en:</strong>
+                </p>
+                <p>
+                  {direccion.nombre} {direccion.apellido}
+                </p>
+                <p>
+                  {direccion.direccion}, {direccion.distrito}, {direccion.ciudad}
+                </p>
                 <button type="button" onClick={() => setStep("direccion")} className="edit-address-btn">
                   Cambiar dirección
                 </button>
@@ -657,14 +326,7 @@ export default function CheckoutPage() {
 
               <button
                 onClick={handlePlaceOrder}
-                disabled={
-                  loading ||
-                  (orsEnabled &&
-                    (deliveryQuoteLoading ||
-                      !!deliveryQuoteError ||
-                      !deliveryQuote ||
-                      deliveryQuote.isOutOfRange))
-                }
+                disabled={loading || pagoDisabledByDelivery}
                 className="btn-primary btn-full"
               >
                 {loading ? "Procesando..." : `Confirmar Pedido — S/ ${checkoutTotal.toFixed(2)}`}
@@ -673,7 +335,6 @@ export default function CheckoutPage() {
           )}
         </div>
 
-        {/* Right: order summary */}
         <div className="checkout-summary">
           <h2>Tu Pedido</h2>
           <div className="checkout-items">
@@ -706,21 +367,7 @@ export default function CheckoutPage() {
             </div>
             <div className="summary-row">
               <span>Envío</span>
-              <span>
-                {!orsEnabled
-                  ? "S/ 0.00"
-                  : deliveryQuoteLoading
-                    ? "…"
-                    : deliveryQuoteError
-                      ? "—"
-                      : !deliveryQuote
-                        ? "—"
-                        : deliveryQuote.isOutOfRange
-                          ? "No disponible"
-                          : deliveryQuote.isFreeDelivery
-                            ? "Gratis"
-                            : deliveryQuote.costFormatted}
-              </span>
+              <span>{envioSummaryText}</span>
             </div>
             <div className="summary-row summary-total">
               <span>Total</span>
