@@ -5,45 +5,46 @@ import {
   buildCanonicalCatalogLocation,
   CATALOG_ROUTE_PARAM_KEYS,
   CATALOG_SHELF,
-  CYBER_WOW_DEFAULT_DESCUENTO,
   getCatalogCanonicalRedirect,
   mergeCatalogSearchParams,
 } from "@/routes/catalogRouting";
-import { AlertTriangle, ChevronDown, ChevronRight, X } from "lucide-react";
+import { AlertTriangle, ChevronRight, X } from "lucide-react";
 import { fetchProductFamilyGroupCounts, fetchPublicProducts } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import ProductCard from "@/domains/productos/components/ProductCard";
-import { getProductColors } from "@/utils/colors";
 import cyberWowJuvenilEditorial from "@/assets/home/cyber/cyber-wow-juvenil-editorial.png";
 import cyberWowZapatillasEditorial from "@/assets/home/cyber/cyber-wow-zapatillas-editorial.png";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
-import {
-  productMatchesBrandSlug,
-  productMatchesCategory,
-  productMatchesSearch,
-  productMatchesTaxonomy,
-  slugifyCatalogValue,
-  toPublicCategorySlug,
-} from "@/utils/catalog";
+import { slugifyCatalogValue, toPublicCategorySlug } from "@/utils/catalog";
 import { categoryLabel } from "@/utils/labels";
 import { effectiveFamiliaKey } from "@/utils/productFamily";
+import { CatalogFilterRail } from "@/domains/productos/components/CatalogFilterRail";
+import {
+  buildActiveCatalogFacetChips,
+  buildCatalogBreadcrumbs,
+  buildContextualCatalogFilters,
+  buildFacetFilteredCatalogProducts,
+  buildRouteFilteredCatalogProducts,
+  DISCOUNT_OPTIONS,
+  filterParsedColorsForCatalogDraft,
+  filterParsedMaterialsForCatalogDraft,
+  filterParsedSizesForCatalogDraft,
+  getPriceLabel,
+  getProductSizes,
+  humanizeSlug,
+  MATERIAL_FILTER_ORDER,
+  MATERIAL_RULES,
+  parseColorSelection,
+  parseDiscountSelection,
+  parseMaterialSelection,
+  parsePriceRange,
+  parseSizeSelection,
+  resolveProductsPageTitle,
+  toggleCatalogStringListMember,
+  type CatalogFilterGroup,
+} from "@/domains/productos/utils/productsPageCatalogDerivations";
 
 const CATALOG_CAMPAIGN_ROTATION_MS = 9000;
-
-type CatalogQuickFilter = {
-  label: string;
-  params: Record<string, string | undefined>;
-};
-
-type CatalogFilterGroup = {
-  title: string;
-  items: CatalogQuickFilter[];
-};
-
-type CatalogBreadcrumb = {
-  label: string;
-  params: Record<string, string | undefined>;
-};
 
 type FilterOption = {
   label: string;
@@ -57,145 +58,6 @@ type FilterMenuConfig = {
   options: FilterOption[];
   onSelect: (value: string) => void;
 };
-
-type MaterialRule = {
-  slug: string;
-  label: string;
-  terms: string[];
-};
-
-const MATERIAL_RULES: MaterialRule[] = [
-  { slug: "cuero", label: "Cuero", terms: ["cuero", "leather"] },
-  { slug: "charol", label: "Charol", terms: ["charol", "patent"] },
-  { slug: "nubuk", label: "Nubuk", terms: ["nubuk"] },
-  { slug: "sintetico", label: "Sintético", terms: ["sintetico", "sintética", "synthetic"] },
-  { slug: "textil", label: "Textil", terms: ["textil", "mesh", "tejido"] },
-  { slug: "gamuza", label: "Gamuza", terms: ["gamuza", "suede"] },
-  { slug: "lona", label: "Lona", terms: ["lona", "canvas"] },
-];
-
-const MATERIAL_FILTER_ORDER = ["cuero", "gamuza", "charol", "nubuk", "sintetico", "textil"] as const;
-
-function normalizeText(value = "") {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
-
-function humanizeSlug(value: string) {
-  return value
-    .split("-")
-    .filter(Boolean)
-    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
-    .join(" ");
-}
-
-function inferProductMaterials(product: Product) {
-  const haystack = normalizeText(
-    [product.nombre, product.descripcion, product.tipoCalzado, product.color, product.marca]
-      .filter(Boolean)
-      .join(" ")
-  );
-
-  return MATERIAL_RULES.filter((rule) => rule.terms.some((term) => haystack.includes(normalizeText(term))));
-}
-
-function getProductSizes(product: Product) {
-  const fromTallas = Array.isArray(product.tallas) ? product.tallas : [];
-  const fromStock = product.tallaStock ? Object.keys(product.tallaStock) : [];
-  return Array.from(new Set([...fromTallas, ...fromStock].map((value) => value.trim()).filter(Boolean)));
-}
-
-function getPriceLabel(value: string, min: number, max: number) {
-  if (!value) return "";
-  const [mode, rawFirst, rawSecond] = value.split(":");
-  const first = Number(rawFirst);
-  const second = Number(rawSecond);
-
-  if (mode === "under" && Number.isFinite(first)) return `Hasta S/ ${first}`;
-  if (mode === "between" && Number.isFinite(first) && Number.isFinite(second)) return `S/ ${first} - ${second}`;
-  if (mode === "over" && Number.isFinite(first)) return `Desde S/ ${first}`;
-  if (mode === "range" && Number.isFinite(first) && Number.isFinite(second)) return `S/ ${first} - ${second}`;
-  return min === max ? `S/ ${min}` : "";
-}
-
-function matchesPriceBucket(price: number, bucket: string) {
-  if (!bucket) return true;
-  const [mode, rawFirst, rawSecond] = bucket.split(":");
-  const first = Number(rawFirst);
-  const second = Number(rawSecond);
-
-  if (mode === "under" && Number.isFinite(first)) return price <= first;
-  if (mode === "between" && Number.isFinite(first) && Number.isFinite(second)) {
-    return price >= first && price <= second;
-  }
-  if (mode === "over" && Number.isFinite(first)) return price >= first;
-  if (mode === "range" && Number.isFinite(first) && Number.isFinite(second)) {
-    return price >= Math.min(first, second) && price <= Math.max(first, second);
-  }
-  return true;
-}
-
-function parsePriceRange(value: string, fallbackMin: number, fallbackMax: number) {
-  const [mode, rawFirst, rawSecond] = value.split(":");
-
-  if (mode === "range") {
-    const first = Number(rawFirst);
-    const second = Number(rawSecond);
-    if (Number.isFinite(first) && Number.isFinite(second)) {
-      return {
-        min: Math.min(first, second),
-        max: Math.max(first, second),
-      };
-    }
-  }
-
-  return {
-    min: fallbackMin,
-    max: fallbackMax,
-  };
-}
-
-function parseSizeSelection(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function parseColorSelection(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function parseMaterialSelection(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function parseDiscountSelection(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function inferProductDiscountPercent(product: Product) {
-  return product.descuento ?? null;
-}
-
-const DISCOUNT_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: "10", label: "10 %" },
-  { value: "20", label: "20 %" },
-  { value: "30", label: "30 %" },
-  { value: "all", label: "Todo con descuento" },
-];
 
 const CYBER_DISCOUNT_PILL_OPTIONS: Array<{ label: string; value: string }> = [
   { label: "Todo Cyber Wow", value: "all" },
@@ -666,79 +528,43 @@ export default function ProductsPage() {
     };
   }, [activeMenu]);
 
-  const routeFiltered = useMemo(() => {
-    let result = [...products];
-
-    if (categoria !== "todos") {
-      result = result.filter((product) => productMatchesCategory(product.categoria, categoria));
-    }
-
-    if (vista === "marcas" && marca !== "todas") {
-      result = result.filter((product) => product.marca?.toLowerCase() === marca.toLowerCase());
-    }
-
-    if (marcaSlug) {
-      result = result.filter((product) => productMatchesBrandSlug(product, marcaSlug));
-    }
-
-    if (campana) {
-      result = result.filter((product) => productMatchesTaxonomy(product, "campana", campana));
-    }
-
-    if (promocion) {
-      result = result.filter((product) => productMatchesTaxonomy(product, "promocion", promocion));
-    }
-
-    if (coleccion) {
-      result = result.filter((product) => productMatchesTaxonomy(product, "coleccion", coleccion));
-    }
-
-    if (tipo) {
-      result = result.filter((product) => productMatchesTaxonomy(product, "tipo", tipo));
-    }
-
-    if (linea) {
-      result = result.filter((product) => productMatchesTaxonomy(product, "linea", linea));
-    }
-
-    if (estilo) {
-      result = result.filter((product) => productMatchesTaxonomy(product, "estilo", estilo));
-    }
-
-    if (segmento) {
-      result = result.filter((product) => productMatchesTaxonomy(product, "segmento", segmento));
-    }
-
-    if (rangoEdad) {
-      result = result.filter((product) => productMatchesTaxonomy(product, "rangoEdad", rangoEdad));
-    }
-
-    if (color && !color.includes(",")) {
-      result = result.filter((product) => productMatchesTaxonomy(product, "color", color));
-    }
-
-    if (trimmedQuery) {
-      result = result.filter((product) => productMatchesSearch(product, trimmedQuery));
-    }
-
-    return result;
-  }, [
-    products,
-    categoria,
-    vista,
-    marca,
-    marcaSlug,
-    campana,
-    promocion,
-    coleccion,
-    tipo,
-    linea,
-    estilo,
-    segmento,
-    rangoEdad,
-    color,
-    trimmedQuery,
-  ]);
+  const routeFiltered = useMemo(
+    () =>
+      buildRouteFilteredCatalogProducts({
+        products,
+        categoria,
+        vista,
+        marca,
+        marcaSlug,
+        campana,
+        promocion,
+        coleccion,
+        tipo,
+        linea,
+        estilo,
+        segmento,
+        rangoEdad,
+        color,
+        trimmedQuery,
+      }),
+    [
+      products,
+      categoria,
+      vista,
+      marca,
+      marcaSlug,
+      campana,
+      promocion,
+      coleccion,
+      tipo,
+      linea,
+      estilo,
+      segmento,
+      rangoEdad,
+      color,
+      trimmedQuery,
+    ]
+  );
 
   const marcas = useMemo(() => {
     const names = routeFiltered
@@ -793,74 +619,35 @@ export default function ProductsPage() {
     return { min, max, low, high: Math.min(high, max) };
   }, [routeFiltered]);
 
-  const filtered = useMemo(() => {
-    let result = [...routeFiltered];
+  const filtered = useMemo(
+    () =>
+      buildFacetFilteredCatalogProducts(routeFiltered, {
+        precio,
+        talla,
+        color,
+        material,
+        descuento,
+      }),
+    [color, descuento, material, precio, routeFiltered, talla]
+  );
 
-    if (precio) {
-      result = result.filter((product) => matchesPriceBucket(product.precio, precio));
-    }
-
-    if (talla) {
-      const selectedSizes = parseSizeSelection(talla);
-      result = result.filter((product) => {
-        const productSizes = getProductSizes(product);
-        return selectedSizes.some((size) => productSizes.includes(size));
-      });
-    }
-
-    if (color && color.includes(",")) {
-      const selectedColors = parseColorSelection(color);
-      result = result.filter((product) => {
-        const productColors = getProductColors(product).map((value) => slugifyCatalogValue(value));
-        return selectedColors.some((selected) => productColors.includes(selected));
-      });
-    }
-
-    if (material) {
-      const selectedMaterials = parseMaterialSelection(material);
-      result = result.filter((product) =>
-        inferProductMaterials(product).some((rule) => selectedMaterials.includes(rule.slug))
-      );
-    }
-
-    if (descuento) {
-      const selectedDiscounts = parseDiscountSelection(descuento);
-      const hasAllDiscount = selectedDiscounts.includes("all");
-      const selectedPercents = selectedDiscounts
-        .filter((item) => item !== "all")
-        .map((item) => Number(item))
-        .filter(Number.isFinite);
-
-      result = result.filter((product) => {
-        const fieldPercent = inferProductDiscountPercent(product);
-
-        if (hasAllDiscount) {
-          return fieldPercent !== null;
-        }
-
-        if (selectedPercents.length === 0) return true;
-        if (fieldPercent === null) return false;
-        return selectedPercents.some((percent) => fieldPercent >= percent);
-      });
-    }
-
-    return result;
-  }, [color, descuento, material, precio, routeFiltered, talla]);
-
-  const pageTitle = useMemo(() => {
-    if (vista === "marcas") return "Marcas seleccionadas";
-    if (campana) return `Campaña ${humanizeSlug(campana)}`;
-    if (promocion) return `Selección ${humanizeSlug(promocion)}`;
-    if (coleccion) return humanizeSlug(coleccion);
-    if (linea) return `${humanizeSlug(linea)}${categoria !== "todos" ? ` ${categoryLabel(categoria)}` : ""}`.trim();
-    if (tipo) return `${humanizeSlug(tipo)}${categoria !== "todos" ? ` ${categoryLabel(categoria)}` : ""}`.trim();
-    if (estilo) return `${humanizeSlug(estilo)}${categoria !== "todos" ? ` ${categoryLabel(categoria)}` : ""}`.trim();
-    if (segmento) return humanizeSlug(segmento);
-    if (marcaSlug) return `Marca ${humanizeSlug(marcaSlug)}`;
-    if (categoria !== "todos") return `Calzado ${categoryLabel(categoria)}`;
-    if (trimmedQuery) return `Resultados para "${trimmedQuery}"`;
-    return "Todos los productos";
-  }, [campana, categoria, coleccion, estilo, linea, marcaSlug, promocion, segmento, tipo, trimmedQuery, vista]);
+  const pageTitle = useMemo(
+    () =>
+      resolveProductsPageTitle({
+        vista,
+        campana,
+        promocion,
+        coleccion,
+        linea,
+        tipo,
+        estilo,
+        segmento,
+        marcaSlug,
+        categoria,
+        trimmedQuery,
+      }),
+    [campana, categoria, coleccion, estilo, linea, marcaSlug, promocion, segmento, tipo, trimmedQuery, vista]
+  );
 
   const pageSubtitle = useMemo(() => {
     const visibleCount = `${filtered.length} producto${filtered.length !== 1 ? "s" : ""}`;
@@ -906,237 +693,23 @@ export default function ProductsPage() {
     []
   );
 
-  const contextualFilters = useMemo<CatalogFilterGroup>(() => {
-    const make = (title: string, items: CatalogQuickFilter[]) => ({ title, items });
-    const cyberDesc = descuento || CYBER_WOW_DEFAULT_DESCUENTO;
-
-    if (vista === "marcas") {
-      return make("Marcas", [
-        { label: "Todas", params: { vista: "marcas" } },
-        ...marcas.map((brand) => ({
-          label: brand.label,
-          params: { vista: "marcas", marcaSlug: brand.value },
-        })),
-      ]);
-    }
-
-    if (campana === "cyber" && linea === "zapatillas") {
-      return make("Cyber Zapatillas", [
-        { label: "Todos", params: { linea: "zapatillas", campana: "cyber", descuento: cyberDesc } },
-        {
-          label: "Mujer",
-          params: { categoria: "mujer", tipo: "zapatillas", campana: "cyber", descuento: cyberDesc },
-        },
-        {
-          label: "Hombre",
-          params: { categoria: "hombre", tipo: "zapatillas", campana: "cyber", descuento: cyberDesc },
-        },
-        {
-          label: "Ni\u00f1os",
-          params: { categoria: "nino", tipo: "zapatillas", campana: "cyber", descuento: cyberDesc },
-        },
-      ]);
-    }
-
-    if (campana === "cyber" && categoria === "hombre") {
-      return make("Cyber Hombre", [
-        { label: "Todos", params: { categoria: "hombre", campana: "cyber", descuento: cyberDesc } },
-        {
-          label: "Zapatillas Cyber",
-          params: { categoria: "hombre", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
-        },
-        {
-          label: "Zapatos Cyber",
-          params: { categoria: "hombre", campana: "cyber", tipo: "zapatos", descuento: cyberDesc },
-        },
-        {
-          label: "Botines Cyber",
-          params: { categoria: "hombre", campana: "cyber", tipo: "botines", descuento: cyberDesc },
-        },
-      ]);
-    }
-
-    if (campana === "cyber" && categoria === "mujer") {
-      return make("Cyber Mujer", [
-        { label: "Todos", params: { categoria: "mujer", campana: "cyber", descuento: cyberDesc } },
-        {
-          label: "Zapatillas Cyber",
-          params: { categoria: "mujer", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
-        },
-        {
-          label: "Sandalias Cyber",
-          params: { categoria: "mujer", campana: "cyber", tipo: "sandalias", descuento: cyberDesc },
-        },
-        {
-          label: "Botines Cyber",
-          params: { categoria: "mujer", campana: "cyber", tipo: "botines", descuento: cyberDesc },
-        },
-      ]);
-    }
-
-    if (campana === "cyber" && categoria === "nino") {
-      return make("Cyber Infantil", [
-        { label: "Todos", params: { categoria: "nino", campana: "cyber", descuento: cyberDesc } },
-        {
-          label: "Escolar Cyber",
-          params: { categoria: "nino", campana: "cyber", tipo: "escolar", descuento: cyberDesc },
-        },
-        {
-          label: "Juvenil Activo",
-          params: { categoria: "nino", campana: "cyber", segmento: "juvenil", descuento: cyberDesc },
-        },
-        {
-          label: "Zapatillas Cyber",
-          params: { categoria: "nino", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
-        },
-      ]);
-    }
-
-    if (
-      categoria === "mujer" &&
-      (campana === "nueva-temporada" ||
-        ["pasos-radiantes", "urban-glow", "sunset-chic"].includes(coleccion))
-    ) {
-      return make("Nuevas tendencias", [
-        { label: "Nueva temporada", params: { categoria: "mujer", campana: "nueva-temporada" } },
-        { label: "Pasos radiantes", params: { categoria: "mujer", coleccion: "pasos-radiantes" } },
-        { label: "Urban glow", params: { categoria: "mujer", coleccion: "urban-glow" } },
-        { label: "Sunset chic", params: { categoria: "mujer", coleccion: "sunset-chic" } },
-      ]);
-    }
-
-    if (
-      categoria === "hombre" &&
-      (campana === "nueva-temporada" ||
-        ["ruta-urbana", "paso-ejecutivo", "weekend-flow"].includes(coleccion))
-    ) {
-      return make("Nuevas tendencias", [
-        { label: "Nueva temporada", params: { categoria: "hombre", campana: "nueva-temporada" } },
-        { label: "Ruta urbana", params: { categoria: "hombre", coleccion: "ruta-urbana" } },
-        { label: "Paso ejecutivo", params: { categoria: "hombre", coleccion: "paso-ejecutivo" } },
-        { label: "Weekend flow", params: { categoria: "hombre", coleccion: "weekend-flow" } },
-      ]);
-    }
-
-    if (
-      categoria === "nino" &&
-      (campana === "nueva-temporada" || ["vuelta-al-cole", "mini-aventuras"].includes(coleccion))
-    ) {
-      return make("Nuevas tendencias", [
-        { label: "Nueva temporada", params: { categoria: "nino", campana: "nueva-temporada" } },
-        { label: "Vuelta al cole", params: { categoria: "nino", coleccion: "vuelta-al-cole" } },
-        { label: "Paso activo", params: { categoria: "nino", tipo: "zapatillas" } },
-        { label: "Mini aventuras", params: { categoria: "nino", coleccion: "mini-aventuras" } },
-      ]);
-    }
-
-    if (categoria === "mujer" && tipo === "zapatillas") {
-      return make("Zapatillas mujer", [
-        { label: "Todos", params: { categoria: "mujer", tipo: "zapatillas" } },
-        { label: "Urbanas", params: { categoria: "mujer", tipo: "zapatillas", estilo: "urbanas" } },
-        { label: "Deportivas", params: { categoria: "mujer", tipo: "zapatillas", estilo: "deportivas" } },
-        { label: "Casuales", params: { categoria: "mujer", tipo: "zapatillas", estilo: "casuales" } },
-        { label: "Outdoor", params: { categoria: "mujer", tipo: "zapatillas", estilo: "outdoor" } },
-      ]);
-    }
-
-    if (categoria === "hombre" && tipo === "zapatillas") {
-      return make("Zapatillas hombre", [
-        { label: "Todos", params: { categoria: "hombre", tipo: "zapatillas" } },
-        { label: "Urbanas", params: { categoria: "hombre", tipo: "zapatillas", estilo: "urbanas" } },
-        { label: "Deportivas", params: { categoria: "hombre", tipo: "zapatillas", estilo: "deportivas" } },
-        { label: "Casuales", params: { categoria: "hombre", tipo: "zapatillas", estilo: "casuales" } },
-        { label: "Outdoor", params: { categoria: "hombre", tipo: "zapatillas", estilo: "outdoor" } },
-      ]);
-    }
-
-    if ((linea === "zapatillas" || tipo === "zapatillas") && color === "blanco") {
-      return make("Zapatillas blancas", [
-        { label: "Todos", params: { linea: "zapatillas", color: "blanco" } },
-        { label: "Mujer", params: { categoria: "mujer", tipo: "zapatillas", color: "blanco" } },
-        { label: "Hombre", params: { categoria: "hombre", tipo: "zapatillas", color: "blanco" } },
-        { label: "Ni\u00f1os", params: { categoria: "nino", tipo: "zapatillas", color: "blanco" } },
-        { label: "Juvenil", params: { categoria: "nino", segmento: "juvenil", tipo: "zapatillas", color: "blanco" } },
-      ]);
-    }
-
-    if (categoria === "nino" && segmento === "ninas") {
-      return make("Ni\u00f1as", [
-        { label: "Todos", params: { categoria: "nino", segmento: "ninas" } },
-        { label: "Escolar", params: { categoria: "nino", segmento: "ninas", tipo: "escolar" } },
-        { label: "Zapatillas", params: { categoria: "nino", segmento: "ninas", tipo: "zapatillas" } },
-        { label: "Ballerinas", params: { categoria: "nino", segmento: "ninas", tipo: "ballerinas" } },
-        { label: "Botas y botines", params: { categoria: "nino", segmento: "ninas", tipo: "botas" } },
-        { label: "Sandalias", params: { categoria: "nino", segmento: "ninas", tipo: "sandalias" } },
-        { label: "Zapatos", params: { categoria: "nino", segmento: "ninas", tipo: "zapatos" } },
-      ]);
-    }
-
-    if (categoria === "nino" && (segmento === "ninos" || segmento === "junior" || rangoEdad)) {
-      return make("Ni\u00f1os", [
-        { label: "Todos", params: { categoria: "nino", segmento: "ninos" } },
-        { label: "Infantil 1-3", params: { categoria: "nino", rangoEdad: "1-3" } },
-        { label: "Niños 4-6", params: { categoria: "nino", segmento: "ninos" } },
-        { label: "Junior 7-10", params: { categoria: "nino", segmento: "junior" } },
-        { label: "Zapatos", params: { categoria: "nino", tipo: "zapatos" } },
-        { label: "Zapatillas", params: { categoria: "nino", tipo: "zapatillas" } },
-      ]);
-    }
-
-    if (categoria === "mujer") {
-      return make("Calzado mujer", [
-        { label: "Todos", params: { categoria: "mujer" } },
-        { label: "Zapatillas", params: { categoria: "mujer", tipo: "zapatillas" } },
-        { label: "Sandalias", params: { categoria: "mujer", tipo: "sandalias" } },
-        { label: "Casual", params: { categoria: "mujer", tipo: "casual" } },
-        { label: "Vestir", params: { categoria: "mujer", tipo: "formal" } },
-        { label: "Mocasines", params: { categoria: "mujer", tipo: "mocasines" } },
-        { label: "Botas", params: { categoria: "mujer", tipo: "botas" } },
-      ]);
-    }
-
-    if (categoria === "hombre") {
-      return make("Calzado hombre", [
-        { label: "Todos", params: { categoria: "hombre" } },
-        { label: "Zapatillas", params: { categoria: "hombre", tipo: "zapatillas" } },
-        { label: "Vestir", params: { categoria: "hombre", tipo: "formal" } },
-        { label: "Casual", params: { categoria: "hombre", tipo: "casual" } },
-        { label: "Sandalias", params: { categoria: "hombre", tipo: "sandalias" } },
-        { label: "Botines", params: { categoria: "hombre", tipo: "botines" } },
-        { label: "Seguridad", params: { categoria: "hombre", tipo: "seguridad" } },
-      ]);
-    }
-
-    if (categoria === "nino") {
-      return make("Infantil", [
-        { label: "Todos", params: { categoria: "nino" } },
-        { label: "Escolar", params: { categoria: "nino", tipo: "escolar" } },
-        { label: "Sandalias", params: { categoria: "nino", tipo: "sandalias" } },
-        { label: "Zapatillas", params: { categoria: "nino", tipo: "zapatillas" } },
-        { label: "Ni\u00f1os", params: { categoria: "nino", segmento: "ninos" } },
-        { label: "Ni\u00f1as", params: { categoria: "nino", segmento: "ninas" } },
-      ]);
-    }
-
-    return make("Categoría", [
-      { label: "Todos", params: {} },
-      { label: "Mujer", params: { categoria: "mujer" } },
-      { label: "Hombre", params: { categoria: "hombre" } },
-      { label: "Infantil", params: { categoria: "nino" } },
-    ]);
-  }, [
-    campana,
-    categoria,
-    coleccion,
-    color,
-    descuento,
-    linea,
-    marcas,
-    rangoEdad,
-    segmento,
-    tipo,
-    vista,
-  ]);
+  const contextualFilters = useMemo(
+    () =>
+      buildContextualCatalogFilters({
+        vista,
+        campana,
+        categoria,
+        coleccion,
+        tipo,
+        linea,
+        segmento,
+        color,
+        descuento,
+        rangoEdad,
+        marcas,
+      }),
+    [campana, categoria, coleccion, color, descuento, linea, marcas, rangoEdad, segmento, tipo, vista]
+  );
 
   const showContextualFilterGroup = useMemo(() => {
     if (contextualFilters.title === "Categoría") return false;
@@ -1207,15 +780,15 @@ export default function ProductsPage() {
       }
       if (menuKey === "talla") {
         setSizePopoverStyle(null);
-        setDraftSelectedSizes(parseSizeSelection(talla).filter((size) => availableSizes.includes(size)));
+        setDraftSelectedSizes(filterParsedSizesForCatalogDraft(parseSizeSelection(talla), availableSizes));
       }
       if (menuKey === "color") {
         setColorPopoverStyle(null);
-        setDraftSelectedColors(parseColorSelection(color).filter((value) => availableColors.some((c) => c.value === value)));
+        setDraftSelectedColors(filterParsedColorsForCatalogDraft(parseColorSelection(color), availableColors));
       }
       if (menuKey === "material") {
         setMaterialPopoverStyle(null);
-        setDraftSelectedMaterials(parseMaterialSelection(material).filter((value) => availableMaterials.some((m) => m.value === value)));
+        setDraftSelectedMaterials(filterParsedMaterialsForCatalogDraft(parseMaterialSelection(material), availableMaterials));
       }
       if (menuKey === "descuento") {
         setDiscountPopoverStyle(null);
@@ -1225,120 +798,28 @@ export default function ProductsPage() {
     });
   }, [availableColors, availableMaterials, availableSizes, color, descuento, material, precio, priceBounds.max, priceBounds.min, talla]);
 
-  const breadcrumbs = useMemo<CatalogBreadcrumb[]>(() => {
-    const items: CatalogBreadcrumb[] = [];
-
-    const withRefinements = (params: Record<string, string | undefined>) => ({
-      ...params,
-      ...(descuento ? { descuento } : {}),
-      ...(precio ? { precio } : {}),
-      ...(talla ? { talla } : {}),
-      ...(material ? { material } : {}),
-    });
-
-    const pushCrumb = (label: string, params: Record<string, string | undefined>) => {
-      items.push({ label, params: withRefinements(params) });
-    };
-
-    const sectionParams: Record<string, string | undefined> = {};
-
-    if (vista === "marcas") {
-      sectionParams.vista = "marcas";
-      pushCrumb("Marcas", { ...sectionParams });
-    } else if (categoria !== "todos") {
-      sectionParams.categoria = categoria;
-      pushCrumb(categoryLabel(categoria), { ...sectionParams });
-    }
-
-    if (campana) {
-      const params: Record<string, string | undefined> = { ...sectionParams, campana };
-      if (linea) params.linea = linea;
-      pushCrumb(humanizeSlug(campana), params);
-    }
-
-    if (coleccion) {
-      pushCrumb(humanizeSlug(coleccion), {
-        ...sectionParams,
-        campana: campana || undefined,
+  const breadcrumbs = useMemo(
+    () =>
+      buildCatalogBreadcrumbs({
+        vista,
+        categoria,
+        campana,
         coleccion,
-      });
-    }
-
-    if (linea) {
-      pushCrumb(humanizeSlug(linea), {
-        ...sectionParams,
-        campana: campana || undefined,
-        coleccion: coleccion || undefined,
         linea,
-      });
-    }
-
-    if (tipo) {
-      pushCrumb(humanizeSlug(tipo), {
-        ...sectionParams,
-        campana: campana || undefined,
-        coleccion: coleccion || undefined,
-        linea: linea || undefined,
         tipo,
-      });
-    }
-
-    if (estilo) {
-      pushCrumb(humanizeSlug(estilo), {
-        ...sectionParams,
-        campana: campana || undefined,
-        coleccion: coleccion || undefined,
-        linea: linea || undefined,
-        tipo: tipo || undefined,
         estilo,
-      });
-    }
-
-    if (segmento) {
-      pushCrumb(categoryLabel(segmento), {
-        ...sectionParams,
-        campana: campana || undefined,
-        coleccion: coleccion || undefined,
-        linea: linea || undefined,
-        tipo: tipo || undefined,
         segmento,
-      });
-    }
-
-    if (rangoEdad) {
-      pushCrumb(`${rangoEdad} años`, {
-        ...sectionParams,
-        campana: campana || undefined,
-        coleccion: coleccion || undefined,
-        linea: linea || undefined,
-        tipo: tipo || undefined,
-        segmento: segmento || undefined,
         rangoEdad,
-      });
-    }
-
-    if (color) {
-      pushCrumb(humanizeSlug(color), {
-        ...sectionParams,
-        campana: campana || undefined,
-        coleccion: coleccion || undefined,
-        linea: linea || undefined,
-        tipo: tipo || undefined,
-        segmento: segmento || undefined,
         color,
-      });
-    }
-
-    if (marca !== "todas") {
-      pushCrumb(marca, { vista: "marcas", marca });
-    }
-
-    if (marcaSlug) {
-      pushCrumb(humanizeSlug(marcaSlug), { vista: "marcas", marcaSlug });
-    }
-
-    return items;
-  }, [campana, categoria, coleccion, color, descuento, estilo, linea, marca, marcaSlug, material, precio, rangoEdad, segmento, talla, tipo, vista]);
+        marca,
+        marcaSlug,
+        descuento,
+        precio,
+        talla,
+        material,
+      }),
+    [campana, categoria, coleccion, color, descuento, estilo, linea, marca, marcaSlug, material, precio, rangoEdad, segmento, talla, tipo, vista]
+  );
 
   const sectionLabel = useMemo(() => {
     if (vista === "marcas") return "Marcas";
@@ -1409,51 +890,25 @@ export default function ProductsPage() {
     vista,
   ]);
 
-  const activeFacets = useMemo(() => {
-    const items: { label: string; onClear: () => void }[] = [];
-
-    if (precio) items.push({ label: `Precio: ${getPriceLabel(precio, priceBounds.min, priceBounds.max)}`, onClear: () => applyFacetFilter({ precio: undefined }) });
-    if (talla) items.push({ label: `Talla: ${parseSizeSelection(talla).join(", ")}`, onClear: () => applyFacetFilter({ talla: undefined }) });
-    if (marcaSlug) items.push({ label: `Marca: ${humanizeSlug(marcaSlug)}`, onClear: () => applyFacetFilter({ marcaSlug: undefined, vista: categoria === "todos" ? undefined : vista || undefined }) });
-    if (color) {
-      const selectedColors = parseColorSelection(color);
-      selectedColors.forEach((selectedColor) => {
-        items.push({
-          label: `Color: ${humanizeSlug(selectedColor)}`,
-          onClear: () => {
-            const nextColors = selectedColors.filter((value) => value !== selectedColor);
-            applyFacetFilter({ color: nextColors.length ? nextColors.join(",") : undefined });
-          },
-        });
-      });
-    }
-    if (material) {
-      const selectedMaterials = parseMaterialSelection(material);
-      selectedMaterials.forEach((selectedMaterial) => {
-        items.push({
-          label: `Material: ${humanizeSlug(selectedMaterial)}`,
-          onClear: () => {
-            const nextMaterials = selectedMaterials.filter((value) => value !== selectedMaterial);
-            applyFacetFilter({ material: nextMaterials.length ? nextMaterials.join(",") : undefined });
-          },
-        });
-      });
-    }
-    if (descuento) {
-      const selectedDiscounts = parseDiscountSelection(descuento);
-      selectedDiscounts.forEach((selectedDiscount) => {
-        items.push({
-          label: `Descuento: ${DISCOUNT_OPTIONS.find((option) => option.value === selectedDiscount)?.label ?? selectedDiscount}`,
-          onClear: () => {
-            const nextDiscounts = selectedDiscounts.filter((value) => value !== selectedDiscount);
-            applyFacetFilter({ descuento: nextDiscounts.length ? nextDiscounts.join(",") : undefined });
-          },
-        });
-      });
-    }
-
-    return items;
-  }, [applyFacetFilter, categoria, color, descuento, marcaSlug, material, precio, priceBounds.max, priceBounds.min, talla, vista]);
+  const activeFacets = useMemo(
+    () =>
+      buildActiveCatalogFacetChips(
+        {
+          precio,
+          talla,
+          marcaSlug,
+          color,
+          material,
+          descuento,
+          categoria,
+          vista,
+          priceBoundsMin: priceBounds.min,
+          priceBoundsMax: priceBounds.max,
+        },
+        applyFacetFilter
+      ),
+    [applyFacetFilter, categoria, color, descuento, marcaSlug, material, precio, priceBounds.max, priceBounds.min, talla, vista]
+  );
 
   const hasAnyProducts = filtered.length > 0;
 
@@ -1722,56 +1177,20 @@ export default function ProductsPage() {
           </div>
         )}
 
-        <div className="catalog-filter-rail" ref={filterRailRef}>
-          {filterMenus.map((menu) => {
-            const isExpandable = menu.key === "precio" || menu.key === "talla" || menu.key === "marcaSlug" || menu.key === "color" || menu.key === "material" || menu.key === "descuento";
-            const isOpen = activeMenu === menu.key;
-
-            return (
-            <div
-              key={menu.key}
-              className={`catalog-filter-item ${isOpen ? "is-open" : ""} ${!isExpandable ? "is-static" : ""}`}
-            >
-              <button
-                type="button"
-                className="catalog-filter-trigger"
-                onClick={isExpandable ? () => toggleMenu(menu.key) : undefined}
-                disabled={!isExpandable}
-                aria-disabled={!isExpandable}
-                aria-haspopup={isExpandable ? "dialog" : undefined}
-                aria-expanded={isExpandable ? isOpen : undefined}
-                aria-controls={
-                  isExpandable && isOpen
-                    ? menu.key === "precio"
-                      ? "catalog-price-popover"
-                      : menu.key === "talla"
-                        ? "catalog-size-popover"
-                        : menu.key === "marcaSlug"
-                          ? "catalog-marca-popover"
-                          : menu.key === "color"
-                            ? "catalog-color-popover"
-                            : menu.key === "material"
-                              ? "catalog-material-popover"
-                              : "catalog-discount-popover"
-                    : undefined
-                }
-                ref={
-                  menu.key === "precio" ? priceTriggerRef
-                  : menu.key === "talla" ? sizeTriggerRef
-                  : menu.key === "marcaSlug" ? marcaTriggerRef
-                  : menu.key === "color" ? colorTriggerRef
-                  : menu.key === "material" ? materialTriggerRef
-                  : menu.key === "descuento" ? discountTriggerRef
-                  : undefined
-                }
-              >
-                <span className="catalog-filter-label">{menu.label}</span>
-                <span className="catalog-filter-value">{menu.value}</span>
-                {isExpandable && <ChevronDown size={14} className="catalog-filter-chevron" />}
-              </button>
-            </div>
-          )})}
-        </div>
+        <CatalogFilterRail
+          filterRailRef={filterRailRef}
+          menus={filterMenus.map((menu) => ({ key: menu.key, label: menu.label, value: menu.value }))}
+          activeMenu={activeMenu}
+          toggleMenu={toggleMenu}
+          triggerRefs={{
+            priceTriggerRef,
+            sizeTriggerRef,
+            marcaTriggerRef,
+            colorTriggerRef,
+            materialTriggerRef,
+            discountTriggerRef,
+          }}
+        />
 
         {activeMenu === "precio" && pricePopoverStyle && (
           <div
@@ -1898,7 +1317,7 @@ export default function ProductsPage() {
                           checked={checked}
                           onChange={() => {
                             setDraftSelectedSizes((current) =>
-                              checked ? current.filter((item) => item !== size) : [...current, size]
+                              toggleCatalogStringListMember(current, size, checked)
                             );
                           }}
                         />
@@ -1950,9 +1369,7 @@ export default function ProductsPage() {
                         className={`catalog-color-item ${checked ? "is-active" : ""}`}
                         onClick={() =>
                           setDraftSelectedColors((current) =>
-                            checked
-                              ? current.filter((value) => value !== colorOption.value)
-                              : [...current, colorOption.value]
+                            toggleCatalogStringListMember(current, colorOption.value, checked)
                           )
                         }
                       >
@@ -2009,9 +1426,7 @@ export default function ProductsPage() {
                           checked={checked}
                           onChange={() => {
                             setDraftSelectedMaterials((current) =>
-                              checked
-                                ? current.filter((item) => item !== materialOption.value)
-                                : [...current, materialOption.value]
+                              toggleCatalogStringListMember(current, materialOption.value, checked)
                             );
                           }}
                         />
@@ -2060,9 +1475,7 @@ export default function ProductsPage() {
                         checked={checked}
                         onChange={() => {
                           setDraftSelectedDiscounts((current) =>
-                            checked
-                              ? current.filter((item) => item !== discountOption.value)
-                              : [...current, discountOption.value]
+                            toggleCatalogStringListMember(current, discountOption.value, checked)
                           );
                         }}
                       />
