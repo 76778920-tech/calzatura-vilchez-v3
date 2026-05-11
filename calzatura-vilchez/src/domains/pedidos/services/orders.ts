@@ -1,10 +1,10 @@
 import { auth } from "@/firebase/config";
 import { supabase } from "@/supabase/client";
 import { logAudit } from "@/services/audit";
+import { getBackendApiBaseUrl } from "@/config/apiBackend";
 import type { Order, OrderStatus, CartItem, Address } from "@/types";
 
 const COL = "pedidos";
-const FUNCTIONS_BASE_URL = "https://us-central1-calzaturavilchez-ab17f.cloudfunctions.net";
 
 export async function createOrder(data: {
   items: CartItem[];
@@ -19,8 +19,13 @@ export async function createOrder(data: {
     throw new Error("Debes iniciar sesion para crear un pedido");
   }
 
+  const base = getBackendApiBaseUrl();
+  if (!base) {
+    throw new Error("VITE_BACKEND_API_URL no configurada (BFF pedidos)");
+  }
+
   const idToken = await user.getIdToken();
-  const response = await fetch(`${FUNCTIONS_BASE_URL}/createOrder`, {
+  const response = await fetch(`${base}/createOrder`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -16,6 +16,7 @@ import { logAudit } from "@/services/audit";
 import { isSuperAdminEmail } from "@/config/security";
 import type { UserRole } from "@/types";
 import { clearFavoriteProductsByUser } from "@/domains/clientes/services/favorites";
+import { getBackendApiBaseUrl } from "@/config/apiBackend";
 
 const MIN_PASSWORD_LENGTH = 8;
 const PENDING_PROFILE_PREFIX = "CV_PENDING";
@@ -184,10 +185,8 @@ function resolveAuthLoginProxyUrl(): string | null {
   const explicit = (import.meta.env.VITE_AUTH_PROXY_LOGIN_URL as string | undefined)?.trim();
   if (explicit === "0" || explicit === "false") return null;
   if (explicit) return explicit.replace(/\/$/, "");
-  if (import.meta.env.PROD && import.meta.env.VITE_FIREBASE_PROJECT_ID) {
-    const pid = String(import.meta.env.VITE_FIREBASE_PROJECT_ID).trim();
-    if (pid) return `https://us-central1-${pid}.cloudfunctions.net/authLogin`;
-  }
+  const backend = getBackendApiBaseUrl();
+  if (backend) return `${backend}/authLogin`;
   return null;
 }
 

@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Base del BFF Express (Render, etc.): /createOrder, /authLogin, /createCheckoutSession, … */
+  readonly VITE_BACKEND_API_URL?: string;
+  /** URL completa del proxy de login si difiere de `VITE_BACKEND_API_URL/authLogin`. 0|false desactiva. */
+  readonly VITE_AUTH_PROXY_LOGIN_URL?: string;
   readonly VITE_ORS_API_KEY?: string;
   readonly VITE_STORE_LAT?: string;
   readonly VITE_STORE_LNG?: string;

@@ -1,21 +1,26 @@
-/**
- * Cloud Functions (Firebase). Requiere plan Blaze para desplegar.
- * Misma lógica que `bff/server.cjs` (Express en Render, etc.) — mantener alineados al cambiar la API.
- */
+/* Copiado desde ../functions/index.js — al cambiar lógica de API, actualizar ambos o extraer módulo compartido. */
+/* BFF Express: mismo contrato de rutas que Cloud Functions. Desplegar en Render/Fly/Railway (sin plan Blaze). */
+require("dotenv").config();
+
+const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
-const { onRequest } = require("firebase-functions/v2/https");
-const { defineSecret, defineString } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 
-/** Misma clave pública del cliente; solo la usa el servidor para REST Identity Toolkit (login vía BFF). */
-const FIREBASE_WEB_API_KEY = defineString("FIREBASE_WEB_API_KEY", { default: "" });
+function loadAllowedOrigins() {
+  const defaults = [
+    "https://calzaturavilchez-ab17f.web.app",
+    "https://calzaturavilchez-ab17f.firebaseapp.com",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ];
+  const extras = (process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return new Set([...defaults, ...extras]);
+}
 
-const allowedOrigins = new Set([
-  "https://calzaturavilchez-ab17f.web.app",
-  "https://calzaturavilchez-ab17f.firebaseapp.com",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-]);
+const allowedOrigins = loadAllowedOrigins();
 
 const cors = require("cors")({
   origin(origin, callback) {
@@ -27,14 +32,17 @@ const cors = require("cors")({
   },
 });
 
-admin.initializeApp();
-
-const STRIPE_SECRET = defineSecret("STRIPE_SECRET_KEY");
-const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
-const SUPABASE_URL = defineSecret("SUPABASE_URL");
-const SUPABASE_SERVICE_ROLE_KEY = defineSecret("SUPABASE_SERVICE_ROLE_KEY");
-const AI_SERVICE_URL = defineSecret("AI_SERVICE_URL");
-const AI_SERVICE_BEARER_TOKEN = defineSecret("AI_SERVICE_BEARER_TOKEN");
+const saJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+if (saJson) {
+  try {
+    admin.initializeApp({ credential: admin.credential.cert(JSON.parse(saJson)) });
+  } catch (e) {
+    console.error("FIREBASE_SERVICE_ACCOUNT_JSON invalido:", e.message);
+    process.exit(1);
+  }
+} else {
+  admin.initializeApp();
+}
 
 const ORDER_ITEM_LIMIT = 30;
 const ORDER_QTY_LIMIT = 100;
@@ -44,8 +52,8 @@ const DELIVERY_MAX_ENVIO_S = 35;
 
 function getSupabaseAdmin() {
   return createClient(
-    SUPABASE_URL.value(),
-    SUPABASE_SERVICE_ROLE_KEY.value(),
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
     {
       auth: {
         autoRefreshToken: false,
@@ -543,9 +551,19 @@ async function discountOrderStock(supabase, order) {
   }
 }
 
-exports.createOrder = onRequest(
-  { secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
-  async (req, res) => {
+const app = express();
+app.set("trust proxy", 1);
+app.use(
+  express.json({
+    verify: (req, res, buf) => {
+      req.rawBody = buf;
+    },
+  })
+);
+
+app.get("/health", (_req, res) => res.status(200).type("text/plain").send("ok"));
+
+app.post("/createOrder", (req, res) => {
     cors(req, res, async () => {
       if (req.method !== "POST") {
         return res.status(405).json({ error: "Metodo no permitido" });
@@ -604,12 +622,9 @@ exports.createOrder = onRequest(
         return res.status(error.status || 500).json({ error: publicError(error) });
       }
     });
-  }
-);
+});
 
-exports.createCheckoutSession = onRequest(
-  { secrets: [STRIPE_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
-  async (req, res) => {
+app.post("/createCheckoutSession", (req, res) => {
     cors(req, res, async () => {
       if (req.method !== "POST") {
         return res.status(405).json({ error: "Metodo no permitido" });
@@ -617,7 +632,7 @@ exports.createCheckoutSession = onRequest(
 
       try {
         const decodedToken = await verifyFirebaseUser(req);
-        const stripe = require("stripe")(STRIPE_SECRET.value());
+        const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
         const supabase = getSupabaseAdmin();
         const { orderId } = req.body || {};
 
@@ -696,16 +711,13 @@ exports.createCheckoutSession = onRequest(
         return res.status(error.status || 500).json({ error: publicError(error) });
       }
     });
-  }
-);
+});
 
-exports.stripeWebhook = onRequest(
-  { secrets: [STRIPE_SECRET, STRIPE_WEBHOOK_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
-  async (req, res) => {
-    const stripe = require("stripe")(STRIPE_SECRET.value());
+app.post("/stripeWebhook", async (req, res) => {
+    const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
     const supabase = getSupabaseAdmin();
     const sig = req.headers["stripe-signature"];
-    const webhookSecret = STRIPE_WEBHOOK_SECRET.value();
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     let event;
     try {
@@ -755,12 +767,9 @@ exports.stripeWebhook = onRequest(
     }
 
     return res.json({ received: true });
-  }
-);
+});
 
-exports.confirmCodOrder = onRequest(
-  { secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
-  async (req, res) => {
+app.post("/confirmCodOrder", (req, res) => {
     cors(req, res, async () => {
       if (req.method !== "POST") {
         return res.status(405).json({ error: "Metodo no permitido" });
@@ -796,8 +805,7 @@ exports.confirmCodOrder = onRequest(
         return res.status(error.status || 500).json({ error: publicError(error) });
       }
     });
-  }
-);
+});
 
 async function favoritesGetOne(supabase, userId, productId, res) {
   const { data, error } = await supabase
@@ -868,9 +876,7 @@ async function favoritesHandleDelete(supabase, userId, productId, res) {
   return res.status(200).json({ success: true });
 }
 
-exports.favorites = onRequest(
-  { secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
-  async (req, res) => {
+app.all("/favorites", (req, res) => {
     cors(req, res, async () => {
       if (req.method === "OPTIONS") {
         return res.status(204).send("");
@@ -901,8 +907,7 @@ exports.favorites = onRequest(
         return res.status(error.status || 500).json({ error: publicError(error) });
       }
     });
-  }
-);
+});
 
 const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
 
@@ -1012,8 +1017,8 @@ async function runAiAdminProxyRequest(req, res) {
   const supabase = getSupabaseAdmin();
   await assertAdminRole(supabase, decodedToken.uid);
 
-  const base = AI_SERVICE_URL.value().replace(/\/$/, "");
-  const serviceAuth = { Authorization: `Bearer ${AI_SERVICE_BEARER_TOKEN.value()}` };
+  const base = process.env.AI_SERVICE_URL.replace(/\/$/, "");
+  const serviceAuth = { Authorization: `Bearer ${process.env.AI_SERVICE_BEARER_TOKEN}` };
   const signal = AbortSignal.timeout(AI_PROXY_UPSTREAM_TIMEOUT_MS);
   const op = typeof req.query.op === "string" ? req.query.op : "";
 
@@ -1034,87 +1039,79 @@ async function runAiAdminProxyRequest(req, res) {
   return sendUpstreamToClient(res, upstream, text);
 }
 
-exports.aiAdminProxy = onRequest(
-  {
-    secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, AI_SERVICE_URL, AI_SERVICE_BEARER_TOKEN],
-    invoker: "public",
-  },
-  async (req, res) => {
-    cors(req, res, async () => {
-      if (req.method === "OPTIONS") {
-        return res.status(204).send("");
-      }
+app.all("/aiAdminProxy", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method === "OPTIONS") {
+      return res.status(204).send("");
+    }
 
-      try {
-        return await runAiAdminProxyRequest(req, res);
-      } catch (error) {
-        console.error("aiAdminProxy error:", error);
-        const status = aiAdminProxyErrorStatus(error);
-        const message = aiAdminProxyErrorMessage(status, error);
-        return res.status(status).json({ error: message });
-      }
-    });
-  }
-);
+    try {
+      return await runAiAdminProxyRequest(req, res);
+    } catch (error) {
+      console.error("aiAdminProxy error:", error);
+      const status = aiAdminProxyErrorStatus(error);
+      const message = aiAdminProxyErrorMessage(status, error);
+      return res.status(status).json({ error: message });
+    }
+  });
+});
 
 /**
- * BFF de login: el navegador no llama a identitytoolkit; solo a esta función.
+ * BFF de login: el navegador no llama a identitytoolkit; solo a este servidor.
  * Respuesta siempre 200 + JSON genérico (ok) para no exponer códigos de Google en el cliente.
- * Configurar parámetro FIREBASE_WEB_API_KEY (misma clave web del proyecto) en entorno de Functions.
+ * Requiere FIREBASE_WEB_API_KEY (misma clave web del proyecto) y cuenta de servicio para custom token.
  */
-exports.authLogin = onRequest(
-  {
-    invoker: "public",
-    memory: "256MiB",
-    timeoutSeconds: 25,
-  },
-  async (req, res) => {
-    cors(req, res, async () => {
-      if (req.method === "OPTIONS") {
-        return res.status(204).send("");
-      }
-      if (req.method !== "POST") {
-        return res.status(405).json({ error: "Metodo no permitido" });
-      }
+app.all("/authLogin", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method === "OPTIONS") {
+      return res.status(204).send("");
+    }
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
 
-      const ip = getClientIp(req);
-      if (isLoginRateLimited(ip)) {
+    const ip = getClientIp(req);
+    if (isLoginRateLimited(ip)) {
+      return res.status(200).json({ ok: false });
+    }
+
+    try {
+      const rawEmail = req.body && req.body.email;
+      const rawPassword = req.body && req.body.password;
+      if (!isValidLoginEmail(rawEmail) || !isValidLoginPassword(rawPassword)) {
+        return res.status(200).json({ ok: false });
+      }
+      const email = String(rawEmail).trim().toLowerCase();
+      const password = String(rawPassword);
+      const apiKey = process.env.FIREBASE_WEB_API_KEY;
+      if (!apiKey) {
+        console.error("authLogin: falta FIREBASE_WEB_API_KEY en entorno del BFF");
         return res.status(200).json({ ok: false });
       }
 
-      try {
-        const rawEmail = req.body && req.body.email;
-        const rawPassword = req.body && req.body.password;
-        if (!isValidLoginEmail(rawEmail) || !isValidLoginPassword(rawPassword)) {
-          return res.status(200).json({ ok: false });
-        }
-        const email = String(rawEmail).trim().toLowerCase();
-        const password = String(rawPassword);
-        const apiKey = FIREBASE_WEB_API_KEY.value();
-        if (!apiKey) {
-          console.error("authLogin: falta FIREBASE_WEB_API_KEY en parametros de Functions");
-          return res.status(200).json({ ok: false });
-        }
-
-        const identityUrl =
-          "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" +
-          encodeURIComponent(apiKey);
-        const identityRes = await fetch(identityUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, returnSecureToken: true }),
-        });
-        const identityJson = await identityRes.json();
-        if (!identityRes.ok || !identityJson.localId) {
-          return res.status(200).json({ ok: false });
-        }
-
-        const customToken = await admin.auth().createCustomToken(identityJson.localId);
-        return res.status(200).json({ ok: true, customToken });
-      } catch {
-        console.error("authLogin: error interno");
+      const identityUrl =
+        "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" +
+        encodeURIComponent(apiKey);
+      const identityRes = await fetch(identityUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, returnSecureToken: true }),
+      });
+      const identityJson = await identityRes.json();
+      if (!identityRes.ok || !identityJson.localId) {
         return res.status(200).json({ ok: false });
       }
-    });
-  }
-);
+
+      const customToken = await admin.auth().createCustomToken(identityJson.localId);
+      return res.status(200).json({ ok: true, customToken });
+    } catch {
+      console.error("authLogin: error interno");
+      return res.status(200).json({ ok: false });
+    }
+  });
+});
+
+const PORT = Number(process.env.PORT || 8787);
+app.listen(PORT, () => {
+  console.log(`Calzatura BFF escuchando en http://0.0.0.0:${PORT}`);
+});

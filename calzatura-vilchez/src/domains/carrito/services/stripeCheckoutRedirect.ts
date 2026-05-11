@@ -1,15 +1,18 @@
 import { loadStripe } from "@stripe/stripe-js";
 import type { User } from "firebase/auth";
-
-const STRIPE_CHECKOUT_URL =
-  "https://us-central1-calzaturavilchez-ab17f.cloudfunctions.net/createCheckoutSession";
+import { getBackendApiBaseUrl } from "@/config/apiBackend";
 
 export async function redirectStripeCheckoutForOrder(user: User, orderId: string, stripePublicKey: string): Promise<void> {
+  const base = getBackendApiBaseUrl();
+  if (!base) {
+    throw new Error("VITE_BACKEND_API_URL no configurada (BFF Stripe Checkout)");
+  }
+
   const idToken = await user.getIdToken();
   const stripe = await loadStripe(stripePublicKey);
   if (!stripe) throw new Error("Stripe no disponible");
 
-  const res = await fetch(STRIPE_CHECKOUT_URL, {
+  const res = await fetch(`${base}/createCheckoutSession`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
