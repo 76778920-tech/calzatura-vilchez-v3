@@ -190,6 +190,194 @@ function getColorHex(colorName: string): string {
   return found?.hex ?? "#888888";
 }
 
+/** Excluye metadatos de admin sin usar el operador `void` en variables descartadas (Sonar). */
+function omitProductMetaForForm(product: AdminProduct): Omit<AdminProduct, "id" | "finanzas" | "codigo"> {
+  const rest = { ...product } as Record<string, unknown>;
+  delete rest.id;
+  delete rest.finanzas;
+  delete rest.codigo;
+  return rest as Omit<AdminProduct, "id" | "finanzas" | "codigo">;
+}
+
+function remapVariantSlotsStockForCategory(slots: VariantSlot[], categoria: string): VariantSlot[] {
+  const allowed = new Set(sizesForCategory(categoria));
+  return slots.map((slot) => {
+    const nextStock = Object.fromEntries(
+      sizesForCategory(categoria).map((size) => [
+        size,
+        allowed.has(size) ? Math.max(0, Number(slot.tallaStock[size]) || 0) : 0,
+      ]),
+    ) as Record<string, number>;
+    return { ...slot, tallaStock: nextStock };
+  });
+}
+
+type ActiveVariantSlot = {
+  index: number;
+  color: string;
+  imagenes: string[];
+  tallaStock: Record<string, number>;
+  totalStock: number;
+  descripcion: string;
+  activo: boolean;
+};
+
+function buildActiveVariantSlots(variantSlots: VariantSlot[], categoria: string): ActiveVariantSlot[] {
+  return variantSlots
+    .map((slot, index) => {
+      const color = capitalizeWords(slot.color ?? "");
+      const imagenes = normalizeImageSlots(slot.imagenes)
+        .map(normalizeCloudinaryImageUrl)
+        .filter(Boolean);
+      const tallaStock = filterStockByCategory(slot.tallaStock, categoria);
+      const totalStock = sumSizeStock(tallaStock);
+      return {
+        index,
+        color,
+        imagenes,
+        tallaStock,
+        totalStock,
+        descripcion: slot.descripcion,
+        activo: slot.activo,
+      };
+    })
+    .filter((slot) => slot.color || slot.imagenes.length > 0 || slot.totalStock > 0);
+}
+
+function validateActiveVariantSlotsForCreate(activeSlots: ActiveVariantSlot[]): string | null {
+  if (activeSlots.length === 0) {
+    return "Completa al menos un bloque de color (1 a 5)";
+  }
+  const normalizedColors = activeSlots.map((slot) => slot.color.toLowerCase()).filter(Boolean);
+  if (new Set(normalizedColors).size !== normalizedColors.length) {
+    return "No repitas colores entre variantes";
+  }
+  for (const slot of activeSlots) {
+    if (!slot.color) {
+      return `Color ${slot.index + 1}: registra el color`;
+    }
+    if (slot.totalStock <= 0) {
+      return `Color ${slot.index + 1}: registra al menos una talla con stock`;
+    }
+    if (slot.imagenes.length === 0) {
+      return `Color ${slot.index + 1}: agrega al menos una imagen`;
+    }
+  }
+  return null;
+}
+
+function buildExistingCodesSet(products: AdminProduct[], editingId: string | null): Set<string> {
+  return new Set(
+    products
+      .filter((product) => product.id !== editingId)
+      .map((product) => normalizeVariantCode(product.codigo ?? ""))
+      .filter(Boolean),
+  );
+}
+
+function validateProductSaveForm(args: {
+  codigo: string;
+  form: ProductForm;
+  editingId: string | null;
+  products: AdminProduct[];
+}): string | null {
+  const { codigo, form, editingId, products } = args;
+  if (!isValidVariantCode(codigo)) {
+    return "El código debe tener 3 a 40 caracteres: letras, números o guiones";
+  }
+  const existingCodes = buildExistingCodesSet(products, editingId);
+  if (existingCodes.has(codigo)) {
+    return `El código "${codigo}" ya existe en otro producto`;
+  }
+  if (!form.nombre.trim() || form.precio <= 0) {
+    return "Nombre y precio son requeridos";
+  }
+  if (!form.categoria || !sizesForCategory(form.categoria).length) {
+    return "Selecciona la categoría del producto";
+  }
+  if (!form.marca?.trim()) {
+    return "La marca es obligatoria";
+  }
+  if (!form.tipoCalzado?.trim()) {
+    return "Selecciona el tipo de calzado";
+  }
+  if (!footwearTypesForCategory(form.categoria).includes(form.tipoCalzado.trim())) {
+    return "Selecciona un tipo de calzado acorde a la categoría";
+  }
+  if (form.costoCompra <= 0) {
+    return "Registra el costo real de compra";
+  }
+  if (form.margenMinimo > form.margenObjetivo || form.margenObjetivo > form.margenMaximo) {
+    return "Ordena los márgenes: mínimo, objetivo y máximo";
+  }
+  const range = calculatePriceRange(
+    form.costoCompra,
+    form.margenMinimo,
+    form.margenObjetivo,
+    form.margenMaximo,
+  );
+  if (form.precio < range.precioMinimo || form.precio > range.precioMaximo) {
+    return "El precio público debe estar dentro del rango óptimo de venta";
+  }
+  const estiloNorm = normalizeEstiloField(form.estilo);
+  const commercialErrors = validateCommercialProductDraft({
+    categoria: form.categoria,
+    tipoCalzado: form.tipoCalzado,
+    estilo: estiloNorm,
+    precio: form.precio,
+    costoCompra: form.costoCompra,
+    margenMinimo: form.margenMinimo,
+    margenObjetivo: form.margenObjetivo,
+    margenMaximo: form.margenMaximo,
+    material: form.material,
+  });
+  if (commercialErrors.length > 0) {
+    return commercialErrors[0];
+  }
+  return null;
+}
+
+function validateEditProductPayload(form: ProductForm): string | null {
+  const imagenes = normalizeImageSlots(form.imagenes, form.imagen).map(normalizeCloudinaryImageUrl).filter(Boolean);
+  const tallaStock = filterStockByCategory(form.tallaStock, form.categoria);
+  const totalStock = sumSizeStock(tallaStock);
+  const color = capitalizeWords(form.color ?? "");
+  if (!color) {
+    return "Registra el color del producto";
+  }
+  if (totalStock <= 0) {
+    return "Registra al menos una talla con stock";
+  }
+  if (imagenes.length === 0) {
+    return "Agrega al menos una imagen del producto";
+  }
+  return null;
+}
+
+function toastFromSaveError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : "";
+  const code = typeof err === "object" && err && "code" in err ? String((err as { code?: unknown }).code) : "";
+  const isPermissionError = code === "42501" || msg.toLowerCase().includes("row-level security");
+  const isUniqueCodeError =
+    code === "23505" ||
+    msg.toLowerCase().includes("duplicate key value") ||
+    msg.toLowerCase().includes("unique");
+  const commercialError = describeCommercialDraftError(err);
+  if (msg === "TIMEOUT") {
+    return "Tiempo agotado. Inténtalo de nuevo o revisa tu conexión.";
+  }
+  if (isUniqueCodeError) {
+    return "Código duplicado: usa un código único para este producto";
+  }
+  if (commercialError) {
+    return commercialError;
+  }
+  if (isPermissionError) {
+    return "Sin permisos para realizar esta operación.";
+  }
+  return `Error: ${msg || "no se pudo guardar el producto"}`;
+}
+
 export default function AdminProducts() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -473,8 +661,7 @@ export default function AdminProducts() {
 
   const openEdit = (product: AdminProduct) => {
     triggerRef.current = document.activeElement as HTMLElement;
-    const { id: _id, finanzas: _finanzas, codigo: _codigo, ...productData } = product;
-    void _id; void _finanzas; void _codigo;
+    const productData = omitProductMetaForForm(product);
     const categoria = normalizeAdminCategory(product.categoria);
     const tallaStock = filterStockByCategory(product.tallaStock ?? {}, categoria);
 
@@ -508,8 +695,7 @@ export default function AdminProducts() {
 
   const openVariant = (product: AdminProduct) => {
     triggerRef.current = document.activeElement as HTMLElement;
-    const { id: _id, finanzas: _finanzas, codigo: _codigo, ...productData } = product;
-    void _id; void _finanzas; void _codigo;
+    const productData = omitProductMetaForForm(product);
     const categoria = normalizeAdminCategory(product.categoria);
     const emptyStock = Object.fromEntries(sizesForCategory(categoria).map((s) => [s, 0]));
 
@@ -698,18 +884,7 @@ export default function AdminProducts() {
     const tallaStock = filterStockByCategory(form.tallaStock, categoria);
     const validTypes = footwearTypesForCategory(categoria);
     if (!editingId) {
-      const allowed = new Set(sizesForCategory(categoria));
-      setVariantSlots((current) =>
-        current.map((slot) => {
-          const nextStock = Object.fromEntries(
-            sizesForCategory(categoria).map((size) => [
-              size,
-              allowed.has(size) ? Math.max(0, Number(slot.tallaStock[size]) || 0) : 0,
-            ])
-          ) as Record<string, number>;
-          return { ...slot, tallaStock: nextStock };
-        })
-      );
+      setVariantSlots((current) => remapVariantSlotsStockForCategory(current, categoria));
     }
     setForm({
       ...form,
@@ -725,76 +900,33 @@ export default function AdminProducts() {
     event.preventDefault();
     const codigo = normalizeVariantCode(form.codigo ?? "");
 
-    if (!isValidVariantCode(codigo)) {
-      toast.error("El código debe tener 3 a 40 caracteres: letras, números o guiones");
+    const formError = validateProductSaveForm({ codigo, form, editingId, products });
+    if (formError) {
+      toast.error(formError);
       return;
     }
-    const existingCodes = new Set(
-      products
-        .filter((product) => product.id !== editingId)
-        .map((product) => normalizeVariantCode(product.codigo ?? ""))
-        .filter(Boolean)
-    );
-    if (existingCodes.has(codigo)) {
-      toast.error(`El código "${codigo}" ya existe en otro producto`);
-      return;
-    }
-    if (!form.nombre.trim() || form.precio <= 0) {
-      toast.error("Nombre y precio son requeridos");
-      return;
-    }
-    if (!form.categoria || !sizesForCategory(form.categoria).length) {
-      toast.error("Selecciona la categoría del producto");
-      return;
-    }
-    if (!form.marca?.trim()) {
-      toast.error("La marca es obligatoria");
-      return;
-    }
-    if (!form.tipoCalzado?.trim()) {
-      toast.error("Selecciona el tipo de calzado");
-      return;
-    }
-    if (!footwearTypesForCategory(form.categoria).includes(form.tipoCalzado.trim())) {
-      toast.error("Selecciona un tipo de calzado acorde a la categoría");
-      return;
-    }
-    if (form.costoCompra <= 0) {
-      toast.error("Registra el costo real de compra");
-      return;
-    }
-    if (form.margenMinimo > form.margenObjetivo || form.margenObjetivo > form.margenMaximo) {
-      toast.error("Ordena los márgenes: mínimo, objetivo y máximo");
-      return;
+
+    if (editingId) {
+      const editErr = validateEditProductPayload(form);
+      if (editErr) {
+        toast.error(editErr);
+        return;
+      }
+    } else {
+      const activeSlots = buildActiveVariantSlots(variantSlots, form.categoria);
+      const slotErr = validateActiveVariantSlotsForCreate(activeSlots);
+      if (slotErr) {
+        toast.error(slotErr);
+        return;
+      }
     }
 
     const range = calculatePriceRange(
       form.costoCompra,
       form.margenMinimo,
       form.margenObjetivo,
-      form.margenMaximo
+      form.margenMaximo,
     );
-    if (form.precio < range.precioMinimo || form.precio > range.precioMaximo) {
-      toast.error("El precio público debe estar dentro del rango óptimo de venta");
-      return;
-    }
-
-    const estiloNorm = normalizeEstiloField(form.estilo);
-    const commercialErrors = validateCommercialProductDraft({
-      categoria: form.categoria,
-      tipoCalzado: form.tipoCalzado,
-      estilo: estiloNorm,
-      precio: form.precio,
-      costoCompra: form.costoCompra,
-      margenMinimo: form.margenMinimo,
-      margenObjetivo: form.margenObjetivo,
-      margenMaximo: form.margenMaximo,
-      material: form.material,
-    });
-    if (commercialErrors.length > 0) {
-      toast.error(commercialErrors[0]);
-      return;
-    }
 
     setSaving(true);
     try {
@@ -811,18 +943,6 @@ export default function AdminProducts() {
         const tallaStock = filterStockByCategory(form.tallaStock, form.categoria);
         const totalStock = sumSizeStock(tallaStock);
         const color = capitalizeWords(form.color ?? "");
-        if (!color) {
-          toast.error("Registra el color del producto");
-          return;
-        }
-        if (totalStock <= 0) {
-          toast.error("Registra al menos una talla con stock");
-          return;
-        }
-        if (imagenes.length === 0) {
-          toast.error("Agrega al menos una imagen del producto");
-          return;
-        }
         const payload: Omit<Product, "id"> = {
           nombre: form.nombre.trim(),
           precio: form.precio,
@@ -831,10 +951,10 @@ export default function AdminProducts() {
           imagenes,
           stock: totalStock,
           categoria: form.categoria,
-          tipoCalzado: form.tipoCalzado.trim(),
+          tipoCalzado: form.tipoCalzado?.trim() ?? "",
           tallas: sizesFromStock(tallaStock),
           tallaStock: Object.fromEntries(Object.entries(tallaStock).filter(([, qty]) => qty > 0)),
-          marca: form.marca.trim(),
+          marca: form.marca?.trim() ?? "",
           material: form.material?.trim() || undefined,
           estilo: normalizeEstiloField(form.estilo),
           color,
@@ -847,52 +967,8 @@ export default function AdminProducts() {
         await updateProductAtomic(editingId, payload, codigo, financialPayload);
         toast.success("Producto actualizado");
       } else {
-        const activeSlots = variantSlots
-          .map((slot, index) => {
-            const color = capitalizeWords(slot.color ?? "");
-            const imagenes = normalizeImageSlots(slot.imagenes)
-              .map(normalizeCloudinaryImageUrl)
-              .filter(Boolean);
-            const tallaStock = filterStockByCategory(slot.tallaStock, form.categoria);
-            const totalStock = sumSizeStock(tallaStock);
-            return {
-              index,
-              color,
-              imagenes,
-              tallaStock,
-              totalStock,
-              descripcion: slot.descripcion,
-              activo: slot.activo,
-            };
-          })
-          .filter((slot) => slot.color || slot.imagenes.length > 0 || slot.totalStock > 0);
-
-        if (activeSlots.length === 0) {
-          toast.error("Completa al menos un bloque de color (1 a 5)");
-          return;
-        }
-
-        const normalizedColors = activeSlots.map((slot) => slot.color.toLowerCase()).filter(Boolean);
-        if (new Set(normalizedColors).size !== normalizedColors.length) {
-          toast.error("No repitas colores entre variantes");
-          return;
-        }
-
-        for (const slot of activeSlots) {
-          if (!slot.color) {
-            toast.error(`Color ${slot.index + 1}: registra el color`);
-            return;
-          }
-          if (slot.totalStock <= 0) {
-            toast.error(`Color ${slot.index + 1}: registra al menos una talla con stock`);
-            return;
-          }
-          if (slot.imagenes.length === 0) {
-            toast.error(`Color ${slot.index + 1}: agrega al menos una imagen`);
-            return;
-          }
-        }
-
+        const activeSlots = buildActiveVariantSlots(variantSlots, form.categoria);
+        const existingCodes = buildExistingCodesSet(products, editingId);
         const createPlan = buildVariantCreationPlan(
           {
             codigoBase: codigo,
@@ -901,8 +977,8 @@ export default function AdminProducts() {
             precio: form.precio,
             descripcion: form.descripcion,
             categoria: form.categoria,
-            tipoCalzado: form.tipoCalzado,
-            marca: form.marca,
+            tipoCalzado: form.tipoCalzado ?? "",
+            marca: form.marca?.trim() ?? "",
             material: form.material,
             estilo: normalizeEstiloField(form.estilo),
             destacado: form.destacado,
@@ -910,7 +986,7 @@ export default function AdminProducts() {
             descuento: form.descuento,
             campana: form.campana,
           },
-          activeSlots
+          activeSlots,
         );
         const generatedCodes = createPlan.map((item) => normalizeVariantCode(item.generatedCode));
         const duplicatedGenerated = generatedCodes.find((genCode) => existingCodes.has(genCode));
@@ -931,27 +1007,7 @@ export default function AdminProducts() {
       closeModal();
       load();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "";
-      const code = typeof err === "object" && err && "code" in err ? String(err.code) : "";
-      const isPermissionError =
-        code === "42501" ||
-        msg.toLowerCase().includes("row-level security");
-      const isUniqueCodeError =
-        code === "23505" ||
-        msg.toLowerCase().includes("duplicate key value") ||
-        msg.toLowerCase().includes("unique");
-      const commercialError = describeCommercialDraftError(err);
-      if (msg === "TIMEOUT") {
-        toast.error("Tiempo agotado. Inténtalo de nuevo o revisa tu conexión.");
-      } else if (isUniqueCodeError) {
-        toast.error("Código duplicado: usa un código único para este producto");
-      } else if (commercialError) {
-        toast.error(commercialError);
-      } else if (isPermissionError) {
-        toast.error("Sin permisos para realizar esta operación.");
-      } else {
-        toast.error(`Error: ${msg || "no se pudo guardar el producto"}`);
-      }
+      toast.error(toastFromSaveError(err));
     } finally {
       setSaving(false);
     }
