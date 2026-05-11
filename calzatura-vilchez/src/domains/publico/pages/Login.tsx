@@ -31,13 +31,16 @@ export default function Login() {
     }
     try {
       await resetPassword(target);
-      toast.success("Correo enviado. Revisa tu bandeja de entrada.");
     } catch (err: unknown) {
       const code = (err as { code?: string }).code;
-      if (code === "auth/user-not-found") toast.error("No existe una cuenta con ese correo.");
-      else if (code === "auth/too-many-requests") toast.error("Demasiados intentos. Intenta más tarde.");
-      else toast.error("No se pudo enviar el correo.");
+      if (code === "auth/too-many-requests") {
+        toast.error("Demasiados intentos. Intenta más tarde.");
+        return;
+      }
     }
+    toast.success(
+      "Si ese correo está registrado, recibirás instrucciones para restablecer la contraseña. Revisa la bandeja de entrada y el spam.",
+    );
   };
 
   const handleLogin = async (e: { preventDefault(): void }) => {
@@ -123,6 +126,7 @@ export default function Login() {
               <input
                 id="login-password"
                 type={showPass ? "text" : "password"}
+                autoComplete="current-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required

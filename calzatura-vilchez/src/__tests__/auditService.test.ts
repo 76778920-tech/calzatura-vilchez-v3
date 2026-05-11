@@ -108,6 +108,21 @@ describe("logAudit", () => {
     const payload = insertFn.mock.calls[0][0] as Record<string, unknown>;
     expect(payload.detalle).toBeNull();
   });
+
+  it("redacta claves sensibles en detalle antes de insertar", async () => {
+    const insertFn = createInsertMock({ data: { id: "ok" }, error: null });
+    await logAudit("editar", "producto", "id-9", "Prod", {
+      campos: ["nombre"],
+      accessToken: "sekret",
+      meta: { api_key: "k", ok: 1 },
+    });
+    const payload = insertFn.mock.calls[0][0] as Record<string, unknown>;
+    expect(payload.detalle).toEqual({
+      campos: ["nombre"],
+      accessToken: "[redacted]",
+      meta: { api_key: "[redacted]", ok: 1 },
+    });
+  });
 });
 
 // ─── fetchRecentAudit ─────────────────────────────────────────────────────────

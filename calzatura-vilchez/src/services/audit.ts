@@ -28,6 +28,33 @@ export interface AuditEntry {
   realizadoEn: string;
 }
 
+const REDACTED = "[redacted]";
+
+function isSensitiveAuditKey(key: string): boolean {
+  const k = key.toLowerCase();
+  if (k === "authorization" || k === "cookie" || k === "jwt") return true;
+  if (k.includes("password") || k.includes("passwd") || k.includes("contrase")) return true;
+  if (/(^|_)api[_-]?key($|_)/.test(k) || k.endsWith("apikey")) return true;
+  if (/(^|_)(access|refresh|id|bearer|session)?token($|_)/.test(k) || k.endsWith("token")) return true;
+  if (k.includes("secret") || k.includes("bearer")) return true;
+  return false;
+}
+
+function sanitizeAuditValue(value: unknown): unknown {
+  if (value === null || value === undefined) return value;
+  if (Array.isArray(value)) return value.map(sanitizeAuditValue);
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(obj)) {
+      out[key] = isSensitiveAuditKey(key) ? REDACTED : sanitizeAuditValue(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+/** `detalle` no debe incluir secretos; las claves sensibles se redactan al persistir. */
 export async function logAudit(
   accion: AuditAction,
   entidad: AuditEntity,
@@ -37,12 +64,13 @@ export async function logAudit(
 ): Promise<void> {
   try {
     const user = auth.currentUser;
+    const safeDetalle = detalle == null ? null : (sanitizeAuditValue(detalle) as Record<string, unknown>);
     const { error: dbError } = await supabase.from("auditoria").insert({
       accion,
       entidad,
       entidadId,
       entidadNombre,
-      detalle: detalle ?? null,
+      detalle: safeDetalle,
       usuarioUid: user?.uid ?? null,
       usuarioEmail: user?.email ?? null,
       realizadoEn: new Date().toISOString(),

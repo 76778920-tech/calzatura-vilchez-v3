@@ -104,14 +104,18 @@ export default function Register() {
         toast.error("Este correo es temporal o desechable. Usa un correo real.");
       } else if (msg === "PASSWORD_TOO_SHORT") {
         toast.error(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
+      } else if (code.includes("weak-password")) {
+        toast.error("La contraseña es demasiado débil. Usa más caracteres o combina letras, números y símbolos.");
       } else if (code.includes("email-already-in-use") || msg.includes("email-already-in-use")) {
-        toast.error("Este correo ya esta registrado");
+        toast.error(
+          "No se pudo crear la cuenta con ese correo. Si ya tenías cuenta, inicia sesión; si no, revisa los datos o intenta más tarde.",
+        );
       } else if (code.includes("permission-denied") || msg.includes("insufficient permissions")) {
         toast.error("Error de permisos. Intenta de nuevo o contacta al soporte.");
       } else if (code.includes("network-request-failed") || msg.includes("Failed to fetch")) {
         toast.error("Sin conexion. Verifica tu internet");
       } else {
-        toast.error(`Error: ${code || msg || "desconocido"}`);
+        toast.error("No se pudo crear la cuenta. Intenta de nuevo o contacta al soporte.");
       }
     } finally {
       setLoading(false);
@@ -225,6 +229,7 @@ export default function Register() {
                 <Lock size={16} className="input-icon" />
                 <input
                   type={showPass ? "text" : "password"}
+                  autoComplete="new-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -243,6 +248,7 @@ export default function Register() {
                 <Lock size={16} className="input-icon" />
                 <input
                   type={showPass ? "text" : "password"}
+                  autoComplete="new-password"
                   value={confirmPass}
                   onChange={(e) => setConfirmPass(e.target.value)}
                   required
