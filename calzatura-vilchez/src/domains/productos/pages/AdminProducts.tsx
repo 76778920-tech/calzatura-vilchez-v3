@@ -378,6 +378,169 @@ function toastFromSaveError(err: unknown): string {
   return `Error: ${msg || "no se pudo guardar el producto"}`;
 }
 
+type AdminProductSaveFlowContext = {
+  codigo: string;
+  form: ProductForm;
+  editingId: string | null;
+  products: AdminProduct[];
+  variantSlots: VariantSlot[];
+  setSaving: (value: boolean) => void;
+  closeModal: () => void;
+  load: () => void | Promise<void>;
+};
+
+async function persistAdminProductEdit(input: {
+  editingId: string;
+  form: ProductForm;
+  codigo: string;
+  familiaId: string;
+  financialPayload: ReturnType<typeof calculatePriceRange> & { costoCompra: number };
+}): Promise<void> {
+  const { editingId, form, codigo, familiaId, financialPayload } = input;
+  const imagenes = normalizeImageSlots(form.imagenes, form.imagen)
+    .map(normalizeCloudinaryImageUrl)
+    .filter(Boolean);
+  const tallaStock = filterStockByCategory(form.tallaStock, form.categoria);
+  const totalStock = sumSizeStock(tallaStock);
+  const color = capitalizeWords(form.color ?? "");
+  const payload: Omit<Product, "id"> = {
+    nombre: form.nombre.trim(),
+    precio: form.precio,
+    descripcion: form.descripcion.trim(),
+    imagen: imagenes[0] ?? "",
+    imagenes,
+    stock: totalStock,
+    categoria: form.categoria,
+    tipoCalzado: form.tipoCalzado?.trim() ?? "",
+    tallas: sizesFromStock(tallaStock),
+    tallaStock: Object.fromEntries(Object.entries(tallaStock).filter(([, qty]) => qty > 0)),
+    marca: form.marca?.trim() ?? "",
+    material: form.material?.trim() || undefined,
+    estilo: normalizeEstiloField(form.estilo),
+    color,
+    familiaId,
+    destacado: form.destacado,
+    activo: form.activo ?? true,
+    descuento: form.descuento,
+    campana: form.campana,
+  };
+  await updateProductAtomic(editingId, payload, codigo, financialPayload);
+}
+
+function tryBuildVariantCreationBatch(input: {
+  codigo: string;
+  familiaId: string;
+  form: ProductForm;
+  variantSlots: VariantSlot[];
+  products: AdminProduct[];
+  editingId: string | null;
+  financialPayload: ReturnType<typeof calculatePriceRange> & { costoCompra: number };
+}):
+  | { ok: true; variantInput: { product: Omit<Product, "id">; codigo: string; finanzas: typeof input.financialPayload }[]; variantCount: number }
+  | { ok: false; duplicateCode: string } {
+  const { codigo, familiaId, form, variantSlots, products, editingId, financialPayload } = input;
+  const activeSlots = buildActiveVariantSlots(variantSlots, form.categoria);
+  const existingCodes = buildExistingCodesSet(products, editingId);
+  const createPlan = buildVariantCreationPlan(
+    {
+      codigoBase: codigo,
+      familiaId,
+      nombre: form.nombre,
+      precio: form.precio,
+      descripcion: form.descripcion,
+      categoria: form.categoria,
+      tipoCalzado: form.tipoCalzado ?? "",
+      marca: form.marca?.trim() ?? "",
+      material: form.material,
+      estilo: normalizeEstiloField(form.estilo),
+      destacado: form.destacado,
+      activo: form.activo ?? true,
+      descuento: form.descuento,
+      campana: form.campana,
+    },
+    activeSlots,
+  );
+  const generatedCodes = createPlan.map((item) => normalizeVariantCode(item.generatedCode));
+  const duplicatedGenerated = generatedCodes.find((genCode) => existingCodes.has(genCode));
+  if (duplicatedGenerated) {
+    return { ok: false, duplicateCode: duplicatedGenerated };
+  }
+  const variantInput = createPlan.map(({ generatedCode, product: payload }) => ({
+    product: payload,
+    codigo: generatedCode,
+    finanzas: financialPayload,
+  }));
+  return { ok: true, variantInput, variantCount: activeSlots.length };
+}
+
+async function runAdminProductSaveFlow(ctx: AdminProductSaveFlowContext): Promise<void> {
+  const { codigo, form, editingId, products, variantSlots, setSaving, closeModal, load } = ctx;
+
+  const formError = validateProductSaveForm({ codigo, form, editingId, products });
+  if (formError) {
+    toast.error(formError);
+    return;
+  }
+
+  if (editingId) {
+    const editErr = validateEditProductPayload(form);
+    if (editErr) {
+      toast.error(editErr);
+      return;
+    }
+  } else {
+    const activeSlots = buildActiveVariantSlots(variantSlots, form.categoria);
+    const slotErr = validateActiveVariantSlotsForCreate(activeSlots);
+    if (slotErr) {
+      toast.error(slotErr);
+      return;
+    }
+  }
+
+  const range = calculatePriceRange(
+    form.costoCompra,
+    form.margenMinimo,
+    form.margenObjetivo,
+    form.margenMaximo,
+  );
+
+  setSaving(true);
+  try {
+    const familiaId =
+      editingId != null
+        ? (form.familiaId?.trim() || editingId)
+        : (form.familiaId?.trim() || crypto.randomUUID());
+    const financialPayload = { costoCompra: form.costoCompra, ...range };
+
+    if (editingId) {
+      await persistAdminProductEdit({ editingId, form, codigo, familiaId, financialPayload });
+      toast.success("Producto actualizado");
+    } else {
+      const batch = tryBuildVariantCreationBatch({
+        codigo,
+        familiaId,
+        form,
+        variantSlots,
+        products,
+        editingId,
+        financialPayload,
+      });
+      if (!batch.ok) {
+        toast.error(`El código generado "${batch.duplicateCode}" ya existe. Cambia el código base.`);
+        return;
+      }
+      await createProductVariantsAtomic(batch.variantInput);
+      toast.success(`${batch.variantCount} variante(s) creadas`);
+    }
+    closeModal();
+    load();
+  } catch (err: unknown) {
+    toast.error(toastFromSaveError(err));
+  } finally {
+    setSaving(false);
+  }
+}
+
 export default function AdminProducts() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -899,118 +1062,16 @@ export default function AdminProducts() {
   const handleSave = async (event: { preventDefault(): void }) => {
     event.preventDefault();
     const codigo = normalizeVariantCode(form.codigo ?? "");
-
-    const formError = validateProductSaveForm({ codigo, form, editingId, products });
-    if (formError) {
-      toast.error(formError);
-      return;
-    }
-
-    if (editingId) {
-      const editErr = validateEditProductPayload(form);
-      if (editErr) {
-        toast.error(editErr);
-        return;
-      }
-    } else {
-      const activeSlots = buildActiveVariantSlots(variantSlots, form.categoria);
-      const slotErr = validateActiveVariantSlotsForCreate(activeSlots);
-      if (slotErr) {
-        toast.error(slotErr);
-        return;
-      }
-    }
-
-    const range = calculatePriceRange(
-      form.costoCompra,
-      form.margenMinimo,
-      form.margenObjetivo,
-      form.margenMaximo,
-    );
-
-    setSaving(true);
-    try {
-      const familiaId =
-        editingId != null
-          ? (form.familiaId?.trim() || editingId)
-          : (form.familiaId?.trim() || crypto.randomUUID());
-      const financialPayload = { costoCompra: form.costoCompra, ...range };
-
-      if (editingId) {
-        const imagenes = normalizeImageSlots(form.imagenes, form.imagen)
-          .map(normalizeCloudinaryImageUrl)
-          .filter(Boolean);
-        const tallaStock = filterStockByCategory(form.tallaStock, form.categoria);
-        const totalStock = sumSizeStock(tallaStock);
-        const color = capitalizeWords(form.color ?? "");
-        const payload: Omit<Product, "id"> = {
-          nombre: form.nombre.trim(),
-          precio: form.precio,
-          descripcion: form.descripcion.trim(),
-          imagen: imagenes[0] ?? "",
-          imagenes,
-          stock: totalStock,
-          categoria: form.categoria,
-          tipoCalzado: form.tipoCalzado?.trim() ?? "",
-          tallas: sizesFromStock(tallaStock),
-          tallaStock: Object.fromEntries(Object.entries(tallaStock).filter(([, qty]) => qty > 0)),
-          marca: form.marca?.trim() ?? "",
-          material: form.material?.trim() || undefined,
-          estilo: normalizeEstiloField(form.estilo),
-          color,
-          familiaId,
-          destacado: form.destacado,
-          activo: form.activo ?? true,
-          descuento: form.descuento,
-          campana: form.campana,
-        };
-        await updateProductAtomic(editingId, payload, codigo, financialPayload);
-        toast.success("Producto actualizado");
-      } else {
-        const activeSlots = buildActiveVariantSlots(variantSlots, form.categoria);
-        const existingCodes = buildExistingCodesSet(products, editingId);
-        const createPlan = buildVariantCreationPlan(
-          {
-            codigoBase: codigo,
-            familiaId,
-            nombre: form.nombre,
-            precio: form.precio,
-            descripcion: form.descripcion,
-            categoria: form.categoria,
-            tipoCalzado: form.tipoCalzado ?? "",
-            marca: form.marca?.trim() ?? "",
-            material: form.material,
-            estilo: normalizeEstiloField(form.estilo),
-            destacado: form.destacado,
-            activo: form.activo ?? true,
-            descuento: form.descuento,
-            campana: form.campana,
-          },
-          activeSlots,
-        );
-        const generatedCodes = createPlan.map((item) => normalizeVariantCode(item.generatedCode));
-        const duplicatedGenerated = generatedCodes.find((genCode) => existingCodes.has(genCode));
-        if (duplicatedGenerated) {
-          toast.error(`El código generado "${duplicatedGenerated}" ya existe. Cambia el código base.`);
-          return;
-        }
-
-        const variantInput = createPlan.map(({ generatedCode, product: payload }) => ({
-          product: payload,
-          codigo: generatedCode,
-          finanzas: financialPayload,
-        }));
-
-        await createProductVariantsAtomic(variantInput);
-        toast.success(`${activeSlots.length} variante(s) creadas`);
-      }
-      closeModal();
-      load();
-    } catch (err: unknown) {
-      toast.error(toastFromSaveError(err));
-    } finally {
-      setSaving(false);
-    }
+    await runAdminProductSaveFlow({
+      codigo,
+      form,
+      editingId,
+      products,
+      variantSlots,
+      setSaving,
+      closeModal,
+      load,
+    });
   };
 
   const handleDelete = async (product: AdminProduct) => {

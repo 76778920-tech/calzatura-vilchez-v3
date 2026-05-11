@@ -1,5 +1,4 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, PointerEvent } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   buildCanonicalCatalogLocation,
@@ -43,6 +42,16 @@ import {
   toggleCatalogStringListMember,
   type CatalogFilterGroup,
 } from "@/domains/productos/utils/productsPageCatalogDerivations";
+import { useCatalogCampaignCarousel } from "@/domains/productos/hooks/useCatalogCampaignCarousel";
+import {
+  measureColorCatalogPopover,
+  measureDiscountCatalogPopover,
+  measureMarcaCatalogPopover,
+  measureMaterialCatalogPopover,
+  measurePriceCatalogPopover,
+  measureSizeCatalogPopover,
+} from "@/domains/productos/utils/productsPagePopoverLayouts";
+import { usePopoverDockEffect } from "@/hooks/usePopoverDockEffect";
 
 const CATALOG_CAMPAIGN_ROTATION_MS = 9000;
 
@@ -138,7 +147,6 @@ export default function ProductsPage() {
   const [reloadToken, setReloadToken] = useState(0);
   useProductsRealtime(() => setReloadToken((t) => t + 1));
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [activeCampaignSlide, setActiveCampaignSlide] = useState(0);
   const [draftPriceMin, setDraftPriceMin] = useState(0);
   const [draftPriceMax, setDraftPriceMax] = useState(0);
   const [pricePopoverStyle, setPricePopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -151,13 +159,6 @@ export default function ProductsPage() {
   const sizeTriggerRef = useRef<HTMLButtonElement | null>(null);
   const sizePopoverRef = useRef<HTMLDivElement | null>(null);
   const sizePopoverFrameRef = useRef<number | null>(null);
-  const campaignTrackRef = useRef<HTMLDivElement | null>(null);
-  const campaignDragStartXRef = useRef<number | null>(null);
-  const campaignDragDeltaXRef = useRef(0);
-  const [isCampaignDragging, setIsCampaignDragging] = useState(false);
-  const [campaignDragOffset, setCampaignDragOffset] = useState(0);
-  const [campaignWidth, setCampaignWidth] = useState(0);
-  const [campaignTransition, setCampaignTransition] = useState<{ from: number; to: number; direction: 1 | -1 } | null>(null);
   const [draftSelectedColors, setDraftSelectedColors] = useState<string[]>([]);
   const [colorPopoverStyle, setColorPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
   const colorTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -289,244 +290,37 @@ export default function ProductsPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (activeMenu !== "precio" || !priceTriggerRef.current) return undefined;
+  const layoutPricePopover = useCallback(
+    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measurePriceCatalogPopover(rect, viewport),
+    [],
+  );
+  const layoutSizePopover = useCallback(
+    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureSizeCatalogPopover(rect, viewport),
+    [],
+  );
+  const layoutColorPopover = useCallback(
+    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureColorCatalogPopover(rect, viewport),
+    [],
+  );
+  const layoutMaterialPopover = useCallback(
+    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureMaterialCatalogPopover(rect, viewport),
+    [],
+  );
+  const layoutDiscountPopover = useCallback(
+    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureDiscountCatalogPopover(rect, viewport),
+    [],
+  );
+  const layoutMarcaPopover = useCallback(
+    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureMarcaCatalogPopover(rect, viewport),
+    [],
+  );
 
-    const syncPopoverPosition = () => {
-      if (!priceTriggerRef.current) return;
-      if (pricePopoverFrameRef.current) {
-        window.cancelAnimationFrame(pricePopoverFrameRef.current);
-      }
-
-      pricePopoverFrameRef.current = window.requestAnimationFrame(() => {
-        if (!priceTriggerRef.current) return;
-
-        const rect = priceTriggerRef.current.getBoundingClientRect();
-        const desiredWidth = Math.min(340, window.innerWidth - 32);
-        const margin = 16;
-        const topBelow = rect.bottom + 10;
-        const maxLeft = Math.max(margin, window.innerWidth - desiredWidth - margin);
-        const left = Math.max(margin, Math.min(rect.left, maxLeft));
-        const top = topBelow;
-
-        setPricePopoverStyle({
-          top,
-          left,
-          width: desiredWidth,
-        });
-      });
-    };
-
-    syncPopoverPosition();
-    window.addEventListener("resize", syncPopoverPosition);
-    window.addEventListener("scroll", syncPopoverPosition, true);
-    return () => {
-      if (pricePopoverFrameRef.current) {
-        window.cancelAnimationFrame(pricePopoverFrameRef.current);
-        pricePopoverFrameRef.current = null;
-      }
-      window.removeEventListener("resize", syncPopoverPosition);
-      window.removeEventListener("scroll", syncPopoverPosition, true);
-    };
-  }, [activeMenu]);
-
-  useEffect(() => {
-    if (activeMenu !== "talla" || !sizeTriggerRef.current) return undefined;
-
-    const syncPopoverPosition = () => {
-      if (!sizeTriggerRef.current) return;
-      if (sizePopoverFrameRef.current) {
-        window.cancelAnimationFrame(sizePopoverFrameRef.current);
-      }
-
-      sizePopoverFrameRef.current = window.requestAnimationFrame(() => {
-        if (!sizeTriggerRef.current) return;
-
-        const rect = sizeTriggerRef.current.getBoundingClientRect();
-        const desiredWidth = Math.min(340, window.innerWidth - 32);
-        const margin = 16;
-        const topBelow = rect.bottom + 10;
-        const maxLeft = Math.max(margin, window.innerWidth - desiredWidth - margin);
-        const left = Math.max(margin, Math.min(rect.left, maxLeft));
-        const top = topBelow;
-
-        setSizePopoverStyle({
-          top,
-          left,
-          width: desiredWidth,
-        });
-      });
-    };
-
-    syncPopoverPosition();
-    window.addEventListener("resize", syncPopoverPosition);
-    window.addEventListener("scroll", syncPopoverPosition, true);
-    return () => {
-      if (sizePopoverFrameRef.current) {
-        window.cancelAnimationFrame(sizePopoverFrameRef.current);
-        sizePopoverFrameRef.current = null;
-      }
-      window.removeEventListener("resize", syncPopoverPosition);
-      window.removeEventListener("scroll", syncPopoverPosition, true);
-    };
-  }, [activeMenu]);
-
-  useEffect(() => {
-    if (activeMenu !== "color" || !colorTriggerRef.current) return undefined;
-
-    const syncPopoverPosition = () => {
-      if (!colorTriggerRef.current) return;
-      if (colorPopoverFrameRef.current) {
-        window.cancelAnimationFrame(colorPopoverFrameRef.current);
-      }
-
-      colorPopoverFrameRef.current = window.requestAnimationFrame(() => {
-        if (!colorTriggerRef.current) return;
-
-        const rect = colorTriggerRef.current.getBoundingClientRect();
-        const desiredWidth = Math.min(600, window.innerWidth - 32);
-        const margin = 16;
-        const topBelow = rect.bottom + 10;
-        const maxLeft = Math.max(margin, window.innerWidth - desiredWidth - margin);
-        const left = Math.max(margin, Math.min(rect.left - desiredWidth / 2 + rect.width / 2, maxLeft));
-        const top = topBelow;
-
-        setColorPopoverStyle({
-          top,
-          left,
-          width: desiredWidth,
-        });
-      });
-    };
-
-    syncPopoverPosition();
-    window.addEventListener("resize", syncPopoverPosition);
-    window.addEventListener("scroll", syncPopoverPosition, true);
-    return () => {
-      if (colorPopoverFrameRef.current) {
-        window.cancelAnimationFrame(colorPopoverFrameRef.current);
-        colorPopoverFrameRef.current = null;
-      }
-      window.removeEventListener("resize", syncPopoverPosition);
-      window.removeEventListener("scroll", syncPopoverPosition, true);
-    };
-  }, [activeMenu]);
-
-  useEffect(() => {
-    if (activeMenu !== "material" || !materialTriggerRef.current) return undefined;
-
-    const syncPopoverPosition = () => {
-      if (!materialTriggerRef.current) return;
-      if (materialPopoverFrameRef.current) {
-        window.cancelAnimationFrame(materialPopoverFrameRef.current);
-      }
-
-      materialPopoverFrameRef.current = window.requestAnimationFrame(() => {
-        if (!materialTriggerRef.current) return;
-
-        const rect = materialTriggerRef.current.getBoundingClientRect();
-        const desiredWidth = Math.min(420, window.innerWidth - 32);
-        const margin = 16;
-        const topBelow = rect.bottom + 10;
-        const maxLeft = Math.max(margin, window.innerWidth - desiredWidth - margin);
-        const left = Math.max(margin, Math.min(rect.left - desiredWidth / 2 + rect.width / 2, maxLeft));
-        const top = topBelow;
-
-        setMaterialPopoverStyle({
-          top,
-          left,
-          width: desiredWidth,
-        });
-      });
-    };
-
-    syncPopoverPosition();
-    window.addEventListener("resize", syncPopoverPosition);
-    window.addEventListener("scroll", syncPopoverPosition, true);
-    return () => {
-      if (materialPopoverFrameRef.current) {
-        window.cancelAnimationFrame(materialPopoverFrameRef.current);
-        materialPopoverFrameRef.current = null;
-      }
-      window.removeEventListener("resize", syncPopoverPosition);
-      window.removeEventListener("scroll", syncPopoverPosition, true);
-    };
-  }, [activeMenu]);
-
-  useEffect(() => {
-    if (activeMenu !== "descuento" || !discountTriggerRef.current) return undefined;
-
-    const syncPopoverPosition = () => {
-      if (!discountTriggerRef.current) return;
-      if (discountPopoverFrameRef.current) {
-        window.cancelAnimationFrame(discountPopoverFrameRef.current);
-      }
-
-      discountPopoverFrameRef.current = window.requestAnimationFrame(() => {
-        if (!discountTriggerRef.current) return;
-
-        const rect = discountTriggerRef.current.getBoundingClientRect();
-        const desiredWidth = Math.min(360, window.innerWidth - 32);
-        const margin = 16;
-        const topBelow = rect.bottom + 10;
-        const maxLeft = Math.max(margin, window.innerWidth - desiredWidth - margin);
-        const left = Math.max(margin, Math.min(rect.left, maxLeft));
-        const top = topBelow;
-
-        setDiscountPopoverStyle({
-          top,
-          left,
-          width: desiredWidth,
-        });
-      });
-    };
-
-    syncPopoverPosition();
-    window.addEventListener("resize", syncPopoverPosition);
-    window.addEventListener("scroll", syncPopoverPosition, true);
-    return () => {
-      if (discountPopoverFrameRef.current) {
-        window.cancelAnimationFrame(discountPopoverFrameRef.current);
-        discountPopoverFrameRef.current = null;
-      }
-      window.removeEventListener("resize", syncPopoverPosition);
-      window.removeEventListener("scroll", syncPopoverPosition, true);
-    };
-  }, [activeMenu]);
-
-  useEffect(() => {
-    if (activeMenu !== "marcaSlug" || !marcaTriggerRef.current) return undefined;
-    const syncPopoverPosition = () => {
-      if (!marcaTriggerRef.current) return;
-      if (marcaPopoverFrameRef.current) window.cancelAnimationFrame(marcaPopoverFrameRef.current);
-      marcaPopoverFrameRef.current = window.requestAnimationFrame(() => {
-        if (!marcaTriggerRef.current) return;
-        const rect = marcaTriggerRef.current.getBoundingClientRect();
-        const desiredWidth = Math.min(260, window.innerWidth - 32);
-        const margin = 16;
-        const estimatedHeight = 172;
-        const maxLeft = Math.max(margin, window.innerWidth - desiredWidth - margin);
-        const left = Math.max(margin, Math.min(rect.left, maxLeft));
-        const topBelow = rect.bottom + 10;
-        const topAbove = rect.top - estimatedHeight - 10;
-        const top = topBelow + estimatedHeight <= window.innerHeight - margin
-          ? topBelow
-          : Math.max(margin, topAbove);
-        setMarcaPopoverStyle({ top, left, width: desiredWidth });
-      });
-    };
-    syncPopoverPosition();
-    window.addEventListener("resize", syncPopoverPosition);
-    window.addEventListener("scroll", syncPopoverPosition, true);
-    return () => {
-      if (marcaPopoverFrameRef.current) {
-        window.cancelAnimationFrame(marcaPopoverFrameRef.current);
-        marcaPopoverFrameRef.current = null;
-      }
-      window.removeEventListener("resize", syncPopoverPosition);
-      window.removeEventListener("scroll", syncPopoverPosition, true);
-    };
-  }, [activeMenu]);
+  usePopoverDockEffect(activeMenu === "precio", priceTriggerRef, pricePopoverFrameRef, setPricePopoverStyle, layoutPricePopover);
+  usePopoverDockEffect(activeMenu === "talla", sizeTriggerRef, sizePopoverFrameRef, setSizePopoverStyle, layoutSizePopover);
+  usePopoverDockEffect(activeMenu === "color", colorTriggerRef, colorPopoverFrameRef, setColorPopoverStyle, layoutColorPopover);
+  usePopoverDockEffect(activeMenu === "material", materialTriggerRef, materialPopoverFrameRef, setMaterialPopoverStyle, layoutMaterialPopover);
+  usePopoverDockEffect(activeMenu === "descuento", discountTriggerRef, discountPopoverFrameRef, setDiscountPopoverStyle, layoutDiscountPopover);
+  usePopoverDockEffect(activeMenu === "marcaSlug", marcaTriggerRef, marcaPopoverFrameRef, setMarcaPopoverStyle, layoutMarcaPopover);
 
   const routeFiltered = useMemo(
     () =>
@@ -678,6 +472,19 @@ export default function ProductsPage() {
     ],
     []
   );
+
+  const {
+    activeCampaignSlide,
+    isCampaignDragging,
+    campaignTrackRef,
+    handleCampaignPointerDown,
+    handleCampaignPointerMove,
+    handleCampaignPointerUp,
+    handleCampaignPointerCancel,
+    handleCampaignAnimationEnd,
+    getCampaignSlideClassName,
+    getCampaignSlideStyle,
+  } = useCatalogCampaignCarousel(catalogCampaignSlides, CATALOG_CAMPAIGN_ROTATION_MS);
 
   const primaryFilters = useMemo<CatalogFilterGroup>(
     () => ({
@@ -911,136 +718,6 @@ export default function ProductsPage() {
   );
 
   const hasAnyProducts = filtered.length > 0;
-
-  useEffect(() => {
-    const track = campaignTrackRef.current;
-    if (!track) return undefined;
-
-    const updateCampaignWidth = () => {
-      setCampaignWidth(track.getBoundingClientRect().width);
-    };
-    updateCampaignWidth();
-
-    const observer = new ResizeObserver(updateCampaignWidth);
-    observer.observe(track);
-    return () => observer.disconnect();
-  }, []);
-
-  const moveCampaignBy = useCallback((direction: 1 | -1) => {
-    const slideCount = catalogCampaignSlides.length;
-    if (slideCount < 2 || campaignTransition) return;
-
-    const from = activeCampaignSlide;
-    const to = (activeCampaignSlide + direction + slideCount) % slideCount;
-    setActiveCampaignSlide(to);
-    setCampaignTransition({ from, to, direction });
-  }, [activeCampaignSlide, campaignTransition, catalogCampaignSlides.length]);
-
-  const handleCampaignPointerDown = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const track = campaignTrackRef.current;
-    if (!track || catalogCampaignSlides.length < 2 || campaignTransition) return;
-    campaignDragStartXRef.current = event.clientX;
-    campaignDragDeltaXRef.current = 0;
-    setCampaignWidth(track.getBoundingClientRect().width);
-    setIsCampaignDragging(true);
-    try {
-      track.setPointerCapture?.(event.pointerId);
-    } catch {
-      // Playwright synthetic touch events do not always create an active pointer.
-    }
-  }, [campaignTransition, catalogCampaignSlides.length]);
-
-  const handleCampaignPointerMove = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    const startX = campaignDragStartXRef.current;
-    if (startX === null) return;
-
-    const deltaX = event.clientX - startX;
-    campaignDragDeltaXRef.current = deltaX;
-    setCampaignDragOffset(deltaX);
-    event.preventDefault();
-  }, []);
-
-  const endCampaignDrag = useCallback((pointerId?: number) => {
-    const track = campaignTrackRef.current;
-    const startX = campaignDragStartXRef.current;
-    campaignDragStartXRef.current = null;
-    setIsCampaignDragging(false);
-    setCampaignDragOffset(0);
-    if (!track || startX === null) return;
-
-    if (typeof pointerId === "number" && track.hasPointerCapture?.(pointerId)) {
-      track.releasePointerCapture(pointerId);
-    }
-
-    const dragDeltaX = campaignDragDeltaXRef.current;
-    if (Math.abs(dragDeltaX) > 44) {
-      moveCampaignBy(dragDeltaX < 0 ? 1 : -1);
-    }
-  }, [moveCampaignBy]);
-
-  const handleCampaignPointerUp = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    endCampaignDrag(event.pointerId);
-  }, [endCampaignDrag]);
-
-  const handleCampaignPointerCancel = useCallback((event: PointerEvent<HTMLDivElement>) => {
-    endCampaignDrag(event.pointerId);
-  }, [endCampaignDrag]);
-
-  const advanceCampaignSlide = useCallback(() => {
-    if (catalogCampaignSlides.length < 2) return;
-    moveCampaignBy(1);
-  }, [catalogCampaignSlides.length, moveCampaignBy]);
-
-  useEffect(() => {
-    if (catalogCampaignSlides.length < 2 || isCampaignDragging || campaignTransition) return undefined;
-    const timer = window.setTimeout(() => {
-      advanceCampaignSlide();
-    }, CATALOG_CAMPAIGN_ROTATION_MS);
-    return () => window.clearTimeout(timer);
-  }, [activeCampaignSlide, advanceCampaignSlide, campaignTransition, catalogCampaignSlides.length, isCampaignDragging]);
-
-  const handleCampaignAnimationEnd = useCallback((index: number) => {
-    if (campaignTransition?.to === index) {
-      setCampaignTransition(null);
-    }
-  }, [campaignTransition]);
-
-  const campaignDragDirection = campaignDragOffset < 0 ? 1 : campaignDragOffset > 0 ? -1 : 0;
-  const campaignDragTarget = campaignDragDirection === 0
-    ? null
-    : (activeCampaignSlide + campaignDragDirection + catalogCampaignSlides.length) % catalogCampaignSlides.length;
-
-  const getCampaignSlideClassName = useCallback((index: number) => {
-    let className = "catalog-campaign-slide";
-    if (campaignTransition) {
-      if (index === campaignTransition.from) {
-        className += ` is-active is-exiting ${campaignTransition.direction === 1 ? "to-left" : "to-right"}`;
-      }
-      if (index === campaignTransition.to) {
-        className += ` is-active is-entering ${campaignTransition.direction === 1 ? "from-right" : "from-left"}`;
-      }
-      return className;
-    }
-
-    if (index === activeCampaignSlide) className += " is-active";
-    if (isCampaignDragging && campaignDragTarget === index) className += " is-drag-target";
-    return className;
-  }, [activeCampaignSlide, campaignDragTarget, campaignTransition, isCampaignDragging]);
-
-  const getCampaignSlideStyle = useCallback((index: number) => {
-    if (!isCampaignDragging || campaignDragDirection === 0 || campaignWidth <= 0) return undefined;
-
-    if (index === activeCampaignSlide) {
-      return { transform: `translate3d(${campaignDragOffset}px, 0, 0)`, opacity: 1, zIndex: 2 } as CSSProperties;
-    }
-
-    if (index === campaignDragTarget) {
-      const origin = campaignDragDirection === 1 ? campaignWidth : -campaignWidth;
-      return { transform: `translate3d(${origin + campaignDragOffset}px, 0, 0)`, opacity: 1, zIndex: 1 } as CSSProperties;
-    }
-
-    return undefined;
-  }, [activeCampaignSlide, campaignDragDirection, campaignDragOffset, campaignDragTarget, campaignWidth, isCampaignDragging]);
 
   const fillRangeLeft = (() => {
     if (priceBounds.max <= priceBounds.min) return "10px";

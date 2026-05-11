@@ -333,21 +333,30 @@ export type ProductsPageTitleInput = {
   trimmedQuery: string;
 };
 
-export function resolveProductsPageTitle(input: ProductsPageTitleInput): string {
-  const { vista, campana, promocion, coleccion, linea, tipo, estilo, segmento, marcaSlug, categoria, trimmedQuery } =
-    input;
+function catalogLineTipoEstiloTitle(segment: string, categoria: string): string {
+  const base = humanizeSlug(segment);
+  if (categoria === "todos") return base;
+  return `${base} ${categoryLabel(categoria)}`.trim();
+}
 
-  if (vista === "marcas") return "Marcas seleccionadas";
-  if (campana) return `Campaña ${humanizeSlug(campana)}`;
-  if (promocion) return `Selección ${humanizeSlug(promocion)}`;
-  if (coleccion) return humanizeSlug(coleccion);
-  if (linea) return `${humanizeSlug(linea)}${categoria !== "todos" ? ` ${categoryLabel(categoria)}` : ""}`.trim();
-  if (tipo) return `${humanizeSlug(tipo)}${categoria !== "todos" ? ` ${categoryLabel(categoria)}` : ""}`.trim();
-  if (estilo) return `${humanizeSlug(estilo)}${categoria !== "todos" ? ` ${categoryLabel(categoria)}` : ""}`.trim();
-  if (segmento) return humanizeSlug(segmento);
-  if (marcaSlug) return `Marca ${humanizeSlug(marcaSlug)}`;
-  if (categoria !== "todos") return `Calzado ${categoryLabel(categoria)}`;
-  if (trimmedQuery) return `Resultados para "${trimmedQuery}"`;
+function tryResolveLineTipoEstiloTitle(input: ProductsPageTitleInput): string | null {
+  if (input.linea) return catalogLineTipoEstiloTitle(input.linea, input.categoria);
+  if (input.tipo) return catalogLineTipoEstiloTitle(input.tipo, input.categoria);
+  if (input.estilo) return catalogLineTipoEstiloTitle(input.estilo, input.categoria);
+  return null;
+}
+
+export function resolveProductsPageTitle(input: ProductsPageTitleInput): string {
+  if (input.vista === "marcas") return "Marcas seleccionadas";
+  if (input.campana) return `Campaña ${humanizeSlug(input.campana)}`;
+  if (input.promocion) return `Selección ${humanizeSlug(input.promocion)}`;
+  if (input.coleccion) return humanizeSlug(input.coleccion);
+  const lineTipoEstilo = tryResolveLineTipoEstiloTitle(input);
+  if (lineTipoEstilo) return lineTipoEstilo;
+  if (input.segmento) return humanizeSlug(input.segmento);
+  if (input.marcaSlug) return `Marca ${humanizeSlug(input.marcaSlug)}`;
+  if (input.categoria !== "todos") return `Calzado ${categoryLabel(input.categoria)}`;
+  if (input.trimmedQuery) return `Resultados para "${input.trimmedQuery}"`;
   return "Todos los productos";
 }
 
@@ -365,232 +374,294 @@ export type ContextualFiltersInput = {
   marcas: { label: string; value: string }[];
 };
 
-export function buildContextualCatalogFilters(input: ContextualFiltersInput): CatalogFilterGroup {
-  const make = (title: string, items: CatalogQuickFilter[]) => ({ title, items });
-  const {
-    vista,
-    campana,
-    categoria,
-    coleccion,
-    tipo,
-    linea,
-    segmento,
-    color,
-    descuento,
-    rangoEdad,
-    marcas,
-  } = input;
-  const cyberDesc = descuento || CYBER_WOW_DEFAULT_DESCUENTO;
+type CatalogFilterMaker = (title: string, items: CatalogQuickFilter[]) => CatalogFilterGroup;
 
-  if (vista === "marcas") {
-    return make("Marcas", [
-      { label: "Todas", params: { vista: "marcas" } },
-      ...marcas.map((brand) => ({
-        label: brand.label,
-        params: { vista: "marcas", marcaSlug: brand.value },
-      })),
-    ]);
-  }
+function tryContextualMarcas(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (input.vista !== "marcas") return null;
+  return make("Marcas", [
+    { label: "Todas", params: { vista: "marcas" } },
+    ...input.marcas.map((brand) => ({
+      label: brand.label,
+      params: { vista: "marcas", marcaSlug: brand.value },
+    })),
+  ]);
+}
 
-  if (campana === "cyber" && linea === "zapatillas") {
-    return make("Cyber Zapatillas", [
-      { label: "Todos", params: { linea: "zapatillas", campana: "cyber", descuento: cyberDesc } },
-      {
-        label: "Mujer",
-        params: { categoria: "mujer", tipo: "zapatillas", campana: "cyber", descuento: cyberDesc },
-      },
-      {
-        label: "Hombre",
-        params: { categoria: "hombre", tipo: "zapatillas", campana: "cyber", descuento: cyberDesc },
-      },
-      {
-        label: "Ni\u00f1os",
-        params: { categoria: "nino", tipo: "zapatillas", campana: "cyber", descuento: cyberDesc },
-      },
-    ]);
-  }
+function tryContextualCyberLineaZapatillas(
+  input: ContextualFiltersInput,
+  make: CatalogFilterMaker,
+  cyberDesc: string
+): CatalogFilterGroup | null {
+  if (input.campana !== "cyber" || input.linea !== "zapatillas") return null;
+  return make("Cyber Zapatillas", [
+    { label: "Todos", params: { linea: "zapatillas", campana: "cyber", descuento: cyberDesc } },
+    {
+      label: "Mujer",
+      params: { categoria: "mujer", tipo: "zapatillas", campana: "cyber", descuento: cyberDesc },
+    },
+    {
+      label: "Hombre",
+      params: { categoria: "hombre", tipo: "zapatillas", campana: "cyber", descuento: cyberDesc },
+    },
+    {
+      label: "Ni\u00f1os",
+      params: { categoria: "nino", tipo: "zapatillas", campana: "cyber", descuento: cyberDesc },
+    },
+  ]);
+}
 
-  if (campana === "cyber" && categoria === "hombre") {
-    return make("Cyber Hombre", [
-      { label: "Todos", params: { categoria: "hombre", campana: "cyber", descuento: cyberDesc } },
-      {
-        label: "Zapatillas Cyber",
-        params: { categoria: "hombre", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
-      },
-      {
-        label: "Zapatos Cyber",
-        params: { categoria: "hombre", campana: "cyber", tipo: "zapatos", descuento: cyberDesc },
-      },
-      {
-        label: "Botines Cyber",
-        params: { categoria: "hombre", campana: "cyber", tipo: "botines", descuento: cyberDesc },
-      },
-    ]);
-  }
+function tryContextualCyberHombre(
+  input: ContextualFiltersInput,
+  make: CatalogFilterMaker,
+  cyberDesc: string
+): CatalogFilterGroup | null {
+  if (input.campana !== "cyber" || input.categoria !== "hombre") return null;
+  return make("Cyber Hombre", [
+    { label: "Todos", params: { categoria: "hombre", campana: "cyber", descuento: cyberDesc } },
+    {
+      label: "Zapatillas Cyber",
+      params: { categoria: "hombre", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
+    },
+    {
+      label: "Zapatos Cyber",
+      params: { categoria: "hombre", campana: "cyber", tipo: "zapatos", descuento: cyberDesc },
+    },
+    {
+      label: "Botines Cyber",
+      params: { categoria: "hombre", campana: "cyber", tipo: "botines", descuento: cyberDesc },
+    },
+  ]);
+}
 
-  if (campana === "cyber" && categoria === "mujer") {
-    return make("Cyber Mujer", [
-      { label: "Todos", params: { categoria: "mujer", campana: "cyber", descuento: cyberDesc } },
-      {
-        label: "Zapatillas Cyber",
-        params: { categoria: "mujer", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
-      },
-      {
-        label: "Sandalias Cyber",
-        params: { categoria: "mujer", campana: "cyber", tipo: "sandalias", descuento: cyberDesc },
-      },
-      {
-        label: "Botines Cyber",
-        params: { categoria: "mujer", campana: "cyber", tipo: "botines", descuento: cyberDesc },
-      },
-    ]);
-  }
+function tryContextualCyberMujer(
+  input: ContextualFiltersInput,
+  make: CatalogFilterMaker,
+  cyberDesc: string
+): CatalogFilterGroup | null {
+  if (input.campana !== "cyber" || input.categoria !== "mujer") return null;
+  return make("Cyber Mujer", [
+    { label: "Todos", params: { categoria: "mujer", campana: "cyber", descuento: cyberDesc } },
+    {
+      label: "Zapatillas Cyber",
+      params: { categoria: "mujer", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
+    },
+    {
+      label: "Sandalias Cyber",
+      params: { categoria: "mujer", campana: "cyber", tipo: "sandalias", descuento: cyberDesc },
+    },
+    {
+      label: "Botines Cyber",
+      params: { categoria: "mujer", campana: "cyber", tipo: "botines", descuento: cyberDesc },
+    },
+  ]);
+}
 
-  if (campana === "cyber" && categoria === "nino") {
-    return make("Cyber Infantil", [
-      { label: "Todos", params: { categoria: "nino", campana: "cyber", descuento: cyberDesc } },
-      {
-        label: "Escolar Cyber",
-        params: { categoria: "nino", campana: "cyber", tipo: "escolar", descuento: cyberDesc },
-      },
-      {
-        label: "Juvenil Activo",
-        params: { categoria: "nino", campana: "cyber", segmento: "juvenil", descuento: cyberDesc },
-      },
-      {
-        label: "Zapatillas Cyber",
-        params: { categoria: "nino", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
-      },
-    ]);
-  }
+function tryContextualCyberNino(
+  input: ContextualFiltersInput,
+  make: CatalogFilterMaker,
+  cyberDesc: string
+): CatalogFilterGroup | null {
+  if (input.campana !== "cyber" || input.categoria !== "nino") return null;
+  return make("Cyber Infantil", [
+    { label: "Todos", params: { categoria: "nino", campana: "cyber", descuento: cyberDesc } },
+    {
+      label: "Escolar Cyber",
+      params: { categoria: "nino", campana: "cyber", tipo: "escolar", descuento: cyberDesc },
+    },
+    {
+      label: "Juvenil Activo",
+      params: { categoria: "nino", campana: "cyber", segmento: "juvenil", descuento: cyberDesc },
+    },
+    {
+      label: "Zapatillas Cyber",
+      params: { categoria: "nino", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
+    },
+  ]);
+}
 
+function tryContextualNuevasMujer(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
   if (
-    categoria === "mujer" &&
-    (campana === "nueva-temporada" || ["pasos-radiantes", "urban-glow", "sunset-chic"].includes(coleccion))
+    input.categoria !== "mujer" ||
+    !(
+      input.campana === "nueva-temporada" ||
+      ["pasos-radiantes", "urban-glow", "sunset-chic"].includes(input.coleccion)
+    )
   ) {
-    return make("Nuevas tendencias", [
-      { label: "Nueva temporada", params: { categoria: "mujer", campana: "nueva-temporada" } },
-      { label: "Pasos radiantes", params: { categoria: "mujer", coleccion: "pasos-radiantes" } },
-      { label: "Urban glow", params: { categoria: "mujer", coleccion: "urban-glow" } },
-      { label: "Sunset chic", params: { categoria: "mujer", coleccion: "sunset-chic" } },
-    ]);
+    return null;
   }
+  return make("Nuevas tendencias", [
+    { label: "Nueva temporada", params: { categoria: "mujer", campana: "nueva-temporada" } },
+    { label: "Pasos radiantes", params: { categoria: "mujer", coleccion: "pasos-radiantes" } },
+    { label: "Urban glow", params: { categoria: "mujer", coleccion: "urban-glow" } },
+    { label: "Sunset chic", params: { categoria: "mujer", coleccion: "sunset-chic" } },
+  ]);
+}
 
+function tryContextualNuevasHombre(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
   if (
-    categoria === "hombre" &&
-    (campana === "nueva-temporada" || ["ruta-urbana", "paso-ejecutivo", "weekend-flow"].includes(coleccion))
+    input.categoria !== "hombre" ||
+    !(
+      input.campana === "nueva-temporada" ||
+      ["ruta-urbana", "paso-ejecutivo", "weekend-flow"].includes(input.coleccion)
+    )
   ) {
-    return make("Nuevas tendencias", [
-      { label: "Nueva temporada", params: { categoria: "hombre", campana: "nueva-temporada" } },
-      { label: "Ruta urbana", params: { categoria: "hombre", coleccion: "ruta-urbana" } },
-      { label: "Paso ejecutivo", params: { categoria: "hombre", coleccion: "paso-ejecutivo" } },
-      { label: "Weekend flow", params: { categoria: "hombre", coleccion: "weekend-flow" } },
-    ]);
+    return null;
   }
+  return make("Nuevas tendencias", [
+    { label: "Nueva temporada", params: { categoria: "hombre", campana: "nueva-temporada" } },
+    { label: "Ruta urbana", params: { categoria: "hombre", coleccion: "ruta-urbana" } },
+    { label: "Paso ejecutivo", params: { categoria: "hombre", coleccion: "paso-ejecutivo" } },
+    { label: "Weekend flow", params: { categoria: "hombre", coleccion: "weekend-flow" } },
+  ]);
+}
 
-  if (categoria === "nino" && (campana === "nueva-temporada" || ["vuelta-al-cole", "mini-aventuras"].includes(coleccion))) {
-    return make("Nuevas tendencias", [
-      { label: "Nueva temporada", params: { categoria: "nino", campana: "nueva-temporada" } },
-      { label: "Vuelta al cole", params: { categoria: "nino", coleccion: "vuelta-al-cole" } },
-      { label: "Paso activo", params: { categoria: "nino", tipo: "zapatillas" } },
-      { label: "Mini aventuras", params: { categoria: "nino", coleccion: "mini-aventuras" } },
-    ]);
+function tryContextualNuevasNino(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (
+    input.categoria !== "nino" ||
+    !(input.campana === "nueva-temporada" || ["vuelta-al-cole", "mini-aventuras"].includes(input.coleccion))
+  ) {
+    return null;
   }
+  return make("Nuevas tendencias", [
+    { label: "Nueva temporada", params: { categoria: "nino", campana: "nueva-temporada" } },
+    { label: "Vuelta al cole", params: { categoria: "nino", coleccion: "vuelta-al-cole" } },
+    { label: "Paso activo", params: { categoria: "nino", tipo: "zapatillas" } },
+    { label: "Mini aventuras", params: { categoria: "nino", coleccion: "mini-aventuras" } },
+  ]);
+}
 
-  if (categoria === "mujer" && tipo === "zapatillas") {
-    return make("Zapatillas mujer", [
-      { label: "Todos", params: { categoria: "mujer", tipo: "zapatillas" } },
-      { label: "Urbanas", params: { categoria: "mujer", tipo: "zapatillas", estilo: "urbanas" } },
-      { label: "Deportivas", params: { categoria: "mujer", tipo: "zapatillas", estilo: "deportivas" } },
-      { label: "Casuales", params: { categoria: "mujer", tipo: "zapatillas", estilo: "casuales" } },
-      { label: "Outdoor", params: { categoria: "mujer", tipo: "zapatillas", estilo: "outdoor" } },
-    ]);
+function tryContextualZapatillasMujer(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (input.categoria !== "mujer" || input.tipo !== "zapatillas") return null;
+  return make("Zapatillas mujer", [
+    { label: "Todos", params: { categoria: "mujer", tipo: "zapatillas" } },
+    { label: "Urbanas", params: { categoria: "mujer", tipo: "zapatillas", estilo: "urbanas" } },
+    { label: "Deportivas", params: { categoria: "mujer", tipo: "zapatillas", estilo: "deportivas" } },
+    { label: "Casuales", params: { categoria: "mujer", tipo: "zapatillas", estilo: "casuales" } },
+    { label: "Outdoor", params: { categoria: "mujer", tipo: "zapatillas", estilo: "outdoor" } },
+  ]);
+}
+
+function tryContextualZapatillasHombre(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (input.categoria !== "hombre" || input.tipo !== "zapatillas") return null;
+  return make("Zapatillas hombre", [
+    { label: "Todos", params: { categoria: "hombre", tipo: "zapatillas" } },
+    { label: "Urbanas", params: { categoria: "hombre", tipo: "zapatillas", estilo: "urbanas" } },
+    { label: "Deportivas", params: { categoria: "hombre", tipo: "zapatillas", estilo: "deportivas" } },
+    { label: "Casuales", params: { categoria: "hombre", tipo: "zapatillas", estilo: "casuales" } },
+    { label: "Outdoor", params: { categoria: "hombre", tipo: "zapatillas", estilo: "outdoor" } },
+  ]);
+}
+
+function tryContextualZapatillasBlancas(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (input.color !== "blanco" || (input.linea !== "zapatillas" && input.tipo !== "zapatillas")) return null;
+  return make("Zapatillas blancas", [
+    { label: "Todos", params: { linea: "zapatillas", color: "blanco" } },
+    { label: "Mujer", params: { categoria: "mujer", tipo: "zapatillas", color: "blanco" } },
+    { label: "Hombre", params: { categoria: "hombre", tipo: "zapatillas", color: "blanco" } },
+    { label: "Ni\u00f1os", params: { categoria: "nino", tipo: "zapatillas", color: "blanco" } },
+    { label: "Juvenil", params: { categoria: "nino", segmento: "juvenil", tipo: "zapatillas", color: "blanco" } },
+  ]);
+}
+
+function tryContextualNinas(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (input.categoria !== "nino" || input.segmento !== "ninas") return null;
+  return make("Ni\u00f1as", [
+    { label: "Todos", params: { categoria: "nino", segmento: "ninas" } },
+    { label: "Escolar", params: { categoria: "nino", segmento: "ninas", tipo: "escolar" } },
+    { label: "Zapatillas", params: { categoria: "nino", segmento: "ninas", tipo: "zapatillas" } },
+    { label: "Ballerinas", params: { categoria: "nino", segmento: "ninas", tipo: "ballerinas" } },
+    { label: "Botas y botines", params: { categoria: "nino", segmento: "ninas", tipo: "botas" } },
+    { label: "Sandalias", params: { categoria: "nino", segmento: "ninas", tipo: "sandalias" } },
+    { label: "Zapatos", params: { categoria: "nino", segmento: "ninas", tipo: "zapatos" } },
+  ]);
+}
+
+function tryContextualNinos(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (
+    input.categoria !== "nino" ||
+    !(input.segmento === "ninos" || input.segmento === "junior" || input.rangoEdad)
+  ) {
+    return null;
   }
+  return make("Ni\u00f1os", [
+    { label: "Todos", params: { categoria: "nino", segmento: "ninos" } },
+    { label: "Infantil 1-3", params: { categoria: "nino", rangoEdad: "1-3" } },
+    { label: "Niños 4-6", params: { categoria: "nino", segmento: "ninos" } },
+    { label: "Junior 7-10", params: { categoria: "nino", segmento: "junior" } },
+    { label: "Zapatos", params: { categoria: "nino", tipo: "zapatos" } },
+    { label: "Zapatillas", params: { categoria: "nino", tipo: "zapatillas" } },
+  ]);
+}
 
-  if (categoria === "hombre" && tipo === "zapatillas") {
-    return make("Zapatillas hombre", [
-      { label: "Todos", params: { categoria: "hombre", tipo: "zapatillas" } },
-      { label: "Urbanas", params: { categoria: "hombre", tipo: "zapatillas", estilo: "urbanas" } },
-      { label: "Deportivas", params: { categoria: "hombre", tipo: "zapatillas", estilo: "deportivas" } },
-      { label: "Casuales", params: { categoria: "hombre", tipo: "zapatillas", estilo: "casuales" } },
-      { label: "Outdoor", params: { categoria: "hombre", tipo: "zapatillas", estilo: "outdoor" } },
-    ]);
-  }
+function tryContextualCalzadoMujer(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (input.categoria !== "mujer") return null;
+  return make("Calzado mujer", [
+    { label: "Todos", params: { categoria: "mujer" } },
+    { label: "Zapatillas", params: { categoria: "mujer", tipo: "zapatillas" } },
+    { label: "Sandalias", params: { categoria: "mujer", tipo: "sandalias" } },
+    { label: "Casual", params: { categoria: "mujer", tipo: "casual" } },
+    { label: "Vestir", params: { categoria: "mujer", tipo: "formal" } },
+    { label: "Mocasines", params: { categoria: "mujer", tipo: "mocasines" } },
+    { label: "Botas", params: { categoria: "mujer", tipo: "botas" } },
+  ]);
+}
 
-  if ((linea === "zapatillas" || tipo === "zapatillas") && color === "blanco") {
-    return make("Zapatillas blancas", [
-      { label: "Todos", params: { linea: "zapatillas", color: "blanco" } },
-      { label: "Mujer", params: { categoria: "mujer", tipo: "zapatillas", color: "blanco" } },
-      { label: "Hombre", params: { categoria: "hombre", tipo: "zapatillas", color: "blanco" } },
-      { label: "Ni\u00f1os", params: { categoria: "nino", tipo: "zapatillas", color: "blanco" } },
-      { label: "Juvenil", params: { categoria: "nino", segmento: "juvenil", tipo: "zapatillas", color: "blanco" } },
-    ]);
-  }
+function tryContextualCalzadoHombre(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (input.categoria !== "hombre") return null;
+  return make("Calzado hombre", [
+    { label: "Todos", params: { categoria: "hombre" } },
+    { label: "Zapatillas", params: { categoria: "hombre", tipo: "zapatillas" } },
+    { label: "Vestir", params: { categoria: "hombre", tipo: "formal" } },
+    { label: "Casual", params: { categoria: "hombre", tipo: "casual" } },
+    { label: "Sandalias", params: { categoria: "hombre", tipo: "sandalias" } },
+    { label: "Botines", params: { categoria: "hombre", tipo: "botines" } },
+    { label: "Seguridad", params: { categoria: "hombre", tipo: "seguridad" } },
+  ]);
+}
 
-  if (categoria === "nino" && segmento === "ninas") {
-    return make("Ni\u00f1as", [
-      { label: "Todos", params: { categoria: "nino", segmento: "ninas" } },
-      { label: "Escolar", params: { categoria: "nino", segmento: "ninas", tipo: "escolar" } },
-      { label: "Zapatillas", params: { categoria: "nino", segmento: "ninas", tipo: "zapatillas" } },
-      { label: "Ballerinas", params: { categoria: "nino", segmento: "ninas", tipo: "ballerinas" } },
-      { label: "Botas y botines", params: { categoria: "nino", segmento: "ninas", tipo: "botas" } },
-      { label: "Sandalias", params: { categoria: "nino", segmento: "ninas", tipo: "sandalias" } },
-      { label: "Zapatos", params: { categoria: "nino", segmento: "ninas", tipo: "zapatos" } },
-    ]);
-  }
+function tryContextualInfantil(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  if (input.categoria !== "nino") return null;
+  return make("Infantil", [
+    { label: "Todos", params: { categoria: "nino" } },
+    { label: "Escolar", params: { categoria: "nino", tipo: "escolar" } },
+    { label: "Sandalias", params: { categoria: "nino", tipo: "sandalias" } },
+    { label: "Zapatillas", params: { categoria: "nino", tipo: "zapatillas" } },
+    { label: "Ni\u00f1os", params: { categoria: "nino", segmento: "ninos" } },
+    { label: "Ni\u00f1as", params: { categoria: "nino", segmento: "ninas" } },
+  ]);
+}
 
-  if (categoria === "nino" && (segmento === "ninos" || segmento === "junior" || rangoEdad)) {
-    return make("Ni\u00f1os", [
-      { label: "Todos", params: { categoria: "nino", segmento: "ninos" } },
-      { label: "Infantil 1-3", params: { categoria: "nino", rangoEdad: "1-3" } },
-      { label: "Niños 4-6", params: { categoria: "nino", segmento: "ninos" } },
-      { label: "Junior 7-10", params: { categoria: "nino", segmento: "junior" } },
-      { label: "Zapatos", params: { categoria: "nino", tipo: "zapatos" } },
-      { label: "Zapatillas", params: { categoria: "nino", tipo: "zapatillas" } },
-    ]);
-  }
-
-  if (categoria === "mujer") {
-    return make("Calzado mujer", [
-      { label: "Todos", params: { categoria: "mujer" } },
-      { label: "Zapatillas", params: { categoria: "mujer", tipo: "zapatillas" } },
-      { label: "Sandalias", params: { categoria: "mujer", tipo: "sandalias" } },
-      { label: "Casual", params: { categoria: "mujer", tipo: "casual" } },
-      { label: "Vestir", params: { categoria: "mujer", tipo: "formal" } },
-      { label: "Mocasines", params: { categoria: "mujer", tipo: "mocasines" } },
-      { label: "Botas", params: { categoria: "mujer", tipo: "botas" } },
-    ]);
-  }
-
-  if (categoria === "hombre") {
-    return make("Calzado hombre", [
-      { label: "Todos", params: { categoria: "hombre" } },
-      { label: "Zapatillas", params: { categoria: "hombre", tipo: "zapatillas" } },
-      { label: "Vestir", params: { categoria: "hombre", tipo: "formal" } },
-      { label: "Casual", params: { categoria: "hombre", tipo: "casual" } },
-      { label: "Sandalias", params: { categoria: "hombre", tipo: "sandalias" } },
-      { label: "Botines", params: { categoria: "hombre", tipo: "botines" } },
-      { label: "Seguridad", params: { categoria: "hombre", tipo: "seguridad" } },
-    ]);
-  }
-
-  if (categoria === "nino") {
-    return make("Infantil", [
-      { label: "Todos", params: { categoria: "nino" } },
-      { label: "Escolar", params: { categoria: "nino", tipo: "escolar" } },
-      { label: "Sandalias", params: { categoria: "nino", tipo: "sandalias" } },
-      { label: "Zapatillas", params: { categoria: "nino", tipo: "zapatillas" } },
-      { label: "Ni\u00f1os", params: { categoria: "nino", segmento: "ninos" } },
-      { label: "Ni\u00f1as", params: { categoria: "nino", segmento: "ninas" } },
-    ]);
-  }
-
+function contextualDefaultCategoria(make: CatalogFilterMaker): CatalogFilterGroup {
   return make("Categoría", [
     { label: "Todos", params: {} },
     { label: "Mujer", params: { categoria: "mujer" } },
     { label: "Hombre", params: { categoria: "hombre" } },
     { label: "Infantil", params: { categoria: "nino" } },
   ]);
+}
+
+export function buildContextualCatalogFilters(input: ContextualFiltersInput): CatalogFilterGroup {
+  const make: CatalogFilterMaker = (title, items) => ({ title, items });
+  const cyberDesc = input.descuento || CYBER_WOW_DEFAULT_DESCUENTO;
+  return (
+    tryContextualMarcas(input, make) ??
+    tryContextualCyberLineaZapatillas(input, make, cyberDesc) ??
+    tryContextualCyberHombre(input, make, cyberDesc) ??
+    tryContextualCyberMujer(input, make, cyberDesc) ??
+    tryContextualCyberNino(input, make, cyberDesc) ??
+    tryContextualNuevasMujer(input, make) ??
+    tryContextualNuevasHombre(input, make) ??
+    tryContextualNuevasNino(input, make) ??
+    tryContextualZapatillasMujer(input, make) ??
+    tryContextualZapatillasHombre(input, make) ??
+    tryContextualZapatillasBlancas(input, make) ??
+    tryContextualNinas(input, make) ??
+    tryContextualNinos(input, make) ??
+    tryContextualCalzadoMujer(input, make) ??
+    tryContextualCalzadoHombre(input, make) ??
+    tryContextualInfantil(input, make) ??
+    contextualDefaultCategoria(make)
+  );
 }
 
 export type CatalogBreadcrumbsInput = {

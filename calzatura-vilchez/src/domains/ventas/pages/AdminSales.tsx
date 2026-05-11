@@ -1,3 +1,4 @@
+import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Calculator, CircleDollarSign, Eye, FileText, IdCard, PackageSearch, Plus, RotateCcw, Trash2, TrendingUp, Truck, X } from "lucide-react";
 import toast from "react-hot-toast";
@@ -146,6 +147,147 @@ async function decrementStockForPendingLines(pendingLines: PendingSaleLine[]): P
       )
     )
   );
+}
+
+async function resolveRegisterSaleCustomerForDocument(
+  requiresCustomer: boolean,
+  customer: SaleCustomer,
+  documentPreview: Window | null,
+  setCustomer: (c: SaleCustomer) => void,
+  setValidatedDni: (d: string) => void
+): Promise<SaleCustomer | undefined> {
+  if (!requiresCustomer) return undefined;
+  const dni = normalizeDni(customer.dni);
+  if (!isValidDni(dni)) {
+    toast.error("Ingresa el DNI del cliente para emitir el documento");
+    closeSaleDocumentWindow(documentPreview);
+    return undefined;
+  }
+  const person = await lookupDni(dni);
+  const saleCustomer = { dni: person.dni, nombres: person.nombres, apellidos: person.apellidos };
+  setCustomer(saleCustomer);
+  setValidatedDni(person.dni);
+  return saleCustomer;
+}
+
+function renderRegisterSaleDocumentIfNeeded(
+  documentToIssue: "nota_venta" | "guia_remision" | null,
+  docNumber: string | undefined,
+  saleCustomer: SaleCustomer | undefined,
+  documentPreview: Window | null,
+  pendingLines: PendingSaleLine[],
+  products: SaleProduct[]
+) {
+  if (!documentToIssue || !docNumber || !saleCustomer || !documentPreview) return;
+  const documentLines: SaleDocumentLine[] = pendingLines.map((line) => {
+    const product = products.find((p) => p.id === line.productId);
+    return {
+      codigo: product?.codigo || "SIN-CODIGO",
+      nombre: product?.nombre || "Producto",
+      color: line.color || product?.color || "",
+      talla: line.talla,
+      quantity: line.quantity,
+      salePrice: line.salePrice,
+      total: saleLineTotal(line),
+    };
+  });
+  const rendered = renderSaleDocument(documentPreview, {
+    id: docNumber,
+    type: documentToIssue,
+    customer: saleCustomer,
+    date: new Date(),
+    lines: documentLines,
+  });
+  if (rendered) {
+    toast.success("Documento listo para imprimir o guardar como PDF");
+  } else {
+    toast.error("No se pudo abrir el documento");
+  }
+}
+
+type RegisterPendingSalesParams = {
+  pendingLines: PendingSaleLine[];
+  products: SaleProduct[];
+  date: string;
+  documentType: SaleDocumentType;
+  requiresCustomer: boolean;
+  customer: SaleCustomer;
+  setSaving: (v: boolean) => void;
+  setCustomer: (c: SaleCustomer) => void;
+  setValidatedDni: (d: string) => void;
+  setPendingLines: Dispatch<SetStateAction<PendingSaleLine[]>>;
+  setDocumentType: (t: SaleDocumentType) => void;
+  load: () => void;
+};
+
+async function executeRegisterPendingSales(p: RegisterPendingSalesParams): Promise<void> {
+  const {
+    pendingLines,
+    products,
+    date,
+    documentType,
+    requiresCustomer,
+    customer,
+    setSaving,
+    setCustomer,
+    setValidatedDni,
+    setPendingLines,
+    setDocumentType,
+    load,
+  } = p;
+
+  if (pendingLines.length === 0) {
+    toast.error("Agrega al menos una línea de venta");
+    return;
+  }
+
+  const documentToIssue = documentType === "nota_venta" || documentType === "guia_remision" ? documentType : null;
+  const docNumber = documentToIssue ? makeDocumentNumber(documentToIssue, date) : undefined;
+  const documentPreview = documentToIssue ? openSaleDocumentWindow() : null;
+  if (documentToIssue && !documentPreview) {
+    toast.error("Permite ventanas emergentes para generar el documento");
+    return;
+  }
+
+  setSaving(true);
+  try {
+    const saleCustomer = await resolveRegisterSaleCustomerForDocument(
+      requiresCustomer,
+      customer,
+      documentPreview,
+      setCustomer,
+      setValidatedDni
+    );
+    if (requiresCustomer && !saleCustomer) return;
+
+    await insertPendingLinesAsDailySales(pendingLines, products, date, documentType, docNumber, saleCustomer);
+    await decrementStockForPendingLines(pendingLines);
+
+    toast.success("Ventas registradas");
+    renderRegisterSaleDocumentIfNeeded(
+      documentToIssue,
+      docNumber,
+      saleCustomer,
+      documentPreview,
+      pendingLines,
+      products
+    );
+
+    setPendingLines([]);
+    setDocumentType("ninguno");
+    setCustomer(EMPTY_SALE_CUSTOMER);
+    setValidatedDni("");
+    load();
+  } catch (err: unknown) {
+    if (isDniLookupError(err)) {
+      showDniLookupError(err);
+    } else {
+      toast.error("No se pudo registrar la venta");
+    }
+    closeSaleDocumentWindow(documentPreview);
+  } finally {
+    setSaving(false);
+  }
 }
 
 export default function AdminSales() {
@@ -413,93 +555,21 @@ export default function AdminSales() {
   };
 
 
-  const registerPendingLines = async () => {
-    if (pendingLines.length === 0) {
-      toast.error("Agrega al menos una línea de venta");
-      return;
-    }
-
-    const documentToIssue = documentType === "nota_venta" || documentType === "guia_remision" ? documentType : null;
-    const docNumber = documentToIssue ? makeDocumentNumber(documentToIssue, date) : undefined;
-    const documentPreview = documentToIssue ? openSaleDocumentWindow() : null;
-    if (documentToIssue && !documentPreview) {
-      toast.error("Permite ventanas emergentes para generar el documento");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      let saleCustomer: SaleCustomer | undefined;
-      if (requiresCustomer) {
-        const dni = normalizeDni(customer.dni);
-        if (!isValidDni(dni)) {
-          toast.error("Ingresa el DNI del cliente para emitir el documento");
-          closeSaleDocumentWindow(documentPreview);
-          return;
-        }
-
-        const person = await lookupDni(dni);
-        saleCustomer = { dni: person.dni, nombres: person.nombres, apellidos: person.apellidos };
-        setCustomer(saleCustomer);
-        setValidatedDni(person.dni);
-      }
-
-      await insertPendingLinesAsDailySales(
-        pendingLines,
-        products,
-        date,
-        documentType,
-        docNumber,
-        saleCustomer
-      );
-
-      await decrementStockForPendingLines(pendingLines);
-
-      toast.success("Ventas registradas");
-      if (documentToIssue && docNumber && saleCustomer && documentPreview) {
-        const documentLines: SaleDocumentLine[] = pendingLines.map((line) => {
-          const product = products.find((p) => p.id === line.productId);
-          return {
-            codigo: product?.codigo || "SIN-CODIGO",
-            nombre: product?.nombre || "Producto",
-            color: line.color || product?.color || "",
-            talla: line.talla,
-            quantity: line.quantity,
-            salePrice: line.salePrice,
-            total: saleLineTotal(line),
-          };
-        });
-
-        const rendered = renderSaleDocument(documentPreview, {
-          id: docNumber,
-          type: documentToIssue,
-          customer: saleCustomer,
-          date: new Date(),
-          lines: documentLines,
-        });
-
-        if (rendered) {
-          toast.success("Documento listo para imprimir o guardar como PDF");
-        } else {
-          toast.error("No se pudo abrir el documento");
-        }
-      }
-      setPendingLines([]);
-      setDocumentType("ninguno");
-      setCustomer(EMPTY_SALE_CUSTOMER);
-      setValidatedDni("");
-      load();
-    } catch (err: unknown) {
-      if (isDniLookupError(err)) {
-        showDniLookupError(err);
-      } else {
-        toast.error("No se pudo registrar la venta");
-      }
-      closeSaleDocumentWindow(documentPreview);
-    } finally {
-      setSaving(false);
-    }
-  };
+  const registerPendingLines = () =>
+    executeRegisterPendingSales({
+      pendingLines,
+      products,
+      date,
+      documentType,
+      requiresCustomer,
+      customer,
+      setSaving,
+      setCustomer,
+      setValidatedDni,
+      setPendingLines,
+      setDocumentType,
+      load,
+    });
 
   const handleViewDocument = (sale: DailySale) => {
     if (!sale.cliente || !sale.documentoTipo || sale.documentoTipo === "ninguno") return;
