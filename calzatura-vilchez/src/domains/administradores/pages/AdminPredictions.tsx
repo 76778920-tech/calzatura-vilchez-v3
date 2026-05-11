@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   AlertTriangle,
   Brain,
@@ -2417,6 +2417,364 @@ function CampanasPanelBody({
   );
 }
 
+function IreProyectadoDeltaBadge({ projectedScore, actualScore }: { projectedScore: number; actualScore: number }) {
+  const delta = projectedScore - actualScore;
+  if (delta === 0) {
+    return <span className="ire-proy-delta ire-proy-delta-eq">sin cambio</span>;
+  }
+  const up = delta > 0;
+  return (
+    <span className={`ire-proy-delta ire-proy-delta-${up ? "up" : "down"}`}>
+      {up ? "▲" : "▼"} {Math.abs(delta)} pts
+    </span>
+  );
+}
+
+function FinanzasRiesgoPanel({
+  predictionsForView,
+  revenueSummary,
+}: {
+  predictionsForView: Prediction[];
+  revenueSummary: RevenueSummary | null | undefined;
+}) {
+  const sobrestock = predictionsForView.filter(
+    (p) => !p.sin_historial && p.dias_hasta_agotarse >= 60 && p.stock_actual > 5,
+  );
+  const capitalInmovilizado = sobrestock.reduce((s, p) => s + p.stock_actual * p.precio, 0);
+  const enDescenso = predictionsForView.filter((p) => !p.sin_historial && p.tendencia === "bajando");
+  const ingresosEnRiesgo = enDescenso.reduce((s, p) => s + p.consumo_estimado_diario * 30 * p.precio, 0);
+  const diarioProyect = revenueSummary?.promedio_diario_proyectado ?? 0;
+  const semanas = [1, 2, 3, 4].map((w) => ({
+    label: `Semana ${w}`,
+    valor: diarioProyect * 7,
+    acumulado: diarioProyect * 7 * w,
+  }));
+
+  return (
+    <div className="fin-risk-panel">
+      <div className="fin-risk-header">
+        <p className="pred-sub">Diagnóstico financiero · basado en predicciones</p>
+        <h3 className="fin-risk-title">Riesgo Financiero</h3>
+      </div>
+
+      <div className="fin-risk-kpi-row">
+        <div className="fin-risk-kpi fin-risk-kpi-warn">
+          <span className="fin-risk-kpi-label">Capital inmovilizado</span>
+          <span className="fin-risk-kpi-val">{formatCurrency(capitalInmovilizado)}</span>
+          <span className="fin-risk-kpi-sub">
+            {sobrestock.length} producto{sobrestock.length !== 1 ? "s" : ""} con más de 60 días de cobertura
+          </span>
+        </div>
+        <div className={`fin-risk-kpi ${ingresosEnRiesgo > 0 ? "fin-risk-kpi-danger" : "fin-risk-kpi-ok"}`}>
+          <span className="fin-risk-kpi-label">Ingresos en riesgo</span>
+          <span className="fin-risk-kpi-val">{formatCurrency(ingresosEnRiesgo)}</span>
+          <span className="fin-risk-kpi-sub">
+            {enDescenso.length} producto{enDescenso.length !== 1 ? "s" : ""} con demanda bajando — proyección 30 d
+          </span>
+        </div>
+        <div className="fin-risk-kpi fin-risk-kpi-info">
+          <span className="fin-risk-kpi-label">Flujo est. / semana</span>
+          <span className="fin-risk-kpi-val">{formatCurrency(diarioProyect * 7)}</span>
+          <span className="fin-risk-kpi-sub">Basado en promedio diario del modelo</span>
+        </div>
+      </div>
+
+      {sobrestock.length > 0 && (
+        <div className="fin-risk-section">
+          <div className="ranking-section-title">
+            <Package size={14} /> Capital inmovilizado — productos con exceso de cobertura
+          </div>
+          <div className="fin-risk-stock-list">
+            {[...sobrestock]
+              .sort((a, b) => b.stock_actual * b.precio - a.stock_actual * a.precio)
+              .slice(0, 5)
+              .map((p) => {
+                const cap = p.stock_actual * p.precio;
+                const pct = capitalInmovilizado > 0 ? (cap / capitalInmovilizado) * 100 : 0;
+                return (
+                  <div key={p.productId} className="fin-risk-stock-row">
+                    <div className="fin-risk-stock-info">
+                      <span className="fin-risk-stock-name">{p.nombre}</span>
+                      <span className="fin-risk-stock-meta">
+                        Stock: {p.stock_actual} uds ·{" "}
+                        {p.dias_hasta_agotarse >= 999 ? "sin consumo activo" : `~${p.dias_hasta_agotarse} días de cobertura`}
+                      </span>
+                    </div>
+                    <div className="fin-risk-stock-bar-wrap">
+                      <div className="fin-risk-stock-bar-bg">
+                        <div className="fin-risk-stock-bar" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                    <span className="fin-risk-stock-val">{formatCurrency(cap)}</span>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
+      {revenueSummary && (
+        <div className="fin-risk-section">
+          <div className="ranking-section-title">
+            <TrendingUp size={14} /> Flujo de caja proyectado — próximas 4 semanas
+          </div>
+          <div className="fin-risk-flux-grid">
+            {semanas.map((s, i) => (
+              <div key={i} className="fin-risk-flux-card">
+                <span className="fin-risk-flux-label">{s.label}</span>
+                <span className="fin-risk-flux-val">{formatCurrency(s.valor)}</span>
+                <span className="fin-risk-flux-acum">Acum.: {formatCurrency(s.acumulado)}</span>
+              </div>
+            ))}
+          </div>
+          <p className="ranking-section-note">
+            Proyección lineal basada en el promedio diario del modelo. No contempla estacionalidad ni eventos extraordinarios.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function rankingSalesKey(period: RankingPeriod): keyof Prediction {
+  if (period === 7) return "ventas_7_dias";
+  if (period === 15) return "ventas_15_dias";
+  return "ventas_30_dias";
+}
+
+function rankingRecomendacionTexto(
+  p: Prediction,
+  periodKey: keyof Prediction,
+): { texto: string; nivel: "critico" | "advertencia" | "sugerencia" } {
+  const v = (p[periodKey] as number) ?? 0;
+  if (p.sin_historial && p.stock_actual === 0) {
+    return { texto: "Sin stock y sin ventas. Evalúa si el producto sigue vigente en el catálogo.", nivel: "sugerencia" };
+  }
+  if (p.sin_historial) {
+    return { texto: "Sin ventas registradas. Verifica visibilidad en tienda y precio competitivo.", nivel: "sugerencia" };
+  }
+  if (v === 0 && p.stock_actual > 20) {
+    return {
+      texto: "Sin movimiento con stock alto. Aplica descuento del 20–30% o liquida antes de que pierda valor.",
+      nivel: "critico",
+    };
+  }
+  if (v === 0 && p.stock_actual > 0) {
+    return { texto: "Sin ventas en este período. Revisa precio, ubicación en tienda o visibilidad en web.", nivel: "advertencia" };
+  }
+  if (v < 2 && p.stock_actual > 15) {
+    return {
+      texto: "Rotación muy baja con sobrestock. Combínalo en kit con producto estrella o reubica en zona de mayor tráfico.",
+      nivel: "advertencia",
+    };
+  }
+  if (p.tendencia === "bajando" && p.stock_actual > 20) {
+    return {
+      texto: "Demanda en descenso con inventario alto. Reduce precio ahora antes de que el stock siga acumulando.",
+      nivel: "advertencia",
+    };
+  }
+  if (p.dias_hasta_agotarse > 90) {
+    return {
+      texto: "Cobertura mayor a 3 meses: capital inmovilizado. Prioriza liquidar con descuento promocional.",
+      nivel: "advertencia",
+    };
+  }
+  return { texto: "Rotación baja pero estable. Monitorea semanalmente y considera una promoción puntual.", nivel: "sugerencia" };
+}
+
+function RankingAbcBlock({ abcData }: { abcData: PredictionWithAbc[] }) {
+  if (abcData.length === 0) return null;
+  const catA = abcData.filter((p) => p.abc === "A");
+  const catB = abcData.filter((p) => p.abc === "B");
+  const catC = abcData.filter((p) => p.abc === "C");
+  const totalRev = abcData.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+  const revA = catA.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+  const revB = catB.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+  const revC = catC.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+  const pct = (v: number) => (totalRev > 0 ? ((v / totalRev) * 100).toFixed(1) : "0");
+  return (
+    <>
+      <div className="ranking-section-title" style={{ marginTop: "2rem" }}>
+        <Package size={16} /> Análisis ABC de inventario
+      </div>
+      <p className="ranking-section-note">
+        Clasifica productos por su contribución a los ingresos históricos. A = 80% del ingreso, B = 15%, C = 5%.
+      </p>
+      <div className="abc-grid">
+        <div className="abc-card abc-card-a">
+          <div className="abc-letter abc-letter-a">A</div>
+          <div className="abc-count">{catA.length} productos</div>
+          <div className="abc-pct-rev">
+            {pct(revA)}% del ingreso · S/ {revA.toLocaleString("es-PE", { maximumFractionDigits: 0 })}
+          </div>
+          <div className="abc-desc">Productos estrella. Mantén stock prioritario y reabastece antes de llegar al umbral crítico.</div>
+        </div>
+        <div className="abc-card abc-card-b">
+          <div className="abc-letter abc-letter-b">B</div>
+          <div className="abc-count">{catB.length} productos</div>
+          <div className="abc-pct-rev">
+            {pct(revB)}% del ingreso · S/ {revB.toLocaleString("es-PE", { maximumFractionDigits: 0 })}
+          </div>
+          <div className="abc-desc">Importancia media. Monitorea rotación y ajusta pedidos según tendencia.</div>
+        </div>
+        <div className="abc-card abc-card-c">
+          <div className="abc-letter abc-letter-c">C</div>
+          <div className="abc-count">{catC.length} productos</div>
+          <div className="abc-pct-rev">
+            {pct(revC)}% del ingreso · S/ {revC.toLocaleString("es-PE", { maximumFractionDigits: 0 })}
+          </div>
+          <div className="abc-desc">Baja contribución. Evalúa liquidar stock excedente o discontinuar si no hay demanda.</div>
+        </div>
+      </div>
+      <div className="abc-list">
+        {abcData.slice(0, 12).map((p) => (
+          <div key={p.productId} className="abc-row">
+            <span className={`abc-row-badge abc-row-badge-${p.abc}`}>{p.abc}</span>
+            <span className="abc-row-name">{p.nombre}</span>
+            <span className="abc-row-rev">
+              S/ {(p.total_vendido_historico * p.precio).toLocaleString("es-PE", { maximumFractionDigits: 0 })}
+            </span>
+            <span className="abc-row-pct">{pct(p.total_vendido_historico * p.precio)}%</span>
+          </div>
+        ))}
+        {abcData.length > 12 && (
+          <p className="ranking-section-note" style={{ margin: "0.25rem 0 0" }}>
+            + {abcData.length - 12} productos más no mostrados.
+          </p>
+        )}
+      </div>
+    </>
+  );
+}
+
+function PredictionsRankingTabPanel({
+  predictions,
+  rankingPeriod,
+  setRankingPeriod,
+  abcData,
+  tabDirection,
+}: {
+  predictions: Prediction[];
+  rankingPeriod: RankingPeriod;
+  setRankingPeriod: Dispatch<SetStateAction<RankingPeriod>>;
+  abcData: PredictionWithAbc[];
+  tabDirection: number;
+}) {
+  const periodKey = rankingSalesKey(rankingPeriod);
+  const periodLabel = rankingPeriod === 7 ? "7 días" : rankingPeriod === 15 ? "15 días" : "30 días";
+  const withHistory = predictions.filter((p) => !p.sin_historial && ((p[periodKey] as number) ?? 0) > 0);
+  const top3 = [...withHistory]
+    .sort((a, b) => ((b[periodKey] as number) ?? 0) - ((a[periodKey] as number) ?? 0))
+    .slice(0, 3);
+  const bottomPool = predictions
+    .filter((p) => p.stock_actual > 0)
+    .sort((a, b) => ((a[periodKey] as number) ?? 0) - ((b[periodKey] as number) ?? 0));
+  const bottom = bottomPool.slice(0, 6);
+  const medals = ["🥇", "🥈", "🥉"];
+  const medalColors = ["ranking-gold", "ranking-silver", "ranking-bronze"];
+
+  return (
+    <motion.div
+      key="tab-ranking"
+      initial={{ opacity: 0, x: tabDirection * 28 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -tabDirection * 28 }}
+      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+    >
+      <div className="ranking-period-bar">
+        <span className="ranking-period-label">Período:</span>
+        {([7, 15, 30] as RankingPeriod[]).map((p) => (
+          <button
+            key={p}
+            type="button"
+            className={`ranking-period-btn${rankingPeriod === p ? " active" : ""}`}
+            onClick={() => setRankingPeriod(p)}
+          >
+            {p === 7 ? "Semana" : p === 15 ? "15 días" : "Mes"}
+          </button>
+        ))}
+      </div>
+
+      <div className="ranking-section-title">
+        <TrendingUp size={16} /> Top 3 más vendidos — {periodLabel}
+      </div>
+      {top3.length === 0 ? (
+        <p className="ranking-empty">No hay datos de ventas para este período aún.</p>
+      ) : (
+        <div className="ranking-podium">
+          {top3.map((p, i) => (
+            <div key={p.productId} className={`ranking-podium-card ${medalColors[i]}`}>
+              <div className="ranking-medal">{medals[i]}</div>
+              {p.imagen ? (
+                <img src={p.imagen} alt={p.nombre} className="ranking-product-img" loading="lazy" />
+              ) : (
+                <div className="ranking-product-img-placeholder">
+                  <Package size={28} />
+                </div>
+              )}
+              <div className="ranking-podium-name">{p.nombre}</div>
+              <div className="ranking-podium-cat">{p.categoria}</div>
+              <div className="ranking-podium-units">
+                <strong>{((p[periodKey] as number) ?? 0).toFixed(0)}</strong>
+                <span> uds</span>
+              </div>
+              <div className="ranking-podium-rev">
+                S/{" "}
+                {(((p[periodKey] as number) ?? 0) * p.precio).toLocaleString("es-PE", { maximumFractionDigits: 0 })}
+              </div>
+              <div className={`ranking-trend-badge ${p.tendencia}`}>
+                {p.tendencia === "subiendo" ? "↑ Subiendo" : p.tendencia === "bajando" ? "↓ Bajando" : "→ Estable"}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="ranking-section-title ranking-section-title-warn">
+        <AlertTriangle size={16} /> Productos de baja rotación — {periodLabel}
+      </div>
+      <p className="ranking-section-note">
+        Productos con stock disponible y pocas o ninguna venta en el período. Se incluyen recomendaciones de acción.
+      </p>
+      <div className="ranking-bottom-list">
+        {bottom.map((p, i) => {
+          const rec = rankingRecomendacionTexto(p, periodKey);
+          const ventas = (p[periodKey] as number) ?? 0;
+          return (
+            <div key={p.productId} className={`ranking-bottom-card ranking-bottom-${rec.nivel}`}>
+              <div className="ranking-bottom-left">
+                <span className="ranking-bottom-pos">#{i + 1}</span>
+                {p.imagen ? (
+                  <img src={p.imagen} alt={p.nombre} className="ranking-bottom-img" loading="lazy" />
+                ) : (
+                  <div className="ranking-bottom-img-placeholder">
+                    <Package size={18} />
+                  </div>
+                )}
+                <div className="ranking-bottom-info">
+                  <div className="ranking-bottom-name">{p.nombre}</div>
+                  <div className="ranking-bottom-meta">
+                    {p.categoria} · Stock: {p.stock_actual} uds · Vendido: {ventas.toFixed(0)} uds
+                  </div>
+                </div>
+              </div>
+              <div className={`ranking-rec ranking-rec-${rec.nivel}`}>
+                <span className="ranking-rec-icon">
+                  {rec.nivel === "critico" ? "🔴" : rec.nivel === "advertencia" ? "🟡" : "🔵"}
+                </span>
+                <span>{rec.texto}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <RankingAbcBlock abcData={abcData} />
+    </motion.div>
+  );
+}
+
 export default function AdminPredictions() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [weeklyChart, setWeeklyChart] = useState<WeekPoint[]>([]);
@@ -2992,15 +3350,7 @@ export default function AdminPredictions() {
               <div className="ire-proy-body">
                 <span className="ire-proy-score">{ireProyectado.score}</span>
                 <span className="ire-proy-score-max">/100</span>
-                {(() => {
-                  const delta = ireProyectado.score - ireData.score;
-                  if (delta === 0) return <span className="ire-proy-delta ire-proy-delta-eq">sin cambio</span>;
-                  return (
-                    <span className={`ire-proy-delta ire-proy-delta-${delta > 0 ? "up" : "down"}`}>
-                      {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} pts
-                    </span>
-                  );
-                })()}
+                <IreProyectadoDeltaBadge projectedScore={ireProyectado.score} actualScore={ireData.score} />
               </div>
               <p className="ire-proy-desc">{ireProyectado.descripcion}</p>
             </motion.div>
@@ -3549,257 +3899,20 @@ export default function AdminPredictions() {
           )}
 
           {/* ── Riesgo Financiero ─────────────────────────── */}
-          {(() => {
-            const sobrestock = predictionsForView.filter(
-              p => !p.sin_historial && p.dias_hasta_agotarse >= 60 && p.stock_actual > 5
-            );
-            const capitalInmovilizado = sobrestock.reduce((s, p) => s + p.stock_actual * p.precio, 0);
-            const enDescenso = predictionsForView.filter(p => !p.sin_historial && p.tendencia === "bajando");
-            const ingresosEnRiesgo = enDescenso.reduce((s, p) => s + p.consumo_estimado_diario * 30 * p.precio, 0);
-            const diarioProyect = revenueSummary?.promedio_diario_proyectado ?? 0;
-            const semanas = [1, 2, 3, 4].map(w => ({ label: `Semana ${w}`, valor: diarioProyect * 7, acumulado: diarioProyect * 7 * w }));
-
-            return (
-              <div className="fin-risk-panel">
-                <div className="fin-risk-header">
-                  <p className="pred-sub">Diagnóstico financiero · basado en predicciones</p>
-                  <h3 className="fin-risk-title">Riesgo Financiero</h3>
-                </div>
-
-                <div className="fin-risk-kpi-row">
-                  <div className="fin-risk-kpi fin-risk-kpi-warn">
-                    <span className="fin-risk-kpi-label">Capital inmovilizado</span>
-                    <span className="fin-risk-kpi-val">{formatCurrency(capitalInmovilizado)}</span>
-                    <span className="fin-risk-kpi-sub">{sobrestock.length} producto{sobrestock.length !== 1 ? "s" : ""} con más de 60 días de cobertura</span>
-                  </div>
-                  <div className={`fin-risk-kpi ${ingresosEnRiesgo > 0 ? "fin-risk-kpi-danger" : "fin-risk-kpi-ok"}`}>
-                    <span className="fin-risk-kpi-label">Ingresos en riesgo</span>
-                    <span className="fin-risk-kpi-val">{formatCurrency(ingresosEnRiesgo)}</span>
-                    <span className="fin-risk-kpi-sub">{enDescenso.length} producto{enDescenso.length !== 1 ? "s" : ""} con demanda bajando — proyección 30 d</span>
-                  </div>
-                  <div className="fin-risk-kpi fin-risk-kpi-info">
-                    <span className="fin-risk-kpi-label">Flujo est. / semana</span>
-                    <span className="fin-risk-kpi-val">{formatCurrency(diarioProyect * 7)}</span>
-                    <span className="fin-risk-kpi-sub">Basado en promedio diario del modelo</span>
-                  </div>
-                </div>
-
-                {sobrestock.length > 0 && (
-                  <div className="fin-risk-section">
-                    <div className="ranking-section-title">
-                      <Package size={14} /> Capital inmovilizado — productos con exceso de cobertura
-                    </div>
-                    <div className="fin-risk-stock-list">
-                      {[...sobrestock]
-                        .sort((a, b) => b.stock_actual * b.precio - a.stock_actual * a.precio)
-                        .slice(0, 5)
-                        .map(p => {
-                          const cap = p.stock_actual * p.precio;
-                          const pct = capitalInmovilizado > 0 ? (cap / capitalInmovilizado) * 100 : 0;
-                          return (
-                            <div key={p.productId} className="fin-risk-stock-row">
-                              <div className="fin-risk-stock-info">
-                                <span className="fin-risk-stock-name">{p.nombre}</span>
-                                <span className="fin-risk-stock-meta">
-                                  Stock: {p.stock_actual} uds · {p.dias_hasta_agotarse >= 999 ? "sin consumo activo" : `~${p.dias_hasta_agotarse} días de cobertura`}
-                                </span>
-                              </div>
-                              <div className="fin-risk-stock-bar-wrap">
-                                <div className="fin-risk-stock-bar-bg">
-                                  <div className="fin-risk-stock-bar" style={{ width: `${pct}%` }} />
-                                </div>
-                              </div>
-                              <span className="fin-risk-stock-val">{formatCurrency(cap)}</span>
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
-                )}
-
-                {revenueSummary && (
-                  <div className="fin-risk-section">
-                    <div className="ranking-section-title">
-                      <TrendingUp size={14} /> Flujo de caja proyectado — próximas 4 semanas
-                    </div>
-                    <div className="fin-risk-flux-grid">
-                      {semanas.map((s, i) => (
-                        <div key={i} className="fin-risk-flux-card">
-                          <span className="fin-risk-flux-label">{s.label}</span>
-                          <span className="fin-risk-flux-val">{formatCurrency(s.valor)}</span>
-                          <span className="fin-risk-flux-acum">Acum.: {formatCurrency(s.acumulado)}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="ranking-section-note">Proyección lineal basada en el promedio diario del modelo. No contempla estacionalidad ni eventos extraordinarios.</p>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+          <FinanzasRiesgoPanel predictionsForView={predictionsForView} revenueSummary={revenueSummary} />
         </motion.div>
       )}
 
       {/* ── Pestaña: Ranking ─────────────────────────────── */}
-      {activeTab === "ranking" && (() => {
-        const periodKey: keyof Prediction = rankingPeriod === 7 ? "ventas_7_dias" : rankingPeriod === 15 ? "ventas_15_dias" : "ventas_30_dias";
-        const periodLabel = rankingPeriod === 7 ? "7 días" : rankingPeriod === 15 ? "15 días" : "30 días";
-        const withHistory = predictions.filter(p => !p.sin_historial && (p[periodKey] as number ?? 0) > 0);
-        const top3 = [...withHistory].sort((a, b) => ((b[periodKey] as number) ?? 0) - ((a[periodKey] as number) ?? 0)).slice(0, 3);
-        const bottomPool = predictions
-          .filter(p => p.stock_actual > 0)
-          .sort((a, b) => ((a[periodKey] as number) ?? 0) - ((b[periodKey] as number) ?? 0));
-        const bottom = bottomPool.slice(0, 6);
-
-        const getRecomendacion = (p: Prediction): { texto: string; nivel: "critico" | "advertencia" | "sugerencia" } => {
-          const v = (p[periodKey] as number) ?? 0;
-          if (p.sin_historial && p.stock_actual === 0) return { texto: "Sin stock y sin ventas. Evalúa si el producto sigue vigente en el catálogo.", nivel: "sugerencia" };
-          if (p.sin_historial) return { texto: "Sin ventas registradas. Verifica visibilidad en tienda y precio competitivo.", nivel: "sugerencia" };
-          if (v === 0 && p.stock_actual > 20) return { texto: "Sin movimiento con stock alto. Aplica descuento del 20–30% o liquida antes de que pierda valor.", nivel: "critico" };
-          if (v === 0 && p.stock_actual > 0) return { texto: "Sin ventas en este período. Revisa precio, ubicación en tienda o visibilidad en web.", nivel: "advertencia" };
-          if (v < 2 && p.stock_actual > 15) return { texto: "Rotación muy baja con sobrestock. Combínalo en kit con producto estrella o reubica en zona de mayor tráfico.", nivel: "advertencia" };
-          if (p.tendencia === "bajando" && p.stock_actual > 20) return { texto: "Demanda en descenso con inventario alto. Reduce precio ahora antes de que el stock siga acumulando.", nivel: "advertencia" };
-          if (p.dias_hasta_agotarse > 90) return { texto: "Cobertura mayor a 3 meses: capital inmovilizado. Prioriza liquidar con descuento promocional.", nivel: "advertencia" };
-          return { texto: "Rotación baja pero estable. Monitorea semanalmente y considera una promoción puntual.", nivel: "sugerencia" };
-        };
-
-        const medals = ["🥇", "🥈", "🥉"];
-        const medalColors = ["ranking-gold", "ranking-silver", "ranking-bronze"];
-
-        return (
-          <motion.div key="tab-ranking" initial={{ opacity: 0, x: tabDirection * 28 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -tabDirection * 28 }} transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}>
-            {/* Selector de período */}
-            <div className="ranking-period-bar">
-              <span className="ranking-period-label">Período:</span>
-              {([7, 15, 30] as RankingPeriod[]).map(p => (
-                <button key={p} type="button" className={`ranking-period-btn${rankingPeriod === p ? " active" : ""}`} onClick={() => setRankingPeriod(p)}>
-                  {p === 7 ? "Semana" : p === 15 ? "15 días" : "Mes"}
-                </button>
-              ))}
-            </div>
-
-            {/* Pódium top 3 */}
-            <div className="ranking-section-title">
-              <TrendingUp size={16} /> Top 3 más vendidos — {periodLabel}
-            </div>
-            {top3.length === 0 ? (
-              <p className="ranking-empty">No hay datos de ventas para este período aún.</p>
-            ) : (
-              <div className="ranking-podium">
-                {top3.map((p, i) => (
-                  <div key={p.productId} className={`ranking-podium-card ${medalColors[i]}`}>
-                    <div className="ranking-medal">{medals[i]}</div>
-                    {p.imagen ? (
-                      <img src={p.imagen} alt={p.nombre} className="ranking-product-img" loading="lazy" />
-                    ) : (
-                      <div className="ranking-product-img-placeholder">
-                        <Package size={28} />
-                      </div>
-                    )}
-                    <div className="ranking-podium-name">{p.nombre}</div>
-                    <div className="ranking-podium-cat">{p.categoria}</div>
-                    <div className="ranking-podium-units">
-                      <strong>{((p[periodKey] as number) ?? 0).toFixed(0)}</strong>
-                      <span> uds</span>
-                    </div>
-                    <div className="ranking-podium-rev">
-                      S/ {((p[periodKey] as number ?? 0) * p.precio).toLocaleString("es-PE", { maximumFractionDigits: 0 })}
-                    </div>
-                    <div className={`ranking-trend-badge ${p.tendencia}`}>
-                      {p.tendencia === "subiendo" ? "↑ Subiendo" : p.tendencia === "bajando" ? "↓ Bajando" : "→ Estable"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Productos sin salida */}
-            <div className="ranking-section-title ranking-section-title-warn">
-              <AlertTriangle size={16} /> Productos de baja rotación — {periodLabel}
-            </div>
-            <p className="ranking-section-note">Productos con stock disponible y pocas o ninguna venta en el período. Se incluyen recomendaciones de acción.</p>
-            <div className="ranking-bottom-list">
-              {bottom.map((p, i) => {
-                const rec = getRecomendacion(p);
-                const ventas = (p[periodKey] as number) ?? 0;
-                return (
-                  <div key={p.productId} className={`ranking-bottom-card ranking-bottom-${rec.nivel}`}>
-                    <div className="ranking-bottom-left">
-                      <span className="ranking-bottom-pos">#{i + 1}</span>
-                      {p.imagen ? (
-                        <img src={p.imagen} alt={p.nombre} className="ranking-bottom-img" loading="lazy" />
-                      ) : (
-                        <div className="ranking-bottom-img-placeholder"><Package size={18} /></div>
-                      )}
-                      <div className="ranking-bottom-info">
-                        <div className="ranking-bottom-name">{p.nombre}</div>
-                        <div className="ranking-bottom-meta">{p.categoria} · Stock: {p.stock_actual} uds · Vendido: {ventas.toFixed(0)} uds</div>
-                      </div>
-                    </div>
-                    <div className={`ranking-rec ranking-rec-${rec.nivel}`}>
-                      <span className="ranking-rec-icon">{rec.nivel === "critico" ? "🔴" : rec.nivel === "advertencia" ? "🟡" : "🔵"}</span>
-                      <span>{rec.texto}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* ── Análisis ABC ─────────────────────────────── */}
-            {abcData.length > 0 && (() => {
-              const catA = abcData.filter(p => p.abc === "A");
-              const catB = abcData.filter(p => p.abc === "B");
-              const catC = abcData.filter(p => p.abc === "C");
-              const totalRev = abcData.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
-              const revA = catA.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
-              const revB = catB.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
-              const revC = catC.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
-              const pct = (v: number) => totalRev > 0 ? ((v / totalRev) * 100).toFixed(1) : "0";
-              return (
-                <>
-                  <div className="ranking-section-title" style={{ marginTop: "2rem" }}>
-                    <Package size={16} /> Análisis ABC de inventario
-                  </div>
-                  <p className="ranking-section-note">Clasifica productos por su contribución a los ingresos históricos. A = 80% del ingreso, B = 15%, C = 5%.</p>
-                  <div className="abc-grid">
-                    <div className="abc-card abc-card-a">
-                      <div className="abc-letter abc-letter-a">A</div>
-                      <div className="abc-count">{catA.length} productos</div>
-                      <div className="abc-pct-rev">{pct(revA)}% del ingreso · S/ {revA.toLocaleString("es-PE", { maximumFractionDigits: 0 })}</div>
-                      <div className="abc-desc">Productos estrella. Mantén stock prioritario y reabastece antes de llegar al umbral crítico.</div>
-                    </div>
-                    <div className="abc-card abc-card-b">
-                      <div className="abc-letter abc-letter-b">B</div>
-                      <div className="abc-count">{catB.length} productos</div>
-                      <div className="abc-pct-rev">{pct(revB)}% del ingreso · S/ {revB.toLocaleString("es-PE", { maximumFractionDigits: 0 })}</div>
-                      <div className="abc-desc">Importancia media. Monitorea rotación y ajusta pedidos según tendencia.</div>
-                    </div>
-                    <div className="abc-card abc-card-c">
-                      <div className="abc-letter abc-letter-c">C</div>
-                      <div className="abc-count">{catC.length} productos</div>
-                      <div className="abc-pct-rev">{pct(revC)}% del ingreso · S/ {revC.toLocaleString("es-PE", { maximumFractionDigits: 0 })}</div>
-                      <div className="abc-desc">Baja contribución. Evalúa liquidar stock excedente o discontinuar si no hay demanda.</div>
-                    </div>
-                  </div>
-                  <div className="abc-list">
-                    {abcData.slice(0, 12).map(p => (
-                      <div key={p.productId} className="abc-row">
-                        <span className={`abc-row-badge abc-row-badge-${p.abc}`}>{p.abc}</span>
-                        <span className="abc-row-name">{p.nombre}</span>
-                        <span className="abc-row-rev">S/ {(p.total_vendido_historico * p.precio).toLocaleString("es-PE", { maximumFractionDigits: 0 })}</span>
-                        <span className="abc-row-pct">{pct(p.total_vendido_historico * p.precio)}%</span>
-                      </div>
-                    ))}
-                    {abcData.length > 12 && (
-                      <p className="ranking-section-note" style={{ margin: "0.25rem 0 0" }}>+ {abcData.length - 12} productos más no mostrados.</p>
-                    )}
-                  </div>
-                </>
-              );
-            })()}
-          </motion.div>
-        );
-      })()}
+      {activeTab === "ranking" && (
+        <PredictionsRankingTabPanel
+          predictions={predictions}
+          rankingPeriod={rankingPeriod}
+          setRankingPeriod={setRankingPeriod}
+          abcData={abcData}
+          tabDirection={tabDirection}
+        />
+      )}
 
       {/* ── Pestaña: Modelo IA ───────────────────────────── */}
       {activeTab === "modelo" && (
