@@ -11,6 +11,8 @@ export async function createOrder(data: {
   direccion: Address;
   metodoPago: "stripe" | "contraentrega";
   notas?: string;
+  /** Envío en soles; el servidor valida y limita el máximo. */
+  envio?: number;
 }): Promise<string> {
   const user = auth.currentUser;
   if (!user) {

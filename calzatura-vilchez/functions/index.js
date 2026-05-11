@@ -32,6 +32,8 @@ const AI_SERVICE_BEARER_TOKEN = defineSecret("AI_SERVICE_BEARER_TOKEN");
 const ORDER_ITEM_LIMIT = 30;
 const ORDER_QTY_LIMIT = 100;
 const SHIPPING_COST = 0;
+/** Tope de envío (S/) que acepta el servidor si el cliente envía `envio` (debe coincidir con tarifa ORS en frontend). */
+const DELIVERY_MAX_ENVIO_S = 35;
 
 function getSupabaseAdmin() {
   return createClient(
@@ -500,7 +502,7 @@ exports.createOrder = onRequest(
       try {
         const decodedToken = await verifyFirebaseUser(req);
         const supabase = getSupabaseAdmin();
-        const { items, direccion, metodoPago, notas } = req.body || {};
+        const { items, direccion, metodoPago, notas, envio: rawEnvio } = req.body || {};
 
         if (!["stripe", "contraentrega"].includes(metodoPago)) {
           return res.status(400).json({ error: "Metodo de pago invalido" });
@@ -509,6 +511,11 @@ exports.createOrder = onRequest(
         const normalizedAddress = normalizeAddress(direccion);
         const normalizedNotes = normalizeOptionalText(notas, 600);
         const draft = await buildOrderDraft(supabase, items);
+        let envio = draft.envio;
+        if (typeof rawEnvio === "number" && Number.isFinite(rawEnvio) && rawEnvio >= 0) {
+          envio = Math.min(Math.round(rawEnvio * 100) / 100, DELIVERY_MAX_ENVIO_S);
+        }
+        const total = draft.subtotal + envio;
         const creadoEn = new Date().toISOString();
 
         const { data, error } = await supabase
@@ -518,8 +525,8 @@ exports.createOrder = onRequest(
             userEmail: decodedToken.email || "",
             items: draft.items,
             subtotal: draft.subtotal,
-            envio: draft.envio,
-            total: draft.total,
+            envio,
+            total,
             estado: "pendiente",
             direccion: normalizedAddress,
             creadoEn,
@@ -536,8 +543,8 @@ exports.createOrder = onRequest(
         return res.status(200).json({
           orderId: data.id,
           subtotal: draft.subtotal,
-          envio: draft.envio,
-          total: draft.total,
+          envio,
+          total,
           estado: "pendiente",
         });
       } catch (error) {

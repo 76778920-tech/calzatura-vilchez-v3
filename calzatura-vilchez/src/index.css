@@ -4969,6 +4969,20 @@ h1, h2, h3, h4, h5 { font-weight: 600; color: var(--text); line-height: 1.3; }
 .checkout-item > span { font-size: 14px; font-weight: 700; flex-shrink: 0; color: var(--gold); }
 .checkout-totals { border-top: 1px solid var(--border); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.4rem; }
 
+.checkout-delivery-box {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem 1rem;
+  font-size: 13px;
+  background: var(--bg-alt);
+}
+.checkout-delivery-title { font-weight: 600; margin: 0 0 0.35rem; font-size: 13px; }
+.checkout-delivery-line { margin: 0.2rem 0; }
+.checkout-delivery-muted { margin: 0.2rem 0; color: var(--text-muted); font-size: 12px; }
+.checkout-delivery-error { margin: 0.2rem 0; color: #b91c1c; font-size: 12px; }
+.checkout-delivery-ok { margin: 0.2rem 0; color: #15803d; font-size: 12px; }
+.checkout-delivery-code { font-size: 11px; background: var(--border); padding: 0.1rem 0.35rem; border-radius: 4px; }
+
 /* ============================================================
    ORDER SUCCESS
    ============================================================ */

@@ -1,24 +1,37 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ShoppingBag, CreditCard, Truck, ChevronRight } from "lucide-react";
-import { useCart, COSTO_ENVIO } from "@/domains/carrito/context/CartContext";
+import { useCart } from "@/domains/carrito/context/CartContext";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { createOrder } from "@/domains/pedidos/services/orders";
 import toast from "react-hot-toast";
 import type { Address } from "@/types";
 import { loadStripe } from "@stripe/stripe-js";
 import { formatPeruPhone, isValidPeruPhone, normalizePeruPhoneInput, peruPhoneError } from "@/utils/phone";
+import { DELIVERY_CONFIG } from "@/config/delivery";
+import {
+  calculateDeliveryForAddressLine,
+  hasOpenRouteServiceKey,
+  type DeliveryQuote,
+} from "@/services/deliveryOpenRoute";
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? "";
 
+function buildAddressLine(d: Address): string {
+  return [d.direccion, d.distrito, d.ciudad].map((s) => s.trim()).filter(Boolean).join(", ");
+}
+
 export default function CheckoutPage() {
-  const { items, subtotal, total, clearCart } = useCart();
+  const { items, subtotal, clearCart } = useCart();
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<"direccion" | "pago">("direccion");
   const [loading, setLoading] = useState(false);
   const [metodoPago, setMetodoPago] = useState<"stripe" | "contraentrega">("stripe");
+  const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
+  const [deliveryLoading, setDeliveryLoading] = useState(false);
+  const [deliveryError, setDeliveryError] = useState("");
 
   const [direccion, setDireccion] = useState<Address>({
     nombre: userProfile?.nombre?.split(" ")[0] ?? "",
@@ -29,6 +42,55 @@ export default function CheckoutPage() {
     telefono: userProfile?.telefono ?? "",
     referencia: "",
   });
+
+  const orsEnabled = hasOpenRouteServiceKey();
+
+  useEffect(() => {
+    if (!orsEnabled) {
+      return;
+    }
+
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => {
+      const line = buildAddressLine(direccion);
+      if (line.length < 10) {
+        setDeliveryQuote(null);
+        setDeliveryError("");
+        setDeliveryLoading(false);
+        return;
+      }
+      void (async () => {
+        setDeliveryLoading(true);
+        setDeliveryError("");
+        try {
+          const quote = await calculateDeliveryForAddressLine(`${line}, Perú`);
+          if (ctrl.signal.aborted) return;
+          setDeliveryQuote(quote);
+        } catch (err) {
+          if (ctrl.signal.aborted) return;
+          setDeliveryQuote(null);
+          setDeliveryError(err instanceof Error ? err.message : "No se pudo calcular el envío");
+        } finally {
+          if (!ctrl.signal.aborted) setDeliveryLoading(false);
+        }
+      })();
+    }, 550);
+
+    return () => {
+      ctrl.abort();
+      window.clearTimeout(timer);
+    };
+    // Solo recalcular cuando cambian los campos que componen la dirección de entrega.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- evitar re-ejecutar en cada tecla de otros campos
+  }, [direccion.direccion, direccion.distrito, direccion.ciudad, orsEnabled]);
+
+  const envioMonto = useMemo(() => {
+    if (!orsEnabled) return 0;
+    if (!deliveryQuote || deliveryQuote.isOutOfRange) return 0;
+    return deliveryQuote.cost;
+  }, [deliveryQuote, orsEnabled]);
+
+  const checkoutTotal = subtotal + envioMonto;
 
   if (items.length === 0) {
     return (
@@ -64,6 +126,22 @@ export default function CheckoutPage() {
       ...current,
       telefono: formatPeruPhone(current.telefono),
     }));
+    if (orsEnabled) {
+      if (deliveryLoading) {
+        toast.error("Espera un momento: estamos calculando el costo de envío.");
+        return;
+      }
+      if (deliveryError) {
+        toast.error(deliveryError);
+        return;
+      }
+      if (!deliveryQuote || deliveryQuote.isOutOfRange) {
+        toast.error(
+          `No podemos entregar a esa dirección (máx. ${DELIVERY_CONFIG.maxDeliveryKm} km desde la tienda).`,
+        );
+        return;
+      }
+    }
     setStep("pago");
   };
 
@@ -75,6 +153,7 @@ export default function CheckoutPage() {
         direccion,
         metodoPago,
         notas: "",
+        envio: envioMonto,
       });
 
       if (metodoPago === "stripe" && STRIPE_PK) {
@@ -227,6 +306,47 @@ export default function CheckoutPage() {
                 />
               </div>
 
+              {orsEnabled && (
+                <div className="checkout-delivery-box">
+                  <p className="checkout-delivery-title">Envío (OpenRouteService)</p>
+                  {deliveryLoading && <p className="checkout-delivery-muted">Calculando distancia y costo…</p>}
+                  {!deliveryLoading && deliveryError && (
+                    <p className="checkout-delivery-error">{deliveryError}</p>
+                  )}
+                  {!deliveryLoading && !deliveryError && deliveryQuote && (
+                    <>
+                      <p className="checkout-delivery-line">
+                        Distancia aprox.: <strong>{deliveryQuote.distanceFormatted}</strong>
+                        {deliveryQuote.label ? (
+                          <span className="checkout-delivery-muted"> — {deliveryQuote.label}</span>
+                        ) : null}
+                      </p>
+                      {deliveryQuote.isOutOfRange ? (
+                        <p className="checkout-delivery-error">
+                          Fuera de zona de reparto (máximo {DELIVERY_CONFIG.maxDeliveryKm} km).
+                        </p>
+                      ) : deliveryQuote.isFreeDelivery ? (
+                        <p className="checkout-delivery-ok">Envío gratis en tu zona.</p>
+                      ) : (
+                        <p className="checkout-delivery-line">
+                          Costo de envío: <strong>{deliveryQuote.costFormatted}</strong>
+                        </p>
+                      )}
+                    </>
+                  )}
+                  {!deliveryLoading && !deliveryError && !deliveryQuote && buildAddressLine(direccion).length < 10 && (
+                    <p className="checkout-delivery-muted">Completa dirección, distrito y ciudad para estimar el envío.</p>
+                  )}
+                </div>
+              )}
+
+              {!orsEnabled && (
+                <p className="checkout-delivery-muted">
+                  Sin <code className="checkout-delivery-code">VITE_ORS_API_KEY</code>, el envío se registra como S/ 0.00
+                  (configura la clave en <code className="checkout-delivery-code">.env.local</code> para cálculo automático).
+                </p>
+              )}
+
               <button type="submit" className="btn-primary btn-full">
                 Continuar al Pago
               </button>
@@ -286,10 +406,14 @@ export default function CheckoutPage() {
 
               <button
                 onClick={handlePlaceOrder}
-                disabled={loading}
+                disabled={
+                  loading ||
+                  (orsEnabled &&
+                    (deliveryLoading || !!deliveryError || !deliveryQuote || deliveryQuote.isOutOfRange))
+                }
                 className="btn-primary btn-full"
               >
-                {loading ? "Procesando..." : `Confirmar Pedido — S/ ${total.toFixed(2)}`}
+                {loading ? "Procesando..." : `Confirmar Pedido — S/ ${checkoutTotal.toFixed(2)}`}
               </button>
             </div>
           )}
@@ -328,11 +452,25 @@ export default function CheckoutPage() {
             </div>
             <div className="summary-row">
               <span>Envío</span>
-              <span>{COSTO_ENVIO === 0 ? "Gratis" : `S/ ${Number(COSTO_ENVIO).toFixed(2)}`}</span>
+              <span>
+                {!orsEnabled
+                  ? "S/ 0.00"
+                  : deliveryLoading
+                    ? "…"
+                    : deliveryError
+                      ? "—"
+                      : !deliveryQuote
+                        ? "—"
+                        : deliveryQuote.isOutOfRange
+                          ? "No disponible"
+                          : deliveryQuote.isFreeDelivery
+                            ? "Gratis"
+                            : deliveryQuote.costFormatted}
+              </span>
             </div>
             <div className="summary-row summary-total">
               <span>Total</span>
-              <span>S/ {total.toFixed(2)}</span>
+              <span>S/ {checkoutTotal.toFixed(2)}</span>
             </div>
           </div>
         </div>
