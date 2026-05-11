@@ -119,8 +119,8 @@ function isNonEmptyString(value, max) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
 }
 
-const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_RATE_MAX = 25;
+const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000; // ventana: 15 minutos
+const LOGIN_RATE_MAX = 25; // máximo de POST /authLogin por IP en esa ventana (antes de cortar sin llamar a Google)
 const loginRateByIp = new Map();
 
 function getClientIp(req) {
