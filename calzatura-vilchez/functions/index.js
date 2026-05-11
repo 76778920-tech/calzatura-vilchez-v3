@@ -1,7 +1,10 @@
 const { createClient } = require("@supabase/supabase-js");
 const { onRequest } = require("firebase-functions/v2/https");
-const { defineSecret } = require("firebase-functions/params");
+const { defineSecret, defineString } = require("firebase-functions/params");
 const admin = require("firebase-admin");
+
+/** Misma clave pública del cliente; solo la usa el servidor para REST Identity Toolkit (login vía BFF). */
+const FIREBASE_WEB_API_KEY = defineString("FIREBASE_WEB_API_KEY", { default: "" });
 
 const allowedOrigins = new Set([
   "https://calzaturavilchez-ab17f.web.app",
@@ -114,6 +117,51 @@ function publicError(error) {
 
 function isNonEmptyString(value, max) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
+}
+
+const LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
+const LOGIN_RATE_MAX = 25;
+const loginRateByIp = new Map();
+
+function getClientIp(req) {
+  const xf = req.headers["x-forwarded-for"];
+  if (typeof xf === "string" && xf.trim()) {
+    return xf.split(",")[0].trim();
+  }
+  return req.ip || "unknown";
+}
+
+function isLoginRateLimited(ip) {
+  const now = Date.now();
+  let row = loginRateByIp.get(ip);
+  if (!row || now > row.resetAt) {
+    row = { count: 0, resetAt: now + LOGIN_RATE_WINDOW_MS };
+  }
+  if (row.count >= LOGIN_RATE_MAX) {
+    loginRateByIp.set(ip, row);
+    return true;
+  }
+  row.count += 1;
+  loginRateByIp.set(ip, row);
+  if (loginRateByIp.size > 5000) {
+    for (const [k, v] of loginRateByIp) {
+      if (now > v.resetAt) loginRateByIp.delete(k);
+    }
+  }
+  return false;
+}
+
+const LOGIN_EMAIL_RE =
+  /^[A-Za-z0-9_+~-]+(?:\.[A-Za-z0-9_+~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
+
+function isValidLoginEmail(email) {
+  if (typeof email !== "string") return false;
+  const t = email.trim().toLowerCase();
+  return t.length <= 254 && LOGIN_EMAIL_RE.test(t);
+}
+
+function isValidLoginPassword(password) {
+  return typeof password === "string" && password.length >= 1 && password.length <= 256;
 }
 
 function isValidPeruPhone(value) {
@@ -1000,6 +1048,68 @@ exports.aiAdminProxy = onRequest(
         const status = aiAdminProxyErrorStatus(error);
         const message = aiAdminProxyErrorMessage(status, error);
         return res.status(status).json({ error: message });
+      }
+    });
+  }
+);
+
+/**
+ * BFF de login: el navegador no llama a identitytoolkit; solo a esta función.
+ * Respuesta siempre 200 + JSON genérico (ok) para no exponer códigos de Google en el cliente.
+ * Configurar parámetro FIREBASE_WEB_API_KEY (misma clave web del proyecto) en entorno de Functions.
+ */
+exports.authLogin = onRequest(
+  {
+    invoker: "public",
+    memory: "256MiB",
+    timeoutSeconds: 25,
+  },
+  async (req, res) => {
+    cors(req, res, async () => {
+      if (req.method === "OPTIONS") {
+        return res.status(204).send("");
+      }
+      if (req.method !== "POST") {
+        return res.status(405).json({ error: "Metodo no permitido" });
+      }
+
+      const ip = getClientIp(req);
+      if (isLoginRateLimited(ip)) {
+        return res.status(200).json({ ok: false });
+      }
+
+      try {
+        const rawEmail = req.body && req.body.email;
+        const rawPassword = req.body && req.body.password;
+        if (!isValidLoginEmail(rawEmail) || !isValidLoginPassword(rawPassword)) {
+          return res.status(200).json({ ok: false });
+        }
+        const email = String(rawEmail).trim().toLowerCase();
+        const password = String(rawPassword);
+        const apiKey = FIREBASE_WEB_API_KEY.value();
+        if (!apiKey) {
+          console.error("authLogin: falta FIREBASE_WEB_API_KEY en parametros de Functions");
+          return res.status(200).json({ ok: false });
+        }
+
+        const identityUrl =
+          "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" +
+          encodeURIComponent(apiKey);
+        const identityRes = await fetch(identityUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password, returnSecureToken: true }),
+        });
+        const identityJson = await identityRes.json();
+        if (!identityRes.ok || !identityJson.localId) {
+          return res.status(200).json({ ok: false });
+        }
+
+        const customToken = await admin.auth().createCustomToken(identityJson.localId);
+        return res.status(200).json({ ok: true, customToken });
+      } catch {
+        console.error("authLogin: error interno");
+        return res.status(200).json({ ok: false });
       }
     });
   }

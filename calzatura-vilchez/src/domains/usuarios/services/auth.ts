@@ -4,6 +4,7 @@ import {
   reload,
   sendEmailVerification,
   sendPasswordResetEmail,
+  signInWithCustomToken,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
@@ -179,7 +180,41 @@ export async function ensureVerifiedUserProfile(user: User) {
   return profile;
 }
 
+function resolveAuthLoginProxyUrl(): string | null {
+  const explicit = (import.meta.env.VITE_AUTH_PROXY_LOGIN_URL as string | undefined)?.trim();
+  if (explicit === "0" || explicit === "false") return null;
+  if (explicit) return explicit.replace(/\/$/, "");
+  if (import.meta.env.PROD && import.meta.env.VITE_FIREBASE_PROJECT_ID) {
+    const pid = String(import.meta.env.VITE_FIREBASE_PROJECT_ID).trim();
+    if (pid) return `https://us-central1-${pid}.cloudfunctions.net/authLogin`;
+  }
+  return null;
+}
+
+async function loginThroughAuthProxy(proxyUrl: string, email: string, password: string): Promise<User> {
+  const res = await fetch(proxyUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  let json: { ok?: boolean; customToken?: string };
+  try {
+    json = (await res.json()) as { ok?: boolean; customToken?: string };
+  } catch {
+    throw new Error("AUTH_FAILED");
+  }
+  if (!json.ok || typeof json.customToken !== "string" || json.customToken.length === 0) {
+    throw new Error("AUTH_FAILED");
+  }
+  const cred = await signInWithCustomToken(auth, json.customToken);
+  return cred.user;
+}
+
 export async function loginUser(email: string, password: string) {
+  const proxyUrl = resolveAuthLoginProxyUrl();
+  if (proxyUrl) {
+    return loginThroughAuthProxy(proxyUrl, email, password);
+  }
   const userCredential = await signInWithEmailAndPassword(auth, email, password);
   return userCredential.user;
 }
