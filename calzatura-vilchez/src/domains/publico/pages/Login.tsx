@@ -79,6 +79,7 @@ export default function Login() {
       toast.success(isAdmin ? "Bienvenido al panel administrativo" : "Bienvenido");
       navigate(redirect, { replace: true });
     } catch {
+      // ISO/IEC 27002: un solo mensaje ante fallo de credenciales; no exponer códigos ni si el correo existe.
       toast.error("Correo o contraseña incorrectos");
     } finally {
       setLoading(false);
