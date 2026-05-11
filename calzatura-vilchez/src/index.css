@@ -4977,11 +4977,114 @@ h1, h2, h3, h4, h5 { font-weight: 600; color: var(--text); line-height: 1.3; }
   background: var(--bg-alt);
 }
 .checkout-delivery-title { font-weight: 600; margin: 0 0 0.35rem; font-size: 13px; }
+.checkout-delivery-intro { margin: 0 0 0.75rem; line-height: 1.45; }
+.checkout-delivery-subtitle { font-weight: 600; margin: 0 0 0.35rem; font-size: 12px; }
+.checkout-delivery-search-group { margin-bottom: 0.75rem; }
+.checkout-delivery-suggest-block { margin-bottom: 0.75rem; }
 .checkout-delivery-line { margin: 0.2rem 0; }
 .checkout-delivery-muted { margin: 0.2rem 0; color: var(--text-muted); font-size: 12px; }
 .checkout-delivery-error { margin: 0.2rem 0; color: #b91c1c; font-size: 12px; }
 .checkout-delivery-ok { margin: 0.2rem 0; color: #15803d; font-size: 12px; }
 .checkout-delivery-code { font-size: 11px; background: var(--border); padding: 0.1rem 0.35rem; border-radius: 4px; }
+
+.checkout-delivery-map {
+  margin-top: 0.75rem;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  position: relative;
+  height: 220px;
+  background: var(--border);
+}
+.checkout-delivery-map--interactive .leaflet-container { cursor: crosshair; }
+.checkout-delivery-map--interactive .leaflet-marker-draggable { cursor: grab; }
+.checkout-delivery-map--interactive .leaflet-marker-draggable.leaflet-drag-target { cursor: grabbing; }
+.checkout-delivery-map-hint {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  right: 8px;
+  margin: 0;
+  font-size: 11px;
+  color: #0f172a;
+  text-align: center;
+  text-shadow: 0 0 3px #fff, 0 0 6px #fff;
+  pointer-events: none;
+  z-index: 401;
+  line-height: 1.3;
+}
+.checkout-delivery-map-divicon { background: transparent !important; border: none !important; }
+.checkout-delivery-map-pin--customer {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  background: #3b82f6;
+  box-sizing: border-box;
+}
+.checkout-delivery-suggest-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+}
+.checkout-delivery-suggest-list li + li { border-top: 1px solid var(--border); }
+.checkout-delivery-suggest-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  font-size: 12px;
+  line-height: 1.35;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+}
+.checkout-delivery-suggest-label { display: block; }
+.checkout-delivery-layer-hint {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.checkout-delivery-suggest-btn:hover { background: var(--bg-alt); }
+.checkout-delivery-map-inner { height: 100%; width: 100%; z-index: 0; }
+.checkout-delivery-map .leaflet-container { font-family: inherit; }
+.checkout-delivery-map-legend {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 400;
+  font-size: 11px;
+  color: #1e293b;
+  text-shadow: 0 0 2px #fff, 0 0 4px #fff;
+}
+.checkout-delivery-map-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+.checkout-delivery-map-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.15);
+  flex-shrink: 0;
+}
+.checkout-delivery-map-dot--store { background: #d97706; }
+.checkout-delivery-map-dot--delivery { background: #3b82f6; }
 
 /* ============================================================
    ORDER SUCCESS

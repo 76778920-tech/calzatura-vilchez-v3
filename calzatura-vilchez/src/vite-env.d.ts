@@ -8,6 +8,8 @@ interface ImportMetaEnv {
   readonly VITE_DELIVERY_PRICE_PER_KM?: string;
   readonly VITE_DELIVERY_FREE_KM?: string;
   readonly VITE_DELIVERY_MAX_KM?: string;
+  /** minLat,minLon,maxLat,maxLon — acota geocodificación. off|none|0 desactiva. */
+  readonly VITE_GEOCODE_BBOX?: string;
 }
 
 interface ImportMeta {

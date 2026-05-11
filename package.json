@@ -1,0 +1,10 @@
+{
+  "name": "calzatura-vilchez-v3",
+  "private": true,
+  "scripts": {
+    "sonar": "node ./node_modules/sonarqube-scanner/bin/sonar-scanner.js"
+  },
+  "devDependencies": {
+    "sonarqube-scanner": "4.3.6"
+  }
+}

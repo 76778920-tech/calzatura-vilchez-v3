@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ShoppingBag, CreditCard, Truck, ChevronRight } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
@@ -10,15 +10,36 @@ import { loadStripe } from "@stripe/stripe-js";
 import { formatPeruPhone, isValidPeruPhone, normalizePeruPhoneInput, peruPhoneError } from "@/utils/phone";
 import { DELIVERY_CONFIG } from "@/config/delivery";
 import {
-  calculateDeliveryForAddressLine,
+  calculateDeliveryForCoordinates,
+  geocodeCheckoutFormSuggestions,
+  geocodeSearchBarSuggestions,
   hasOpenRouteServiceKey,
+  reverseGeocodeLabel,
   type DeliveryQuote,
+  type GeocodeCandidate,
 } from "@/services/deliveryOpenRoute";
+import CheckoutDeliveryMap from "@/domains/carrito/components/CheckoutDeliveryMap";
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? "";
 
 function buildAddressLine(d: Address): string {
   return [d.direccion, d.distrito, d.ciudad].map((s) => s.trim()).filter(Boolean).join(", ");
+}
+
+const GEO_LAYER_HINT: Partial<Record<string, string>> = {
+  address: "Dirección (calle y número)",
+  street: "Calle",
+  venue: "Lugar / negocio",
+  neighbourhood: "Barrio",
+  borough: "Distrito o zona",
+  locality: "Ciudad (poco preciso)",
+  localadmin: "Zona administrativa",
+  region: "Región",
+};
+
+function geoLayerHint(layer?: string): string | null {
+  if (!layer) return null;
+  return GEO_LAYER_HINT[layer] ?? null;
 }
 
 export default function CheckoutPage() {
@@ -30,8 +51,25 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [metodoPago, setMetodoPago] = useState<"stripe" | "contraentrega">("stripe");
   const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
-  const [deliveryLoading, setDeliveryLoading] = useState(false);
-  const [deliveryError, setDeliveryError] = useState("");
+  const [deliveryQuoteLoading, setDeliveryQuoteLoading] = useState(false);
+  const [deliveryQuoteError, setDeliveryQuoteError] = useState("");
+
+  const [addressSuggestions, setAddressSuggestions] = useState<GeocodeCandidate[]>([]);
+  const [addressSuggestLoading, setAddressSuggestLoading] = useState(false);
+  const [addressSuggestError, setAddressSuggestError] = useState("");
+
+  const [mapSearchInput, setMapSearchInput] = useState("");
+  const [searchSuggestions, setSearchSuggestions] = useState<GeocodeCandidate[]>([]);
+  const [searchSuggestLoading, setSearchSuggestLoading] = useState(false);
+  const [searchSuggestError, setSearchSuggestError] = useState("");
+
+  const [selectedDelivery, setSelectedDelivery] = useState<GeocodeCandidate | null>(null);
+  const [mapFitNonce, setMapFitNonce] = useState(0);
+
+  const selectedDeliveryRef = useRef<GeocodeCandidate | null>(null);
+  selectedDeliveryRef.current = selectedDelivery;
+
+  const reverseGeocodeRequestId = useRef(0);
 
   const [direccion, setDireccion] = useState<Address>({
     nombre: userProfile?.nombre?.split(" ")[0] ?? "",
@@ -49,29 +87,36 @@ export default function CheckoutPage() {
     if (!orsEnabled) {
       return;
     }
-
     const ctrl = new AbortController();
     const timer = window.setTimeout(() => {
       const line = buildAddressLine(direccion);
       if (line.length < 10) {
+        setAddressSuggestions([]);
+        setAddressSuggestError("");
+        setAddressSuggestLoading(false);
+        setSelectedDelivery(null);
         setDeliveryQuote(null);
-        setDeliveryError("");
-        setDeliveryLoading(false);
+        setDeliveryQuoteError("");
+        setDeliveryQuoteLoading(false);
         return;
       }
       void (async () => {
-        setDeliveryLoading(true);
-        setDeliveryError("");
+        setAddressSuggestLoading(true);
+        setAddressSuggestError("");
         try {
-          const quote = await calculateDeliveryForAddressLine(`${line}, Perú`);
+          const list = await geocodeCheckoutFormSuggestions({
+            direccion: direccion.direccion,
+            distrito: direccion.distrito,
+            ciudad: direccion.ciudad,
+          });
           if (ctrl.signal.aborted) return;
-          setDeliveryQuote(quote);
+          setAddressSuggestions(list);
         } catch (err) {
           if (ctrl.signal.aborted) return;
-          setDeliveryQuote(null);
-          setDeliveryError(err instanceof Error ? err.message : "No se pudo calcular el envío");
+          setAddressSuggestions([]);
+          setAddressSuggestError(err instanceof Error ? err.message : "No se pudieron cargar sugerencias");
         } finally {
-          if (!ctrl.signal.aborted) setDeliveryLoading(false);
+          if (!ctrl.signal.aborted) setAddressSuggestLoading(false);
         }
       })();
     }, 550);
@@ -80,9 +125,112 @@ export default function CheckoutPage() {
       ctrl.abort();
       window.clearTimeout(timer);
     };
-    // Solo recalcular cuando cambian los campos que componen la dirección de entrega.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- evitar re-ejecutar en cada tecla de otros campos
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo dirección compuesta
   }, [direccion.direccion, direccion.distrito, direccion.ciudad, orsEnabled]);
+
+  useEffect(() => {
+    if (!orsEnabled) return;
+    const ctrl = new AbortController();
+    const q = mapSearchInput.trim();
+    const timer = window.setTimeout(() => {
+      if (q.length < 3) {
+        setSearchSuggestions([]);
+        setSearchSuggestError("");
+        setSearchSuggestLoading(false);
+        return;
+      }
+      void (async () => {
+        setSearchSuggestLoading(true);
+        setSearchSuggestError("");
+        try {
+          const list = await geocodeSearchBarSuggestions(q, {
+            ciudad: direccion.ciudad,
+            distrito: direccion.distrito,
+          });
+          if (ctrl.signal.aborted) return;
+          setSearchSuggestions(list);
+        } catch (err) {
+          if (ctrl.signal.aborted) return;
+          setSearchSuggestions([]);
+          setSearchSuggestError(err instanceof Error ? err.message : "Error en la búsqueda");
+        } finally {
+          if (!ctrl.signal.aborted) setSearchSuggestLoading(false);
+        }
+      })();
+    }, 450);
+    return () => {
+      ctrl.abort();
+      window.clearTimeout(timer);
+    };
+  }, [mapSearchInput, orsEnabled]);
+
+  useEffect(() => {
+    if (!orsEnabled || !selectedDelivery) {
+      setDeliveryQuote(null);
+      setDeliveryQuoteError("");
+      setDeliveryQuoteLoading(false);
+      return;
+    }
+    const lat = selectedDelivery.lat;
+    const lng = selectedDelivery.lng;
+    let cancelled = false;
+    setDeliveryQuoteLoading(true);
+    setDeliveryQuoteError("");
+    void calculateDeliveryForCoordinates(lat, lng, selectedDeliveryRef.current?.label)
+      .then((q) => {
+        if (cancelled) return;
+        setDeliveryQuote({
+          ...q,
+          label: selectedDeliveryRef.current?.label ?? q.label,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setDeliveryQuote(null);
+        setDeliveryQuoteError(err instanceof Error ? err.message : "No se pudo calcular el envío");
+      })
+      .finally(() => {
+        if (!cancelled) setDeliveryQuoteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [orsEnabled, selectedDelivery?.lat, selectedDelivery?.lng]);
+
+  useEffect(() => {
+    if (!selectedDelivery?.label) return;
+    setDeliveryQuote((prev) => {
+      if (
+        !prev ||
+        prev.customerLat !== selectedDelivery.lat ||
+        prev.customerLng !== selectedDelivery.lng
+      ) {
+        return prev;
+      }
+      if (prev.label === selectedDelivery.label) return prev;
+      return { ...prev, label: selectedDelivery.label };
+    });
+  }, [selectedDelivery?.label, selectedDelivery?.lat, selectedDelivery?.lng]);
+
+  const pickCandidate = useCallback((c: GeocodeCandidate, refitMap: boolean) => {
+    setSelectedDelivery(c);
+    if (refitMap) setMapFitNonce((n) => n + 1);
+  }, []);
+
+  const onMapCustomerMove = useCallback((lat: number, lng: number) => {
+    const id = ++reverseGeocodeRequestId.current;
+    setSelectedDelivery({ lat, lng, label: "Ubicación en el mapa…" });
+    void (async () => {
+      let label: string | null = null;
+      try {
+        label = await reverseGeocodeLabel(lng, lat);
+      } catch {
+        label = null;
+      }
+      if (reverseGeocodeRequestId.current !== id) return;
+      setSelectedDelivery({ lat, lng, label: label ?? "Ubicación elegida en el mapa" });
+    })();
+  }, []);
 
   const envioMonto = useMemo(() => {
     if (!orsEnabled) return 0;
@@ -127,12 +275,17 @@ export default function CheckoutPage() {
       telefono: formatPeruPhone(current.telefono),
     }));
     if (orsEnabled) {
-      if (deliveryLoading) {
+      const line = buildAddressLine(direccion);
+      if (line.length >= 10 && !selectedDelivery) {
+        toast.error("Elegí un punto de entrega: una sugerencia de la lista, una búsqueda o el mapa.");
+        return;
+      }
+      if (deliveryQuoteLoading) {
         toast.error("Espera un momento: estamos calculando el costo de envío.");
         return;
       }
-      if (deliveryError) {
-        toast.error(deliveryError);
+      if (deliveryQuoteError) {
+        toast.error(deliveryQuoteError);
         return;
       }
       if (!deliveryQuote || deliveryQuote.isOutOfRange) {
@@ -309,11 +462,102 @@ export default function CheckoutPage() {
               {orsEnabled && (
                 <div className="checkout-delivery-box">
                   <p className="checkout-delivery-title">Envío (OpenRouteService)</p>
-                  {deliveryLoading && <p className="checkout-delivery-muted">Calculando distancia y costo…</p>}
-                  {!deliveryLoading && deliveryError && (
-                    <p className="checkout-delivery-error">{deliveryError}</p>
+                  <p className="checkout-delivery-muted checkout-delivery-intro">
+                    La lista prioriza direcciones y calles sobre solo «ciudad». Incluí en <strong>Dirección</strong> el
+                    nombre de la vía y el número (ej. Jr. Puno 245). Si no aparece tu puerta exacta, tocá el mapa o
+                    arrastrá el pin azul.
+                  </p>
+
+                  <div className="form-group checkout-delivery-search-group">
+                    <label>Buscar ubicación en el mapa</label>
+                    <input
+                      type="text"
+                      value={mapSearchInput}
+                      onChange={(e) => setMapSearchInput(e.target.value)}
+                      className="form-input"
+                      placeholder="Ej: Jr. Puno 123, Huancayo"
+                      autoComplete="street-address"
+                    />
+                    {searchSuggestLoading && (
+                      <p className="checkout-delivery-muted">Buscando…</p>
+                    )}
+                    {!searchSuggestLoading && searchSuggestError && (
+                      <p className="checkout-delivery-error">{searchSuggestError}</p>
+                    )}
+                    {!searchSuggestLoading && !searchSuggestError && searchSuggestions.length > 0 && (
+                      <ul className="checkout-delivery-suggest-list" role="listbox" aria-label="Resultados de búsqueda">
+                        {searchSuggestions.map((c, i) => (
+                          <li key={`s-${i}-${c.lat}-${c.lng}`}>
+                            <button
+                              type="button"
+                              className="checkout-delivery-suggest-btn"
+                              title={c.label}
+                              onClick={() => pickCandidate(c, true)}
+                            >
+                              <span className="checkout-delivery-suggest-label">{c.label}</span>
+                              {geoLayerHint(c.layer) ? (
+                                <span className="checkout-delivery-layer-hint">{geoLayerHint(c.layer)}</span>
+                              ) : null}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+
+                  {buildAddressLine(direccion).length >= 10 && (
+                    <div className="checkout-delivery-suggest-block">
+                      <p className="checkout-delivery-subtitle">Sugerencias según tu dirección</p>
+                      {addressSuggestLoading && (
+                        <p className="checkout-delivery-muted">Cargando sugerencias…</p>
+                      )}
+                      {!addressSuggestLoading && addressSuggestError && (
+                        <p className="checkout-delivery-error">{addressSuggestError}</p>
+                      )}
+                      {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length === 0 && (
+                        <p className="checkout-delivery-muted">No hay resultados; probá el buscador de arriba.</p>
+                      )}
+                      {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length > 0 && (
+                        <ul className="checkout-delivery-suggest-list" role="listbox" aria-label="Sugerencias por dirección">
+                          {addressSuggestions.map((c, i) => (
+                            <li key={`a-${i}-${c.lat}-${c.lng}`}>
+                              <button
+                                type="button"
+                                className="checkout-delivery-suggest-btn"
+                                title={c.label}
+                                onClick={() => pickCandidate(c, true)}
+                              >
+                                <span className="checkout-delivery-suggest-label">{c.label}</span>
+                                {geoLayerHint(c.layer) ? (
+                                  <span className="checkout-delivery-layer-hint">{geoLayerHint(c.layer)}</span>
+                                ) : null}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   )}
-                  {!deliveryLoading && !deliveryError && deliveryQuote && (
+
+                  {selectedDelivery && (
+                    <CheckoutDeliveryMap
+                      storeLat={DELIVERY_CONFIG.storeLat}
+                      storeLng={DELIVERY_CONFIG.storeLng}
+                      customerLat={selectedDelivery.lat}
+                      customerLng={selectedDelivery.lng}
+                      fitBoundsNonce={mapFitNonce}
+                      interactive
+                      onCustomerPositionChange={onMapCustomerMove}
+                    />
+                  )}
+
+                  {deliveryQuoteLoading && (
+                    <p className="checkout-delivery-muted">Calculando distancia y costo…</p>
+                  )}
+                  {!deliveryQuoteLoading && deliveryQuoteError && (
+                    <p className="checkout-delivery-error">{deliveryQuoteError}</p>
+                  )}
+                  {!deliveryQuoteLoading && !deliveryQuoteError && deliveryQuote && (
                     <>
                       <p className="checkout-delivery-line">
                         Distancia aprox.: <strong>{deliveryQuote.distanceFormatted}</strong>
@@ -334,8 +578,9 @@ export default function CheckoutPage() {
                       )}
                     </>
                   )}
-                  {!deliveryLoading && !deliveryError && !deliveryQuote && buildAddressLine(direccion).length < 10 && (
-                    <p className="checkout-delivery-muted">Completa dirección, distrito y ciudad para estimar el envío.</p>
+
+                  {buildAddressLine(direccion).length < 10 && (
+                    <p className="checkout-delivery-muted">Completa dirección, distrito y ciudad para ver sugerencias de envío.</p>
                   )}
                 </div>
               )}
@@ -409,7 +654,10 @@ export default function CheckoutPage() {
                 disabled={
                   loading ||
                   (orsEnabled &&
-                    (deliveryLoading || !!deliveryError || !deliveryQuote || deliveryQuote.isOutOfRange))
+                    (deliveryQuoteLoading ||
+                      !!deliveryQuoteError ||
+                      !deliveryQuote ||
+                      deliveryQuote.isOutOfRange))
                 }
                 className="btn-primary btn-full"
               >
@@ -455,9 +703,9 @@ export default function CheckoutPage() {
               <span>
                 {!orsEnabled
                   ? "S/ 0.00"
-                  : deliveryLoading
+                  : deliveryQuoteLoading
                     ? "…"
-                    : deliveryError
+                    : deliveryQuoteError
                       ? "—"
                       : !deliveryQuote
                         ? "—"

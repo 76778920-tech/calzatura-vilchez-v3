@@ -1758,7 +1758,7 @@ function normalizeRevenueForecastForHorizon(revenueForecast: RevenueForecast | n
   };
 }
 
-function buildResumenEjecutivoBloques(args: {
+type ResumenEjecutivoArgs = {
   revenueSummary: RevenueSummary | null;
   horizon: number;
   riskAlerts: Prediction[];
@@ -1770,7 +1770,122 @@ function buildResumenEjecutivoBloques(args: {
   promedioCobertura: number;
   alertDays: number;
   productoMotor: Prediction | null;
-}): {
+};
+
+type ResumenEjecutivoCtx = ResumenEjecutivoArgs & {
+  growth: number;
+  tendencia: RevenueSummary["tendencia"];
+  confianza: number;
+  principalRiesgo: Prediction | null;
+  inventarioPesado: boolean;
+  negocioDebil: boolean;
+};
+
+function buildResumenEjecutivoCtx(args: ResumenEjecutivoArgs): ResumenEjecutivoCtx {
+  const growth = args.revenueSummary?.crecimiento_estimado_horizonte_pct ?? 0;
+  const tendencia = args.revenueSummary?.tendencia ?? "estable";
+  const confianza = args.revenueSummary?.confianza ?? 0;
+  const principalRiesgo = args.riskAlerts[0] ?? null;
+  const inventarioPesado = args.sobreStock >= Math.max(2, Math.ceil(args.conHistorial * 0.25));
+  const negocioDebil =
+    growth <= -8 ||
+    ((growth < 3 || tendencia === "bajando") && inventarioPesado && args.altaDemanda <= 1);
+  return {
+    ...args,
+    growth,
+    tendencia,
+    confianza,
+    principalRiesgo,
+    inventarioPesado,
+    negocioDebil,
+  };
+}
+
+function resumenEjecutivoTitular(ctx: ResumenEjecutivoCtx): string {
+  const { revenueSummary, negocioDebil, growth, enRiesgo, inventarioPesado } = ctx;
+  if (revenueSummary && negocioDebil) {
+    return "El negocio muestra señales de enfríamiento y stock acumulado; no conviene leer este escenario como una operación sana.";
+  }
+  if (revenueSummary && growth >= 8 && enRiesgo === 0 && !inventarioPesado) {
+    return "La venta proyectada viene bien y el foco principal es sostener stock y margen.";
+  }
+  if (revenueSummary && growth >= 0 && enRiesgo > 0) {
+    return "La venta puede sostenerse, pero ya hay productos que requieren reposición para no frenar el ritmo.";
+  }
+  if (revenueSummary && growth < 0 && enRiesgo === 0) {
+    return "La proyección se enfría y conviene ajustar compras y seguimiento comercial antes de cerrar el periodo.";
+  }
+  if (revenueSummary && growth < 0 && enRiesgo > 0) {
+    return "El negocio se desacelera y, al mismo tiempo, hay alertas de inventario que requieren reacción inmediata.";
+  }
+  if (enRiesgo > 0) {
+    return "Hay alertas operativas activas y el panel recomienda priorizar inventario antes de comprar de nuevo.";
+  }
+  return "El negocio necesita una lectura más clara antes de tomar decisiones.";
+}
+
+function resumenEjecutivoDetalle(ctx: ResumenEjecutivoCtx): string {
+  const { revenueSummary, horizon, tendencia, confianza } = ctx;
+  if (!revenueSummary) {
+    return "Todavía no hay una proyección financiera disponible, pero ya se puede revisar el estado del inventario y la demanda.";
+  }
+  return `Para los próximos ${horizon} días se estiman ${formatCurrency(revenueSummary.proximo_horizonte)} con una tendencia ${formatTrendLabel(tendencia).toLowerCase()} y una confianza ${formatConfidenceLabel(confianza).toLowerCase()}.`;
+}
+
+function resumenLecturaFinanciera(ctx: ResumenEjecutivoCtx): string {
+  const { revenueSummary, negocioDebil, growth } = ctx;
+  if (!revenueSummary) {
+    return "Aún no se cuenta con una lectura financiera consolidada para este horizonte.";
+  }
+  if (negocioDebil) {
+    return `Aunque no haya quiebres de stock, el ritmo proyectado luce flojo: se estiman ${formatCurrency(revenueSummary.proximo_horizonte)} y el crecimiento frente al último tramo es ${formatPercent(growth)}.`;
+  }
+  if (growth >= 0) {
+    return `Si el ritmo actual se mantiene, el negocio podría cerrar el horizonte con ${formatCurrency(revenueSummary.proximo_horizonte)}, que representa ${formatPercent(growth)} frente al mismo tramo anterior.`;
+  }
+  return `Si no se corrige el ritmo actual, el negocio podría cerrar en ${formatCurrency(revenueSummary.proximo_horizonte)}, es decir ${formatPercent(growth)} frente al mismo tramo anterior.`;
+}
+
+function resumenLecturaInventario(ctx: ResumenEjecutivoCtx): string {
+  const { principalRiesgo, inventarioPesado, sobreStock, rotacionDebil, promedioCobertura, enRiesgo, alertDays } = ctx;
+  if (principalRiesgo) {
+    return `${principalRiesgo.nombre} es hoy el caso más sensible: tiene ${principalRiesgo.stock_actual} unidades y una cobertura aproximada de ${principalRiesgo.dias_hasta_agotarse} días.`;
+  }
+  if (inventarioPesado) {
+    return `No faltan productos, pero hay ${sobreStock} con stock acumulado y ${rotacionDebil} con rotación débil. La cobertura promedio ronda ${Math.round(promedioCobertura || 0)} días.`;
+  }
+  if (enRiesgo === 0) {
+    return "No hay productos en riesgo para este horizonte. La cobertura de stock luce controlada.";
+  }
+  return `Hay ${enRiesgo} productos que necesitan seguimiento de stock (umbral: ${alertDays} días).`;
+}
+
+function resumenLecturaPortafolio(ctx: ResumenEjecutivoCtx): string {
+  const { productoMotor, conHistorial } = ctx;
+  if (productoMotor) {
+    return `${productoMotor.nombre} lidera la rotación actual con un consumo estimado de ${formatUnits(productoMotor.consumo_estimado_diario)} unidades por día.`;
+  }
+  if (conHistorial > 0) {
+    return `El portafolio ya cuenta con ${conHistorial} productos con historial suficiente para analizar comportamiento.`;
+  }
+  return "Aún no hay historial suficiente para identificar productos motores del negocio.";
+}
+
+function resumenRecomendacion(ctx: ResumenEjecutivoCtx): string {
+  const { principalRiesgo, inventarioPesado, altaDemanda } = ctx;
+  if (principalRiesgo) {
+    return `Reponer primero ${principalRiesgo.nombre}, vigilar los productos en riesgo y luego revisar el mix de compra según demanda real.`;
+  }
+  if (inventarioPesado) {
+    return "Frenar compras en los productos de baja rotación, revisar descuentos o salida comercial y comprar solo lo que tenga demanda comprobada.";
+  }
+  if (altaDemanda > 0) {
+    return "Asegurar inventario en los productos de mayor salida y evitar sobrecomprar en los que vienen bajando.";
+  }
+  return "Mantener seguimiento semanal y usar este panel como base para comparar lo proyectado contra lo real.";
+}
+
+function buildResumenEjecutivoBloques(args: ResumenEjecutivoArgs): {
   titular: string;
   detalle: string;
   lecturaFinanciera: string;
@@ -1778,84 +1893,528 @@ function buildResumenEjecutivoBloques(args: {
   lecturaPortafolio: string;
   recomendacion: string;
 } {
-  const {
-    revenueSummary,
-    horizon,
-    riskAlerts,
-    sobreStock,
-    conHistorial,
-    rotacionDebil,
-    enRiesgo,
-    altaDemanda,
-    promedioCobertura,
-    alertDays,
-    productoMotor,
-  } = args;
-
-  const growth = revenueSummary?.crecimiento_estimado_horizonte_pct ?? 0;
-  const tendencia = revenueSummary?.tendencia ?? "estable";
-  const confianza = revenueSummary?.confianza ?? 0;
-  const principalRiesgo = riskAlerts[0] ?? null;
-  const inventarioPesado = sobreStock >= Math.max(2, Math.ceil(conHistorial * 0.25));
-  const negocioDebil = growth <= -8 || ((growth < 3 || tendencia === "bajando") && inventarioPesado && altaDemanda <= 1);
-
-  let titular = "El negocio necesita una lectura más clara antes de tomar decisiones.";
-  if (revenueSummary && negocioDebil) {
-    titular = "El negocio muestra señales de enfríamiento y stock acumulado; no conviene leer este escenario como una operación sana.";
-  } else if (revenueSummary && growth >= 8 && enRiesgo === 0 && !inventarioPesado) {
-    titular = "La venta proyectada viene bien y el foco principal es sostener stock y margen.";
-  } else if (revenueSummary && growth >= 0 && enRiesgo > 0) {
-    titular = "La venta puede sostenerse, pero ya hay productos que requieren reposición para no frenar el ritmo.";
-  } else if (revenueSummary && growth < 0 && enRiesgo === 0) {
-    titular = "La proyección se enfría y conviene ajustar compras y seguimiento comercial antes de cerrar el periodo.";
-  } else if (revenueSummary && growth < 0 && enRiesgo > 0) {
-    titular = "El negocio se desacelera y, al mismo tiempo, hay alertas de inventario que requieren reacción inmediata.";
-  } else if (enRiesgo > 0) {
-    titular = "Hay alertas operativas activas y el panel recomienda priorizar inventario antes de comprar de nuevo.";
-  }
-
-  const detalle = revenueSummary
-    ? `Para los próximos ${horizon} días se estiman ${formatCurrency(revenueSummary.proximo_horizonte)} con una tendencia ${formatTrendLabel(tendencia).toLowerCase()} y una confianza ${formatConfidenceLabel(confianza).toLowerCase()}.`
-    : `Todavía no hay una proyección financiera disponible, pero ya se puede revisar el estado del inventario y la demanda.`;
-
-  const lecturaFinanciera = revenueSummary
-    ? negocioDebil
-      ? `Aúnque no haya quiebres de stock, el ritmo proyectado luce flojo: se estiman ${formatCurrency(revenueSummary.proximo_horizonte)} y el crecimiento frente al último tramo es ${formatPercent(growth)}.`
-      : growth >= 0
-        ? `Si el ritmo actual se mantiene, el negocio podría cerrar el horizonte con ${formatCurrency(revenueSummary.proximo_horizonte)}, que representa ${formatPercent(growth)} frente al mismo tramo anterior.`
-        : `Si no se corrige el ritmo actual, el negocio podría cerrar en ${formatCurrency(revenueSummary.proximo_horizonte)}, es decir ${formatPercent(growth)} frente al mismo tramo anterior.`
-    : "Aún no se cuenta con una lectura financiera consolidada para este horizonte.";
-
-  const lecturaInventario = principalRiesgo
-    ? `${principalRiesgo.nombre} es hoy el caso más sensible: tiene ${principalRiesgo.stock_actual} unidades y una cobertura aproximada de ${principalRiesgo.dias_hasta_agotarse} días.`
-    : inventarioPesado
-      ? `No faltan productos, pero hay ${sobreStock} con stock acumulado y ${rotacionDebil} con rotación débil. La cobertura promedio ronda ${Math.round(promedioCobertura || 0)} días.`
-      : enRiesgo === 0
-        ? `No hay productos en riesgo para este horizonte. La cobertura de stock luce controlada.`
-        : `Hay ${enRiesgo} productos que necesitan seguimiento de stock (umbral: ${alertDays} días).`;
-
-  const lecturaPortafolio = productoMotor
-    ? `${productoMotor.nombre} lidera la rotación actual con un consumo estimado de ${formatUnits(productoMotor.consumo_estimado_diario)} unidades por día.`
-    : conHistorial > 0
-      ? `El portafolio ya cuenta con ${conHistorial} productos con historial suficiente para analizar comportamiento.`
-      : `Aún no hay historial suficiente para identificar productos motores del negocio.`;
-
-  const recomendacion = principalRiesgo
-    ? `Reponer primero ${principalRiesgo.nombre}, vigilar los productos en riesgo y luego revisar el mix de compra según demanda real.`
-    : inventarioPesado
-      ? `Frenar compras en los productos de baja rotación, revisar descuentos o salida comercial y comprar solo lo que tenga demanda comprobada.`
-      : altaDemanda > 0
-        ? `Asegurar inventario en los productos de mayor salida y evitar sobrecomprar en los que vienen bajando.`
-        : `Mantener seguimiento semanal y usar este panel como base para comparar lo proyectado contra lo real.`;
-
+  const ctx = buildResumenEjecutivoCtx(args);
   return {
-    titular,
-    detalle,
-    lecturaFinanciera,
-    lecturaInventario,
-    lecturaPortafolio,
-    recomendacion,
+    titular: resumenEjecutivoTitular(ctx),
+    detalle: resumenEjecutivoDetalle(ctx),
+    lecturaFinanciera: resumenLecturaFinanciera(ctx),
+    lecturaInventario: resumenLecturaInventario(ctx),
+    lecturaPortafolio: resumenLecturaPortafolio(ctx),
+    recomendacion: resumenRecomendacion(ctx),
   };
+}
+
+function adminPredictionsSortPriority(item: Prediction): number {
+  if (item.sin_historial) return 5;
+  if (item.stock_actual === 0 && item.alta_demanda) return 0;
+  if (item.alerta_stock) return 1;
+  return 2 + riskPriority[item.nivel_riesgo];
+}
+
+function filterPredictionsBySearchQuery(items: Prediction[], searchRaw: string): Prediction[] {
+  const query = searchRaw.trim().toLowerCase();
+  if (!query) return items;
+  return items.filter((item) => {
+    const haystack = [item.codigo, item.nombre, item.categoria].join(" ").toLowerCase();
+    return haystack.includes(query);
+  });
+}
+
+function sortPredictionsByAdminPriority(items: Prediction[]): Prediction[] {
+  return [...items].sort(
+    (a, b) =>
+      adminPredictionsSortPriority(a) - adminPredictionsSortPriority(b) ||
+      b.consumo_estimado_diario - a.consumo_estimado_diario,
+  );
+}
+
+type PredictionWithAbc = Prediction & { abc: "A" | "B" | "C" };
+
+function buildAbcInventoryItems(predictionsForView: Prediction[]): PredictionWithAbc[] {
+  const withH = predictionsForView.filter((p) => !p.sin_historial && p.total_vendido_historico > 0);
+  const sorted = [...withH].sort(
+    (a, b) => b.total_vendido_historico * b.precio - a.total_vendido_historico * a.precio,
+  );
+  const totalRev = sorted.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
+  return sorted.reduce<{ items: PredictionWithAbc[]; cum: number }>(
+    ({ items, cum }, p) => {
+      const newCum = cum + p.total_vendido_historico * p.precio;
+      const pct = totalRev > 0 ? newCum / totalRev : 0;
+      const abc = (pct <= 0.80 ? "A" : pct <= 0.95 ? "B" : "C") as "A" | "B" | "C";
+      return { cum: newCum, items: [...items, { ...p, abc }] };
+    },
+    { items: [], cum: 0 },
+  ).items;
+}
+
+type TabPrefetchScheduleInput = {
+  activeTab: PredictionTab;
+  weeklyChartFetched: boolean;
+  weeklyChartLoading: boolean;
+  modelMetricsFetched: boolean;
+  modelMetricsLoading: boolean;
+  modeloMeta: ModeloMeta | null;
+  ireHistorialFetched: boolean;
+  campanaFetched: boolean;
+  campanaLoading: boolean;
+  learningStatsFetched: boolean;
+  loadWeeklyChart: () => Promise<void>;
+  loadModelMetrics: () => Promise<void>;
+  loadIreHistorial: () => Promise<void>;
+  loadCampana: () => Promise<void>;
+  loadLearningStats: () => Promise<void>;
+};
+
+function scheduleTabPrefetchTimeouts(p: TabPrefetchScheduleInput): () => void {
+  const timers: ReturnType<typeof window.setTimeout>[] = [];
+  if (p.activeTab === "ventas" && !p.weeklyChartFetched && !p.weeklyChartLoading) {
+    timers.push(
+      window.setTimeout(() => {
+        void p.loadWeeklyChart().catch(() => undefined);
+      }, 0),
+    );
+  }
+  if (p.activeTab === "modelo" && !p.modelMetricsFetched && !p.modelMetricsLoading && p.modeloMeta) {
+    timers.push(
+      window.setTimeout(() => {
+        void p.loadModelMetrics().catch(() => undefined);
+      }, 0),
+    );
+  }
+  if ((p.activeTab === "resumen" || p.activeTab === "ire") && !p.ireHistorialFetched) {
+    timers.push(
+      window.setTimeout(() => {
+        void p.loadIreHistorial().catch(() => undefined);
+      }, 0),
+    );
+  }
+  if (p.activeTab === "campanas" && !p.campanaFetched && !p.campanaLoading) {
+    timers.push(
+      window.setTimeout(() => {
+        void p.loadCampana().catch(() => undefined);
+      }, 0),
+    );
+  }
+  if (p.activeTab === "campanas" && !p.learningStatsFetched) {
+    timers.push(
+      window.setTimeout(() => {
+        void p.loadLearningStats().catch(() => undefined);
+      }, 0),
+    );
+  }
+  return () => {
+    timers.forEach((id) => window.clearTimeout(id));
+  };
+}
+
+const CAMPANA_NIVEL_COLOR: Record<string, string> = {
+  alta: "critico",
+  media: "alto",
+  baja: "moderado",
+  normal: "bajo",
+  observando: "moderado",
+};
+
+const CAMPANA_NIVEL_LABEL: Record<string, string> = {
+  alta: "Alta demanda",
+  media: "Campaña activa",
+  baja: "Actividad elevada",
+  normal: "Normal",
+  observando: "En observación",
+};
+
+const CAMPANA_ESTADO_LABEL: Record<string, string> = {
+  inicio: "Inicio",
+  activa: "Activa",
+  finalizando: "Finalizando",
+  en_riesgo_stock: "Riesgo stock",
+  finalizada: "Finalizada",
+  descartada: "Descartada",
+  observando: "En observación",
+};
+
+function campanaHistorialImpactoSoles(h: CampanaDetectada): number {
+  return h.scope === "focalizada" && (h.impacto_estimado_soles_focalizado ?? 0) > 0
+    ? h.impacto_estimado_soles_focalizado ?? 0
+    : h.impacto_estimado_soles ?? 0;
+}
+
+function CampanaFeedbackActions({
+  campana,
+  feedbackLoading,
+  onFeedback,
+  onRefresh,
+}: {
+  campana: CampanaDetectada;
+  feedbackLoading: boolean;
+  onFeedback: (id: number, accion: "confirmar" | "descartar") => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", minWidth: "152px" }}>
+      {campana.confirmada_por_admin == null ? (
+        <>
+          <button
+            type="button"
+            className="pred-btn"
+            disabled={feedbackLoading}
+            onClick={() => onFeedback(campana.id, "confirmar")}
+            style={{ background: "#22c55e", color: "#fff", border: "none", fontWeight: 600, padding: "0.55rem 1rem" }}
+          >
+            {feedbackLoading ? "…" : "✓ Confirmar"}
+          </button>
+          <button
+            type="button"
+            className="pred-btn"
+            disabled={feedbackLoading}
+            onClick={() => onFeedback(campana.id, "descartar")}
+            style={{
+              background: "rgba(255,255,255,0.12)",
+              border: "1px solid rgba(255,255,255,0.28)",
+              fontWeight: 600,
+              padding: "0.55rem 1rem",
+            }}
+          >
+            {feedbackLoading ? "…" : "✗ Descartar"}
+          </button>
+        </>
+      ) : (
+        <div
+          style={{
+            padding: "0.6rem 0.9rem",
+            borderRadius: "0.5rem",
+            fontWeight: 600,
+            fontSize: "0.85rem",
+            background: campana.confirmada_por_admin ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)",
+          }}
+        >
+          {campana.confirmada_por_admin ? "✓ Confirmada" : "✗ Descartada"}
+          {campana.admin_nota && (
+            <p style={{ margin: "0.3rem 0 0", opacity: 0.8, fontSize: "0.78rem", fontWeight: 400 }}>{campana.admin_nota}</p>
+          )}
+        </div>
+      )}
+      <button type="button" className="pred-btn" style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem", opacity: 0.7 }} onClick={onRefresh}>
+        Actualizar
+      </button>
+    </div>
+  );
+}
+
+function CampanaActivaPanel({
+  campana: c,
+  feedbackLoading,
+  onFeedback,
+  onRefresh,
+}: {
+  campana: CampanaDetectada;
+  feedbackLoading: boolean;
+  onFeedback: (id: number, accion: "confirmar" | "descartar") => void;
+  onRefresh: () => void;
+}) {
+  const nc = CAMPANA_NIVEL_COLOR[c.nivel] ?? "moderado";
+  const TIMELINE_STEPS: { key: string; label: string; side?: boolean }[] = [
+    { key: "inicio", label: "Inicio" },
+    { key: "activa", label: "Activa" },
+    { key: "en_riesgo_stock", label: "Riesgo stock", side: true },
+    { key: "finalizando", label: "Finalizando" },
+    { key: "finalizada", label: "Finalizada" },
+  ];
+  const mainSteps = TIMELINE_STEPS.filter((s) => !s.side);
+  const mainOrder = mainSteps.map((s) => s.key);
+  const currentIdx = mainOrder.indexOf(c.estado === "en_riesgo_stock" ? "activa" : c.estado);
+
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 0, padding: "0.65rem 0.25rem", overflowX: "auto" }}>
+        {mainSteps.map((step, i) => {
+          const isDone = i < currentIdx;
+          const isCurrent = i === currentIdx;
+          const isRiesgo = c.estado === "en_riesgo_stock" && step.key === "activa";
+          const color = isRiesgo ? "#f59e0b" : isCurrent ? "#6366f1" : isDone ? "#22c55e" : "rgba(255,255,255,0.18)";
+          const labelColor = isCurrent || isRiesgo ? "#fff" : isDone ? "#22c55e" : "rgba(255,255,255,0.45)";
+          return (
+            <div
+              key={step.key}
+              style={{ display: "flex", alignItems: "center", flex: i < mainSteps.length - 1 ? 1 : undefined, minWidth: 0 }}
+            >
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem", minWidth: "4.5rem" }}>
+                <div
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    background: color,
+                    border: `2px solid ${color}`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    color: "#fff",
+                    flexShrink: 0,
+                  }}
+                >
+                  {isDone ? "✓" : i + 1}
+                </div>
+                <span style={{ fontSize: "0.68rem", color: labelColor, textAlign: "center", whiteSpace: "nowrap" }}>
+                  {isRiesgo ? "Riesgo stock" : step.label}
+                </span>
+              </div>
+              {i < mainSteps.length - 1 && (
+                <div
+                  style={{
+                    flex: 1,
+                    height: 2,
+                    margin: "0 0.15rem",
+                    marginBottom: "1.1rem",
+                    background: i < currentIdx ? "#22c55e" : "rgba(255,255,255,0.15)",
+                    minWidth: "1.5rem",
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+        {c.estado === "descartada" && (
+          <span style={{ fontSize: "0.8rem", color: "#ef4444", fontWeight: 600, marginLeft: "0.75rem" }}>✗ Descartada</span>
+        )}
+      </div>
+
+      <div className={`ire-hero ire-hero-${nc}`} style={{ flexWrap: "wrap", gap: "1rem" }}>
+        <div className="ire-left" style={{ flex: "1 1 280px" }}>
+          <div className="ire-label" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
+            <span>Campaña detectada</span>
+            {c.scope && (
+              <span
+                style={{
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                  padding: "0.15rem 0.5rem",
+                  borderRadius: "999px",
+                  background: "rgba(255,255,255,0.2)",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                }}
+              >
+                {c.scope === "focalizada" ? `Focalizada · ${c.foco_tipo ?? "segmento"}` : "Alcance global"}
+              </span>
+            )}
+            {c.foco_nombre && <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>— {c.foco_nombre}</span>}
+          </div>
+
+          <div className="ire-score-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
+            <span className={`ire-nivel ire-nivel-${nc}`}>{CAMPANA_NIVEL_LABEL[c.nivel] ?? c.nivel}</span>
+            {c.confidence_pct != null && (
+              <span style={{ fontSize: "0.9rem", opacity: 0.8 }}>Confianza {c.confidence_pct}%</span>
+            )}
+          </div>
+
+          <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
+            {c.uplift_ratio != null && (
+              <div>
+                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Uplift</div>
+                <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{c.uplift_ratio.toFixed(2)}×</div>
+              </div>
+            )}
+            {(c.impacto_estimado_soles ?? 0) > 0 && (
+              <div>
+                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Impacto global</div>
+                <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
+                  S/ {(c.impacto_estimado_soles ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            )}
+            {(c.impacto_estimado_soles_focalizado ?? 0) > 0 && (
+              <div>
+                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Impacto focalizado</div>
+                <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
+                  S/ {(c.impacto_estimado_soles_focalizado ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                </div>
+              </div>
+            )}
+            <div>
+              <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Estado</div>
+              <div style={{ fontWeight: 600 }}>{CAMPANA_ESTADO_LABEL[c.estado] ?? c.estado}</div>
+            </div>
+            {c.fecha_inicio && (
+              <div>
+                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Desde</div>
+                <div style={{ fontWeight: 600 }}>{c.fecha_inicio}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <CampanaFeedbackActions campana={c} feedbackLoading={feedbackLoading} onFeedback={onFeedback} onRefresh={onRefresh} />
+      </div>
+
+      {c.recomendacion && (
+        <div
+          className="pred-warning"
+          style={{
+            background: "rgba(234,179,8,0.07)",
+            border: "1px solid rgba(234,179,8,0.28)",
+            borderRadius: "0.75rem",
+            padding: "0.85rem 1rem",
+            fontSize: "0.9rem",
+            lineHeight: 1.6,
+          }}
+        >
+          <strong>Recomendación · </strong>
+          {c.recomendacion}
+        </div>
+      )}
+
+      {c.top_productos_detalle && c.top_productos_detalle.length > 0 && (
+        <section>
+          <h3 className="pred-section-title" style={{ marginBottom: "0.65rem" }}>
+            Top productos con mayor actividad
+          </h3>
+          <div className="pred-table-wrapper">
+            <table className="admin-table pred-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Categoría</th>
+                  <th>Uplift</th>
+                  <th>Ventas recientes</th>
+                  <th>Ventas esperadas</th>
+                  <th>Impacto S/</th>
+                  <th>Stock</th>
+                </tr>
+              </thead>
+              <tbody>
+                {c.top_productos_detalle.map((p) => (
+                  <tr key={p.producto_id} className={p.stock_actual === 0 ? "pred-row-alert" : ""}>
+                    <td style={{ fontWeight: 600 }}>{p.nombre}</td>
+                    <td>{p.categoria}</td>
+                    <td>
+                      <span className={`pred-estado-badge ${p.uplift_ratio >= 2 ? "critico" : p.uplift_ratio >= 1.5 ? "alerta" : ""}`}>
+                        {p.uplift_ratio.toFixed(2)}×
+                      </span>
+                    </td>
+                    <td>{p.ventas_recientes.toFixed(1)} uds</td>
+                    <td>{p.ventas_baseline.toFixed(1)} uds</td>
+                    <td style={{ fontWeight: 600, color: (p.impacto_soles ?? 0) > 0 ? "#22c55e" : undefined }}>
+                      {(p.impacto_soles ?? 0) > 0
+                        ? `S/ ${(p.impacto_soles!).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                        : "—"}
+                    </td>
+                    <td
+                      style={{
+                        fontWeight: 600,
+                        color:
+                          p.stock_actual === 0 ? "#ef4444" : (p.stock_actual ?? 999) < 5 ? "#f59e0b" : undefined,
+                      }}
+                    >
+                      {p.stock_actual ?? "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+    </>
+  );
+}
+
+function CampanasHistorialTable({ historial }: { historial: CampanaDetectada[] }) {
+  const nivelBadge: Record<string, string> = {
+    alta: "critico",
+    media: "alerta",
+    baja: "alerta",
+  };
+  return (
+    <section>
+      <h3 className="pred-section-title" style={{ marginBottom: "0.65rem" }}>
+        Historial de campañas detectadas
+      </h3>
+      <div className="pred-table-wrapper">
+        <table className="admin-table pred-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Nivel</th>
+              <th>Scope</th>
+              <th>Foco</th>
+              <th>Uplift</th>
+              <th>Impacto S/</th>
+              <th>Estado</th>
+              <th>Admin</th>
+            </tr>
+          </thead>
+          <tbody>
+            {historial.map((h) => {
+              const impacto = campanaHistorialImpactoSoles(h);
+              return (
+                <tr key={h.id}>
+                  <td>{h.fecha_deteccion}</td>
+                  <td>
+                    <span className={`pred-estado-badge ${nivelBadge[h.nivel] ?? ""}`}>{h.nivel}</span>
+                  </td>
+                  <td>{h.scope ?? "—"}</td>
+                  <td style={{ fontSize: "0.83rem" }}>{h.foco_nombre ? `${h.foco_tipo}: ${h.foco_nombre}` : "—"}</td>
+                  <td>{h.uplift_ratio != null ? `${h.uplift_ratio.toFixed(2)}×` : "—"}</td>
+                  <td>{impacto > 0 ? `S/ ${impacto.toLocaleString("es-PE", { minimumFractionDigits: 2 })}` : "—"}</td>
+                  <td>{CAMPANA_ESTADO_LABEL[h.estado] ?? h.estado}</td>
+                  <td style={{ fontSize: "0.8rem", opacity: 0.85 }}>
+                    {h.confirmada_por_admin === true
+                      ? "✓ Confirmada"
+                      : h.confirmada_por_admin === false
+                        ? "✗ Descartada"
+                        : "Pendiente"}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function CampanasPanelBody({
+  data,
+  feedbackLoading,
+  onFeedback,
+  onRefresh,
+}: {
+  data: CampanaActiveResponse;
+  feedbackLoading: boolean;
+  onFeedback: (id: number, accion: "confirmar" | "descartar") => void;
+  onRefresh: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      {!data.activa && (
+        <div className="ire-hero ire-hero-bajo" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
+          <div className="ire-label">Estado de campañas</div>
+          <p style={{ margin: 0, fontWeight: 600, fontSize: "1.05rem" }}>Sin campaña activa en este momento</p>
+          <p style={{ margin: 0, opacity: 0.75, fontSize: "0.9rem" }}>
+            El sistema monitorea ventas en tiempo real. Se registrará automáticamente cuando detecte actividad elevada o focalizada.
+          </p>
+          <button type="button" className="pred-btn" onClick={onRefresh} style={{ marginTop: "0.25rem" }}>
+            Actualizar
+          </button>
+        </div>
+      )}
+
+      {data.activa && (
+        <CampanaActivaPanel
+          campana={data.activa}
+          feedbackLoading={feedbackLoading}
+          onFeedback={onFeedback}
+          onRefresh={onRefresh}
+        />
+      )}
+
+      {data.historial.length > 0 && <CampanasHistorialTable historial={data.historial} />}
+    </div>
+  );
 }
 
 export default function AdminPredictions() {
@@ -2008,6 +2567,17 @@ export default function AdminPredictions() {
     setCampanaFeedbackLoading(false);
   }, [loadCampana, loadLearningStats]);
 
+  const runCampanaFeedback = useCallback(
+    (campanaId: number, accion: "confirmar" | "descartar" | "nota", nota?: string) => {
+      void submitCampanaFeedback(campanaId, accion, nota);
+    },
+    [submitCampanaFeedback],
+  );
+
+  const refreshCampanaData = useCallback(() => {
+    void loadCampana().catch(() => undefined);
+  }, [loadCampana]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       load(horizon, history).catch(() => undefined);
@@ -2016,36 +2586,40 @@ export default function AdminPredictions() {
   }, [horizon, history, load]);
 
   useEffect(() => {
-    const timers: ReturnType<typeof window.setTimeout>[] = [];
-    if (activeTab === "ventas" && !weeklyChartFetched && !weeklyChartLoading) {
-      timers.push(window.setTimeout(() => {
-        loadWeeklyChart().catch(() => undefined);
-      }, 0));
-    }
-    if (activeTab === "modelo" && !modelMetricsFetched && !modelMetricsLoading && modeloMeta) {
-      timers.push(window.setTimeout(() => {
-        loadModelMetrics().catch(() => undefined);
-      }, 0));
-    }
-    if ((activeTab === "resumen" || activeTab === "ire") && !ireHistorialFetched) {
-      timers.push(window.setTimeout(() => {
-        loadIreHistorial().catch(() => undefined);
-      }, 0));
-    }
-    if (activeTab === "campanas" && !campanaFetched && !campanaLoading) {
-      timers.push(window.setTimeout(() => {
-        loadCampana().catch(() => undefined);
-      }, 0));
-    }
-    if (activeTab === "campanas" && !learningStatsFetched) {
-      timers.push(window.setTimeout(() => {
-        loadLearningStats().catch(() => undefined);
-      }, 0));
-    }
-    return () => {
-      timers.forEach((id) => window.clearTimeout(id));
-    };
-  }, [activeTab, weeklyChartFetched, weeklyChartLoading, modelMetricsFetched, modelMetricsLoading, modeloMeta, loadWeeklyChart, loadModelMetrics, ireHistorialFetched, loadIreHistorial, campanaFetched, campanaLoading, loadCampana, learningStatsFetched, loadLearningStats]);
+    return scheduleTabPrefetchTimeouts({
+      activeTab,
+      weeklyChartFetched,
+      weeklyChartLoading,
+      modelMetricsFetched,
+      modelMetricsLoading,
+      modeloMeta,
+      ireHistorialFetched,
+      campanaFetched,
+      campanaLoading,
+      learningStatsFetched,
+      loadWeeklyChart,
+      loadModelMetrics,
+      loadIreHistorial,
+      loadCampana,
+      loadLearningStats,
+    });
+  }, [
+    activeTab,
+    weeklyChartFetched,
+    weeklyChartLoading,
+    modelMetricsFetched,
+    modelMetricsLoading,
+    modeloMeta,
+    ireHistorialFetched,
+    loadWeeklyChart,
+    loadModelMetrics,
+    loadIreHistorial,
+    campanaFetched,
+    campanaLoading,
+    loadCampana,
+    learningStatsFetched,
+    loadLearningStats,
+  ]);
 
   const refreshPredictions = useCallback(async () => {
     setWeeklyChartFetched(false);
@@ -2078,25 +2652,10 @@ export default function AdminPredictions() {
     [predictionsForView]
   );
 
-  const porOrden = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const filtered = query
-      ? predictionsForView.filter((item) => {
-          const haystack = [item.codigo, item.nombre, item.categoria].join(" ").toLowerCase();
-          return haystack.includes(query);
-        })
-      : predictionsForView;
-
-    return [...filtered].sort((a, b) => {
-      const priority = (item: Prediction) => {
-        if (item.sin_historial) return 5;
-        if (item.stock_actual === 0 && item.alta_demanda) return 0;
-        if (item.alerta_stock) return 1;
-        return 2 + riskPriority[item.nivel_riesgo];
-      };
-      return priority(a) - priority(b) || b.consumo_estimado_diario - a.consumo_estimado_diario;
-    });
-  }, [predictionsForView, search]);
+  const porOrden = useMemo(
+    () => sortPredictionsByAdminPriority(filterPredictionsBySearchQuery(predictionsForView, search)),
+    [predictionsForView, search],
+  );
 
   const normalizedRevenueForecast = useMemo(
     () => normalizeRevenueForecastForHorizon(revenueForecast),
@@ -2105,21 +2664,7 @@ export default function AdminPredictions() {
 
   const revenueSummary = normalizedRevenueForecast?.summary ?? null;
   // Análisis ABC por ingreso histórico (A = 80%, B = 15%, C = 5%)
-  const abcData = useMemo(() => {
-    const withH = predictionsForView.filter(p => !p.sin_historial && p.total_vendido_historico > 0);
-    const sorted = [...withH].sort((a, b) => (b.total_vendido_historico * b.precio) - (a.total_vendido_historico * a.precio));
-    const totalRev = sorted.reduce((s, p) => s + p.total_vendido_historico * p.precio, 0);
-    type Entry = (typeof sorted)[0] & { abc: "A" | "B" | "C" };
-    return sorted.reduce<{ items: Entry[]; cum: number }>(
-      ({ items, cum }, p) => {
-        const newCum = cum + p.total_vendido_historico * p.precio;
-        const pct = totalRev > 0 ? newCum / totalRev : 0;
-        const abc = (pct <= 0.80 ? "A" : pct <= 0.95 ? "B" : "C") as "A" | "B" | "C";
-        return { cum: newCum, items: [...items, { ...p, abc }] };
-      },
-      { items: [], cum: 0 }
-    ).items;
-  }, [predictionsForView]);
+  const abcData = useMemo(() => buildAbcInventoryItems(predictionsForView), [predictionsForView]);
 
   const enRiesgo = predictionsForView.filter((item) => !item.sin_historial && item.alerta_stock).length;
   const sinStock = predictionsForView.filter((item) => !item.sin_historial && item.stock_actual === 0).length;
@@ -3593,363 +4138,20 @@ export default function AdminPredictions() {
 
           {!campanaLoading && !campanaFetched && (
             <div style={{ textAlign: "center", padding: "2rem" }}>
-              <button className="pred-btn" onClick={() => {
-                loadCampana().catch(() => undefined);
-              }}>
+              <button type="button" className="pred-btn" onClick={refreshCampanaData}>
                 Consultar campañas detectadas
               </button>
             </div>
           )}
 
-          {!campanaLoading && campanaFetched && campanaData && (() => {
-            const NIVEL_COLOR: Record<string, string> = {
-              alta: "critico", media: "alto", baja: "moderado", normal: "bajo", observando: "moderado",
-            };
-            const NIVEL_LABEL: Record<string, string> = {
-              alta: "Alta demanda", media: "Campaña activa", baja: "Actividad elevada",
-              normal: "Normal", observando: "En observación",
-            };
-            const ESTADO_LABEL: Record<string, string> = {
-              inicio: "Inicio", activa: "Activa", finalizando: "Finalizando",
-              en_riesgo_stock: "Riesgo stock", finalizada: "Finalizada",
-              descartada: "Descartada", observando: "En observación",
-            };
-
-            return (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-
-                {/* ── Sin campaña activa ── */}
-                {!campanaData.activa && (
-                  <div className="ire-hero ire-hero-bajo" style={{ flexDirection: "column", alignItems: "flex-start", gap: "0.75rem" }}>
-                    <div className="ire-label">Estado de campañas</div>
-                    <p style={{ margin: 0, fontWeight: 600, fontSize: "1.05rem" }}>Sin campaña activa en este momento</p>
-                    <p style={{ margin: 0, opacity: 0.75, fontSize: "0.9rem" }}>
-                      El sistema monitorea ventas en tiempo real. Se registrará automáticamente cuando detecte actividad elevada o focalizada.
-                    </p>
-                    <button className="pred-btn" onClick={() => {
-                loadCampana().catch(() => undefined);
-              }} style={{ marginTop: "0.25rem" }}>
-                      Actualizar
-                    </button>
-                  </div>
-                )}
-
-                {/* ── Campaña activa ── */}
-                {campanaData.activa && (() => {
-                  const c = campanaData.activa!;
-                  const nc = NIVEL_COLOR[c.nivel] ?? "moderado";
-
-                  // Timeline de estados del ciclo de vida
-                  const TIMELINE_STEPS = [
-                    { key: "inicio",          label: "Inicio" },
-                    { key: "activa",          label: "Activa" },
-                    { key: "en_riesgo_stock", label: "Riesgo stock", side: true },
-                    { key: "finalizando",     label: "Finalizando" },
-                    { key: "finalizada",      label: "Finalizada" },
-                  ];
-                  const mainSteps = TIMELINE_STEPS.filter((s) => !s.side);
-                  const mainOrder = mainSteps.map((s) => s.key);
-                  const currentIdx = mainOrder.indexOf(
-                    c.estado === "en_riesgo_stock" ? "activa" : c.estado,
-                  );
-
-                  return (
-                    <>
-                      {/* Timeline de ciclo de vida */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 0, padding: "0.65rem 0.25rem", overflowX: "auto" }}>
-                        {mainSteps.map((step, i) => {
-                          const isDone    = i < currentIdx;
-                          const isCurrent = i === currentIdx;
-                          const isRiesgo  = c.estado === "en_riesgo_stock" && step.key === "activa";
-                          const color = isRiesgo
-                            ? "#f59e0b"
-                            : isCurrent ? "#6366f1"
-                            : isDone    ? "#22c55e"
-                            : "rgba(255,255,255,0.18)";
-                          const labelColor = (isCurrent || isRiesgo) ? "#fff" : isDone ? "#22c55e" : "rgba(255,255,255,0.45)";
-                          return (
-                            <div key={step.key} style={{ display: "flex", alignItems: "center", flex: i < mainSteps.length - 1 ? 1 : undefined, minWidth: 0 }}>
-                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.25rem", minWidth: "4.5rem" }}>
-                                <div style={{
-                                  width: 28, height: 28, borderRadius: "50%",
-                                  background: color, border: `2px solid ${color}`,
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                  fontSize: "0.75rem", fontWeight: 700, color: "#fff",
-                                  flexShrink: 0,
-                                }}>
-                                  {isDone ? "✓" : i + 1}
-                                </div>
-                                <span style={{ fontSize: "0.68rem", color: labelColor, textAlign: "center", whiteSpace: "nowrap" }}>
-                                  {isRiesgo ? "Riesgo stock" : step.label}
-                                </span>
-                              </div>
-                              {i < mainSteps.length - 1 && (
-                                <div style={{
-                                  flex: 1, height: 2, margin: "0 0.15rem", marginBottom: "1.1rem",
-                                  background: i < currentIdx ? "#22c55e" : "rgba(255,255,255,0.15)",
-                                  minWidth: "1.5rem",
-                                }} />
-                              )}
-                            </div>
-                          );
-                        })}
-                        {c.estado === "descartada" && (
-                          <span style={{ fontSize: "0.8rem", color: "#ef4444", fontWeight: 600, marginLeft: "0.75rem" }}>
-                            ✗ Descartada
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Hero */}
-                      <div className={`ire-hero ire-hero-${nc}`} style={{ flexWrap: "wrap", gap: "1rem" }}>
-                        <div className="ire-left" style={{ flex: "1 1 280px" }}>
-                          <div className="ire-label" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
-                            <span>Campaña detectada</span>
-                            {c.scope && (
-                              <span style={{
-                                fontSize: "0.7rem", fontWeight: 700, padding: "0.15rem 0.5rem",
-                                borderRadius: "999px", background: "rgba(255,255,255,0.2)",
-                                textTransform: "uppercase", letterSpacing: "0.05em",
-                              }}>
-                                {c.scope === "focalizada"
-                                  ? `Focalizada · ${c.foco_tipo ?? "segmento"}`
-                                  : "Alcance global"}
-                              </span>
-                            )}
-                            {c.foco_nombre && (
-                              <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>— {c.foco_nombre}</span>
-                            )}
-                          </div>
-
-                          <div className="ire-score-row" style={{ gap: "0.75rem", flexWrap: "wrap" }}>
-                            <span className={`ire-nivel ire-nivel-${nc}`}>
-                              {NIVEL_LABEL[c.nivel] ?? c.nivel}
-                            </span>
-                            {c.confidence_pct != null && (
-                              <span style={{ fontSize: "0.9rem", opacity: 0.8 }}>
-                                Confianza {c.confidence_pct}%
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Metrics */}
-                          <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", marginTop: "0.75rem" }}>
-                            {c.uplift_ratio != null && (
-                              <div>
-                                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Uplift</div>
-                                <div style={{ fontWeight: 700, fontSize: "1.1rem" }}>{c.uplift_ratio.toFixed(2)}×</div>
-                              </div>
-                            )}
-                            {(c.impacto_estimado_soles ?? 0) > 0 && (
-                              <div>
-                                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Impacto global</div>
-                                <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
-                                  S/ {(c.impacto_estimado_soles ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                                </div>
-                              </div>
-                            )}
-                            {(c.impacto_estimado_soles_focalizado ?? 0) > 0 && (
-                              <div>
-                                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Impacto focalizado</div>
-                                <div style={{ fontWeight: 700, fontSize: "1.05rem" }}>
-                                  S/ {(c.impacto_estimado_soles_focalizado ?? 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
-                                </div>
-                              </div>
-                            )}
-                            <div>
-                              <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Estado</div>
-                              <div style={{ fontWeight: 600 }}>{ESTADO_LABEL[c.estado] ?? c.estado}</div>
-                            </div>
-                            {c.fecha_inicio && (
-                              <div>
-                                <div style={{ fontSize: "0.7rem", opacity: 0.7, marginBottom: "0.15rem" }}>Desde</div>
-                                <div style={{ fontWeight: 600 }}>{c.fecha_inicio}</div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Confirm / Discard */}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", minWidth: "152px" }}>
-                          {c.confirmada_por_admin == null ? (
-                            <>
-                              <button
-                                className="pred-btn"
-                                disabled={campanaFeedbackLoading}
-                                onClick={() => {
-                                  submitCampanaFeedback(c.id, "confirmar").catch(() => undefined);
-                                }}
-                                style={{ background: "#22c55e", color: "#fff", border: "none", fontWeight: 600, padding: "0.55rem 1rem" }}
-                              >
-                                {campanaFeedbackLoading ? "…" : "✓ Confirmar"}
-                              </button>
-                              <button
-                                className="pred-btn"
-                                disabled={campanaFeedbackLoading}
-                                onClick={() => {
-                                  submitCampanaFeedback(c.id, "descartar").catch(() => undefined);
-                                }}
-                                style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.28)", fontWeight: 600, padding: "0.55rem 1rem" }}
-                              >
-                                {campanaFeedbackLoading ? "…" : "✗ Descartar"}
-                              </button>
-                            </>
-                          ) : (
-                            <div style={{
-                              padding: "0.6rem 0.9rem", borderRadius: "0.5rem", fontWeight: 600, fontSize: "0.85rem",
-                              background: c.confirmada_por_admin ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)",
-                            }}>
-                              {c.confirmada_por_admin ? "✓ Confirmada" : "✗ Descartada"}
-                              {c.admin_nota && (
-                                <p style={{ margin: "0.3rem 0 0", opacity: 0.8, fontSize: "0.78rem", fontWeight: 400 }}>
-                                  {c.admin_nota}
-                                </p>
-                              )}
-                            </div>
-                          )}
-                          <button
-                            className="pred-btn"
-                            style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem", opacity: 0.7 }}
-                            onClick={() => {
-                loadCampana().catch(() => undefined);
-              }}
-                          >
-                            Actualizar
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Recommendation */}
-                      {c.recomendacion && (
-                        <div className="pred-warning" style={{
-                          background: "rgba(234,179,8,0.07)",
-                          border: "1px solid rgba(234,179,8,0.28)",
-                          borderRadius: "0.75rem", padding: "0.85rem 1rem",
-                          fontSize: "0.9rem", lineHeight: 1.6,
-                        }}>
-                          <strong>Recomendación · </strong>{c.recomendacion}
-                        </div>
-                      )}
-
-                      {/* Top products */}
-                      {c.top_productos_detalle && c.top_productos_detalle.length > 0 && (
-                        <section>
-                          <h3 className="pred-section-title" style={{ marginBottom: "0.65rem" }}>
-                            Top productos con mayor actividad
-                          </h3>
-                          <div className="pred-table-wrapper">
-                            <table className="admin-table pred-table">
-                              <thead>
-                                <tr>
-                                  <th>Producto</th>
-                                  <th>Categoría</th>
-                                  <th>Uplift</th>
-                                  <th>Ventas recientes</th>
-                                  <th>Ventas esperadas</th>
-                                  <th>Impacto S/</th>
-                                  <th>Stock</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {c.top_productos_detalle.map((p) => (
-                                  <tr
-                                    key={p.producto_id}
-                                    className={p.stock_actual === 0 ? "pred-row-alert" : ""}
-                                  >
-                                    <td style={{ fontWeight: 600 }}>{p.nombre}</td>
-                                    <td>{p.categoria}</td>
-                                    <td>
-                                      <span className={`pred-estado-badge ${p.uplift_ratio >= 2 ? "critico" : p.uplift_ratio >= 1.5 ? "alerta" : ""}`}>
-                                        {p.uplift_ratio.toFixed(2)}×
-                                      </span>
-                                    </td>
-                                    <td>{p.ventas_recientes.toFixed(1)} uds</td>
-                                    <td>{p.ventas_baseline.toFixed(1)} uds</td>
-                                    <td style={{ fontWeight: 600, color: (p.impacto_soles ?? 0) > 0 ? "#22c55e" : undefined }}>
-                                      {(p.impacto_soles ?? 0) > 0
-                                        ? `S/ ${(p.impacto_soles!).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                                        : "—"}
-                                    </td>
-                                    <td style={{
-                                      fontWeight: 600,
-                                      color: p.stock_actual === 0 ? "#ef4444"
-                                        : (p.stock_actual ?? 999) < 5 ? "#f59e0b"
-                                        : undefined,
-                                    }}>
-                                      {p.stock_actual ?? "—"}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </section>
-                      )}
-                    </>
-                  );
-                })()}
-
-                {/* ── Historial ── */}
-                {campanaData.historial.length > 0 && (
-                  <section>
-                    <h3 className="pred-section-title" style={{ marginBottom: "0.65rem" }}>
-                      Historial de campañas detectadas
-                    </h3>
-                    <div className="pred-table-wrapper">
-                      <table className="admin-table pred-table">
-                        <thead>
-                          <tr>
-                            <th>Fecha</th>
-                            <th>Nivel</th>
-                            <th>Scope</th>
-                            <th>Foco</th>
-                            <th>Uplift</th>
-                            <th>Impacto S/</th>
-                            <th>Estado</th>
-                            <th>Admin</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {campanaData.historial.map((h) => {
-                            const nivelBadge: Record<string, string> = {
-                              alta: "critico", media: "alerta", baja: "alerta",
-                            };
-                            const impacto = h.scope === "focalizada" && (h.impacto_estimado_soles_focalizado ?? 0) > 0
-                              ? h.impacto_estimado_soles_focalizado ?? 0
-                              : h.impacto_estimado_soles ?? 0;
-                            return (
-                              <tr key={h.id}>
-                                <td>{h.fecha_deteccion}</td>
-                                <td>
-                                  <span className={`pred-estado-badge ${nivelBadge[h.nivel] ?? ""}`}>
-                                    {h.nivel}
-                                  </span>
-                                </td>
-                                <td>{h.scope ?? "—"}</td>
-                                <td style={{ fontSize: "0.83rem" }}>
-                                  {h.foco_nombre ? `${h.foco_tipo}: ${h.foco_nombre}` : "—"}
-                                </td>
-                                <td>{h.uplift_ratio != null ? `${h.uplift_ratio.toFixed(2)}×` : "—"}</td>
-                                <td>{impacto > 0 ? `S/ ${impacto.toLocaleString("es-PE", { minimumFractionDigits: 2 })}` : "—"}</td>
-                                <td>{ESTADO_LABEL[h.estado] ?? h.estado}</td>
-                                <td style={{ fontSize: "0.8rem", opacity: 0.85 }}>
-                                  {h.confirmada_por_admin === true
-                                    ? "✓ Confirmada"
-                                    : h.confirmada_por_admin === false
-                                    ? "✗ Descartada"
-                                    : "Pendiente"}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </section>
-                )}
-              </div>
-            );
-          })()}
+          {!campanaLoading && campanaFetched && campanaData && (
+            <CampanasPanelBody
+              data={campanaData}
+              feedbackLoading={campanaFeedbackLoading}
+              onFeedback={runCampanaFeedback}
+              onRefresh={refreshCampanaData}
+            />
+          )}
 
           {/* ── Panel de aprendizaje por feedback (independiente de campanaData) ── */}
           {learningStats && (
