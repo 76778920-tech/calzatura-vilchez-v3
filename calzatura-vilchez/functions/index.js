@@ -670,7 +670,7 @@ exports.stripeWebhook = onRequest(
               stripeSessionId: session.id,
               pagadoEn: new Date().toISOString(),
             });
-            void logAuditFn(
+            await logAuditFn(
               supabase,
               "cambiar_estado",
               "pedido",

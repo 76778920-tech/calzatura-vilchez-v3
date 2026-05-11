@@ -479,199 +479,6 @@ function generarRecomendaciónes(predictions: Prediction[]): Recomendación[] {
   return recs.sort((a, b) => order[a.tipo] - order[b.tipo]);
 }
 
-function generateAIResponse(
-  message: string,
-  predictions: Prediction[],
-  revenueForecast: RevenueForecast | null,
-): string {
-  const msg = message.toLowerCase();
-  const withHistory = predictions.filter((p) => !p.sin_historial);
-  const sinHistorial = predictions.filter((p) => p.sin_historial);
-  const inRisk = withHistory.filter((p) => p.riesgo_agotamiento);
-  const criticos = withHistory.filter((p) => p.nivel_riesgo === "critico");
-  const atencion = withHistory.filter((p) => p.nivel_riesgo === "atencion");
-  const outOfStock = withHistory.filter((p) => p.stock_actual === 0);
-  const highDemand = withHistory.filter((p) => p.alta_demanda);
-  const subiendo = withHistory.filter((p) => p.tendencia === "subiendo");
-  const bajando = withHistory.filter((p) => p.tendencia === "bajando");
-  const estables = withHistory.filter((p) => p.tendencia === "estable");
-
-  // ── Riesgo / stock ──────────────────────────────────────────────────────────
-  if (msg.includes("riesgo") || msg.includes("agota") || msg.includes("stock") || msg.includes("queda") || msg.includes("inventario") || msg.includes("sin stock") || msg.includes("se acaba")) {
-    if (outOfStock.length === 0 && inRisk.length === 0 && criticos.length === 0) {
-      return `El inventario se encuentra en buen estado en este momento.\n\nDe los ${withHistory.length} productos con historial de ventas, ninguno presenta riesgo crítico de agotamiento. Todos cuentan con cobertura de stock suficiente para los próximos días según el ritmo de ventas actual.\n\n${sinHistorial.length > 0 ? `Hay ${sinHistorial.length} producto(s) sin ventas registradas aún, por lo que no se puede proyectar su consumo todavía.` : ""}`;
-    }
-
-    const lines: string[] = [];
-
-    if (outOfStock.length > 0) {
-      lines.push(`PRODUCTOS SIN STOCK (${outOfStock.length}):`);
-      outOfStock.forEach((p) => {
-        lines.push(`  • ${p.nombre} (${p.codigo || "sin código"}) — Se vendían ~${formatUnits(p.consumo_estimado_diario)} unidades por día. Cada día sin stock representa ventas perdidas. Requiere reposición inmediata.`);
-      });
-    }
-
-    if (criticos.length > 0) {
-      lines.push(`\nRIESGO CRÍTICO — SE AGOTAN EN MENOS DE 7 DÍAS (${criticos.length}):`);
-      criticos.forEach((p) => {
-        lines.push(`  • ${p.nombre} — Stock actual: ${p.stock_actual} uds. Consumo estimado: ${formatUnits(p.consumo_estimado_diario)} uds/día. Le quedan aproximadamente ${p.dias_hasta_agotarse} días. Coordinar pedido urgente al proveedor.`);
-      });
-    }
-
-    if (atencion.length > 0) {
-      lines.push(`\nATENCIÓN — REPOSICIÓN EN LOS PRÓXIMOS DÍAS (${atencion.length}):`);
-      atencion.slice(0, 4).forEach((p) => {
-        lines.push(`  • ${p.nombre} — Stock: ${p.stock_actual} uds. Dura ~${p.dias_hasta_agotarse} días al ritmo actual de ${formatUnits(p.consumo_estimado_diario)} uds/día.`);
-      });
-    }
-
-    lines.push(`\nRECOMENDACIÓN: Priorizar los pedidos en el orden indicado arriba. Los productos sin stock generan pérdida de ventas directa. Los críticos deben pedirse hoy mismo para evitar quiebre de stock.`);
-    return lines.join("\n");
-  }
-
-  // ── Ingresos / proyección financiera ────────────────────────────────────────
-  if (msg.includes("ingreso") || msg.includes("venta") || msg.includes("dinero") || msg.includes("ganancia") || msg.includes("proyecc") || msg.includes("financ") || msg.includes("cuánto") || msg.includes("cuanto") || msg.includes("factura") || msg.includes("recaudar") || msg.includes("cobrar")) {
-    if (!revenueForecast) {
-      return `La proyección de ingresos aún no está disponible en este momento.\n\nEsto puede deberse a que el módulo financiero está actualizándose. Puede reintentar recargando la página en unos segúndos.`;
-    }
-    const s = revenueForecast.summary;
-    const dir = s.crecimiento_estimado_pct >= 0 ? "+" : "";
-    const tendenciaTexto = s.tendencia === "subiendo"
-      ? "Los ingresos muestran una tendencia positiva respecto al período anterior."
-      : s.tendencia === "bajando"
-      ? "Los ingresos muestran una tendencia a la baja. Se recomienda revisar estrategias de ventas."
-      : "Los ingresos se mantienen estables sin variación significativa.";
-    const confianzaTexto = s.confianza >= CONFIDENCE_ALTA_MIN
-      ? "La proyección tiene alta confiabilidad basada en el historial disponible."
-      : s.confianza >= CONFIDENCE_MEDIA_MIN
-      ? "La proyección es moderada. A mayor historial de ventas, más precisa será."
-      : "La proyección es estimada. Se necesita más historial de ventas para mayor precisión.";
-
-    return `PROYECCIÓN DE INGRESOS — PRÓXIMOS 30 DÍAS\n\nResumen ejecutivo:\n  • Ingreso estimado próxima semana: S/ ${s.proximo_7_dias.toFixed(2)}\n  • Ingreso estimado próximo mes: S/ ${s.proximo_30_dias.toFixed(2)}\n  • Comparado con los últimos 30 días reales (S/ ${s.ultimo_30_dias.toFixed(2)}): ${dir}${s.crecimiento_estimado_pct.toFixed(1)}%\n\nPromedios:\n  • Ingreso diario histórico: S/ ${s.promedio_diario_historico.toFixed(2)}\n  • Ingreso diario proyectado: S/ ${s.promedio_diario_proyectado.toFixed(2)}\n\nTendencia: ${s.tendencia.toUpperCase()}\n${tendenciaTexto}\n\nConfianza del modelo: ${s.confianza}%\n${confianzaTexto}\n\nNOTA: Esta proyección se basa en el comportamiento histórico de ventas y ajusta el ritmo según la estacionalidad por día de semana. No incluye factores externos como campañas promocionales o cambios en el mercado.`;
-  }
-
-  // ── Alta demanda / mejores productos ────────────────────────────────────────
-  if (msg.includes("demanda") || msg.includes("popular") || msg.includes("mejor") || msg.includes("mas vendido") || msg.includes("más vendido") || msg.includes("estrella") || msg.includes("top") || msg.includes("más se vende") || msg.includes("mas se vende") || msg.includes("más rotan") || msg.includes("rotan")) {
-    if (highDemand.length === 0) {
-      return `Actualmente no se detectan productos con alta demanda en el período analizado.\n\nEsto puede significar que las ventas están distribuidas uniformemente entre los productos, o que el volumen general de ventas es bajo. Se recomienda revisar si hay oportunidades de promoción para activar la rotación.`;
-    }
-    const lines = [`PRODUCTOS CON ALTA DEMANDA (${highDemand.length} identificados):\n`];
-    highDemand.slice(0, 6).forEach((p, i) => {
-      lines.push(`${i + 1}. ${p.nombre} (${p.codigo || "sin código"})`);
-      lines.push(`   Consumo estimado: ${formatUnits(p.consumo_estimado_diario)} uds/día — ${formatUnits(p.prediccion_semanal)} uds/semana`);
-      lines.push(`   Tendencia: ${p.tendencia} | Stock actual: ${p.stock_actual} uds | Cobertura: ${p.stock_actual === 0 ? "SIN STOCK" : p.dias_hasta_agotarse >= 999 ? "amplia" : `~${p.dias_hasta_agotarse} días`}`);
-      lines.push(`   Ventas últimos 30 días: ${formatUnits(p.ventas_30_dias)} unidades\n`);
-    });
-    lines.push(`RECOMENDACIÓN: Asegúrese de mantener stock suficiente en estos productos, especialmente los que muestran tendencia al alza. Son los que generan la mayor parte de los ingresos y su quiebre de stock tendría el mayor impacto económico.`);
-    return lines.join("\n");
-  }
-
-  // ── Recomendaciónes ─────────────────────────────────────────────────────────
-  if (msg.includes("recomend") || msg.includes("consejo") || msg.includes("qué hacer") || msg.includes("que hacer") || msg.includes("que debo") || msg.includes("accion") || msg.includes("acción") || msg.includes("pedir") || msg.includes("comprar") || msg.includes("reponer") || msg.includes("proveed")) {
-    const recs = generarRecomendaciónes(predictions);
-    if (recs.length === 0) {
-      return `En este momento no hay acciones urgentes requeridas.\n\nEl inventario se encuentra en un estado saludable: los productos con mayor demanda cuentan con stock suficiente y no se detectan quiebres inminentes. Se recomienda mantener el monitoreo regular y revisar el panel cada semana para anticipar cualquier cambio en el ritmo de ventas.`;
-    }
-    const urgent = recs.filter((r) => r.tipo === "urgente");
-    const atenc = recs.filter((r) => r.tipo === "atencion");
-    const oport = recs.filter((r) => r.tipo === "oportunidad");
-    const calm = recs.filter((r) => r.tipo === "tranquilo");
-    const lines: string[] = ["PLAN DE ACCIÓN RECOMENDADO:\n"];
-
-    if (urgent.length > 0) {
-      lines.push(`🔴 URGENTE — Hacer hoy mismo (${urgent.length}):`);
-      urgent.forEach((r) => {
-        lines.push(`  • ${r.producto}: ${r.detalle}`);
-        lines.push(`    → ${r.accion}`);
-      });
-    }
-    if (atenc.length > 0) {
-      lines.push(`\n🟡 ESTA SEMANA — Coordinar con proveedor (${atenc.length}):`);
-      atenc.forEach((r) => {
-        lines.push(`  • ${r.producto}: ${r.detalle}`);
-        lines.push(`    → ${r.accion}`);
-      });
-    }
-    if (oport.length > 0) {
-      lines.push(`\n🟢 OPORTUNIDAD — Aprovechar el momento (${oport.length}):`);
-      oport.forEach((r) => {
-        lines.push(`  • ${r.producto}: ${r.detalle}`);
-        lines.push(`    → ${r.accion}`);
-      });
-    }
-    if (calm.length > 0) {
-      lines.push(`\n⚪ SIN URGENCIA — Mantener seguimiento (${calm.length}):`);
-      calm.forEach((r) => {
-        lines.push(`  • ${r.producto}: ${r.detalle}`);
-      });
-    }
-    lines.push(`\nPRIORIDAD GENERAL: Atender primero los casos urgentes para evitar pérdida de ventas. Luego coordinar los pedidos de la semana de forma ordenada.`);
-    return lines.join("\n");
-  }
-
-  // ── Tendencias ──────────────────────────────────────────────────────────────
-  if (msg.includes("tendencia") || msg.includes("trend") || msg.includes("sube") || msg.includes("baja") || msg.includes("comportamiento") || msg.includes("creciendo") || msg.includes("decayendo") || msg.includes("subiendo") || msg.includes("bajando")) {
-    const lines = [`ANÁLISIS DE TENDENCIAS DEL NEGOCIO:\n`];
-    lines.push(`Comportamiento del inventario (${withHistory.length} productos con historial):\n`);
-    if (subiendo.length > 0) {
-      lines.push(`📈 SUBIENDO (${subiendo.length} productos) — Mayor demanda que el período anterior:`);
-      subiendo.slice(0, 4).forEach((p) => lines.push(`   • ${p.nombre}: ${formatUnits(p.consumo_estimado_diario)} uds/día`));
-    }
-    if (estables.length > 0) {
-      lines.push(`\n➡ ESTABLES (${estables.length} productos) — Demanda constante y predecible:`);
-      estables.slice(0, 3).forEach((p) => lines.push(`   • ${p.nombre}: ${formatUnits(p.consumo_estimado_diario)} uds/día`));
-    }
-    if (bajando.length > 0) {
-      lines.push(`\n📉 BAJANDO (${bajando.length} productos) — Menor demanda que el período anterior:`);
-      bajando.slice(0, 3).forEach((p) => lines.push(`   • ${p.nombre}: consumo actual ${formatUnits(p.consumo_estimado_diario)} uds/día`));
-      lines.push(`   → Evaluar si conviene hacer promociones para activar la rotación o evitar sobrestock.`);
-    }
-    if (revenueForecast) {
-      const s = revenueForecast.summary;
-      lines.push(`\nTendencia de ingresos: ${s.tendencia.toUpperCase()}`);
-      lines.push(`Los ingresos proyectados para el próximo mes son ${formatCurrency(s.proximo_30_dias)}, con una variación de ${formatPercent(s.crecimiento_estimado_pct)} respecto a los últimos 30 días.`);
-    }
-    return lines.join("\n");
-  }
-
-  // ── Resumen general ─────────────────────────────────────────────────────────
-  if (msg.includes("resumen") || msg.includes("total") || msg.includes("cuántos") || msg.includes("cuantos") || msg.includes("estado") || msg.includes("general") || msg.includes("situaci") || msg.includes("panorama") || msg.includes("overview") || msg.includes("cómo estamos") || msg.includes("como estamos")) {
-    const s = revenueForecast?.summary;
-    const nivelAlerta = outOfStock.length > 0 || criticos.length > 0 ? "REQUIERE ATENCIÓN INMEDIATA" : inRisk.length > 0 ? "ATENCIÓN ESTA SEMANA" : "SITUACIÓN SALUDABLE";
-    const lines = [
-      `RESUMEN EJECUTIVO — ESTADO ACTUAL DEL NEGOCIO\n`,
-      `Nivel de alerta: ${nivelAlerta}\n`,
-      `INVENTARIO:`,
-      `  • Total de productos en catálogo: ${predictions.length}`,
-      `  • Productos con historial de ventas: ${withHistory.length}`,
-      `  • Sin ventas registradas aún: ${sinHistorial.length}`,
-      `  • Sin stock (agotados): ${outOfStock.length}`,
-      `  • Riesgo crítico (menos de 7 días): ${criticos.length}`,
-      `  • Requieren atención esta semana: ${atencion.length}`,
-      `  • Alta demanda activa: ${highDemand.length}`,
-      `  • Tendencia subiendo: ${subiendo.length} | Bajando: ${bajando.length} | Estable: ${estables.length}`,
-    ];
-    if (s) {
-      lines.push(`\nPROYECCIÓN FINANCIERA:`);
-      lines.push(`  • Ingreso estimado próxima semana: ${formatCurrency(s.proximo_7_dias)}`);
-      lines.push(`  • Ingreso estimado próximo mes: ${formatCurrency(s.proximo_30_dias)}`);
-      lines.push(`  • Variación vs últimos 30 días: ${formatPercent(s.crecimiento_estimado_pct)}`);
-      lines.push(`  • Tendencia de ingresos: ${s.tendencia}`);
-    }
-    if (outOfStock.length > 0 || criticos.length > 0) {
-      lines.push(`\nACCIÓN PRIORITARIA: Hay ${outOfStock.length + criticos.length} producto(s) que requieren pedido urgente al proveedor para evitar pérdida de ventas.`);
-    } else {
-      lines.push(`\nSin alertas críticas por el momento. Se recomienda revisar el panel semanalmente.`);
-    }
-    return lines.join("\n");
-  }
-
-  // ── Ayuda / fallback ─────────────────────────────────────────────────────────
-  return `Hola, soy el asistente de análisis de Calzatura Vilchez. Puedo ayudarle con información detallada sobre:\n\n• "¿Qué productos están en riesgo de agotarse?" — análisis completo del inventario crítico\n• "¿Cuánto vamos a ingresar el próximo mes?" — proyección financiera detallada\n• "¿Qué productos tienen más demanda?" — ranking de los más vendidos\n• "¿Qué debo hacer ahora?" — plan de acción priorizado\n• "¿Cómo están las tendenciasí" — análisis de comportamiento por producto\n• "Dame un resumen general" — estado ejecutivo completo del negocio\n\nEscriba su consulta y le respondo con el análisis correspondiente.`;
-}
-
-void generateAIResponse;
-
 function normalizeChatTextV2(value: string) {
   return value
     .toLowerCase()
@@ -791,14 +598,34 @@ function buildAssistantContextV2(predictions: Prediction[]): AssistantContextV2 
   };
 }
 
+function productDetailCoverageDescrV2(product: Prediction): string {
+  if (product.stock_actual === 0) return "ya no tiene stock";
+  if (product.dias_hasta_agotarse >= 999) return "tiene una cobertura amplia";
+  return `tiene cobertura para unos ${product.dias_hasta_agotarse} días`;
+}
+
+function productDetailRecommendationV2(product: Prediction): string {
+  if (product.stock_actual === 0) return "Mi recomendación es reponerlo cuanto antes para no seguir perdiendo ventas.";
+  if (product.alerta_stock || product.nivel_riesgo === "critico") {
+    return "Mi recomendación es priorizarlo en el siguiente pedido.";
+  }
+  if (product.alta_demanda) return "Mi recomendación es seguirlo de cerca porque viene rotando bien.";
+  return "Mi recomendación es mantener un seguimiento normal por ahora.";
+}
+
+function productDetailTrendInterpretV2(t: Prediction["tendencia"]): string {
+  if (t === "subiendo") {
+    return "Eso significa que el producto viene acelerando su salida y conviene vigilarlo más de cerca.";
+  }
+  if (t === "bajando") {
+    return "Eso significa que su salida se esta enfríando y no hace falta apresurar una compra grande.";
+  }
+  return "Eso significa que, por ahora, su ritmo de venta se mantiene bastante estable.";
+}
+
 function buildProductDetailResponseV2(product: Prediction) {
   const label = `${product.nombre}${product.codigo ? ` (${product.codigo})` : ""}`;
-  const coverage =
-    product.stock_actual === 0
-      ? "ya no tiene stock"
-      : product.dias_hasta_agotarse >= 999
-      ? "tiene una cobertura amplia"
-      : `tiene cobertura para unos ${product.dias_hasta_agotarse} días`;
+  const coverage = productDetailCoverageDescrV2(product);
 
   if (product.sin_historial) {
     return [
@@ -811,13 +638,7 @@ function buildProductDetailResponseV2(product: Prediction) {
     ].join("\n");
   }
 
-  const recommendation = product.stock_actual === 0
-    ? "Mi recomendación es reponerlo cuanto antes para no seguir perdiendo ventas."
-    : product.alerta_stock || product.nivel_riesgo === "critico"
-    ? "Mi recomendación es priorizarlo en el siguiente pedido."
-    : product.alta_demanda
-    ? "Mi recomendación es seguirlo de cerca porque viene rotando bien."
-    : "Mi recomendación es mantener un seguimiento normal por ahora.";
+  const recommendation = productDetailRecommendationV2(product);
 
   return [
     `Producto analizado: ${label}`,
@@ -837,15 +658,538 @@ function buildProductDetailResponseV2(product: Prediction) {
     `- Confianza del cálculo: ${product.confianza}%`,
     "",
     "Interpretación:",
-    product.tendencia === "subiendo"
-      ? "Eso significa que el producto viene acelerando su salida y conviene vigilarlo más de cerca."
-      : product.tendencia === "bajando"
-      ? "Eso significa que su salida se esta enfríando y no hace falta apresurar una compra grande."
-      : "Eso significa que, por ahora, su ritmo de venta se mantiene bastante estable.",
+    productDetailTrendInterpretV2(product.tendencia),
     "",
     "Recomendación:",
     recommendation,
   ].join("\n");
+}
+
+const ASSISTANT_V2_RISK_TERMS = [
+  "riesgo", "agota", "agotarse", "stock", "inventario", "sin stock", "se acaba", "quiebre", "cobertura", "faltando", "faltan unidades",
+];
+const ASSISTANT_V2_REVENUE_TERMS = [
+  "ingreso", "ingresos", "ingresar", "dinero", "ganancia", "ganancias", "proyección", "proyecta", "proyectado", "financ", "recaudar", "cobrar",
+  "facturacion", "facturar", "vender", "ventas", "proximo mes", "proxima semana", "contable", "contabilidad",
+];
+const ASSISTANT_V2_DEMAND_TERMS = [
+  "demanda", "popular", "populares", "mas vendido", "mas vendidos", "mas se vende", "vende mas", "top", "estrella", "rotación", "rotan", "se venden", "alta demanda",
+];
+const ASSISTANT_V2_OVERSTOCK_TERMS = [
+  "sobrestock", "sobre stock", "stock acumulado", "stock de sobra", "rotacion lenta", "rotación lenta", "lenta rotacion", "lenta rotación",
+  "poca rotacion", "poca rotación", "inmovilizado",
+];
+const ASSISTANT_V2_CONFIDENCE_TERMS = [
+  "confianza", "confiable", "precision", "precisión", "preciso", "certeza", "que tan seguro", "fiable", "margen de error",
+];
+const ASSISTANT_V2_MOTOR_TERMS = [
+  "producto motor", "producto estrella", "motor", "lidera", "lider", "líder", "empuja", "sostiene la venta", "defenderias",
+];
+const ASSISTANT_V2_RECOMMENDATION_TERMS = [
+  "recomend", "consejo", "que hacer", "que debo", "accion", "acción", "pedir", "comprar", "reponer", "proveedor", "priorizar",
+];
+const ASSISTANT_V2_TREND_TERMS = [
+  "tendencia", "trend", "sube", "subiendo", "baja", "bajando", "comportamiento", "creciendo", "cae", "caida", "como va", "como van",
+];
+const ASSISTANT_V2_SUMMARY_TERMS = [
+  "resumen", "estado", "general", "situacion", "situación", "panorama", "overview", "como estamos", "estado actual", "resumen general",
+  "informe", "gerencia", "gerencial", "directiva", "junta directiva", "comite",
+];
+const ASSISTANT_V2_NO_HISTORY_TERMS = [
+  "sin historial", "sin ventas", "no tiene ventas", "sin movimiento", "sin rotación", "sin datos",
+];
+
+const ASSISTANT_V2_FALLBACK_HELP = [
+  "Puedo ayudarte a revisar ingresos, stock, demanda, tendencias y recomendaciones del negocio.",
+  "",
+  "Si el gerente necesita una explicación más clara, puedes preguntarme cualquiera de estas cosas y yo le respondo en lenguaje sencillo:",
+  "",
+  '- "Qué está pasando con el negocio este mes"',
+  '- "Qué significa para el negocio la proyección del próximo mes"',
+  '- "Qué recomiendas hacer ahora"',
+  '- "Dame un resumen general del negocio y explícamelo fácil"',
+  '- "Cuánto se proyecta ingresar el próximo mes y qué significa ese número"',
+  '- "Cuánto se espera vender la próxima semana"',
+  '- "Qué productos están en riesgo de agotarse y cuáles son los más urgentes"',
+  '- "Qué productos tienen más demanda y por qué son importantes"',
+  '- "Qué debo reponer primero y cuál sería el orden recomendado"',
+  '- "Cómo están las tendencias y qué decisión debería tomar"',
+  '- "Cuál es el producto más urgente para reponer esta semana"',
+  '- "Cuántos productos están en estado crítico hoy"',
+  '- "Compara el próximo mes contra el último mes real"',
+  '- "Qué productos sostienen más los ingresos del negocio"',
+  '- "Cómo va CV001"',
+  '- "Dame detalle de Zapatilla Running Pro"',
+  '- "Qué productos no tienen historial y qué implica eso"',
+  "",
+  "También puedo responder con cifras exactas, por ejemplo:",
+  '- "Dame el resumen con números exactos"',
+  '- "Qué productos están en riesgo con stock, consumo y días de cobertura"',
+  '- "Dame la proyección para junta directiva y área contable"',
+  '- "Dame un informe gerencial con cifras exactas"',
+  '- "Dame un resumen para contabilidad"',
+].join("\n");
+
+type AssistantIntentScoresV2 = {
+  product: number;
+  risk: number;
+  revenue: number;
+  demand: number;
+  overstock: number;
+  confidence: number;
+  motor: number;
+  recommendations: number;
+  trend: number;
+  summary: number;
+  noHistory: number;
+};
+
+function buildAssistantIntentScoresV2(
+  msg: string,
+  forcedIntent: AssistantIntentV2,
+  mentionedProductCount: number
+): AssistantIntentScoresV2 {
+  const productBoostTerms = [
+    ...ASSISTANT_V2_RISK_TERMS,
+    ...ASSISTANT_V2_DEMAND_TERMS,
+    ...ASSISTANT_V2_TREND_TERMS,
+    ...ASSISTANT_V2_RECOMMENDATION_TERMS,
+  ];
+  return {
+    product: mentionedProductCount > 0 ? 3 + countIntentMatches(msg, productBoostTerms) : 0,
+    risk: (forcedIntent === "risk" ? 100 : 0) + countIntentMatches(msg, ASSISTANT_V2_RISK_TERMS),
+    revenue: (forcedIntent === "revenue" ? 100 : 0) + countIntentMatches(msg, ASSISTANT_V2_REVENUE_TERMS),
+    demand: (forcedIntent === "demand" ? 100 : 0) + countIntentMatches(msg, ASSISTANT_V2_DEMAND_TERMS),
+    overstock: (forcedIntent === "overstock" ? 100 : 0) + countIntentMatches(msg, ASSISTANT_V2_OVERSTOCK_TERMS),
+    confidence: (forcedIntent === "confidence" ? 100 : 0) + countIntentMatches(msg, ASSISTANT_V2_CONFIDENCE_TERMS),
+    motor: (forcedIntent === "motor" ? 100 : 0) + countIntentMatches(msg, ASSISTANT_V2_MOTOR_TERMS),
+    recommendations: (forcedIntent === "recommendations" ? 100 : 0) + countIntentMatches(msg, ASSISTANT_V2_RECOMMENDATION_TERMS),
+    trend: countIntentMatches(msg, ASSISTANT_V2_TREND_TERMS),
+    summary: (forcedIntent === "summary" ? 100 : 0) + countIntentMatches(msg, ASSISTANT_V2_SUMMARY_TERMS) + (msg.includes("cuantos") ? 1 : 0),
+    noHistory: (forcedIntent === "noHistory" ? 100 : 0) + countIntentMatches(msg, ASSISTANT_V2_NO_HISTORY_TERMS),
+  };
+}
+
+function computeAssistantV2AsksRevenue(msg: string, intentScores: AssistantIntentScoresV2): boolean {
+  return (
+    intentScores.revenue > 0 ||
+    (((msg.includes("proximo mes") || msg.includes("proxima semana")) &&
+      (msg.includes("ingresar") || msg.includes("ingresos") || msg.includes("vender") || msg.includes("ventas") || msg.includes("facturar"))) ||
+      msg.includes("cuanto se proyecta"))
+  );
+}
+
+function assistantV2LabelOf(product: Prediction): string {
+  return `${product.nombre}${product.codigo ? ` (${product.codigo})` : ""}`;
+}
+
+function assistantV2JoinNatural(items: string[]): string {
+  if (items.length === 0) return "";
+  if (items.length === 1) return items[0];
+  if (items.length === 2) return `${items[0]} y ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
+}
+
+function assistantV2CoverageText(product: Prediction): string {
+  if (product.stock_actual === 0) return "sin stock";
+  if (product.dias_hasta_agotarse >= 999) return "con cobertura amplia";
+  return `con cobertura para unos ${product.dias_hasta_agotarse} dias`;
+}
+
+function assistantV2TrendText(trend: Prediction["tendencia"]): string {
+  if (trend === "subiendo") return "al alza";
+  if (trend === "bajando") return "a la baja";
+  return "estable";
+}
+
+type AssistantV2Shared = {
+  msg: string;
+  predictions: Prediction[];
+  revenueForecast: RevenueForecast | null;
+  context: AssistantContextV2;
+  intentScores: AssistantIntentScoresV2;
+  asksRevenue: boolean;
+  mentionedProducts: Prediction[];
+};
+
+function assistantV2TrySingleProduct(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.product >= 3 && shared.mentionedProducts.length === 1) {
+    return buildProductDetailResponseV2(shared.mentionedProducts[0]);
+  }
+  return null;
+}
+
+function assistantV2TryNoHistory(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.noHistory <= 0) return null;
+  const { noHistory } = shared.context;
+  if (noHistory.length === 0) {
+    return "Hoy todos los productos del catálogo ya tienen historial suficiente para analizarlos con normalidad. Eso ayuda a que las proyecciónes sean más útiles y más fáciles de interpretar.";
+  }
+  const lines = [
+    `Todavía hay ${noHistory.length} producto(s) sin historial suficiente.`,
+    "",
+    "Listado actual:",
+  ];
+  noHistory.slice(0, 8).forEach((p, index) => {
+    lines.push(`${index + 1}. ${assistantV2LabelOf(p)}: stock actual ${p.stock_actual} unidades.`);
+  });
+  lines.push("", "Interpretación:", "En la práctica, estos productos aún no tienen suficiente movimiento como para estimar si se venden rápido o lento.", "", "Implicancia para gerencia y contabilidad:", "Todavía no conviene tomar decisiones fuertes de compra o proyección basadas en ellos.", "", "Recomendación:", "En cuanto acumulen ventas reales, el panel podra calcular mejor su demanda, su nivel de reposición y su prioridad dentro del negocio.");
+  return lines.join("\n");
+}
+
+function assistantV2TryRisk(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.risk <= 0) return null;
+  const { withHistory, noHistory, inRisk, criticos, atencion, outOfStock, overstocked, slowMoving, urgentProducts } = shared.context;
+
+  if (outOfStock.length === 0 && inRisk.length === 0 && criticos.length === 0) {
+    if (overstocked.length > 0 || slowMoving.length > 0) {
+      return [
+        "Hoy no veo riesgo fuerte de quiebre de stock, pero tampoco diria que el inventario este sano del todo.",
+        "",
+        `No hay productos criticos por agotarse, pero si hay ${overstocked.length} con stock acumulado y ${slowMoving.length} con rotación lenta.`,
+        "",
+        "Interpretación:",
+        "Eso significa que el problema no es falta de mercadería, sino capital inmovilizado en productos que se están moviendo poco.",
+        "",
+        "Recomendación:",
+        "Conviene frenar compras en esos productos, revisar descuentos o empuje comercial y concentrar reposición solo en los que sí tienen salida real.",
+      ].join("\n");
+    }
+    return [
+      "Por ahora no veo un riesgo fuerte de quiebre de stock.",
+      "",
+      `De los ${withHistory.length} productos con historial, ninguno está en una situación crítica. El inventario se ve estable según el ritmo de ventas actual.`,
+      noHistory.length > 0
+        ? `Eso sí, todavía hay ${noHistory.length} producto(s) sin historial suficiente, así que conviene revisarlos aparte.`
+        : "No hay alertas graves en este momento.",
+      "",
+      "En términos gerenciales, eso significa que hoy no se ve una pérdida inmediata de ventas por falta de producto.",
+    ].join("\n");
+  }
+
+  const lines = [
+    "Resumen ejecutivo:",
+    `Hoy veo ${outOfStock.length} producto(s) sin stock, ${criticos.length} en nivel crítico y ${atencion.length} en atención.`,
+    "",
+    "Datos exactos:",
+    `- Productos con historial analizado: ${withHistory.length}`,
+    `- Sin stock: ${outOfStock.length}`,
+    `- Riesgo crítico: ${criticos.length}`,
+    `- En atención: ${atencion.length}`,
+    "",
+  ];
+
+  if (urgentProducts.length > 0) {
+    lines.push("Productos más urgentes:");
+    lines.push(`Lo más urgente ahora mismo es revisar ${assistantV2JoinNatural(urgentProducts.map((p) => assistantV2LabelOf(p)))}.`, "");
+  }
+
+  urgentProducts.forEach((p) => {
+    lines.push(`- ${assistantV2LabelOf(p)}: stock ${p.stock_actual}, consumo estimado ${formatUnits(p.consumo_estimado_diario)} por día, ${assistantV2CoverageText(p)}.`);
+  });
+
+  lines.push("", "Interpretación:", "En términos simples: estos son los productos con más probabilidad de hacerte perder ventas si no actúas pronto.", "", "Recomendación:", "Mi recomendación es priorizar primero los productos sin stock y luego los que ya están cerca de agotarse.");
+  return lines.join("\n");
+}
+
+function assistantV2TryRevenue(shared: AssistantV2Shared): string | null {
+  if (!shared.asksRevenue) return null;
+  const { revenueForecast } = shared;
+  if (!revenueForecast) {
+    return [
+      "Todavía no tengo una proyección de ingresos disponible.",
+      "",
+      "Puede pasar cuando el servicio aún se esta actualizando o cuando falta historial suficiente.",
+      "Prueba con refrescar el panel y volver a consultarme en unos segúndos.",
+    ].join("\n");
+  }
+
+  const s = revenueForecast.summary;
+  const horizonLabel = revenueForecast.horizon_days;
+  const change = formatPercent(s.crecimiento_estimado_horizonte_pct);
+  const directionSentence =
+    s.crecimiento_estimado_horizonte_pct >= 5
+      ? `Eso apunta a un periodo de ${horizonLabel} días mejor que el anterior.`
+      : s.crecimiento_estimado_horizonte_pct <= -5
+        ? `Eso apunta a un periodo de ${horizonLabel} días más flojo que el anterior.`
+        : `Eso apunta a un periodo de ${horizonLabel} días muy parecido al anterior.`;
+  const decisionSentence =
+    s.crecimiento_estimado_horizonte_pct >= 5
+      ? "La lectura gerencial sería mantener el ritmo y cuidar que no falte stock en los productos que mejor rotan."
+      : s.crecimiento_estimado_horizonte_pct <= -5
+        ? "La lectura gerencial sería revisar promociones, stock y productos de mayor salida para no dejar caer las ventas."
+        : "La lectura gerencial sería mantener el control actual y monitorear si aparece algún cambio importante.";
+  const confidenceSentence =
+    s.confianza >= CONFIDENCE_ALTA_MIN
+      ? "La estimación se ve bastante confiable con los datos que ya tiene el sistema."
+      : s.confianza >= CONFIDENCE_MEDIA_MIN
+        ? "La estimación es útil como guía, aúnque conviene mirarla con algo de cautela."
+        : "La estimación aún es preliminar, así que conviene usarla solo como orientación.";
+
+  return [
+    "Resumen ejecutivo:",
+    `Si el negocio sigue comportándose como hasta ahora, el próximo horizonte de ${horizonLabel} días podría cerrar alrededor de ${formatCurrency(s.proximo_horizonte)} en ingresos.`,
+    "",
+    "Datos exactos:",
+    `- Proyección próxima semana: ${formatCurrency(s.proximo_7_dias)}`,
+    `- Proyección horizonte actual (${horizonLabel} días): ${formatCurrency(s.proximo_horizonte)}`,
+    `- últimos ${horizonLabel} días reales: ${formatCurrency(s.ultimo_horizonte)}`,
+    `- Variación proyectada: ${change}`,
+    `- Promedio diario histórico: ${formatCurrency(s.promedio_diario_historico)}`,
+    `- Promedio diario proyectado: ${formatCurrency(s.promedio_diario_proyectado)}`,
+    `- Tendencia del ingreso: ${s.tendencia}`,
+    `- Confianza del cálculo: ${s.confianza}%`,
+    "",
+    "Interpretación:",
+    `En palabras simples: la próxima semana debería moverse cerca de ${formatCurrency(s.proximo_7_dias)} y, comparado con el último mes, hoy la proyección marca ${change}.`,
+    directionSentence,
+    "",
+    "Implicancia para la junta y contabilidad:",
+    `Como referencia, los últimos ${horizonLabel} días reales cerraron en ${formatCurrency(s.ultimo_horizonte)} y la proyección actual toma ese comportamiento como base para anticipar el siguiente periodo.`,
+    "",
+    "Recomendación:",
+    decisionSentence,
+    confidenceSentence,
+  ].join("\n");
+}
+
+function assistantV2TryDemand(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.demand <= 0) return null;
+  const { highDemand, topDemand } = shared.context;
+  if (highDemand.length === 0) {
+    return [
+      "Ahora mismo no hay un grupo claro de productos con alta demanda.",
+      "",
+      "Las ventas se ven más repartidas o el volumen general todavía no marca diferencias fuertes entre productos.",
+    ].join("\n");
+  }
+
+  const lines = [
+    "Resumen ejecutivo:",
+    `Los productos con mejor salida en este momento son ${assistantV2JoinNatural(topDemand.slice(0, 3).map((p) => assistantV2LabelOf(p)))}.`,
+    "",
+    "Datos exactos:",
+  ];
+
+  topDemand.forEach((p, index) => {
+    lines.push(
+      `${index + 1}. ${assistantV2LabelOf(p)}: ${formatUnits(p.consumo_estimado_diario)} unidades por día, ${formatUnits(p.prediccion_semanal)} proyectadas para la semana, ventas 30 días ${formatUnits(p.ventas_30_dias)} y ${assistantV2CoverageText(p)}.`,
+    );
+  });
+
+  lines.push("", "Interpretación:", "En términos gerenciales, aqui esta el grupo que hoy te sostiene mejor la rotación del negocio.", "", "Recomendación:", "Si vas a priorizar compras, estos son los productos que más conviene vigilar.");
+  return lines.join("\n");
+}
+
+function assistantV2TryOverstock(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.overstock <= 0) return null;
+  const { overstocked, slowMoving } = shared.context;
+  if (overstocked.length === 0 && slowMoving.length === 0) {
+    return [
+      "Hoy no veo una señal fuerte de sobrestock.",
+      "",
+      "No hay productos con capital claramente inmovilizado ni con una rotación tan baja como para frenar compras por ese motivo.",
+      "",
+      "Recomendación:",
+      "Puedes seguir comprando según demanda real y vigilar solo los productos que vayan entrando a tendencia bajista.",
+    ].join("\n");
+  }
+
+  const foco = [...new Set([...overstocked, ...slowMoving])].slice(0, 5);
+  const lines = [
+    "Resumen ejecutivo:",
+    `Detecto ${overstocked.length} producto(s) con sobrestock y ${slowMoving.length} con rotación lenta.`,
+    "",
+    "Productos donde conviene poner atención:",
+  ];
+
+  foco.forEach((p, index) => {
+    lines.push(
+      `${index + 1}. ${assistantV2LabelOf(p)}: stock ${p.stock_actual}, ventas 30 días ${formatUnits(p.ventas_30_dias)}, tendencia ${assistantV2TrendText(p.tendencia)} y ${assistantV2CoverageText(p)}.`,
+    );
+  });
+
+  lines.push("", "Interpretación:", "Aquí no estás perdiendo ventas por falta de mercadería; más bien hay dinero detenido en productos que se mueven más lento de lo deseado.", "", "Recomendación:", "Frena reposición en esos pares, mueve salida comercial con descuentos o vitrinas y prioriza compra solo en los de demanda comprobada.");
+  return lines.join("\n");
+}
+
+function assistantV2TryConfidence(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.confidence <= 0) return null;
+  const { revenueForecast } = shared;
+  if (!revenueForecast) {
+    return [
+      "Aún no tengo una proyección financiera consolidada para medir confianza.",
+      "",
+      "Cuando el servicio termine de calcular ingresos para el horizonte activo, te podré decir qué tan estable es la lectura y qué tanto conviene usarla para decidir.",
+    ].join("\n");
+  }
+
+  const s = revenueForecast.summary;
+  const confidenceLabel = formatConfidenceLabel(s.confianza);
+  const confidenceMeaning =
+    s.confianza >= CONFIDENCE_ALTA_MIN
+      ? "La señal es bastante sólida: el histórico y el comportamiento reciente van en una dirección consistente."
+      : s.confianza >= CONFIDENCE_MEDIA_MIN
+        ? "La señal sirve para decidir, pero todavía conviene contrastarla con criterio comercial y reposición semanal."
+        : "La señal todavía es inicial: úsala como orientación y no como verdad cerrada.";
+
+  return [
+    "Resumen ejecutivo:",
+    `La confianza actual de la proyección es ${confidenceLabel.toLowerCase()} (${s.confianza}%).`,
+    "",
+    "Qué significa eso:",
+    confidenceMeaning,
+    "",
+    "Datos que acompañan la lectura:",
+    `- Horizonte analizado: ${revenueForecast.horizon_days} días`,
+    `- Tendencia detectada: ${assistantV2TrendText(s.tendencia)}`,
+    `- Promedio diario histórico: ${formatCurrency(s.promedio_diario_historico)}`,
+    `- Promedio diario proyectado: ${formatCurrency(s.promedio_diario_proyectado)}`,
+    "",
+    "Recomendación:",
+    s.confianza >= CONFIDENCE_ALTA_MIN
+      ? "Puedes usar esta proyección como base fuerte para comité, reposición y seguimiento comercial."
+      : s.confianza >= CONFIDENCE_MEDIA_MIN
+        ? "Úsala como guía principal, pero acompáñala con revisión semanal del inventario crítico."
+        : "Úsala solo para orientar prioridades y espera más historial antes de tomar decisiones grandes.",
+  ].join("\n");
+}
+
+function assistantV2TryMotor(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.motor <= 0) return null;
+  const { topDemand } = shared.context;
+  if (!topDemand[0]) {
+    return [
+      "Todavía no puedo defender un producto motor claro.",
+      "",
+      "El historial disponible no marca un líder suficientemente fuerte en salida como para sostener una recomendación clara.",
+    ].join("\n");
+  }
+
+  const lider = topDemand[0];
+  return [
+    "Resumen ejecutivo:",
+    `${assistantV2LabelOf(lider)} es hoy el producto motor del panel.`,
+    "",
+    "Datos exactos:",
+    `- Consumo estimado diario: ${formatUnits(lider.consumo_estimado_diario)} unidades`,
+    `- Proyección semanal: ${formatUnits(lider.prediccion_semanal)} unidades`,
+    `- Ventas últimos 30 días: ${formatUnits(lider.ventas_30_dias)} unidades`,
+    `- Tendencia: ${assistantV2TrendText(lider.tendencia)}`,
+    `- Cobertura actual: ${assistantV2CoverageText(lider)}`,
+    "",
+    "Cómo lo defendería:",
+    "Es el par que mejor sostiene rotación y por eso conviene protegerle stock, visibilidad y margen antes que al resto.",
+    "",
+    "Recomendación:",
+    lider.stock_actual === 0 || lider.alerta_stock
+      ? "Asegura reposición inmediata porque este par no solo vende: también marca el ritmo del portafolio."
+      : "Mantén cobertura sana y evita descuentos innecesarios; es un producto que ya se defiende bien por demanda.",
+  ].join("\n");
+}
+
+function assistantV2TryRecommendations(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.recommendations <= 0) return null;
+  const { recomendaciones, topByRisk } = shared.context;
+  if (recomendaciones.length === 0) {
+    return [
+      "Por ahora no veo acciones urgentes.",
+      "",
+      "El inventario esta relativamente sano y no hay señales fuertes de quiebre inmediato.",
+      "Lo mejor seria seguir monitoreando el panel y revisar otra vez en cuanto entren nuevas ventas.",
+    ].join("\n");
+  }
+
+  const topActions = recomendaciones.slice(0, 4);
+  const lines = [
+    "Resumen ejecutivo:",
+    "Si tuviera que priorizar hoy, haria esto:",
+    "",
+    "Te lo ordeno desde lo más urgente hasta lo más conveniente para proteger ventas y evitar sobrestock.",
+    "",
+    "Plan recomendado:",
+  ];
+
+  topActions.forEach((rec, index) => {
+    lines.push(`${index + 1}. ${rec.producto}: ${rec.accion}`);
+    lines.push(`   Motivo: ${rec.detalle}`);
+  });
+
+  if (topByRisk.length > 0) {
+    lines.push("", "Soporte numerico:");
+    topByRisk.slice(0, 3).forEach((p) => {
+      lines.push(`- ${assistantV2LabelOf(p)}: stock ${p.stock_actual}, consumo ${formatUnits(p.consumo_estimado_diario)}/dia, riesgo ${p.nivel_riesgo}.`);
+    });
+  }
+
+  return lines.join("\n");
+}
+
+function assistantV2TryTrend(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.trend <= 0) return null;
+  const { subiendo, estables, bajando } = shared.context;
+  const { revenueForecast } = shared;
+  const lines = [
+    "Resumen ejecutivo:",
+    `En este momento tengo ${subiendo.length} producto(s) subiendo, ${estables.length} estables y ${bajando.length} bajando.`,
+    "",
+    "Datos exactos:",
+  ];
+
+  if (subiendo.length > 0) {
+    lines.push(`Los que mejor vienen creciendo son ${assistantV2JoinNatural(subiendo.slice(0, 3).map((p) => assistantV2LabelOf(p)))}.`);
+  }
+
+  if (bajando.length > 0) {
+    lines.push(`Los que muestran más enfríamiento son ${assistantV2JoinNatural(bajando.slice(0, 3).map((p) => assistantV2LabelOf(p)))}.`);
+  }
+
+  if (revenueForecast) {
+    lines.push(`En ingresos, la tendencia general está ${assistantV2TrendText(revenueForecast.summary.tendencia)} y la proyección del horizonte actual (${revenueForecast.horizon_days} días) es ${formatCurrency(revenueForecast.summary.proximo_horizonte)}.`);
+  }
+
+  lines.push("", "Interpretación:", "En términos simples: la tendencia te ayuda a ver si conviene acelerar compras, mantenerte igual o ser más conservador.");
+  return lines.join("\n");
+}
+
+function assistantV2TrySummary(shared: AssistantV2Shared): string | null {
+  if (shared.intentScores.summary <= 0) return null;
+  const { predictions, revenueForecast, context } = shared;
+  const { withHistory, noHistory, outOfStock, criticos, atencion, highDemand, subiendo, estables, bajando } = context;
+  const s = revenueForecast?.summary;
+  const lines = [
+    "Resumen ejecutivo:",
+    `Ahora mismo el negocio tiene ${predictions.length} productos analizados: ${withHistory.length} con historial y ${noHistory.length} sin historial suficiente.`,
+    "",
+    "Datos exactos:",
+    `- Productos sin stock: ${outOfStock.length}`,
+    `- Riesgo crítico: ${criticos.length}`,
+    `- En atención: ${atencion.length}`,
+    `- Alta demanda: ${highDemand.length}`,
+    `- Tendencia subiendo: ${subiendo.length}`,
+    `- Tendencia estable: ${estables.length}`,
+    `- Tendencia bajando: ${bajando.length}`,
+  ];
+
+  if (s) {
+    lines.push(`- Proyección de ingresos horizonte actual (${revenueForecast?.horizon_days ?? 30} días): ${formatCurrency(s.proximo_horizonte)}`);
+    lines.push(`- Variación estimada vs último horizonte: ${formatPercent(s.crecimiento_estimado_horizonte_pct)}`);
+  }
+
+  lines.push("", "Interpretación:");
+  if (outOfStock.length > 0 || criticos.length > 0) {
+    lines.push("La prioridad más clara es reponer los productos con riesgo alto para no perder ventas.");
+  } else {
+    lines.push("No veo alertas graves en este momento; el panorama general es bastante estable.");
+  }
+
+  lines.push("", "Recomendación:", "Si quieres, después de este resumen puedes preguntarme por ingresos, riesgo, tendencias o por un producto específico y te lo explico con más detalle.");
+  return lines.join("\n\n");
+}
+
+function assistantV2TryMentionedProduct(shared: AssistantV2Shared): string | null {
+  if (shared.mentionedProducts.length === 0) return null;
+  return buildProductDetailResponseV2(shared.mentionedProducts[0]);
 }
 
 function generateAIResponseV2(
@@ -857,575 +1201,33 @@ function generateAIResponseV2(
   const msg = normalizeChatTextV2(message);
   const forcedIntent = detectQuickPromptIntentV2(msg);
   const mentionedProducts = findMentionedProductsV2(message, predictions).slice(0, 3);
-  const {
-    withHistory,
-    noHistory,
-    inRisk,
-    criticos,
-    atencion,
-    outOfStock,
-    highDemand,
-    subiendo,
-    bajando,
-    estables,
-    overstocked,
-    slowMoving,
-    recomendaciones,
-    topByRisk,
-    urgentProducts,
-    topDemand,
-  } = context;
-
-  const labelOf = (product: Prediction) => `${product.nombre}${product.codigo ? ` (${product.codigo})` : ""}`;
-  const joinNatural = (items: string[]) => {
-    if (items.length === 0) return "";
-    if (items.length === 1) return items[0];
-    if (items.length === 2) return `${items[0]} y ${items[1]}`;
-    return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;
-  };
-  const coverageText = (product: Prediction) => {
-    if (product.stock_actual === 0) return "sin stock";
-    if (product.dias_hasta_agotarse >= 999) return "con cobertura amplia";
-    return `con cobertura para unos ${product.dias_hasta_agotarse} dias`;
-  };
-  const trendText = (trend: Prediction["tendencia"]) => {
-    if (trend === "subiendo") return "al alza";
-    if (trend === "bajando") return "a la baja";
-    return "estable";
+  const intentScores = buildAssistantIntentScoresV2(msg, forcedIntent, mentionedProducts.length);
+  const asksRevenue = computeAssistantV2AsksRevenue(msg, intentScores);
+  const shared: AssistantV2Shared = {
+    msg,
+    predictions,
+    revenueForecast,
+    context,
+    intentScores,
+    asksRevenue,
+    mentionedProducts,
   };
 
-  const riskTerms = [
-    "riesgo",
-    "agota",
-    "agotarse",
-    "stock",
-    "inventario",
-    "sin stock",
-    "se acaba",
-    "quiebre",
-    "cobertura",
-    "faltando",
-    "faltan unidades",
-  ];
-  const revenueTerms = [
-    "ingreso",
-    "ingresos",
-    "ingresar",
-    "dinero",
-    "ganancia",
-    "ganancias",
-    "proyección",
-    "proyecta",
-    "proyectado",
-    "financ",
-    "recaudar",
-    "cobrar",
-    "facturacion",
-    "facturar",
-    "vender",
-    "ventas",
-    "proximo mes",
-    "proxima semana",
-    "contable",
-    "contabilidad",
-  ];
-  const demandTerms = [
-    "demanda",
-    "popular",
-    "populares",
-    "mas vendido",
-    "mas vendidos",
-    "mas se vende",
-    "vende mas",
-    "top",
-    "estrella",
-    "rotación",
-    "rotan",
-    "se venden",
-    "alta demanda",
-  ];
-  const overstockTerms = [
-    "sobrestock",
-    "sobre stock",
-    "stock acumulado",
-    "stock de sobra",
-    "rotacion lenta", "rotación lenta",
-    "lenta rotacion", "lenta rotación",
-    "poca rotacion",  "poca rotación",
-    "inmovilizado",
-  ];
-  const confidenceTerms = [
-    "confianza",
-    "confiable",
-    "precision", "precisión",
-    "preciso",
-    "certeza",
-    "que tan seguro",
-    "fiable",
-    "margen de error",
-  ];
-  const motorTerms = [
-    "producto motor",
-    "producto estrella",
-    "motor",
-    "lidera",
-    "lider", "líder",
-    "empuja",
-    "sostiene la venta",
-    "defenderias",
-  ];
-  const recommendationTerms = ["recomend", "consejo", "que hacer", "que debo", "accion", "acción", "pedir", "comprar", "reponer", "proveedor", "priorizar"];
-  const trendTerms = ["tendencia", "trend", "sube", "subiendo", "baja", "bajando", "comportamiento", "creciendo", "cae", "caida", "como va", "como van"];
-  const summaryTerms = [
-    "resumen",
-    "estado",
-    "general",
-    "situacion", "situación",
-    "panorama",
-    "overview",
-    "como estamos",
-    "estado actual",
-    "resumen general",
-    "informe",
-    "gerencia",
-    "gerencial",
-    "directiva",
-    "junta directiva",
-    "comite",
-  ];
-  const noHistoryTerms = ["sin historial", "sin ventas", "no tiene ventas", "sin movimiento", "sin rotación", "sin datos"];
-
-  const intentScores = {
-    product: mentionedProducts.length > 0 ? 3 + countIntentMatches(msg, [...riskTerms, ...demandTerms, ...trendTerms, ...recommendationTerms]) : 0,
-    risk: (forcedIntent === "risk" ? 100 : 0) + countIntentMatches(msg, riskTerms),
-    revenue: (forcedIntent === "revenue" ? 100 : 0) + countIntentMatches(msg, revenueTerms),
-    demand: (forcedIntent === "demand" ? 100 : 0) + countIntentMatches(msg, demandTerms),
-    overstock: (forcedIntent === "overstock" ? 100 : 0) + countIntentMatches(msg, overstockTerms),
-    confidence: (forcedIntent === "confidence" ? 100 : 0) + countIntentMatches(msg, confidenceTerms),
-    motor: (forcedIntent === "motor" ? 100 : 0) + countIntentMatches(msg, motorTerms),
-    recommendations: (forcedIntent === "recommendations" ? 100 : 0) + countIntentMatches(msg, recommendationTerms),
-    trend: countIntentMatches(msg, trendTerms),
-    summary: (forcedIntent === "summary" ? 100 : 0) + countIntentMatches(msg, summaryTerms) + (msg.includes("cuantos") ? 1 : 0),
-    noHistory: (forcedIntent === "noHistory" ? 100 : 0) + countIntentMatches(msg, noHistoryTerms),
-  };
-
-  if (intentScores.product >= 3 && mentionedProducts.length === 1) {
-    return buildProductDetailResponseV2(mentionedProducts[0]);
-  }
-
-  const asksRevenue =
-    intentScores.revenue > 0 ||
-    (((msg.includes("proximo mes") || msg.includes("proxima semana")) &&
-      (msg.includes("ingresar") || msg.includes("ingresos") || msg.includes("vender") || msg.includes("ventas") || msg.includes("facturar"))) ||
-      msg.includes("cuanto se proyecta"));
-
-  if (intentScores.noHistory > 0) {
-    if (noHistory.length === 0) {
-      return "Hoy todos los productos del catálogo ya tienen historial suficiente para analizarlos con normalidad. Eso ayuda a que las proyecciónes sean más útiles y más fáciles de interpretar.";
-    }
-    const lines = [
-      `Todavía hay ${noHistory.length} producto(s) sin historial suficiente.`,
-      "",
-      "Listado actual:",
-    ];
-    noHistory.slice(0, 8).forEach((p, index) => {
-      lines.push(`${index + 1}. ${labelOf(p)}: stock actual ${p.stock_actual} unidades.`);
-    });
-    lines.push("");
-    lines.push("Interpretación:");
-    lines.push("En la práctica, estos productos aún no tienen suficiente movimiento como para estimar si se venden rápido o lento.");
-    lines.push("");
-    lines.push("Implicancia para gerencia y contabilidad:");
-    lines.push("Todavía no conviene tomar decisiones fuertes de compra o proyección basadas en ellos.");
-    lines.push("");
-    lines.push("Recomendación:");
-    lines.push("En cuanto acumulen ventas reales, el panel podra calcular mejor su demanda, su nivel de reposición y su prioridad dentro del negocio.");
-    return lines.join("\n");
-  }
-
-  if (intentScores.risk > 0) {
-    if (outOfStock.length === 0 && inRisk.length === 0 && criticos.length === 0) {
-      if (overstocked.length > 0 || slowMoving.length > 0) {
-        return [
-          "Hoy no veo riesgo fuerte de quiebre de stock, pero tampoco diria que el inventario este sano del todo.",
-          "",
-          `No hay productos criticos por agotarse, pero si hay ${overstocked.length} con stock acumulado y ${slowMoving.length} con rotación lenta.`,
-          "",
-          "Interpretación:",
-          "Eso significa que el problema no es falta de mercadería, sino capital inmovilizado en productos que se están moviendo poco.",
-          "",
-          "Recomendación:",
-          "Conviene frenar compras en esos productos, revisar descuentos o empuje comercial y concentrar reposición solo en los que sí tienen salida real.",
-        ].join("\n");
-      }
-      return [
-        "Por ahora no veo un riesgo fuerte de quiebre de stock.",
-        "",
-        `De los ${withHistory.length} productos con historial, ninguno está en una situación crítica. El inventario se ve estable según el ritmo de ventas actual.`,
-        noHistory.length > 0
-          ? `Eso sí, todavía hay ${noHistory.length} producto(s) sin historial suficiente, así que conviene revisarlos aparte.`
-          : "No hay alertas graves en este momento.",
-        "",
-        "En términos gerenciales, eso significa que hoy no se ve una pérdida inmediata de ventas por falta de producto.",
-      ].join("\n");
-    }
-
-    const lines = [
-      "Resumen ejecutivo:",
-      `Hoy veo ${outOfStock.length} producto(s) sin stock, ${criticos.length} en nivel crítico y ${atencion.length} en atención.`,
-      "",
-      "Datos exactos:",
-      `- Productos con historial analizado: ${withHistory.length}`,
-      `- Sin stock: ${outOfStock.length}`,
-      `- Riesgo crítico: ${criticos.length}`,
-      `- En atención: ${atencion.length}`,
-      "",
-    ];
-
-    if (urgentProducts.length > 0) {
-      lines.push("Productos más urgentes:");
-      lines.push(`Lo más urgente ahora mismo es revisar ${joinNatural(urgentProducts.map((p) => labelOf(p)))}.`);
-      lines.push("");
-    }
-
-    urgentProducts.forEach((p) => {
-      lines.push(`- ${labelOf(p)}: stock ${p.stock_actual}, consumo estimado ${formatUnits(p.consumo_estimado_diario)} por día, ${coverageText(p)}.`);
-    });
-
-    lines.push("");
-    lines.push("Interpretación:");
-    lines.push("En términos simples: estos son los productos con más probabilidad de hacerte perder ventas si no actúas pronto.");
-    lines.push("");
-    lines.push("Recomendación:");
-    lines.push("Mi recomendación es priorizar primero los productos sin stock y luego los que ya están cerca de agotarse.");
-    return lines.join("\n");
-  }
-
-  if (asksRevenue) {
-    if (!revenueForecast) {
-      return [
-        "Todavía no tengo una proyección de ingresos disponible.",
-        "",
-        "Puede pasar cuando el servicio aún se esta actualizando o cuando falta historial suficiente.",
-        "Prueba con refrescar el panel y volver a consultarme en unos segúndos.",
-      ].join("\n");
-    }
-
-    const s = revenueForecast.summary;
-    const horizonLabel = revenueForecast.horizon_days;
-    const change = formatPercent(s.crecimiento_estimado_horizonte_pct);
-    const directionSentence =
-      s.crecimiento_estimado_horizonte_pct >= 5
-        ? `Eso apunta a un periodo de ${horizonLabel} días mejor que el anterior.`
-        : s.crecimiento_estimado_horizonte_pct <= -5
-        ? `Eso apunta a un periodo de ${horizonLabel} días más flojo que el anterior.`
-        : `Eso apunta a un periodo de ${horizonLabel} días muy parecido al anterior.`;
-    const decisionSentence =
-      s.crecimiento_estimado_horizonte_pct >= 5
-        ? "La lectura gerencial sería mantener el ritmo y cuidar que no falte stock en los productos que mejor rotan."
-        : s.crecimiento_estimado_horizonte_pct <= -5
-        ? "La lectura gerencial sería revisar promociones, stock y productos de mayor salida para no dejar caer las ventas."
-        : "La lectura gerencial sería mantener el control actual y monitorear si aparece algún cambio importante.";
-    const confidenceSentence =
-      s.confianza >= CONFIDENCE_ALTA_MIN
-        ? "La estimación se ve bastante confiable con los datos que ya tiene el sistema."
-        : s.confianza >= CONFIDENCE_MEDIA_MIN
-        ? "La estimación es útil como guía, aúnque conviene mirarla con algo de cautela."
-        : "La estimación aún es preliminar, así que conviene usarla solo como orientación.";
-
-    return [
-      "Resumen ejecutivo:",
-      `Si el negocio sigue comportándose como hasta ahora, el próximo horizonte de ${horizonLabel} días podría cerrar alrededor de ${formatCurrency(s.proximo_horizonte)} en ingresos.`,
-      "",
-      "Datos exactos:",
-      `- Proyección próxima semana: ${formatCurrency(s.proximo_7_dias)}`,
-      `- Proyección horizonte actual (${horizonLabel} días): ${formatCurrency(s.proximo_horizonte)}`,
-      `- últimos ${horizonLabel} días reales: ${formatCurrency(s.ultimo_horizonte)}`,
-      `- Variación proyectada: ${change}`,
-      `- Promedio diario histórico: ${formatCurrency(s.promedio_diario_historico)}`,
-      `- Promedio diario proyectado: ${formatCurrency(s.promedio_diario_proyectado)}`,
-      `- Tendencia del ingreso: ${s.tendencia}`,
-      `- Confianza del cálculo: ${s.confianza}%`,
-      "",
-      "Interpretación:",
-      `En palabras simples: la próxima semana debería moverse cerca de ${formatCurrency(s.proximo_7_dias)} y, comparado con el último mes, hoy la proyección marca ${change}.`,
-      directionSentence,
-      "",
-      "Implicancia para la junta y contabilidad:",
-      `Como referencia, los últimos ${horizonLabel} días reales cerraron en ${formatCurrency(s.ultimo_horizonte)} y la proyección actual toma ese comportamiento como base para anticipar el siguiente periodo.`,
-      "",
-      "Recomendación:",
-      decisionSentence,
-      confidenceSentence,
-    ].join("\n");
-  }
-
-  if (intentScores.demand > 0) {
-    if (highDemand.length === 0) {
-      return [
-        "Ahora mismo no hay un grupo claro de productos con alta demanda.",
-        "",
-        "Las ventas se ven más repartidas o el volumen general todavía no marca diferencias fuertes entre productos.",
-      ].join("\n");
-    }
-
-    const lines = [
-      "Resumen ejecutivo:",
-      `Los productos con mejor salida en este momento son ${joinNatural(topDemand.slice(0, 3).map((p) => labelOf(p)))}.`,
-      "",
-      "Datos exactos:",
-    ];
-
-    topDemand.forEach((p, index) => {
-      lines.push(
-        `${index + 1}. ${labelOf(p)}: ${formatUnits(p.consumo_estimado_diario)} unidades por día, ${formatUnits(p.prediccion_semanal)} proyectadas para la semana, ventas 30 días ${formatUnits(p.ventas_30_dias)} y ${coverageText(p)}.`,
-      );
-    });
-
-    lines.push("");
-    lines.push("Interpretación:");
-    lines.push("En términos gerenciales, aqui esta el grupo que hoy te sostiene mejor la rotación del negocio.");
-    lines.push("");
-    lines.push("Recomendación:");
-    lines.push("Si vas a priorizar compras, estos son los productos que más conviene vigilar.");
-    return lines.join("\n");
-  }
-
-  if (intentScores.overstock > 0) {
-    if (overstocked.length === 0 && slowMoving.length === 0) {
-      return [
-        "Hoy no veo una señal fuerte de sobrestock.",
-        "",
-        "No hay productos con capital claramente inmovilizado ni con una rotación tan baja como para frenar compras por ese motivo.",
-        "",
-        "Recomendación:",
-        "Puedes seguir comprando según demanda real y vigilar solo los productos que vayan entrando a tendencia bajista.",
-      ].join("\n");
-    }
-
-    const foco = [...new Set([...overstocked, ...slowMoving])].slice(0, 5);
-    const lines = [
-      "Resumen ejecutivo:",
-      `Detecto ${overstocked.length} producto(s) con sobrestock y ${slowMoving.length} con rotación lenta.`,
-      "",
-      "Productos donde conviene poner atención:",
-    ];
-
-    foco.forEach((p, index) => {
-      lines.push(
-        `${index + 1}. ${labelOf(p)}: stock ${p.stock_actual}, ventas 30 días ${formatUnits(p.ventas_30_dias)}, tendencia ${trendText(p.tendencia)} y ${coverageText(p)}.`,
-      );
-    });
-
-    lines.push("");
-    lines.push("Interpretación:");
-    lines.push("Aquí no estás perdiendo ventas por falta de mercadería; más bien hay dinero detenido en productos que se mueven más lento de lo deseado.");
-    lines.push("");
-    lines.push("Recomendación:");
-    lines.push("Frena reposición en esos pares, mueve salida comercial con descuentos o vitrinas y prioriza compra solo en los de demanda comprobada.");
-    return lines.join("\n");
-  }
-
-  if (intentScores.confidence > 0) {
-    if (!revenueForecast) {
-      return [
-        "Aún no tengo una proyección financiera consolidada para medir confianza.",
-        "",
-        "Cuando el servicio termine de calcular ingresos para el horizonte activo, te podré decir qué tan estable es la lectura y qué tanto conviene usarla para decidir.",
-      ].join("\n");
-    }
-
-    const s = revenueForecast.summary;
-    const confidenceLabel = formatConfidenceLabel(s.confianza);
-    const confidenceMeaning =
-      s.confianza >= CONFIDENCE_ALTA_MIN
-        ? "La señal es bastante sólida: el histórico y el comportamiento reciente van en una dirección consistente."
-        : s.confianza >= CONFIDENCE_MEDIA_MIN
-        ? "La señal sirve para decidir, pero todavía conviene contrastarla con criterio comercial y reposición semanal."
-        : "La señal todavía es inicial: úsala como orientación y no como verdad cerrada.";
-
-    return [
-      "Resumen ejecutivo:",
-      `La confianza actual de la proyección es ${confidenceLabel.toLowerCase()} (${s.confianza}%).`,
-      "",
-      "Qué significa eso:",
-      confidenceMeaning,
-      "",
-      "Datos que acompañan la lectura:",
-      `- Horizonte analizado: ${revenueForecast.horizon_days} días`,
-      `- Tendencia detectada: ${trendText(s.tendencia)}`,
-      `- Promedio diario histórico: ${formatCurrency(s.promedio_diario_historico)}`,
-      `- Promedio diario proyectado: ${formatCurrency(s.promedio_diario_proyectado)}`,
-      "",
-      "Recomendación:",
-      s.confianza >= CONFIDENCE_ALTA_MIN
-        ? "Puedes usar esta proyección como base fuerte para comité, reposición y seguimiento comercial."
-        : s.confianza >= CONFIDENCE_MEDIA_MIN
-        ? "Úsala como guía principal, pero acompáñala con revisión semanal del inventario crítico."
-        : "Úsala solo para orientar prioridades y espera más historial antes de tomar decisiones grandes.",
-    ].join("\n");
-  }
-
-  if (intentScores.motor > 0) {
-    if (!topDemand[0]) {
-      return [
-        "Todavía no puedo defender un producto motor claro.",
-        "",
-        "El historial disponible no marca un líder suficientemente fuerte en salida como para sostener una recomendación clara.",
-      ].join("\n");
-    }
-
-    const lider = topDemand[0];
-    return [
-      "Resumen ejecutivo:",
-      `${labelOf(lider)} es hoy el producto motor del panel.`,
-      "",
-      "Datos exactos:",
-      `- Consumo estimado diario: ${formatUnits(lider.consumo_estimado_diario)} unidades`,
-      `- Proyección semanal: ${formatUnits(lider.prediccion_semanal)} unidades`,
-      `- Ventas últimos 30 días: ${formatUnits(lider.ventas_30_dias)} unidades`,
-      `- Tendencia: ${trendText(lider.tendencia)}`,
-      `- Cobertura actual: ${coverageText(lider)}`,
-      "",
-      "Cómo lo defendería:",
-      "Es el par que mejor sostiene rotación y por eso conviene protegerle stock, visibilidad y margen antes que al resto.",
-      "",
-      "Recomendación:",
-      lider.stock_actual === 0 || lider.alerta_stock
-        ? "Asegura reposición inmediata porque este par no solo vende: también marca el ritmo del portafolio."
-        : "Mantén cobertura sana y evita descuentos innecesarios; es un producto que ya se defiende bien por demanda.",
-    ].join("\n");
-  }
-
-  if (intentScores.recommendations > 0) {
-    if (recomendaciones.length === 0) {
-      return [
-        "Por ahora no veo acciones urgentes.",
-        "",
-        "El inventario esta relativamente sano y no hay señales fuertes de quiebre inmediato.",
-        "Lo mejor seria seguir monitoreando el panel y revisar otra vez en cuanto entren nuevas ventas.",
-      ].join("\n");
-    }
-
-    const topActions = recomendaciones.slice(0, 4);
-    const lines = [
-      "Resumen ejecutivo:",
-      "Si tuviera que priorizar hoy, haria esto:",
-      "",
-      "Te lo ordeno desde lo más urgente hasta lo más conveniente para proteger ventas y evitar sobrestock.",
-      "",
-      "Plan recomendado:",
-    ];
-
-    topActions.forEach((rec, index) => {
-      lines.push(`${index + 1}. ${rec.producto}: ${rec.accion}`);
-      lines.push(`   Motivo: ${rec.detalle}`);
-    });
-
-    if (topByRisk.length > 0) {
-      lines.push("");
-      lines.push("Soporte numerico:");
-      topByRisk.slice(0, 3).forEach((p) => {
-        lines.push(`- ${labelOf(p)}: stock ${p.stock_actual}, consumo ${formatUnits(p.consumo_estimado_diario)}/dia, riesgo ${p.nivel_riesgo}.`);
-      });
-    }
-
-    return lines.join("\n");
-  }
-
-  if (intentScores.trend > 0) {
-    const lines = [
-      "Resumen ejecutivo:",
-      `En este momento tengo ${subiendo.length} producto(s) subiendo, ${estables.length} estables y ${bajando.length} bajando.`,
-      "",
-      "Datos exactos:",
-    ];
-
-    if (subiendo.length > 0) {
-      lines.push(`Los que mejor vienen creciendo son ${joinNatural(subiendo.slice(0, 3).map((p) => labelOf(p)))}.`);
-    }
-
-    if (bajando.length > 0) {
-      lines.push(`Los que muestran más enfríamiento son ${joinNatural(bajando.slice(0, 3).map((p) => labelOf(p)))}.`);
-    }
-
-    if (revenueForecast) {
-      lines.push(`En ingresos, la tendencia general está ${trendText(revenueForecast.summary.tendencia)} y la proyección del horizonte actual (${revenueForecast.horizon_days} días) es ${formatCurrency(revenueForecast.summary.proximo_horizonte)}.`);
-    }
-
-    lines.push("");
-    lines.push("Interpretación:");
-    lines.push("En términos simples: la tendencia te ayuda a ver si conviene acelerar compras, mantenerte igual o ser más conservador.");
-    return lines.join("\n");
-  }
-
-  if (intentScores.summary > 0) {
-    const s = revenueForecast?.summary;
-    const lines = [
-      "Resumen ejecutivo:",
-      `Ahora mismo el negocio tiene ${predictions.length} productos analizados: ${withHistory.length} con historial y ${noHistory.length} sin historial suficiente.`,
-      "",
-      "Datos exactos:",
-      `- Productos sin stock: ${outOfStock.length}`,
-      `- Riesgo crítico: ${criticos.length}`,
-      `- En atención: ${atencion.length}`,
-      `- Alta demanda: ${highDemand.length}`,
-      `- Tendencia subiendo: ${subiendo.length}`,
-      `- Tendencia estable: ${estables.length}`,
-      `- Tendencia bajando: ${bajando.length}`,
-    ];
-
-    if (s) {
-      lines.push(`- Proyección de ingresos horizonte actual (${revenueForecast?.horizon_days ?? 30} días): ${formatCurrency(s.proximo_horizonte)}`);
-      lines.push(`- Variación estimada vs último horizonte: ${formatPercent(s.crecimiento_estimado_horizonte_pct)}`);
-    }
-
-    lines.push("");
-    lines.push("Interpretación:");
-    if (outOfStock.length > 0 || criticos.length > 0) {
-      lines.push("La prioridad más clara es reponer los productos con riesgo alto para no perder ventas.");
-    } else {
-      lines.push("No veo alertas graves en este momento; el panorama general es bastante estable.");
-    }
-
-    lines.push("");
-    lines.push("Recomendación:");
-    lines.push("Si quieres, después de este resumen puedes preguntarme por ingresos, riesgo, tendencias o por un producto específico y te lo explico con más detalle.");
-    return lines.join("\n\n");
-  }
-
-  if (mentionedProducts.length > 0) return buildProductDetailResponseV2(mentionedProducts[0]);
-
-  return [
-    "Puedo ayudarte a revisar ingresos, stock, demanda, tendencias y recomendaciones del negocio.",
-    "",
-    "Si el gerente necesita una explicación más clara, puedes preguntarme cualquiera de estas cosas y yo le respondo en lenguaje sencillo:",
-    "",
-    '- "Qué está pasando con el negocio este mes"',
-    '- "Qué significa para el negocio la proyección del próximo mes"',
-    '- "Qué recomiendas hacer ahora"',
-    '- "Dame un resumen general del negocio y explícamelo fácil"',
-    '- "Cuánto se proyecta ingresar el próximo mes y qué significa ese número"',
-    '- "Cuánto se espera vender la próxima semana"',
-    '- "Qué productos están en riesgo de agotarse y cuáles son los más urgentes"',
-    '- "Qué productos tienen más demanda y por qué son importantes"',
-    '- "Qué debo reponer primero y cuál sería el orden recomendado"',
-    '- "Cómo están las tendencias y qué decisión debería tomar"',
-    '- "Cuál es el producto más urgente para reponer esta semana"',
-    '- "Cuántos productos están en estado crítico hoy"',
-    '- "Compara el próximo mes contra el último mes real"',
-    '- "Qué productos sostienen más los ingresos del negocio"',
-    '- "Cómo va CV001"',
-    '- "Dame detalle de Zapatilla Running Pro"',
-    '- "Qué productos no tienen historial y qué implica eso"',
-    "",
-    "También puedo responder con cifras exactas, por ejemplo:",
-    '- "Dame el resumen con números exactos"',
-    '- "Qué productos están en riesgo con stock, consumo y días de cobertura"',
-    '- "Dame la proyección para junta directiva y área contable"',
-    '- "Dame un informe gerencial con cifras exactas"',
-    '- "Dame un resumen para contabilidad"',
-  ].join("\n");
+  return (
+    assistantV2TrySingleProduct(shared)
+    ?? assistantV2TryNoHistory(shared)
+    ?? assistantV2TryRisk(shared)
+    ?? assistantV2TryRevenue(shared)
+    ?? assistantV2TryDemand(shared)
+    ?? assistantV2TryOverstock(shared)
+    ?? assistantV2TryConfidence(shared)
+    ?? assistantV2TryMotor(shared)
+    ?? assistantV2TryRecommendations(shared)
+    ?? assistantV2TryTrend(shared)
+    ?? assistantV2TrySummary(shared)
+    ?? assistantV2TryMentionedProduct(shared)
+    ?? ASSISTANT_V2_FALLBACK_HELP
+  );
 }
 
 function TipoIcon({ tipo }: { tipo: Recomendación["tipo"] }) {
@@ -1901,6 +1703,161 @@ function exportPredictionsCSV(predictions: Prediction[], horizon: HorizonOption)
   URL.revokeObjectURL(url);
 }
 
+function mapPredictionsForViewDataset(predictions: Prediction[], alertDays: number): Prediction[] {
+  return predictions.map((item) => {
+    if (item.sin_historial || item.consumo_estimado_diario <= 0) {
+      return { ...item, alerta_stock: false, riesgo_agotamiento: false };
+    }
+    const withinThreshold = item.stock_actual === 0 || item.dias_hasta_agotarse <= alertDays;
+    return {
+      ...item,
+      alerta_stock: withinThreshold,
+      riesgo_agotamiento: item.alta_demanda && withinThreshold,
+    };
+  });
+}
+
+function normalizeRevenueForecastForHorizon(revenueForecast: RevenueForecast | null): RevenueForecast | null {
+  const summary = revenueForecast?.summary;
+  if (!summary || !revenueForecast) return null;
+
+  const selectedHorizon = revenueForecast.horizon_days;
+  const proximoHorizonte =
+    summary.proximo_horizonte ?? (selectedHorizon <= 7 ? summary.proximo_7_dias : summary.proximo_30_dias);
+
+  const historyWindowAvailable = revenueForecast.history.length >= selectedHorizon;
+  const ultimoHorizonte =
+    summary.ultimo_horizonte
+    ?? (selectedHorizon >= 30
+      ? summary.ultimo_30_dias
+      : historyWindowAvailable
+        ? Number(
+            revenueForecast.history
+              .slice(-selectedHorizon)
+              .reduce((total, point) => total + point.ingresos, 0)
+              .toFixed(2),
+          )
+        : Number(((summary.promedio_diario_historico ?? 0) * selectedHorizon).toFixed(2)));
+
+  const crecimientoHorizonte =
+    summary.crecimiento_estimado_horizonte_pct
+    ?? (selectedHorizon >= 30
+      ? summary.crecimiento_estimado_pct
+      : ultimoHorizonte > 0
+        ? Number((((proximoHorizonte - ultimoHorizonte) / ultimoHorizonte) * 100).toFixed(1))
+        : 0);
+
+  return {
+    ...revenueForecast,
+    summary: {
+      ...summary,
+      proximo_horizonte: proximoHorizonte,
+      ultimo_horizonte: ultimoHorizonte,
+      crecimiento_estimado_horizonte_pct: crecimientoHorizonte,
+    },
+  };
+}
+
+function buildResumenEjecutivoBloques(args: {
+  revenueSummary: RevenueSummary | null;
+  horizon: number;
+  riskAlerts: Prediction[];
+  sobreStock: number;
+  conHistorial: number;
+  rotacionDebil: number;
+  enRiesgo: number;
+  altaDemanda: number;
+  promedioCobertura: number;
+  alertDays: number;
+  productoMotor: Prediction | null;
+}): {
+  titular: string;
+  detalle: string;
+  lecturaFinanciera: string;
+  lecturaInventario: string;
+  lecturaPortafolio: string;
+  recomendacion: string;
+} {
+  const {
+    revenueSummary,
+    horizon,
+    riskAlerts,
+    sobreStock,
+    conHistorial,
+    rotacionDebil,
+    enRiesgo,
+    altaDemanda,
+    promedioCobertura,
+    alertDays,
+    productoMotor,
+  } = args;
+
+  const growth = revenueSummary?.crecimiento_estimado_horizonte_pct ?? 0;
+  const tendencia = revenueSummary?.tendencia ?? "estable";
+  const confianza = revenueSummary?.confianza ?? 0;
+  const principalRiesgo = riskAlerts[0] ?? null;
+  const inventarioPesado = sobreStock >= Math.max(2, Math.ceil(conHistorial * 0.25));
+  const negocioDebil = growth <= -8 || ((growth < 3 || tendencia === "bajando") && inventarioPesado && altaDemanda <= 1);
+
+  let titular = "El negocio necesita una lectura más clara antes de tomar decisiones.";
+  if (revenueSummary && negocioDebil) {
+    titular = "El negocio muestra señales de enfríamiento y stock acumulado; no conviene leer este escenario como una operación sana.";
+  } else if (revenueSummary && growth >= 8 && enRiesgo === 0 && !inventarioPesado) {
+    titular = "La venta proyectada viene bien y el foco principal es sostener stock y margen.";
+  } else if (revenueSummary && growth >= 0 && enRiesgo > 0) {
+    titular = "La venta puede sostenerse, pero ya hay productos que requieren reposición para no frenar el ritmo.";
+  } else if (revenueSummary && growth < 0 && enRiesgo === 0) {
+    titular = "La proyección se enfría y conviene ajustar compras y seguimiento comercial antes de cerrar el periodo.";
+  } else if (revenueSummary && growth < 0 && enRiesgo > 0) {
+    titular = "El negocio se desacelera y, al mismo tiempo, hay alertas de inventario que requieren reacción inmediata.";
+  } else if (enRiesgo > 0) {
+    titular = "Hay alertas operativas activas y el panel recomienda priorizar inventario antes de comprar de nuevo.";
+  }
+
+  const detalle = revenueSummary
+    ? `Para los próximos ${horizon} días se estiman ${formatCurrency(revenueSummary.proximo_horizonte)} con una tendencia ${formatTrendLabel(tendencia).toLowerCase()} y una confianza ${formatConfidenceLabel(confianza).toLowerCase()}.`
+    : `Todavía no hay una proyección financiera disponible, pero ya se puede revisar el estado del inventario y la demanda.`;
+
+  const lecturaFinanciera = revenueSummary
+    ? negocioDebil
+      ? `Aúnque no haya quiebres de stock, el ritmo proyectado luce flojo: se estiman ${formatCurrency(revenueSummary.proximo_horizonte)} y el crecimiento frente al último tramo es ${formatPercent(growth)}.`
+      : growth >= 0
+        ? `Si el ritmo actual se mantiene, el negocio podría cerrar el horizonte con ${formatCurrency(revenueSummary.proximo_horizonte)}, que representa ${formatPercent(growth)} frente al mismo tramo anterior.`
+        : `Si no se corrige el ritmo actual, el negocio podría cerrar en ${formatCurrency(revenueSummary.proximo_horizonte)}, es decir ${formatPercent(growth)} frente al mismo tramo anterior.`
+    : "Aún no se cuenta con una lectura financiera consolidada para este horizonte.";
+
+  const lecturaInventario = principalRiesgo
+    ? `${principalRiesgo.nombre} es hoy el caso más sensible: tiene ${principalRiesgo.stock_actual} unidades y una cobertura aproximada de ${principalRiesgo.dias_hasta_agotarse} días.`
+    : inventarioPesado
+      ? `No faltan productos, pero hay ${sobreStock} con stock acumulado y ${rotacionDebil} con rotación débil. La cobertura promedio ronda ${Math.round(promedioCobertura || 0)} días.`
+      : enRiesgo === 0
+        ? `No hay productos en riesgo para este horizonte. La cobertura de stock luce controlada.`
+        : `Hay ${enRiesgo} productos que necesitan seguimiento de stock (umbral: ${alertDays} días).`;
+
+  const lecturaPortafolio = productoMotor
+    ? `${productoMotor.nombre} lidera la rotación actual con un consumo estimado de ${formatUnits(productoMotor.consumo_estimado_diario)} unidades por día.`
+    : conHistorial > 0
+      ? `El portafolio ya cuenta con ${conHistorial} productos con historial suficiente para analizar comportamiento.`
+      : `Aún no hay historial suficiente para identificar productos motores del negocio.`;
+
+  const recomendacion = principalRiesgo
+    ? `Reponer primero ${principalRiesgo.nombre}, vigilar los productos en riesgo y luego revisar el mix de compra según demanda real.`
+    : inventarioPesado
+      ? `Frenar compras en los productos de baja rotación, revisar descuentos o salida comercial y comprar solo lo que tenga demanda comprobada.`
+      : altaDemanda > 0
+        ? `Asegurar inventario en los productos de mayor salida y evitar sobrecomprar en los que vienen bajando.`
+        : `Mantener seguimiento semanal y usar este panel como base para comparar lo proyectado contra lo real.`;
+
+  return {
+    titular,
+    detalle,
+    lecturaFinanciera,
+    lecturaInventario,
+    lecturaPortafolio,
+    recomendacion,
+  };
+}
+
 export default function AdminPredictions() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [weeklyChart, setWeeklyChart] = useState<WeekPoint[]>([]);
@@ -2052,26 +2009,38 @@ export default function AdminPredictions() {
   }, [loadCampana, loadLearningStats]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => void load(horizon, history), 0);
+    const timer = window.setTimeout(() => {
+      load(horizon, history).catch(() => undefined);
+    }, 0);
     return () => window.clearTimeout(timer);
   }, [horizon, history, load]);
 
   useEffect(() => {
     const timers: ReturnType<typeof window.setTimeout>[] = [];
     if (activeTab === "ventas" && !weeklyChartFetched && !weeklyChartLoading) {
-      timers.push(window.setTimeout(() => void loadWeeklyChart(), 0));
+      timers.push(window.setTimeout(() => {
+        loadWeeklyChart().catch(() => undefined);
+      }, 0));
     }
     if (activeTab === "modelo" && !modelMetricsFetched && !modelMetricsLoading && modeloMeta) {
-      timers.push(window.setTimeout(() => void loadModelMetrics(), 0));
+      timers.push(window.setTimeout(() => {
+        loadModelMetrics().catch(() => undefined);
+      }, 0));
     }
     if ((activeTab === "resumen" || activeTab === "ire") && !ireHistorialFetched) {
-      timers.push(window.setTimeout(() => void loadIreHistorial(), 0));
+      timers.push(window.setTimeout(() => {
+        loadIreHistorial().catch(() => undefined);
+      }, 0));
     }
     if (activeTab === "campanas" && !campanaFetched && !campanaLoading) {
-      timers.push(window.setTimeout(() => void loadCampana(), 0));
+      timers.push(window.setTimeout(() => {
+        loadCampana().catch(() => undefined);
+      }, 0));
     }
     if (activeTab === "campanas" && !learningStatsFetched) {
-      timers.push(window.setTimeout(() => void loadLearningStats(), 0));
+      timers.push(window.setTimeout(() => {
+        loadLearningStats().catch(() => undefined);
+      }, 0));
     }
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
@@ -2090,19 +2059,7 @@ export default function AdminPredictions() {
   }, [horizon, history, load]);
 
   const predictionsForView = useMemo(
-    () =>
-      predictions.map((item) => {
-        if (item.sin_historial || item.consumo_estimado_diario <= 0) {
-          return { ...item, alerta_stock: false, riesgo_agotamiento: false };
-        }
-
-        const withinThreshold = item.stock_actual === 0 || item.dias_hasta_agotarse <= alertDays;
-        return {
-          ...item,
-          alerta_stock: withinThreshold,
-          riesgo_agotamiento: item.alta_demanda && withinThreshold,
-        };
-      }),
+    () => mapPredictionsForViewDataset(predictions, alertDays),
     [predictions, alertDays],
   );
 
@@ -2141,49 +2098,10 @@ export default function AdminPredictions() {
     });
   }, [predictionsForView, search]);
 
-  const normalizedRevenueForecast = useMemo(() => {
-    const summary = revenueForecast?.summary;
-    if (!summary || !revenueForecast) return null;
-
-    const selectedHorizon = revenueForecast.horizon_days;
-    const proximoHorizonte =
-      summary.proximo_horizonte
-      ?? (selectedHorizon <= 7
-        ? summary.proximo_7_dias
-        : summary.proximo_30_dias);
-
-    const historyWindowAvailable = revenueForecast.history.length >= selectedHorizon;
-    const ultimoHorizonte =
-      summary.ultimo_horizonte
-      ?? (selectedHorizon >= 30
-        ? summary.ultimo_30_dias
-        : historyWindowAvailable
-        ? Number(
-            revenueForecast.history
-              .slice(-selectedHorizon)
-              .reduce((total, point) => total + point.ingresos, 0)
-              .toFixed(2),
-          )
-        : Number(((summary.promedio_diario_historico ?? 0) * selectedHorizon).toFixed(2)));
-
-    const crecimientoHorizonte =
-      summary.crecimiento_estimado_horizonte_pct
-      ?? (selectedHorizon >= 30
-        ? summary.crecimiento_estimado_pct
-        : ultimoHorizonte > 0
-        ? Number((((proximoHorizonte - ultimoHorizonte) / ultimoHorizonte) * 100).toFixed(1))
-        : 0);
-
-    return {
-      ...revenueForecast,
-      summary: {
-        ...summary,
-        proximo_horizonte: proximoHorizonte,
-        ultimo_horizonte: ultimoHorizonte,
-        crecimiento_estimado_horizonte_pct: crecimientoHorizonte,
-      },
-    };
-  }, [revenueForecast]);
+  const normalizedRevenueForecast = useMemo(
+    () => normalizeRevenueForecastForHorizon(revenueForecast),
+    [revenueForecast],
+  );
 
   const revenueSummary = normalizedRevenueForecast?.summary ?? null;
   // Análisis ABC por ingreso histórico (A = 80%, B = 15%, C = 5%)
@@ -2222,72 +2140,35 @@ export default function AdminPredictions() {
     [predictionsForView],
   );
 
-  const resumenEjecutivo = useMemo(() => {
-    const growth = revenueSummary?.crecimiento_estimado_horizonte_pct ?? 0;
-    const tendencia = revenueSummary?.tendencia ?? "estable";
-    const confianza = revenueSummary?.confianza ?? 0;
-    const principalRiesgo = riskAlerts[0] ?? null;
-    const inventarioPesado = sobreStock >= Math.max(2, Math.ceil(conHistorial * 0.25));
-    const negocioDebil = growth <= -8 || ((growth < 3 || tendencia === "bajando") && inventarioPesado && altaDemanda <= 1);
-
-    let titular = "El negocio necesita una lectura más clara antes de tomar decisiones.";
-    if (revenueSummary && negocioDebil) {
-      titular = "El negocio muestra señales de enfríamiento y stock acumulado; no conviene leer este escenario como una operación sana.";
-    } else if (revenueSummary && growth >= 8 && enRiesgo === 0 && !inventarioPesado) {
-      titular = "La venta proyectada viene bien y el foco principal es sostener stock y margen.";
-    } else if (revenueSummary && growth >= 0 && enRiesgo > 0) {
-      titular = "La venta puede sostenerse, pero ya hay productos que requieren reposición para no frenar el ritmo.";
-    } else if (revenueSummary && growth < 0 && enRiesgo === 0) {
-      titular = "La proyección se enfría y conviene ajustar compras y seguimiento comercial antes de cerrar el periodo.";
-    } else if (revenueSummary && growth < 0 && enRiesgo > 0) {
-      titular = "El negocio se desacelera y, al mismo tiempo, hay alertas de inventario que requieren reacción inmediata.";
-    } else if (enRiesgo > 0) {
-      titular = "Hay alertas operativas activas y el panel recomienda priorizar inventario antes de comprar de nuevo.";
-    }
-
-    const detalle = revenueSummary
-      ? `Para los próximos ${horizon} días se estiman ${formatCurrency(revenueSummary.proximo_horizonte)} con una tendencia ${formatTrendLabel(tendencia).toLowerCase()} y una confianza ${formatConfidenceLabel(confianza).toLowerCase()}.`
-      : `Todavía no hay una proyección financiera disponible, pero ya se puede revisar el estado del inventario y la demanda.`;
-
-    const lecturaFinanciera = revenueSummary
-      ? negocioDebil
-        ? `Aúnque no haya quiebres de stock, el ritmo proyectado luce flojo: se estiman ${formatCurrency(revenueSummary.proximo_horizonte)} y el crecimiento frente al último tramo es ${formatPercent(growth)}.`
-        : growth >= 0
-        ? `Si el ritmo actual se mantiene, el negocio podría cerrar el horizonte con ${formatCurrency(revenueSummary.proximo_horizonte)}, que representa ${formatPercent(growth)} frente al mismo tramo anterior.`
-        : `Si no se corrige el ritmo actual, el negocio podría cerrar en ${formatCurrency(revenueSummary.proximo_horizonte)}, es decir ${formatPercent(growth)} frente al mismo tramo anterior.`
-      : "Aún no se cuenta con una lectura financiera consolidada para este horizonte.";
-
-    const lecturaInventario = principalRiesgo
-      ? `${principalRiesgo.nombre} es hoy el caso más sensible: tiene ${principalRiesgo.stock_actual} unidades y una cobertura aproximada de ${principalRiesgo.dias_hasta_agotarse} días.`
-      : inventarioPesado
-      ? `No faltan productos, pero hay ${sobreStock} con stock acumulado y ${rotacionDebil} con rotación débil. La cobertura promedio ronda ${Math.round(promedioCobertura || 0)} días.`
-      : enRiesgo === 0
-      ? `No hay productos en riesgo para este horizonte. La cobertura de stock luce controlada.`
-      : `Hay ${enRiesgo} productos que necesitan seguimiento de stock (umbral: ${alertDays} días).`;
-
-    const lecturaPortafolio = productoMotor
-      ? `${productoMotor.nombre} lidera la rotación actual con un consumo estimado de ${formatUnits(productoMotor.consumo_estimado_diario)} unidades por día.`
-      : conHistorial > 0
-      ? `El portafolio ya cuenta con ${conHistorial} productos con historial suficiente para analizar comportamiento.`
-      : `Aún no hay historial suficiente para identificar productos motores del negocio.`;
-
-    const recomendacion = principalRiesgo
-      ? `Reponer primero ${principalRiesgo.nombre}, vigilar los productos en riesgo y luego revisar el mix de compra según demanda real.`
-      : inventarioPesado
-      ? `Frenar compras en los productos de baja rotación, revisar descuentos o salida comercial y comprar solo lo que tenga demanda comprobada.`
-      : altaDemanda > 0
-      ? `Asegurar inventario en los productos de mayor salida y evitar sobrecomprar en los que vienen bajando.`
-      : `Mantener seguimiento semanal y usar este panel como base para comparar lo proyectado contra lo real.`;
-
-    return {
-      titular,
-      detalle,
-      lecturaFinanciera,
-      lecturaInventario,
-      lecturaPortafolio,
-      recomendacion,
-    };
-  }, [alertDays, altaDemanda, conHistorial, enRiesgo, horizon, productoMotor, promedioCobertura, revenueSummary, riskAlerts, rotacionDebil, sobreStock]);
+  const resumenEjecutivo = useMemo(
+    () =>
+      buildResumenEjecutivoBloques({
+        revenueSummary,
+        horizon,
+        riskAlerts,
+        sobreStock,
+        conHistorial,
+        rotacionDebil,
+        enRiesgo,
+        altaDemanda,
+        promedioCobertura,
+        alertDays,
+        productoMotor,
+      }),
+    [
+      alertDays,
+      altaDemanda,
+      conHistorial,
+      enRiesgo,
+      horizon,
+      productoMotor,
+      promedioCobertura,
+      revenueSummary,
+      riskAlerts,
+      rotacionDebil,
+      sobreStock,
+    ],
+  );
 
   const distribucionInventario = useMemo(() => {
     const items = [
@@ -2385,7 +2266,9 @@ export default function AdminPredictions() {
         <AlertTriangle size={32} />
         <h3>No se pudo conectar con el servicio de IA</h3>
         <p>{error}</p>
-        <button type="button" className="btn btn-primary" onClick={() => void refreshPredictions()}>
+        <button type="button" className="btn btn-primary" onClick={() => {
+          refreshPredictions().catch(() => undefined);
+        }}>
           <RefreshCw size={15} /> Reintentar
         </button>
       </div>
@@ -2429,7 +2312,9 @@ export default function AdminPredictions() {
                 {option} días
               </button>
             ))}
-            <button type="button" className="btn btn-ghost pred-refresh" onClick={() => void refreshPredictions()}>
+            <button type="button" className="btn btn-ghost pred-refresh" onClick={() => {
+          refreshPredictions().catch(() => undefined);
+        }}>
               <RefreshCw size={15} />
             </button>
           </div>
@@ -3110,7 +2995,9 @@ export default function AdminPredictions() {
               <CircleDollarSign size={32} />
               <h3>Proyección financiera no disponible</h3>
               <p>No hay datos de ingresos para este horizonte. El servicio de IA podría estar actualizándose o falta historial suficiente.</p>
-              <button type="button" className="btn btn-primary" onClick={() => void refreshPredictions()}>
+              <button type="button" className="btn btn-primary" onClick={() => {
+          refreshPredictions().catch(() => undefined);
+        }}>
                 <RefreshCw size={15} /> Reintentar
               </button>
             </div>
@@ -3621,7 +3508,9 @@ export default function AdminPredictions() {
                       animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.28, delay: index * 0.035, ease: "easeOut" } }}
                       whileHover={{ y: -4, scale: 1.02 }}
                       whileTap={{ scale: 0.98 }}
-                      onClick={() => void handleSend(question)}
+                      onClick={() => {
+                        handleSend(question);
+                      }}
                     >
                       {question}
                     </motion.button>
@@ -3704,7 +3593,9 @@ export default function AdminPredictions() {
 
           {!campanaLoading && !campanaFetched && (
             <div style={{ textAlign: "center", padding: "2rem" }}>
-              <button className="pred-btn" onClick={() => void loadCampana()}>
+              <button className="pred-btn" onClick={() => {
+                loadCampana().catch(() => undefined);
+              }}>
                 Consultar campañas detectadas
               </button>
             </div>
@@ -3735,7 +3626,9 @@ export default function AdminPredictions() {
                     <p style={{ margin: 0, opacity: 0.75, fontSize: "0.9rem" }}>
                       El sistema monitorea ventas en tiempo real. Se registrará automáticamente cuando detecte actividad elevada o focalizada.
                     </p>
-                    <button className="pred-btn" onClick={() => void loadCampana()} style={{ marginTop: "0.25rem" }}>
+                    <button className="pred-btn" onClick={() => {
+                loadCampana().catch(() => undefined);
+              }} style={{ marginTop: "0.25rem" }}>
                       Actualizar
                     </button>
                   </div>
@@ -3883,7 +3776,9 @@ export default function AdminPredictions() {
                               <button
                                 className="pred-btn"
                                 disabled={campanaFeedbackLoading}
-                                onClick={() => void submitCampanaFeedback(c.id, "confirmar")}
+                                onClick={() => {
+                                  submitCampanaFeedback(c.id, "confirmar").catch(() => undefined);
+                                }}
                                 style={{ background: "#22c55e", color: "#fff", border: "none", fontWeight: 600, padding: "0.55rem 1rem" }}
                               >
                                 {campanaFeedbackLoading ? "…" : "✓ Confirmar"}
@@ -3891,7 +3786,9 @@ export default function AdminPredictions() {
                               <button
                                 className="pred-btn"
                                 disabled={campanaFeedbackLoading}
-                                onClick={() => void submitCampanaFeedback(c.id, "descartar")}
+                                onClick={() => {
+                                  submitCampanaFeedback(c.id, "descartar").catch(() => undefined);
+                                }}
                                 style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.28)", fontWeight: 600, padding: "0.55rem 1rem" }}
                               >
                                 {campanaFeedbackLoading ? "…" : "✗ Descartar"}
@@ -3913,7 +3810,9 @@ export default function AdminPredictions() {
                           <button
                             className="pred-btn"
                             style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem", opacity: 0.7 }}
-                            onClick={() => void loadCampana()}
+                            onClick={() => {
+                loadCampana().catch(() => undefined);
+              }}
                           >
                             Actualizar
                           </button>
