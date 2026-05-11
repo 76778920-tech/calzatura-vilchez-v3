@@ -59,6 +59,54 @@ function normalizeRouteToken(value: string | null | undefined) {
     .trim();
 }
 
+function createIsLinkCurrent(pathname: string, search: string, searchParams: URLSearchParams) {
+  return (to: string) => {
+    const target = new URL(to, "https://calzatura.local");
+    if (isProductCatalogPath(target.pathname) || isProductCatalogPath(pathname)) {
+      return getCatalogUrlKey(pathname, search) === getCatalogUrlKey(target.pathname, target.search);
+    }
+    if (target.pathname !== pathname) return false;
+
+    const targetParams = new URLSearchParams(target.search);
+    const entries = Array.from(targetParams.entries());
+
+    if (entries.length === 0) {
+      return true;
+    }
+
+    return entries.every(([key, value]) => {
+      const expected = normalizeRouteToken(value);
+      const current = normalizeRouteToken(searchParams.get(key));
+      if (!current) return false;
+      if (key === "buscar" || key === "marca") return current.includes(expected);
+      return current === expected;
+    });
+  };
+}
+
+function filterProductsByHeaderSearch(products: Product[], headerSearch: string): Product[] {
+  const query = headerSearch.trim().toLowerCase();
+  if (query.length < 2) return [];
+
+  return products
+    .filter((product) => {
+      const searchable = [
+        product.nombre,
+        product.descripcion,
+        product.marca,
+        product.tipoCalzado,
+        product.color,
+        product.categoria,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(query);
+    })
+    .slice(0, 5);
+}
+
 function slugifyRouteValue(value: string) {
   return normalizeRouteToken(value)
     .replace(/[^a-z0-9]+/g, "-")
@@ -774,30 +822,10 @@ export default function Header() {
     ]
   );
 
-  const isLinkCurrent = useMemo(() => {
-    return (to: string) => {
-      const target = new URL(to, "https://calzatura.local");
-      if (isProductCatalogPath(target.pathname) || isProductCatalogPath(location.pathname)) {
-        return getCatalogUrlKey(location.pathname, location.search) === getCatalogUrlKey(target.pathname, target.search);
-      }
-      if (target.pathname !== location.pathname) return false;
-
-      const targetParams = new URLSearchParams(target.search);
-      const entries = Array.from(targetParams.entries());
-
-      if (entries.length === 0) {
-        return true;
-      }
-
-      return entries.every(([key, value]) => {
-        const expected = normalizeRouteToken(value);
-        const current = normalizeRouteToken(searchParams.get(key));
-        if (!current) return false;
-        if (key === "buscar" || key === "marca") return current.includes(expected);
-        return current === expected;
-      });
-    };
-  }, [location.pathname, location.search, searchParams]);
+  const isLinkCurrent = useMemo(
+    () => createIsLinkCurrent(location.pathname, location.search, searchParams),
+    [location.pathname, location.search, searchParams]
+  );
 
   useEffect(() => {
     fetchPublicProducts()
@@ -846,28 +874,10 @@ export default function Header() {
 
   const displayName = userProfile?.nombre?.split(" ")[0] ?? user?.email?.split("@")[0] ?? "Usuario";
   const avatarLetter = (userProfile?.nombre?.[0] ?? user?.email?.[0] ?? "U").toUpperCase();
-  const searchSuggestions = useMemo(() => {
-    const query = headerSearch.trim().toLowerCase();
-    if (query.length < 2) return [];
-
-    return products
-      .filter((product) => {
-        const searchable = [
-          product.nombre,
-          product.descripcion,
-          product.marca,
-          product.tipoCalzado,
-          product.color,
-          product.categoria,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-
-        return searchable.includes(query);
-      })
-      .slice(0, 5);
-  }, [headerSearch, products]);
+  const searchSuggestions = useMemo(
+    () => filterProductsByHeaderSearch(products, headerSearch),
+    [headerSearch, products]
+  );
 
   const handleHeaderSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

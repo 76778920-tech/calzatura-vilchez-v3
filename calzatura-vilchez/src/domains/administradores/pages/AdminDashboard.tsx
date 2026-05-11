@@ -10,7 +10,7 @@ import { fetchAllOrders } from "@/domains/pedidos/services/orders";
 import { fetchDailySales, fetchProductFinancials } from "@/domains/ventas/services/finance";
 import { fetchAllUsers } from "@/domains/usuarios/services/users";
 import { fetchRecentAudit } from "@/services/audit";
-import type { Order, ProductFinancial, DailySale } from "@/types";
+import type { Order, Product, ProductFinancial, DailySale, UserProfile } from "@/types";
 import type { AuditEntry } from "@/services/audit";
 import { ADMIN_ROUTES } from "@/routes/paths";
 import toast from "react-hot-toast";
@@ -57,6 +57,77 @@ function greetingText() {
   if (h < 12) return "Buenos días";
   if (h < 19) return "Buenas tardes";
   return "Buenas noches";
+}
+
+function dashboardSalesTotalForDate(sales: DailySale[], iso: string): number {
+  return sales.filter((s) => s.fecha === iso).reduce((acc, s) => acc + s.total, 0);
+}
+
+function dashboardOrdersTotalForDate(orders: Order[], iso: string): number {
+  return orders
+    .filter((o) => toLocalISODate(toDate(o.creadoEn)) === iso)
+    .reduce((acc, o) => acc + (o.total ?? 0), 0);
+}
+
+function buildDashboardChartSeries(
+  last7Days: { iso: string }[],
+  sales: DailySale[],
+  completedOrders: Order[]
+): number[] {
+  return last7Days.map(
+    ({ iso }) => dashboardSalesTotalForDate(sales, iso) + dashboardOrdersTotalForDate(completedOrders, iso)
+  );
+}
+
+function computeDashboardFromFetchedData(
+  today: string,
+  last7Days: { iso: string; label: string }[],
+  products: Product[],
+  orders: Order[],
+  sales: DailySale[],
+  financials: Record<string, ProductFinancial>,
+  users: UserProfile[]
+): {
+  stats: {
+    productos: number;
+    pedidos: number;
+    ingresos: number;
+    pendientes: number;
+    ventasHoy: number;
+    gananciaHoy: number;
+    usuarios: number;
+  };
+  chart: number[];
+} {
+  const completedOrders = orders.filter(isCompletedOrder);
+  const completedOrdersToday = completedOrders.filter(
+    (o) => toLocalISODate(toDate(o.creadoEn)) === today
+  );
+  const ingresos = completedOrders.reduce((acc, o) => acc + (o.total ?? 0), 0);
+  const pendientes = orders.filter((o) => o.estado === "pendiente").length;
+
+  const ventasManualesHoy = dashboardSalesTotalForDate(sales, today);
+  const gananciasManualesHoy = sales.filter((s) => s.fecha === today).reduce((acc, s) => acc + s.ganancia, 0);
+  const ventasPedidosHoy = completedOrdersToday.reduce((acc, o) => acc + (o.total ?? 0), 0);
+  const gananciasPedidosHoy = completedOrdersToday.reduce(
+    (acc, o) => acc + estimateOrderProfit(o, financials),
+    0
+  );
+
+  const chart = buildDashboardChartSeries(last7Days, sales, completedOrders);
+
+  return {
+    stats: {
+      productos: products.length,
+      pedidos: orders.length,
+      ingresos,
+      pendientes,
+      ventasHoy: ventasManualesHoy + ventasPedidosHoy,
+      gananciaHoy: gananciasManualesHoy + gananciasPedidosHoy,
+      usuarios: users.length,
+    },
+    chart,
+  };
 }
 
 function formatCurrency(n: number) {
@@ -265,36 +336,17 @@ export default function AdminDashboard() {
       fetchProductFinancials(),
       fetchAllUsers(),
     ]).then(([products, orders, sales, financials, users]) => {
-      const completedOrders = orders.filter(isCompletedOrder);
-      const completedOrdersToday = completedOrders.filter(
-        (o) => toLocalISODate(toDate(o.creadoEn)) === today
+      const salesTyped = sales as DailySale[];
+      const { stats, chart } = computeDashboardFromFetchedData(
+        today,
+        last7Days,
+        products,
+        orders,
+        salesTyped,
+        financials,
+        users
       );
-      const ingresos = completedOrders.reduce((acc, o) => acc + (o.total ?? 0), 0);
-      const pendientes = orders.filter((o) => o.estado === "pendiente").length;
-
-      const ventasManualesHoy = (sales as DailySale[]).filter((s) => s.fecha === today).reduce((acc, s) => acc + s.total, 0);
-      const gananciasManualesHoy = (sales as DailySale[]).filter((s) => s.fecha === today).reduce((acc, s) => acc + s.ganancia, 0);
-      const ventasPedidosHoy = completedOrdersToday.reduce((acc, o) => acc + (o.total ?? 0), 0);
-      const gananciasPedidosHoy = completedOrdersToday.reduce(
-        (acc, o) => acc + estimateOrderProfit(o, financials), 0
-      );
-
-      // Chart: last 7 days
-      const chart = last7Days.map(({ iso }) => {
-        const manual = (sales as DailySale[]).filter((s) => s.fecha === iso).reduce((a, s) => a + s.total, 0);
-        const fromOrders = completedOrders.filter((o) => toLocalISODate(toDate(o.creadoEn)) === iso).reduce((a, o) => a + (o.total ?? 0), 0);
-        return manual + fromOrders;
-      });
-
-      setStats({
-        productos: products.length,
-        pedidos: orders.length,
-        ingresos,
-        pendientes,
-        ventasHoy: ventasManualesHoy + ventasPedidosHoy,
-        gananciaHoy: gananciasManualesHoy + gananciasPedidosHoy,
-        usuarios: users.length,
-      });
+      setStats(stats);
       setRecentOrders(orders.slice(0, 6));
       setAllOrders(orders);
       setChartData(chart);

@@ -365,6 +365,124 @@ function buildPromptPayloadWithModePrefix(
   return prefix ? `${prefix}${input}]` : input;
 }
 
+function handleToolbarFileInputChange(
+  processFile: (file: File) => void,
+  e: React.ChangeEvent<HTMLInputElement>
+) {
+  const file = e.target.files?.[0];
+  if (file) processFile(file);
+  e.target.value = "";
+}
+
+type PromptToolbarModeButtonsProps = {
+  showSearch: boolean;
+  showThink: boolean;
+  showCanvas: boolean;
+  setShowSearch: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowThink: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowCanvas: React.Dispatch<React.SetStateAction<boolean>>;
+};
+
+function PromptToolbarModeButtons({
+  showSearch,
+  showThink,
+  showCanvas,
+  setShowSearch,
+  setShowThink,
+  setShowCanvas,
+}: PromptToolbarModeButtonsProps) {
+  const toggleSearchThink = (mode: "search" | "think") => {
+    if (mode === "search") {
+      setShowSearch((p) => !p);
+      setShowThink(false);
+    } else {
+      setShowThink((p) => !p);
+      setShowSearch(false);
+    }
+  };
+
+  const modes = [
+    {
+      id: "search" as const,
+      active: showSearch,
+      color: "#1EAEDB",
+      Icon: Globe,
+      label: "Buscar",
+      onClick: () => toggleSearchThink("search"),
+    },
+    {
+      id: "think" as const,
+      active: showThink,
+      color: "#8B5CF6",
+      Icon: BrainCog,
+      label: "Analizar",
+      onClick: () => toggleSearchThink("think"),
+    },
+    {
+      id: "canvas" as const,
+      active: showCanvas,
+      color: "#F97316",
+      Icon: FolderCode,
+      label: "Canvas",
+      onClick: () => setShowCanvas((p) => !p),
+    },
+  ];
+
+  return (
+    <div className="flex items-center">
+      {modes.map((mode, idx) => {
+        const { active, color, Icon, label, onClick } = mode;
+        return (
+          <React.Fragment key={mode.id}>
+            {idx > 0 && <CustomDivider />}
+            <button
+              type="button"
+              onClick={onClick}
+              className={cn(
+                "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                active
+                  ? `border-[${color}] text-[${color}]`
+                  : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
+              )}
+              style={active ? { background: `${color}26`, borderColor: color, color } : undefined}
+            >
+              <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                <motion.div
+                  animate={{ rotate: active ? 360 : 0, scale: active ? 1.1 : 1 }}
+                  whileHover={{ rotate: active ? 360 : 15, scale: 1.1 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 25 }}
+                >
+                  <Icon className="w-4 h-4" />
+                </motion.div>
+              </div>
+              <AnimatePresence>
+                {active && (
+                  <motion.span
+                    initial={{ width: 0, opacity: 0 }}
+                    animate={{ width: "auto", opacity: 1 }}
+                    exit={{ width: 0, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="text-xs overflow-hidden whitespace-nowrap shrink-0"
+                  >
+                    {label}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+function promptToolbarVoiceIcon(isLoading: boolean, isRecording: boolean, hasContent: boolean) {
+  if (isLoading) return <Square className="h-4 w-4 fill-[#1F2023] animate-pulse" />;
+  if (isRecording) return <StopCircle className="h-5 w-5 text-red-500" />;
+  if (hasContent) return <ArrowUp className="h-4 w-4 text-[#1F2023]" />;
+  return <Mic className="h-5 w-5" />;
+}
+
 type PromptDefaultToolbarProps = {
   showSearch: boolean;
   showThink: boolean;
@@ -394,16 +512,6 @@ function PromptInputDefaultToolbar({
   processFile,
   onVoicePrimary,
 }: PromptDefaultToolbarProps) {
-  const toggleMode = (mode: "search" | "think") => {
-    if (mode === "search") {
-      setShowSearch((p) => !p);
-      setShowThink(false);
-    } else {
-      setShowThink((p) => !p);
-      setShowSearch(false);
-    }
-  };
-
   return (
     <>
       <div className={cn("flex items-center gap-1 transition-opacity duration-300", isRecording ? "opacity-0 invisible h-0" : "opacity-100 visible")}>
@@ -412,52 +520,18 @@ function PromptInputDefaultToolbar({
             className="flex h-8 w-8 text-[#9CA3AF] cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-gray-600/30 hover:text-[#D1D5DB]">
             <Paperclip className="h-5 w-5" />
             <input ref={uploadInputRef} type="file" className="hidden" accept="image/*"
-              onChange={(e) => { if (e.target.files?.[0]) processFile(e.target.files[0]); if (e.target) e.target.value = ""; }} />
+              onChange={(e) => handleToolbarFileInputChange(processFile, e)} />
           </button>
         </PromptInputAction>
 
-        <div className="flex items-center">
-          {(["search", "think", "canvas"] as const).map((mode, idx) => {
-            const configs = {
-              search: { active: showSearch, color: "#1EAEDB", Icon: Globe, label: "Buscar", onClick: () => toggleMode("search") },
-              think:  { active: showThink,  color: "#8B5CF6", Icon: BrainCog, label: "Analizar", onClick: () => toggleMode("think") },
-              canvas: { active: showCanvas, color: "#F97316", Icon: FolderCode, label: "Canvas", onClick: () => setShowCanvas((p) => !p) },
-            };
-            const { active, color, Icon, label, onClick } = configs[mode];
-            return (
-              <React.Fragment key={mode}>
-                {idx > 0 && <CustomDivider />}
-                <button type="button" onClick={onClick}
-                  className={cn("rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                    active ? `border-[${color}] text-[${color}]` : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
-                  )}
-                  style={active ? { background: `${color}26`, borderColor: color, color } : undefined}
-                >
-                  <div className="w-5 h-5 flex items-center justify-center shrink-0">
-                    <motion.div
-                      animate={{ rotate: active ? 360 : 0, scale: active ? 1.1 : 1 }}
-                      whileHover={{ rotate: active ? 360 : 15, scale: 1.1 }}
-                      transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                    >
-                      <Icon className="w-4 h-4" />
-                    </motion.div>
-                  </div>
-                  <AnimatePresence>
-                    {active && (
-                      <motion.span
-                        initial={{ width: 0, opacity: 0 }} animate={{ width: "auto", opacity: 1 }} exit={{ width: 0, opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="text-xs overflow-hidden whitespace-nowrap shrink-0"
-                      >
-                        {label}
-                      </motion.span>
-                    )}
-                  </AnimatePresence>
-                </button>
-              </React.Fragment>
-            );
-          })}
-        </div>
+        <PromptToolbarModeButtons
+          showSearch={showSearch}
+          showThink={showThink}
+          showCanvas={showCanvas}
+          setShowSearch={setShowSearch}
+          setShowThink={setShowThink}
+          setShowCanvas={setShowCanvas}
+        />
       </div>
 
       <PromptInputAction tooltip={isLoading ? "Detener" : isRecording ? "Parar grabación" : hasContent ? "Enviar" : "Hablar"}>
@@ -470,10 +544,7 @@ function PromptInputDefaultToolbar({
           onClick={onVoicePrimary}
           disabled={isLoading && !hasContent}
         >
-          {isLoading   ? <Square className="h-4 w-4 fill-[#1F2023] animate-pulse" /> :
-           isRecording ? <StopCircle className="h-5 w-5 text-red-500" /> :
-           hasContent  ? <ArrowUp className="h-4 w-4 text-[#1F2023]" /> :
-                         <Mic className="h-5 w-5" />}
+          {promptToolbarVoiceIcon(isLoading, isRecording, hasContent)}
         </Button>
       </PromptInputAction>
     </>

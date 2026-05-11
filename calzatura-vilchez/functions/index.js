@@ -847,89 +847,132 @@ exports.favorites = onRequest(
 
 const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
 
-/**
- * @returns {{ ok: true, upstreamUrl: string, method: string } | { ok: false, status?: number, error: string }}
- */
+/** @returns {{ ok: true, upstreamUrl: string, method: string } | { ok: false, status?: number, error: string }} */
+function aiProxyCombined(base, req) {
+  const horizon = parseInt(String(req.query.horizon ?? "30"), 10);
+  const history = parseInt(String(req.query.history ?? "120"), 10);
+  if (!Number.isFinite(horizon) || horizon < 7 || horizon > 90) return { ok: false, error: "horizon invalido" };
+  if (!Number.isFinite(history) || history < 30 || history > 365) return { ok: false, error: "history invalido" };
+  const upstreamUrl = `${base}/api/predict/combined?horizon=${encodeURIComponent(horizon)}&history=${encodeURIComponent(history)}`;
+  return { ok: true, upstreamUrl, method: "GET" };
+}
+
+function aiProxyWeeklyChart(base, req) {
+  const weeks = parseInt(String(req.query.weeks ?? "8"), 10);
+  if (!Number.isFinite(weeks) || weeks < 2 || weeks > 24) return { ok: false, error: "weeks invalido" };
+  const upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
+  return { ok: true, upstreamUrl, method: "GET" };
+}
+
+function aiProxyModelMetrics(base) {
+  return { ok: true, upstreamUrl: `${base}/api/model/metrics`, method: "GET" };
+}
+
+function aiProxyIreHistorial(base, req) {
+  const days = parseInt(String(req.query.days ?? "30"), 10);
+  if (!Number.isFinite(days) || days < 1 || days > 365) return { ok: false, error: "days invalido" };
+  const upstreamUrl = `${base}/api/ire/historial?days=${encodeURIComponent(days)}`;
+  return { ok: true, upstreamUrl, method: "GET" };
+}
+
+function aiProxyCacheInvalidate(base, req) {
+  if (req.method !== "POST") return { ok: false, status: 405, error: "Metodo no permitido" };
+  return { ok: true, upstreamUrl: `${base}/api/cache/invalidate`, method: "POST" };
+}
+
+function aiProxyCampaignActive(base) {
+  return { ok: true, upstreamUrl: `${base}/api/campaign/active`, method: "GET" };
+}
+
+function aiProxyCampaignFeedback(base, req) {
+  if (req.method !== "POST") return { ok: false, status: 405, error: "Metodo no permitido" };
+  return { ok: true, upstreamUrl: `${base}/api/campaign/feedback`, method: "POST" };
+}
+
+function aiProxyCampaignDetection(base, req) {
+  const recentDays = parseInt(String(req.query.recent_days ?? "7"), 10);
+  const baselineDays = parseInt(String(req.query.baseline_days ?? "60"), 10);
+  if (!Number.isFinite(recentDays) || recentDays < 3 || recentDays > 14) return { ok: false, error: "recent_days invalido" };
+  if (!Number.isFinite(baselineDays) || baselineDays < 30 || baselineDays > 120) {
+    return { ok: false, error: "baseline_days invalido" };
+  }
+  const upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${recentDays}&baseline_days=${baselineDays}`;
+  return { ok: true, upstreamUrl, method: "GET" };
+}
+
+function aiProxyLearningStats(base) {
+  return { ok: true, upstreamUrl: `${base}/api/campaign/learning-stats`, method: "GET" };
+}
+
+const AI_ADMIN_UPSTREAM_RESOLVERS = {
+  combined: aiProxyCombined,
+  weeklyChart: aiProxyWeeklyChart,
+  modelMetrics: (base) => aiProxyModelMetrics(base),
+  ireHistorial: aiProxyIreHistorial,
+  cacheInvalidate: aiProxyCacheInvalidate,
+  campaignActive: (base) => aiProxyCampaignActive(base),
+  campaignFeedback: aiProxyCampaignFeedback,
+  campaignDetection: aiProxyCampaignDetection,
+  learningStats: (base) => aiProxyLearningStats(base),
+};
+
 function resolveAiAdminUpstreamRequest(base, op, req) {
-  let upstreamUrl;
-  let method = "GET";
+  const resolver = AI_ADMIN_UPSTREAM_RESOLVERS[op];
+  if (!resolver) return { ok: false, error: "op invalido" };
+  return resolver(base, req);
+}
 
-  if (op === "combined") {
-    const horizon = parseInt(String(req.query.horizon ?? "30"), 10);
-    const history = parseInt(String(req.query.history ?? "120"), 10);
-    if (!Number.isFinite(horizon) || horizon < 7 || horizon > 90) {
-      return { ok: false, error: "horizon invalido" };
+async function sendUpstreamToClient(res, upstream, text) {
+  const ct = upstream.headers.get("content-type") || "application/json; charset=utf-8";
+  if (ct.includes("application/json")) {
+    try {
+      return res.status(upstream.status).type("application/json").send(JSON.parse(text));
+    } catch {
+      return res.status(upstream.status).type("text/plain").send(text);
     }
-    if (!Number.isFinite(history) || history < 30 || history > 365) {
-      return { ok: false, error: "history invalido" };
-    }
-    upstreamUrl = `${base}/api/predict/combined?horizon=${encodeURIComponent(horizon)}&history=${encodeURIComponent(history)}`;
-    return { ok: true, upstreamUrl, method };
   }
+  return res.status(upstream.status).type(ct).send(text);
+}
 
-  if (op === "weeklyChart") {
-    const weeks = parseInt(String(req.query.weeks ?? "8"), 10);
-    if (!Number.isFinite(weeks) || weeks < 2 || weeks > 24) {
-      return { ok: false, error: "weeks invalido" };
-    }
-    upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
-    return { ok: true, upstreamUrl, method };
+function aiAdminProxyErrorStatus(error) {
+  let status = typeof error.status === "number" ? error.status : 500;
+  if (status === 500 && error.code && String(error.code).startsWith("auth/")) {
+    status = 401;
   }
+  return status;
+}
 
-  if (op === "modelMetrics") {
-    upstreamUrl = `${base}/api/model/metrics`;
-    return { ok: true, upstreamUrl, method };
+function aiAdminProxyErrorMessage(status, error) {
+  if (status === 401) return "Sesion invalida o expirada. Vuelve a iniciar sesion.";
+  if (status < 500 && error.message) return error.message;
+  return publicError(error);
+}
+
+async function runAiAdminProxyRequest(req, res) {
+  const decodedToken = await verifyFirebaseUser(req);
+  const supabase = getSupabaseAdmin();
+  await assertAdminRole(supabase, decodedToken.uid);
+
+  const base = AI_SERVICE_URL.value().replace(/\/$/, "");
+  const serviceAuth = { Authorization: `Bearer ${AI_SERVICE_BEARER_TOKEN.value()}` };
+  const signal = AbortSignal.timeout(AI_PROXY_UPSTREAM_TIMEOUT_MS);
+  const op = typeof req.query.op === "string" ? req.query.op : "";
+
+  const resolved = resolveAiAdminUpstreamRequest(base, op, req);
+  if (!resolved.ok) {
+    return res.status(resolved.status ?? 400).json({ error: resolved.error });
   }
+  const { upstreamUrl, method } = resolved;
 
-  if (op === "ireHistorial") {
-    const days = parseInt(String(req.query.days ?? "30"), 10);
-    if (!Number.isFinite(days) || days < 1 || days > 365) {
-      return { ok: false, error: "days invalido" };
-    }
-    upstreamUrl = `${base}/api/ire/historial?days=${encodeURIComponent(days)}`;
-    return { ok: true, upstreamUrl, method };
-  }
+  const upstreamBody = method === "POST" && op === "campaignFeedback" ? JSON.stringify(req.body) : undefined;
+  const upstreamHeaders = {
+    ...serviceAuth,
+    ...(upstreamBody ? { "Content-Type": "application/json" } : {}),
+  };
 
-  if (op === "cacheInvalidate") {
-    if (req.method !== "POST") {
-      return { ok: false, status: 405, error: "Metodo no permitido" };
-    }
-    upstreamUrl = `${base}/api/cache/invalidate`;
-    return { ok: true, upstreamUrl, method: "POST" };
-  }
-
-  if (op === "campaignActive") {
-    upstreamUrl = `${base}/api/campaign/active`;
-    return { ok: true, upstreamUrl, method };
-  }
-
-  if (op === "campaignFeedback") {
-    if (req.method !== "POST") {
-      return { ok: false, status: 405, error: "Metodo no permitido" };
-    }
-    upstreamUrl = `${base}/api/campaign/feedback`;
-    return { ok: true, upstreamUrl, method: "POST" };
-  }
-
-  if (op === "campaignDetection") {
-    const recentDays = parseInt(String(req.query.recent_days ?? "7"), 10);
-    const baselineDays = parseInt(String(req.query.baseline_days ?? "60"), 10);
-    if (!Number.isFinite(recentDays) || recentDays < 3 || recentDays > 14) {
-      return { ok: false, error: "recent_days invalido" };
-    }
-    if (!Number.isFinite(baselineDays) || baselineDays < 30 || baselineDays > 120) {
-      return { ok: false, error: "baseline_days invalido" };
-    }
-    upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${recentDays}&baseline_days=${baselineDays}`;
-    return { ok: true, upstreamUrl, method };
-  }
-
-  if (op === "learningStats") {
-    upstreamUrl = `${base}/api/campaign/learning-stats`;
-    return { ok: true, upstreamUrl, method };
-  }
-
-  return { ok: false, error: "op invalido" };
+  const upstream = await fetch(upstreamUrl, { method, headers: upstreamHeaders, body: upstreamBody, signal });
+  const text = await upstream.text();
+  return sendUpstreamToClient(res, upstream, text);
 }
 
 exports.aiAdminProxy = onRequest(
@@ -943,59 +986,12 @@ exports.aiAdminProxy = onRequest(
         return res.status(204).send("");
       }
 
-      const op = typeof req.query.op === "string" ? req.query.op : "";
-
       try {
-        const decodedToken = await verifyFirebaseUser(req);
-        const supabase = getSupabaseAdmin();
-        await assertAdminRole(supabase, decodedToken.uid);
-
-        const base = AI_SERVICE_URL.value().replace(/\/$/, "");
-        const serviceAuth = { Authorization: `Bearer ${AI_SERVICE_BEARER_TOKEN.value()}` };
-        const signal = AbortSignal.timeout(AI_PROXY_UPSTREAM_TIMEOUT_MS);
-
-        const resolved = resolveAiAdminUpstreamRequest(base, op, req);
-        if (!resolved.ok) {
-          return res.status(resolved.status ?? 400).json({ error: resolved.error });
-        }
-        const { upstreamUrl, method } = resolved;
-
-        // campaignFeedback needs to forward the request body
-        const upstreamBody = (method === "POST" && op === "campaignFeedback")
-          ? JSON.stringify(req.body)
-          : undefined;
-        const upstreamHeaders = {
-          ...serviceAuth,
-          ...(upstreamBody ? { "Content-Type": "application/json" } : {}),
-        };
-
-        const upstream = await fetch(upstreamUrl, { method, headers: upstreamHeaders, body: upstreamBody, signal });
-        const text = await upstream.text();
-        const ct = upstream.headers.get("content-type") || "application/json; charset=utf-8";
-
-        if (ct.includes("application/json")) {
-          try {
-            return res.status(upstream.status).type("application/json").send(JSON.parse(text));
-          } catch {
-            return res.status(upstream.status).type("text/plain").send(text);
-          }
-        }
-
-        return res.status(upstream.status).type(ct).send(text);
+        return await runAiAdminProxyRequest(req, res);
       } catch (error) {
         console.error("aiAdminProxy error:", error);
-        let status = typeof error.status === "number" ? error.status : 500;
-        if (status === 500 && error.code && String(error.code).startsWith("auth/")) {
-          status = 401;
-        }
-        let message;
-        if (status === 401) {
-          message = "Sesion invalida o expirada. Vuelve a iniciar sesion.";
-        } else if (status < 500 && error.message) {
-          message = error.message;
-        } else {
-          message = publicError(error);
-        }
+        const status = aiAdminProxyErrorStatus(error);
+        const message = aiAdminProxyErrorMessage(status, error);
         return res.status(status).json({ error: message });
       }
     });
