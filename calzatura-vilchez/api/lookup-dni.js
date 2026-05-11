@@ -5,8 +5,8 @@ const allowedOrigins = new Set([
   "http://127.0.0.1:5173",
 ]);
 
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 15;
+const RATE_LIMIT_WINDOW_MS = 30 * 60 * 1000; // 30 minutos
+const RATE_LIMIT_MAX_REQUESTS = 15; // máximo POST por IP en esa ventana
 const ipBuckets = new Map();
 
 function getClientIp(req) {

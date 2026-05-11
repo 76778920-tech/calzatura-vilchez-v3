@@ -6,6 +6,7 @@ export interface DniLookupResult {
 
 const DNI_LOOKUP_URL = (import.meta.env.VITE_DNI_LOOKUP_URL as string | undefined)?.trim();
 
+/** Consulta DNI vía POST a `VITE_DNI_LOOKUP_URL`. Si usas el proxy `api/lookup-dni.js`, allí aplica límite por IP (p. ej. 15 / 30 min). */
 export function normalizeDni(value: string) {
   return value.replace(/\D/g, "").slice(0, 8);
 }
