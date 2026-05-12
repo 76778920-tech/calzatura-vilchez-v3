@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from "react";
-import type { FormEvent } from "react";
+import { useState, useRef, useEffect, useMemo, type FormEventHandler, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ShoppingCart,
@@ -56,7 +55,7 @@ function normalizeRouteToken(value: string | null | undefined) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\+/g, " ")
+    .replaceAll("+", " ")
     .trim();
 }
 
@@ -565,11 +564,11 @@ function MegaMenuPanel({
   menu,
   onClose,
   isLinkCurrent,
-}: {
+}: Readonly<{
   menu: MegaMenu;
   onClose: () => void;
   isLinkCurrent: (to: string) => boolean;
-}) {
+}>) {
   const preferredDefaultLabel = useMemo(() => {
     if (menu.id === "zapatillas") return "Zapatillas Hombre";
     if (menu.id === "cyber") return "Cyber Hombre";
@@ -591,7 +590,7 @@ function MegaMenuPanel({
   const [activeHoverItem, setActiveHoverItem] = useState<MegaLink | null>(() => defaultFeaturedHoverItem);
 
   return (
-    <div className="mega-menu-panel" onMouseEnter={() => undefined}>
+    <div className="mega-menu-panel">
       <button type="button" className="mega-close" onClick={onClose} aria-label="Cerrar menú">
         <X size={26} />
       </button>
@@ -602,20 +601,20 @@ function MegaMenuPanel({
             <div
               key={`${menu.id}-${item.label}`}
               className={`mega-featured-item ${item.hoverPanel ? "has-hover-panel" : ""}`}
-              onMouseEnter={() => {
-                setActiveHoverPanel(item.hoverPanel ?? null);
-                setActiveHoverItem(item.hoverPanel?.items[0] ?? null);
-              }}
-              onFocus={() => {
-                setActiveHoverPanel(item.hoverPanel ?? null);
-                setActiveHoverItem(item.hoverPanel?.items[0] ?? null);
-              }}
             >
               <Link
                 to={item.to}
                 className={`mega-featured-link ${item.accent ? "accent" : ""} ${isLinkCurrent(item.to) ? "is-current" : ""}`}
                 onClick={onClose}
                 aria-current={isLinkCurrent(item.to) ? "page" : undefined}
+                onMouseEnter={() => {
+                  setActiveHoverPanel(item.hoverPanel ?? null);
+                  setActiveHoverItem(item.hoverPanel?.items[0] ?? null);
+                }}
+                onFocus={() => {
+                  setActiveHoverPanel(item.hoverPanel ?? null);
+                  setActiveHoverItem(item.hoverPanel?.items[0] ?? null);
+                }}
               >
                 <span>{item.label}</span>
                 {item.tag && <small>{item.tag}</small>}
@@ -633,8 +632,9 @@ function MegaMenuPanel({
           </div>
         </div>
 
-        <div
+        <section
           className={`mega-columns ${activeHoverPanel ? "panel-open" : ""}`}
+          aria-label="Columnas de navegación del menú"
           onMouseEnter={() => {
             if (activeHoverPanel) return;
             if (!defaultFeaturedHoverPanel && !defaultFeaturedHoverItem) return;
@@ -702,7 +702,7 @@ function MegaMenuPanel({
               )}
             </>
           )}
-        </div>
+        </section>
 
         {activeHoverItem?.image ? (
           <Link
@@ -812,10 +812,10 @@ export default function Header() {
   }, []);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       setHeaderSearch(searchParams.get("buscar") ?? "");
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => globalThis.clearTimeout(timer);
   }, [searchParams]);
 
   useEffect(() => {
@@ -857,7 +857,7 @@ export default function Header() {
     [headerSearch, products]
   );
 
-  const handleHeaderSearch = (event: FormEvent<HTMLFormElement>) => {
+  const handleHeaderSearch: FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
     const query = headerSearch.trim();
     closeMegaMenu();
@@ -879,6 +879,38 @@ export default function Header() {
     closeMegaMenu();
     toggleTheme();
   };
+
+  let userDropdownPrimarySection: ReactNode = null;
+  if (hasVerifiedAccess) {
+    userDropdownPrimarySection = (
+      <>
+        <Link to={CLIENT_ROUTES.orderHistory} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
+          <Package size={16} />
+          Mis Pedidos
+        </Link>
+        <Link to={CLIENT_ROUTES.favorites} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
+          <Heart size={16} />
+          Favoritos
+        </Link>
+        <Link to={CLIENT_ROUTES.profile} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
+          <User size={16} />
+          Mi Perfil
+        </Link>
+      </>
+    );
+  } else if (requiresEmailVerification) {
+    userDropdownPrimarySection = (
+      <Link
+        to={PUBLIC_ROUTES.verifyEmail}
+        className="dropdown-item"
+        onClick={() => setUserMenuOpen(false)}
+        role="menuitem"
+      >
+        <User size={16} />
+        Verificar Correo
+      </Link>
+    );
+  }
 
   return (
     <>
@@ -949,25 +981,26 @@ export default function Header() {
                 setSearchFocused(true);
                 closeMegaMenu();
               }}
-              onBlur={() => window.setTimeout(() => setSearchFocused(false), 120)}
+              onBlur={() => globalThis.setTimeout(() => setSearchFocused(false), 120)}
               placeholder="Buscar"
               aria-label="Buscar productos"
             />
             {searchFocused && searchSuggestions.length > 0 && (
-              <div className="header-search-results" role="listbox">
+              <ul className="header-search-results">
                 {searchSuggestions.map((product) => (
-                  <button
-                    key={product.id}
-                    type="button"
-                    className="header-search-result"
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => selectSuggestion(product)}
-                  >
-                    <span>{product.nombre}</span>
-                    <small>{product.marca || product.categoria}</small>
-                  </button>
+                  <li key={product.id} className="header-search-result-li">
+                    <button
+                      type="button"
+                      className="header-search-result"
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => selectSuggestion(product)}
+                    >
+                      <span>{product.nombre}</span>
+                      <small>{product.marca || product.categoria}</small>
+                    </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
           </form>
 
@@ -1024,32 +1057,7 @@ export default function Header() {
                           Panel Admin
                         </Link>
                       )}
-                      {hasVerifiedAccess ? (
-                        <>
-                          <Link to={CLIENT_ROUTES.orderHistory} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
-                            <Package size={16} />
-                            Mis Pedidos
-                          </Link>
-                          <Link to={CLIENT_ROUTES.favorites} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
-                            <Heart size={16} />
-                            Favoritos
-                          </Link>
-                          <Link to={CLIENT_ROUTES.profile} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
-                            <User size={16} />
-                            Mi Perfil
-                          </Link>
-                        </>
-                      ) : requiresEmailVerification ? (
-                        <Link
-                          to={PUBLIC_ROUTES.verifyEmail}
-                          className="dropdown-item"
-                          onClick={() => setUserMenuOpen(false)}
-                          role="menuitem"
-                        >
-                          <User size={16} />
-                          Verificar Correo
-                        </Link>
-                      ) : null}
+                      {userDropdownPrimarySection}
                       <hr className="dropdown-divider" />
                       <button onClick={handleLogout} className="dropdown-item dropdown-logout" role="menuitem">
                         <LogOut size={16} />
