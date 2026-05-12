@@ -4,7 +4,7 @@
  * Variables de entorno (Vercel / serverless) — configura al menos UNA:
  *   LATINFO_API_KEY       — Latinfo (Bearer), prioridad 1
  *   CONSULTAS_PERU_TOKEN — ConsultasPerú (body token), prioridad 2
- *   PERUAPI_TOKEN        — Perú API peruapi.com (Bearer), prioridad 3
+ *   PERUAPI_TOKEN        — Perú API peruapi.com (cabecera X-API-KEY), prioridad 3
  *   API_INTI_TOKEN       — ApiInti app.apiinti.dev (Bearer), prioridad 4
  *   APIPERU_DEV_TOKEN    — apiperu.dev (Bearer), prioridad 5
  *
@@ -203,11 +203,24 @@ async function tryConsultasPeru(dni) {
 async function tryPeruApi(dni) {
   const token = process.env.PERUAPI_TOKEN?.trim();
   if (!token) return { person: null, httpStatus: null, skipped: true };
-  const { ok, status, json } = await fetchJson(`https://api.peruapi.com/v1/dni/${dni}`, {
-    method: "GET",
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  // Documentación: https://peruapi.com/documentacion — GET + X-API-KEY
+  const { ok, status, json } = await fetchJson(
+    `https://peruapi.com/api/dni/${dni}?summary=0&plan=0`,
+    {
+      method: "GET",
+      headers: { "X-API-KEY": token },
+    }
+  );
   if (!ok) return { person: null, httpStatus: status, skipped: false };
+  const codeOk = json.code == null || String(json.code) === "200";
+  if (!codeOk) {
+    const asNum = Number.parseInt(String(json.code), 10);
+    return {
+      person: null,
+      httpStatus: Number.isFinite(asNum) && asNum >= 400 && asNum < 600 ? asNum : 502,
+      skipped: false,
+    };
+  }
   const person = personFromRecord(json, dni);
   return { person, httpStatus: status, skipped: false };
 }
