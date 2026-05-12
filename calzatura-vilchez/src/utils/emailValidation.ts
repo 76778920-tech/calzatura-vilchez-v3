@@ -3,6 +3,8 @@
  * No intenta cubrir el RFC completo; prioriza formatos reales y dominios con varios segmentos.
  */
 
+import { MAX_AUTH_EMAIL_INPUT_LENGTH } from "@/config/authCredentials";
+
 /** Normaliza para guardar o comparar: sin espacios laterales y en minúsculas. */
 export function normalizeEmailInput(raw: string): string {
   return raw.trim().toLowerCase();
@@ -20,6 +22,9 @@ const EMAIL_PATTERN =
 export function validateEmailFormat(raw: string): string | null {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return "Ingrese un correo electrónico";
+  if (trimmed.length > MAX_AUTH_EMAIL_INPUT_LENGTH) {
+    return `El correo no puede superar ${MAX_AUTH_EMAIL_INPUT_LENGTH} caracteres`;
+  }
   const normalized = normalizeEmailInput(raw);
   if (!EMAIL_PATTERN.test(normalized)) return "Formato de correo no válido";
   return null;

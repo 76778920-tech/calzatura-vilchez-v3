@@ -1,7 +1,6 @@
+import { validateRegisterPasswordLength } from "@/config/authCredentials";
 import { isValidDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import { normalizeEmailInput, validateEmailFormat } from "@/utils/emailValidation";
-
-const MIN_PASSWORD_LENGTH = 8;
 
 export type RegisterFormFields = {
   dni: string;
@@ -25,9 +24,8 @@ export function getRegisterBlockingMessage(fields: RegisterFormFields): string |
   if (fields.password !== fields.confirmPass) {
     return "Las contraseñas no coinciden";
   }
-  if (fields.password.length < MIN_PASSWORD_LENGTH) {
-    return `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`;
-  }
+  const passLen = validateRegisterPasswordLength(fields.password);
+  if (passLen) return passLen;
   return validateEmailFormat(fields.email);
 }
 

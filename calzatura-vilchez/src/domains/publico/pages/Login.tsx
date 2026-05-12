@@ -6,6 +6,7 @@ import { isSuperAdminEmail } from "@/config/security";
 import { getPostLoginRedirect } from "@/routes/redirects";
 import { PUBLIC_ROUTES } from "@/routes/paths";
 import toast from "react-hot-toast";
+import { MAX_AUTH_EMAIL_INPUT_LENGTH, MAX_AUTH_PASSWORD_LENGTH, validateLoginPasswordLength } from "@/config/authCredentials";
 import { normalizeEmailInput, validateEmailFormat } from "@/utils/emailValidation";
 import { clearPendingVerificationEmail, savePendingVerificationEmail } from "@/utils/pendingVerification";
 import type { UserRole } from "@/types";
@@ -49,6 +50,11 @@ export default function Login() {
     const emailErr = validateEmailFormat(email);
     if (emailErr) {
       toast.error(emailErr);
+      return;
+    }
+    const passErr = validateLoginPasswordLength(password);
+    if (passErr) {
+      toast.error(passErr);
       return;
     }
 
@@ -114,6 +120,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                maxLength={MAX_AUTH_EMAIL_INPUT_LENGTH}
                 placeholder="tu@correo.com"
                 className="form-input with-icon"
               />
@@ -131,6 +138,7 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                maxLength={MAX_AUTH_PASSWORD_LENGTH}
                 placeholder="••••••••"
                 className="form-input with-icon"
               />

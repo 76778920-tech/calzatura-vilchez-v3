@@ -62,11 +62,11 @@ const LOGIN_EMAIL_RE =
 function isValidLoginEmail(email) {
   if (typeof email !== "string") return false;
   const t = email.trim().toLowerCase();
-  return t.length <= 254 && LOGIN_EMAIL_RE.test(t);
+  return t.length <= 100 && LOGIN_EMAIL_RE.test(t);
 }
 
 function isValidLoginPassword(password) {
-  return typeof password === "string" && password.length >= 1 && password.length <= 256;
+  return typeof password === "string" && password.length >= 1 && password.length <= 128;
 }
 
 let adminReady = false;

@@ -17,8 +17,12 @@ import { isSuperAdminEmail } from "@/config/security";
 import type { UserRole } from "@/types";
 import { clearFavoriteProductsByUser } from "@/domains/clientes/services/favorites";
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
+import {
+  MAX_AUTH_PASSWORD_LENGTH,
+  MIN_AUTH_PASSWORD_LENGTH,
+  validateLoginPasswordLength,
+} from "@/config/authCredentials";
 
-const MIN_PASSWORD_LENGTH = 8;
 const PENDING_PROFILE_PREFIX = "CV_PENDING";
 
 function encodePendingSegment(value: string): string {
@@ -106,10 +110,12 @@ export async function registerUser(
     password: string;
   }
 ) {
-  if (data.password.length < MIN_PASSWORD_LENGTH) {
+  if (data.password.length < MIN_AUTH_PASSWORD_LENGTH) {
     throw new Error("PASSWORD_TOO_SHORT");
   }
-
+  if (data.password.length > MAX_AUTH_PASSWORD_LENGTH) {
+    throw new Error("PASSWORD_TOO_LONG");
+  }
   const userCredential = await createUserWithEmailAndPassword(
     auth,
     data.email,
@@ -210,6 +216,10 @@ async function loginThroughAuthProxy(proxyUrl: string, email: string, password: 
 }
 
 export async function loginUser(email: string, password: string) {
+  const passLenErr = validateLoginPasswordLength(password);
+  if (passLenErr) {
+    throw new Error("PASSWORD_TOO_LONG");
+  }
   const proxyUrl = resolveAuthLoginProxyUrl();
   if (proxyUrl) {
     return loginThroughAuthProxy(proxyUrl, email, password);

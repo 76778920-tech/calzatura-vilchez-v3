@@ -1,6 +1,5 @@
 import toast from "react-hot-toast";
-
-const MIN_PASSWORD_LENGTH = 8;
+import { MAX_AUTH_PASSWORD_LENGTH, MIN_AUTH_PASSWORD_LENGTH } from "@/config/authCredentials";
 
 /** Mensaje de toast para errores de registro Firebase / validación previa. */
 export function toastRegisterCreateError(err: unknown): void {
@@ -12,7 +11,13 @@ export function toastRegisterCreateError(err: unknown): void {
     return;
   }
   if (msg === "PASSWORD_TOO_SHORT") {
-    toast.error(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
+    toast.error(`La contraseña debe tener al menos ${MIN_AUTH_PASSWORD_LENGTH} caracteres`);
+    return;
+  }
+  if (msg === "PASSWORD_TOO_LONG") {
+    toast.error(
+      `La contraseña supera el límite permitido. Usa como máximo ${MAX_AUTH_PASSWORD_LENGTH} caracteres.`,
+    );
     return;
   }
   if (code.includes("weak-password")) {

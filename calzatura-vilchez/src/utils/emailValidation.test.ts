@@ -37,6 +37,11 @@ describe("emailValidation", () => {
     expect(validateEmailFormat("user..name@gmail.com")).not.toBeNull();
   });
 
+  it("rejects excessively long address (input limit)", () => {
+    const longLocal = "a".repeat(92);
+    expect(validateEmailFormat(`${longLocal}@gmail.com`)).toMatch(/100/);
+  });
+
   it("isValidEmailFormat mirrors validateEmailFormat", () => {
     expect(isValidEmailFormat("ok@test.com")).toBe(true);
     expect(isValidEmailFormat("bad")).toBe(false);

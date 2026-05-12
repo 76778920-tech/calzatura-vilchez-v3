@@ -8,6 +8,7 @@ import { getNormalizedRegisterEmail, getRegisterBlockingMessage } from "./regist
 import { savePendingVerificationEmail } from "@/utils/pendingVerification";
 import toast from "react-hot-toast";
 import { toastRegisterCreateError } from "./registerErrors";
+import { MAX_AUTH_EMAIL_INPUT_LENGTH, MAX_AUTH_PASSWORD_LENGTH } from "@/config/authCredentials";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -188,6 +189,7 @@ export default function Register() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                maxLength={MAX_AUTH_EMAIL_INPUT_LENGTH}
                 placeholder="tu@correo.com"
                 className="form-input with-icon"
               />
@@ -205,6 +207,7 @@ export default function Register() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
+                  maxLength={MAX_AUTH_PASSWORD_LENGTH}
                   placeholder="Minimo 8 caracteres"
                   className="form-input with-icon"
                 />
@@ -224,6 +227,7 @@ export default function Register() {
                   value={confirmPass}
                   onChange={(e) => setConfirmPass(e.target.value)}
                   required
+                  maxLength={MAX_AUTH_PASSWORD_LENGTH}
                   placeholder="Repite tu contraseña"
                   className="form-input with-icon"
                 />
