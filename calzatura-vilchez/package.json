@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node scripts/run-clean-env.mjs vite",
     "build": "node scripts/run-clean-env.mjs tsc -b --next vite build",
+    "dist": "npm run build",
     "typecheck": "node scripts/run-clean-env.mjs tsc -b",
     "quality": "npm run test && npm run lint && npm run typecheck && npm run build",
     "lint": "node scripts/run-clean-env.mjs eslint .",
