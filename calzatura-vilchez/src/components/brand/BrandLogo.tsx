@@ -5,11 +5,11 @@ export type BrandLogoMode = "light" | "dark";
 export type BrandLogoLayout = "horizontal" | "compact";
 
 type BrandLogoProps = {
-  variant?: BrandLogoVariant;
-  mode?: BrandLogoMode;
-  layout?: BrandLogoLayout;
-  className?: string;
-  title?: string;
+  readonly variant?: BrandLogoVariant;
+  readonly mode?: BrandLogoMode;
+  readonly layout?: BrandLogoLayout;
+  readonly className?: string;
+  readonly title?: string;
 };
 
 type LogoPalette = {
@@ -63,15 +63,15 @@ const ANGLES_12 = [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330];
 function BadgeMark({
   palette,
   variant,
-}: {
+}: Readonly<{
   palette: LogoPalette;
   variant: BrandLogoVariant;
-}) {
+}>) {
   const angles = variant === "heritage" ? ANGLES_12 : ANGLES_8;
   // heritage: more petals → narrower; premium/commercial: classic 8
   // Scaled from reference SVG (180×180 → 68×68) keeping original proportions
   const rx   = variant === "heritage" ? 1.8 : 2.3;
-  const ry   = variant === "heritage" ? 5.0 : 6.3;
+  const ry   = variant === "heritage" ? 5 : 6.3;
   const dist = variant === "heritage" ? 13  : 14;
 
   return (
@@ -121,7 +121,7 @@ function BadgeMark({
 
 // ── Wordmarks ─────────────────────────────────────────────────────────────────
 
-function PremiumWordmark({ palette }: { palette: LogoPalette }) {
+function PremiumWordmark({ palette }: Readonly<{ palette: LogoPalette }>) {
   return (
     <>
       {/* textLength pins the width so italic overhang never clips at the viewBox edge */}
@@ -152,7 +152,7 @@ function PremiumWordmark({ palette }: { palette: LogoPalette }) {
   );
 }
 
-function CommercialWordmark({ palette }: { palette: LogoPalette }) {
+function CommercialWordmark({ palette }: Readonly<{ palette: LogoPalette }>) {
   return (
     <>
       <rect
@@ -183,7 +183,7 @@ function CommercialWordmark({ palette }: { palette: LogoPalette }) {
   );
 }
 
-function HeritageWordmark({ palette }: { palette: LogoPalette }) {
+function HeritageWordmark({ palette }: Readonly<{ palette: LogoPalette }>) {
   return (
     <>
       <line x1="80" y1="17" x2="268" y2="17" stroke={palette.outline} strokeWidth="1.2" />
@@ -225,10 +225,10 @@ function HeritageWordmark({ palette }: { palette: LogoPalette }) {
 function CompactLockup({
   palette,
   variant,
-}: {
+}: Readonly<{
   palette: LogoPalette;
   variant: BrandLogoVariant;
-}) {
+}>) {
   return (
     <>
       <BadgeMark palette={palette} variant={variant} />
@@ -257,7 +257,7 @@ export default function BrandLogo({
   layout    = "horizontal",
   className,
   title     = "Calzatura Vilchez",
-}: BrandLogoProps) {
+}: Readonly<BrandLogoProps>) {
   const palette   = getPalette(mode);
   const isCompact = layout === "compact";
 
