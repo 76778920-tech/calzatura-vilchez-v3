@@ -2,9 +2,9 @@
  * Consulta DNI con failover entre proveedores (primer éxito gana).
  *
  * Variables de entorno (Vercel / serverless) — configura al menos UNA:
- *   LATINFO_API_KEY       — Latinfo (Bearer), prioridad 1
+ *   LATINFO_API_KEY o CLAVE_API_LATINFO — Latinfo (Bearer), prioridad 1
  *   CONSULTAS_PERU_TOKEN — ConsultasPerú (body token), prioridad 2
- *   PERUAPI_TOKEN        — Perú API peruapi.com (cabecera X-API-KEY), prioridad 3
+ *   PERUAPI_TOKEN o TOKEN_PERUAPI — Perú API peruapi.com (cabecera X-API-KEY), prioridad 3
  *   API_INTI_TOKEN       — ApiInti app.apiinti.dev (Bearer), prioridad 4
  *   APIPERU_DEV_TOKEN    — apiperu.dev (Bearer), prioridad 5
  *
@@ -22,6 +22,15 @@ const RATE_LIMIT_WINDOW_MS = 30 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 15;
 const ipBuckets = new Map();
 const REQUEST_TIMEOUT_MS = 10_000;
+
+/** Primera variable definida y no vacía (soporta alias en Vercel). */
+function envFirstTrimmed(...names) {
+  for (const name of names) {
+    const v = process.env[name]?.trim();
+    if (v) return v;
+  }
+  return "";
+}
 
 function getClientIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
@@ -162,9 +171,9 @@ async function fetchJson(url, init = {}) {
 
 function hasAnyProviderToken() {
   return Boolean(
-    process.env.LATINFO_API_KEY?.trim()
+    envFirstTrimmed("LATINFO_API_KEY", "CLAVE_API_LATINFO")
     || process.env.CONSULTAS_PERU_TOKEN?.trim()
-    || process.env.PERUAPI_TOKEN?.trim()
+    || envFirstTrimmed("PERUAPI_TOKEN", "TOKEN_PERUAPI")
     || process.env.API_INTI_TOKEN?.trim()
     || process.env.APIPERU_DEV_TOKEN?.trim()
   );
@@ -172,7 +181,7 @@ function hasAnyProviderToken() {
 
 /** @returns {{ person: object | null, httpStatus: number | null, skipped: boolean }} */
 async function tryLatinfo(dni) {
-  const token = process.env.LATINFO_API_KEY?.trim();
+  const token = envFirstTrimmed("LATINFO_API_KEY", "CLAVE_API_LATINFO");
   if (!token) return { person: null, httpStatus: null, skipped: true };
   const { ok, status, json } = await fetchJson(`https://api.latinfo.dev/pe/dni/${dni}`, {
     method: "GET",
@@ -201,7 +210,7 @@ async function tryConsultasPeru(dni) {
 }
 
 async function tryPeruApi(dni) {
-  const token = process.env.PERUAPI_TOKEN?.trim();
+  const token = envFirstTrimmed("PERUAPI_TOKEN", "TOKEN_PERUAPI");
   if (!token) return { person: null, httpStatus: null, skipped: true };
   // Documentación: https://peruapi.com/documentacion — GET + X-API-KEY
   const { ok, status, json } = await fetchJson(
@@ -290,7 +299,8 @@ export default async function handler(req, res) {
   if (!hasAnyProviderToken()) {
     return res.status(500).json({
       error: "Servicio no configurado",
-      detail: "Define al menos una variable: LATINFO_API_KEY, CONSULTAS_PERU_TOKEN, PERUAPI_TOKEN, API_INTI_TOKEN o APIPERU_DEV_TOKEN",
+      detail:
+        "Define al menos una variable DNI: LATINFO_API_KEY o CLAVE_API_LATINFO, CONSULTAS_PERU_TOKEN, PERUAPI_TOKEN o TOKEN_PERUAPI, API_INTI_TOKEN o APIPERU_DEV_TOKEN",
     });
   }
 
