@@ -3,13 +3,13 @@ import { ChevronLeft, ChevronRight, X } from "lucide-react";
 const FALLBACK_PRODUCT_IMAGE = "/placeholder-product.svg";
 
 interface ImagePreviewModalProps {
-  src: string;
-  images?: string[];
-  selectedIndex?: number;
-  title: string;
-  subtitle?: string;
-  onNavigate?: (direction: 1 | -1) => void;
-  onClose: () => void;
+  readonly src: string;
+  readonly images?: string[];
+  readonly selectedIndex?: number;
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly onNavigate?: (direction: 1 | -1) => void;
+  readonly onClose: () => void;
 }
 
 export default function ImagePreviewModal({

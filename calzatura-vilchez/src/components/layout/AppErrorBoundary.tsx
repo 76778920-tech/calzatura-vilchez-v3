@@ -5,7 +5,7 @@ import {
   resetChunkReloadAttempt,
 } from "@/utils/chunkRecovery";
 
-function ErrorFallback({ onRetry }: { onRetry: () => void }) {
+function ErrorFallback({ onRetry }: Readonly<{ onRetry: () => void }>) {
   return (
     <main className="app-error-page">
       <div className="app-error-card">
@@ -24,7 +24,7 @@ function ErrorFallback({ onRetry }: { onRetry: () => void }) {
 }
 
 export class AppErrorBoundary extends Component<
-  { children: ReactNode },
+  Readonly<{ children: ReactNode }>,
   { hasError: boolean }
 > {
   state = { hasError: false };
@@ -42,7 +42,7 @@ export class AppErrorBoundary extends Component<
 
   handleRetry = () => {
     resetChunkReloadAttempt();
-    window.location.reload();
+    globalThis.location.reload();
   };
 
   render() {

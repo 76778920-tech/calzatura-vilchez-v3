@@ -118,7 +118,7 @@ def _data_hash(sales_map: dict, sale_meta: dict | None = None) -> str:
     sale_meta = sale_meta or {}
     key = "|".join(
         f"{pid}:"
-        f"{sum(v for v in day_sales.values()):.1f}:"
+        f"{sum(day_sales.values()):.1f}:"
         f"{sale_meta.get(pid, {}).get('categoria') or ''}:"
         f"{_normalize_campaign(sale_meta.get(pid, {}).get('campana'))}"
         for pid, day_sales in sorted(sales_map.items())
