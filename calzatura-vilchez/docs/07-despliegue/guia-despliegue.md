@@ -90,9 +90,10 @@ VITE_CLOUDINARY_UPLOAD_PRESET=preset-sin-firma
 VITE_AI_SERVICE_URL=https://[nombre-servicio].onrender.com
 VITE_AI_SERVICE_TOKEN=token-secreto-del-servicio-ia
 
-# API de DNI
-VITE_DNI_API_URL=https://api.consultaruc.com/api/dni
-VITE_DNI_API_KEY=tu-api-key
+# Consulta DNI (proxy con failover en Vercel: api/lookup-dni.js)
+VITE_DNI_LOOKUP_URL=https://tu-proyecto.vercel.app/api/lookup-dni
+# En Vercel (Environment Variables del proyecto), define al menos un token:
+# LATINFO_API_KEY, CONSULTAS_PERU_TOKEN, PERUAPI_TOKEN, API_INTI_TOKEN, APIPERU_DEV_TOKEN
 ```
 
 **Nota de seguridad (ISO/IEC 27001, Control A.9.4.3):** El archivo `.env` está en `.gitignore` y nunca debe subirse al repositorio. Contiene credenciales que deben gestionarse con un gestor de secretos en producción.
