@@ -31,13 +31,12 @@ interface ISpeechRecognition {
   start(): void;
   stop(): void;
 }
-interface ISpeechRecognitionCtor { new(): ISpeechRecognition; }
-declare global {
-  interface Window {
-    SpeechRecognition?: ISpeechRecognitionCtor;
-    webkitSpeechRecognition?: ISpeechRecognitionCtor;
-  }
-}
+type ISpeechRecognitionCtor = new () => ISpeechRecognition;
+
+type GlobalWithSpeechRecognition = typeof globalThis & {
+  SpeechRecognition?: ISpeechRecognitionCtor;
+  webkitSpeechRecognition?: ISpeechRecognitionCtor;
+};
 
 const styles = `
   *:focus-visible { outline-offset: 0 !important; --ring-offset: 0 !important; }
@@ -74,7 +73,7 @@ const TooltipProvider = TooltipPrimitive.Provider;
 const Tooltip = TooltipPrimitive.Root;
 const TooltipTrigger = TooltipPrimitive.Trigger;
 const TooltipContent = React.forwardRef<
-  React.ElementRef<typeof TooltipPrimitive.Content>,
+  React.ComponentRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
 >(({ className, sideOffset = 4, ...props }, ref) => (
   <TooltipPrimitive.Content
@@ -95,7 +94,7 @@ const Dialog = DialogPrimitive.Root;
 const DialogPortal = DialogPrimitive.Portal;
 
 const DialogOverlay = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Overlay>,
+  React.ComponentRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
@@ -107,7 +106,7 @@ const DialogOverlay = React.forwardRef<
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, children, ...props }, ref) => (
   <DialogPortal>
@@ -131,7 +130,7 @@ const DialogContent = React.forwardRef<
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 const DialogTitle = React.forwardRef<
-  React.ElementRef<typeof DialogPrimitive.Title>,
+  React.ComponentRef<typeof DialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
@@ -187,12 +186,19 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ isRecording, visualizerBa
   const [time, setTime] = React.useState(0);
 
   const bars = React.useMemo(
-    () => Array.from({ length: visualizerBars }, (_, i) => ({
-      height: Math.max(15, ((i * 37 + 13) % 100)),
-      delay: i * 0.05,
-      duration: 0.5 + ((i * 17) % 10) / 20,
-    })),
-    [visualizerBars]
+    () =>
+      Array.from({ length: visualizerBars }, (_, i) => {
+        const height = Math.max(15, ((i * 37 + 13) % 100));
+        const delay = i * 0.05;
+        const duration = 0.5 + ((i * 17) % 10) / 20;
+        return {
+          key: `viz-${height}-${delay}-${duration}`,
+          height,
+          delay,
+          duration,
+        };
+      }),
+    [visualizerBars],
   );
 
   React.useEffect(() => {
@@ -214,9 +220,9 @@ const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ isRecording, visualizerBa
         <span className="font-mono text-sm text-white/80">{formatTime(time)}</span>
       </div>
       <div className="w-full h-10 flex items-center justify-center gap-0.5 px-4">
-        {bars.map((bar, i) => (
+        {bars.map((bar) => (
           <div
-            key={i}
+            key={bar.key}
             className="w-0.5 rounded-full bg-white/50 animate-pulse"
             style={{ height: `${bar.height}%`, animationDelay: `${bar.delay}s`, animationDuration: `${bar.duration}s` }}
           />
@@ -281,11 +287,26 @@ interface PromptInputProps {
 const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
   ({ className, isLoading = false, maxHeight = 240, value, onValueChange, onSubmit, children, disabled = false, onDragOver, onDragLeave, onDrop }, ref) => {
     const [internalValue, setInternalValue] = React.useState(value || "");
+    const mergedValue = value ?? internalValue;
+    const setValue = onValueChange ?? setInternalValue;
+    const contextValue = React.useMemo(
+      () => ({
+        isLoading,
+        value: mergedValue,
+        setValue,
+        maxHeight,
+        onSubmit,
+        disabled,
+      }),
+      [isLoading, mergedValue, setValue, maxHeight, onSubmit, disabled],
+    );
     return (
       <TooltipProvider>
-        <PromptInputContext.Provider value={{ isLoading, value: value ?? internalValue, setValue: onValueChange ?? setInternalValue, maxHeight, onSubmit, disabled }}>
+        <PromptInputContext.Provider value={contextValue}>
           <div
             ref={ref}
+            role="region"
+            aria-label="Entrada de mensaje. Puedes arrastrar imágenes aquí para adjuntarlas."
             className={cn("rounded-3xl border border-[#444444] bg-[#1F2023] p-2 shadow-[0_8px_30px_rgba(0,0,0,0.24)] transition-all duration-300", isLoading && "border-red-500/70", className)}
             onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
           >
@@ -361,7 +382,10 @@ function buildPromptPayloadWithModePrefix(
   showThink: boolean,
   showCanvas: boolean
 ): string {
-  const prefix = showSearch ? "[Buscar: " : showThink ? "[Analizar: " : showCanvas ? "[Canvas: " : "";
+  let prefix = "";
+  if (showSearch) prefix = "[Buscar: ";
+  else if (showThink) prefix = "[Analizar: ";
+  else if (showCanvas) prefix = "[Canvas: ";
   return prefix ? `${prefix}${input}]` : input;
 }
 
@@ -390,7 +414,7 @@ function PromptToolbarModeButtons({
   setShowSearch,
   setShowThink,
   setShowCanvas,
-}: PromptToolbarModeButtonsProps) {
+}: Readonly<PromptToolbarModeButtonsProps>) {
   const toggleSearchThink = (mode: "search" | "think") => {
     if (mode === "search") {
       setShowSearch((p) => !p);
@@ -511,7 +535,11 @@ function PromptInputDefaultToolbar({
   uploadInputRef,
   processFile,
   onVoicePrimary,
-}: PromptDefaultToolbarProps) {
+}: Readonly<PromptDefaultToolbarProps>) {
+  let voiceButtonClass = "bg-transparent hover:bg-gray-600/30 text-[#9CA3AF]";
+  if (isRecording) voiceButtonClass = "bg-transparent hover:bg-gray-600/30 text-red-500";
+  else if (hasContent) voiceButtonClass = "bg-white hover:bg-white/80 text-[#1F2023]";
+
   return (
     <>
       <div className={cn("flex items-center gap-1 transition-opacity duration-300", isRecording ? "opacity-0 invisible h-0" : "opacity-100 visible")}>
@@ -536,11 +564,7 @@ function PromptInputDefaultToolbar({
 
       <PromptInputAction tooltip={isLoading ? "Detener" : isRecording ? "Parar grabación" : hasContent ? "Enviar" : "Hablar"}>
         <Button variant="default" size="icon"
-          className={cn("h-8 w-8 rounded-full transition-all duration-200",
-            isRecording ? "bg-transparent hover:bg-gray-600/30 text-red-500" :
-            hasContent  ? "bg-white hover:bg-white/80 text-[#1F2023]" :
-                          "bg-transparent hover:bg-gray-600/30 text-[#9CA3AF]"
-          )}
+          className={cn("h-8 w-8 rounded-full transition-all duration-200", voiceButtonClass)}
           onClick={onVoicePrimary}
           disabled={isLoading && !hasContent}
         >
@@ -612,9 +636,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     if (variant === "panel") return;
     const items = e.clipboardData?.items;
     if (!items) return;
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.startsWith("image/")) {
-        const file = items[i].getAsFile();
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith("image/")) {
+        const file = item.getAsFile();
         if (file) { e.preventDefault(); processFile(file); break; }
       }
     }
@@ -633,8 +657,9 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
   };
 
   const startVoiceRecording = () => {
+    const g = globalThis as GlobalWithSpeechRecognition;
     const SpeechRecognitionClass =
-      window.SpeechRecognition || window.webkitSpeechRecognition;
+      g.SpeechRecognition ?? g.webkitSpeechRecognition;
 
     if (!SpeechRecognitionClass) {
       setVoiceError("Tu navegador no soporta voz. Usa Google Chrome.");
@@ -678,7 +703,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     (node: HTMLDivElement | null) => {
       promptBoxRef.current = node;
       if (typeof ref === "function") ref(node);
-      else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      else if (ref != null) ref.current = node;
     },
     [ref],
   );
@@ -691,6 +716,11 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
     },
     [isLoading, isRecording, onSend],
   );
+
+  let textareaPlaceholder = placeholder;
+  if (showSearch) textareaPlaceholder = "Buscar en la web...";
+  else if (showThink) textareaPlaceholder = "Analizar en profundidad...";
+  else if (showCanvas) textareaPlaceholder = "Crear en canvas...";
 
   return (
     <>
@@ -727,23 +757,37 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
       >
         {files.length > 0 && !isRecording && variant !== "panel" && (
           <div className="flex flex-wrap gap-2 pb-1">
-            {files.map((file, i) => (
-              filePreviews[file.name] && (
-                <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden cursor-pointer" onClick={() => setSelectedImage(filePreviews[file.name])}>
-                  <img src={filePreviews[file.name]} alt={file.name} className="h-full w-full object-cover" />
-                  <button onClick={(e) => { e.stopPropagation(); setFiles([]); setFilePreviews({}); }}
-                    className="absolute top-1 right-1 rounded-full bg-black/70 p-0.5">
-                    <X className="h-3 w-3 text-white" />
-                  </button>
-                </div>
-              )
-            ))}
+            {files
+              .filter((file) => Boolean(filePreviews[file.name]))
+              .map((file) => {
+                const previewUrl = filePreviews[file.name];
+                return (
+                  <div key={file.name} className="relative w-16 h-16 rounded-xl overflow-hidden">
+                    <button
+                      type="button"
+                      className="absolute inset-0 h-full w-full p-0 border-0 cursor-pointer rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+                      onClick={() => setSelectedImage(previewUrl)}
+                      aria-label={`Ver vista previa de ${file.name}`}
+                    >
+                      <img src={previewUrl} alt={file.name} className="h-full w-full object-cover pointer-events-none" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setFiles([]); setFilePreviews({}); }}
+                      className="absolute top-1 right-1 z-10 rounded-full bg-black/70 p-0.5 hover:bg-black/90"
+                      aria-label="Quitar imagen"
+                    >
+                      <X className="h-3 w-3 text-white" />
+                    </button>
+                  </div>
+                );
+              })}
           </div>
         )}
 
         <div className={cn("transition-all duration-300", isRecording ? "h-0 overflow-hidden opacity-0" : "opacity-100")}>
           <PromptInputTextarea
-            placeholder={showSearch ? "Buscar en la web..." : showThink ? "Analizar en profundidad..." : showCanvas ? "Crear en canvas..." : placeholder}
+            placeholder={textareaPlaceholder}
             className={variant === "panel" ? "prompt-panel-textarea" : undefined}
           />
         </div>
