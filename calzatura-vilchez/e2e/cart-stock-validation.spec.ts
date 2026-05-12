@@ -108,9 +108,10 @@ test.describe("carrito → validación de stock", () => {
     const addBtn = page.getByRole("button", { name: /Agregar al Carrito/i });
     await expect(addBtn).toBeVisible({ timeout: 15_000 });
 
-    if (await addBtn.isDisabled()) {
-      test.skip(true, "Producto no disponible para agregar en este entorno");
-    }
+    test.skip(
+      await addBtn.isDisabled(),
+      "Producto no disponible para agregar en este entorno (sin talla/stock en la UI mockeada)."
+    );
 
     // Agregar el producto al carrito
     await addBtn.click();
@@ -154,9 +155,10 @@ test.describe("carrito → validación de stock", () => {
     const addBtn = page.getByRole("button", { name: /Agregar al Carrito/i });
     await expect(addBtn).toBeVisible({ timeout: 15_000 });
 
-    if (await addBtn.isDisabled()) {
-      test.skip(true, "Producto no disponible para agregar en este entorno");
-    }
+    test.skip(
+      await addBtn.isDisabled(),
+      "Producto no disponible para agregar en este entorno (sin talla/stock en la UI mockeada)."
+    );
 
     // Agregar dos veces
     await addBtn.click();
@@ -189,9 +191,10 @@ test.describe("carrito → validación de stock", () => {
     const addBtn = page.getByRole("button", { name: /Agregar al Carrito/i });
     await expect(addBtn).toBeVisible({ timeout: 15_000 });
 
-    if (await addBtn.isDisabled()) {
-      test.skip(true, "Producto no disponible para agregar en este entorno");
-    }
+    test.skip(
+      await addBtn.isDisabled(),
+      "Producto no disponible para agregar en este entorno (sin talla/stock en la UI mockeada)."
+    );
 
     await addBtn.click();
     await waitForCartPersistence(page);

@@ -181,25 +181,24 @@ test.describe("admin → rastro de auditoría", () => {
     await expect(createBtn).toBeVisible({ timeout: 10_000 });
     await createBtn.click();
 
-    // Esperar que se haya llamado al INSERT en auditoria
-    // (puede que no sea inmediato — esperar un poco)
-    await page.waitForTimeout(1_000);
+    // El POST a auditoría puede llegar unos ms después del click (guardas, efectos).
+    await expect
+      .poll(
+        () =>
+          insertedPayloads.some(
+            (p) => (p as Record<string, unknown>)?.accion === "crear"
+          ),
+        { timeout: 10_000 }
+      )
+      .toBe(true);
 
-    // Al menos una de las inserciones debe ser de accion='crear'
     const crearPayload = insertedPayloads.find(
       (p) => (p as Record<string, unknown>)?.accion === "crear"
-    );
-    // Si el flujo de creación es más complejo (necesita formulario), al menos
-    // verificamos que el endpoint fue llamado
-    if (insertedPayloads.length > 0 && crearPayload) {
-      const payload = crearPayload as Record<string, unknown>;
-      expect(payload.accion).toBe("crear");
-      expect(payload.entidad).toBe("producto");
-      expect(typeof payload.realizadoEn).toBe("string");
-    } else {
-      // Test informativo: verificar que el endpoint de auditoría está disponible
-      expect(true).toBeTruthy();
-    }
+    ) as Record<string, unknown> | undefined;
+    expect(crearPayload, "POST a auditoría con acción crear").toBeDefined();
+    expect(crearPayload!.accion).toBe("crear");
+    expect(crearPayload!.entidad).toBe("producto");
+    expect(typeof crearPayload!.realizadoEn).toBe("string");
   });
 
   // ──────────────────────────────────────────────────────────────────────────

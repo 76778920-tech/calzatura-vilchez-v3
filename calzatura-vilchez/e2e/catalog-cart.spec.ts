@@ -54,9 +54,10 @@ test.describe("catálogo → detalle → carrito", () => {
     const addBtn = page.getByRole("button", { name: /Agregar al Carrito/i });
     await expect(addBtn).toBeVisible({ timeout: 15_000 });
 
-    if (await addBtn.isDisabled()) {
-      test.skip(true, "El primer producto del listado no tiene stock para agregar al carrito");
-    }
+    test.skip(
+      await addBtn.isDisabled(),
+      "El primer producto del listado no tiene stock/talla seleccionable para agregar al carrito."
+    );
 
     await addBtn.click();
 

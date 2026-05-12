@@ -9,9 +9,11 @@ Falls back to weighted moving average (70 % last-7d + 30 % last-30d) only when
 there are fewer than MIN_TRAIN_ROWS training samples across all products.
 """
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, timedelta
 import hashlib
 import math
+from typing import Any
 
 def _stockout_date(days_until: int) -> str | None:
     if days_until >= 999:
@@ -284,6 +286,7 @@ def _train_global_model(
         n_estimators=50,
         max_depth=8,
         min_samples_leaf=3,
+        max_features=1.0,
         random_state=42,
         n_jobs=-1,
     )
@@ -311,6 +314,7 @@ def _train_global_model(
     return model, le, campaign_le, True, {
         **base_meta,
         "model_type": "random_forest",
+        "max_features": 1.0,
         "feature_importances": importances,
         "feature_stats": feature_stats,
     }
@@ -572,25 +576,46 @@ def _prediction_row_no_sales_history(
     }
 
 
-def _prediction_row_with_sales_history(
-    pid: str,
-    day_sales: dict,
-    date_range: list[str],
-    *,
-    history_days: int,
-    horizon_days: int,
-    window_7: int,
-    window_15: int,
-    window_30: int,
-    used_ml: bool,
-    ml_model,
-    label_enc,
-    campaign_enc,
-    product: dict,
-    meta: dict,
-    codes_map: dict[str, str],
-    feature_stats: dict,
-) -> dict | None:
+@dataclass(slots=True)
+class _SalesHistoryPredictionInput:
+    """Grouped arguments for demand row construction (keeps arity low for maintainability)."""
+
+    pid: str
+    day_sales: dict
+    date_range: list[str]
+    history_days: int
+    horizon_days: int
+    window_7: int
+    window_15: int
+    window_30: int
+    used_ml: bool
+    ml_model: Any
+    label_enc: Any
+    campaign_enc: Any
+    product: dict
+    meta: dict
+    codes_map: dict[str, str]
+    feature_stats: dict
+
+
+def _prediction_row_with_sales_history(inp: _SalesHistoryPredictionInput) -> dict | None:
+    pid = inp.pid
+    day_sales = inp.day_sales
+    date_range = inp.date_range
+    history_days = inp.history_days
+    horizon_days = inp.horizon_days
+    window_7 = inp.window_7
+    window_15 = inp.window_15
+    window_30 = inp.window_30
+    used_ml = inp.used_ml
+    ml_model = inp.ml_model
+    label_enc = inp.label_enc
+    campaign_enc = inp.campaign_enc
+    product = inp.product
+    meta = inp.meta
+    codes_map = inp.codes_map
+    feature_stats = inp.feature_stats
+
     series = [day_sales.get(d, 0.0) for d in date_range]
     total_sold = sum(series)
     if total_sold <= 0:
@@ -726,22 +751,24 @@ def predict_demand(
         product = product_map.get(pid, {})
         meta = sale_meta.get(pid, {})
         row = _prediction_row_with_sales_history(
-            pid,
-            day_sales,
-            date_range,
-            history_days=history_days,
-            horizon_days=horizon_days,
-            window_7=window_7,
-            window_15=window_15,
-            window_30=window_30,
-            used_ml=used_ml,
-            ml_model=ml_model,
-            label_enc=label_enc,
-            campaign_enc=campaign_enc,
-            product=product,
-            meta=meta,
-            codes_map=codes_map,
-            feature_stats=feature_stats,
+            _SalesHistoryPredictionInput(
+                pid=pid,
+                day_sales=day_sales,
+                date_range=date_range,
+                history_days=history_days,
+                horizon_days=horizon_days,
+                window_7=window_7,
+                window_15=window_15,
+                window_30=window_30,
+                used_ml=used_ml,
+                ml_model=ml_model,
+                label_enc=label_enc,
+                campaign_enc=campaign_enc,
+                product=product,
+                meta=meta,
+                codes_map=codes_map,
+                feature_stats=feature_stats,
+            )
         )
         if row is None:
             continue

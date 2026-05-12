@@ -3,6 +3,10 @@ import { Clock, Globe, MapPin, Phone } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
 import { INFO_ROUTES } from "@/routes/paths";
 
+const SOCIAL_INSTAGRAM = "https://www.instagram.com/";
+const SOCIAL_FACEBOOK = "https://www.facebook.com/";
+const SOCIAL_TIKTOK = "https://www.tiktok.com/";
+
 export default function Footer() {
   const whatsappUrl = "https://wa.me/51964052530";
   const mapsUrl = "https://maps.app.goo.gl/RAgi3N12nrffRRTe6";
@@ -120,19 +124,19 @@ export default function Footer() {
             </span>
           </div>
           <div className="footer-social">
-            <a href="#" className="social-link" aria-label="Instagram">
+            <a href={SOCIAL_INSTAGRAM} target="_blank" rel="noreferrer" className="social-link" aria-label="Instagram (sitio oficial)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <rect x="2" y="2" width="20" height="20" rx="5" />
                 <circle cx="12" cy="12" r="4" />
                 <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
               </svg>
             </a>
-            <a href="#" className="social-link" aria-label="Facebook">
+            <a href={SOCIAL_FACEBOOK} target="_blank" rel="noreferrer" className="social-link" aria-label="Facebook (sitio oficial)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
               </svg>
             </a>
-            <a href="#" className="social-link" aria-label="TikTok">
+            <a href={SOCIAL_TIKTOK} target="_blank" rel="noreferrer" className="social-link" aria-label="TikTok (sitio oficial)">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
               </svg>
