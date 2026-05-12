@@ -684,18 +684,18 @@ class TestRecomendacionInteligente:
     # ── normal/observando nunca genera recomendación ──────────────────────────
 
     def test_normal_sin_recomendacion(self):
-        rec = _build_recommendation("normal", 1.0, [], [], None, None)
+        rec = _build_recommendation("normal", 1.0, [], [], None)
         assert rec is None
 
     def test_observando_sin_recomendacion(self):
-        rec = _build_recommendation("observando", 1.3, self._CAT_MEDIA, [], None, "focalizada")
+        rec = _build_recommendation("observando", 1.3, self._CAT_MEDIA, [], None)
         assert rec is None
 
     # ── stock_actual=0 → alerta "sin stock" ───────────────────────────────────
 
     def test_sin_stock_aparece_en_recomendacion(self):
         productos = [self._prod("Runner Pro", 2.8, stock=0, ventas_rec=15)]
-        rec = _build_recommendation("alta", 2.8, self._CAT_ALTA, productos, "cyber-wow", "global")
+        rec = _build_recommendation("alta", 2.8, self._CAT_ALTA, productos, "cyber-wow")
         assert rec is not None
         assert "Sin stock" in rec or "sin stock" in rec.lower()
         assert "Runner Pro" in rec
@@ -705,7 +705,7 @@ class TestRecomendacionInteligente:
     def test_stock_critico_genera_reponer_urgente(self):
         # ventas_rec=20, stock=5 < 20 → critico
         productos = [self._prod("Runner Pro", 2.8, stock=5, ventas_rec=20, impacto=780)]
-        rec = _build_recommendation("alta", 2.8, self._CAT_ALTA, productos, "cyber-wow", "global")
+        rec = _build_recommendation("alta", 2.8, self._CAT_ALTA, productos, "cyber-wow")
         assert rec is not None
         assert "Runner Pro" in rec
         assert "urgente" in rec.lower() or "Reponer" in rec
@@ -716,7 +716,7 @@ class TestRecomendacionInteligente:
     def test_stock_bajo_genera_reponer_sin_urgente(self):
         # ventas_rec=10, stock=15 → bajo (1.5x, < 2x)
         productos = [self._prod("Clásico Cuero", 1.8, stock=15, ventas_rec=10, impacto=400)]
-        rec = _build_recommendation("media", 1.8, self._CAT_MEDIA, productos, "outlet", "global")
+        rec = _build_recommendation("media", 1.8, self._CAT_MEDIA, productos, "outlet")
         assert rec is not None
         assert "Clásico Cuero" in rec
         assert "Reponer" in rec
@@ -727,7 +727,7 @@ class TestRecomendacionInteligente:
     def test_alta_rotacion_nivel_alta_no_descuento(self):
         # ventas_rec=10, stock=50 → ok (5x >= 2x); uplift=UPLIFT_ALTA+
         productos = [self._prod("Sport Max", UPLIFT_ALTA, stock=50, ventas_rec=10)]
-        rec = _build_recommendation("alta", UPLIFT_ALTA, self._CAT_ALTA, productos, "cyber-wow", "global")
+        rec = _build_recommendation("alta", UPLIFT_ALTA, self._CAT_ALTA, productos, "cyber-wow")
         assert rec is not None
         assert "no aplicar descuento" in rec.lower() or "organica" in rec.lower()
 
@@ -735,7 +735,7 @@ class TestRecomendacionInteligente:
 
     def test_alta_rotacion_nivel_media_sugiere_promocion(self):
         productos = [self._prod("Casual Plus", UPLIFT_MEDIA, stock=40, ventas_rec=8)]
-        rec = _build_recommendation("media", UPLIFT_MEDIA, self._CAT_MEDIA, productos, "outlet", "global")
+        rec = _build_recommendation("media", UPLIFT_MEDIA, self._CAT_MEDIA, productos, "outlet")
         assert rec is not None
         assert "promocion" in rec.lower() or "momentum" in rec.lower()
 
@@ -744,7 +744,7 @@ class TestRecomendacionInteligente:
     def test_focalizada_menciona_categoria(self):
         cats = [{"categoria": "escolar", "uplift_ratio": 3.0, "impacto_soles": 600}]
         productos = [self._prod("Escolar Pro", 3.0, stock=20, ventas_rec=12, impacto=600)]
-        rec = _build_recommendation("baja", 1.1, cats, productos, "campana-focalizada", "focalizada")
+        rec = _build_recommendation("baja", 1.1, cats, productos, "campana-focalizada")
         assert rec is not None
         assert "escolar" in rec.lower()
 
@@ -752,7 +752,7 @@ class TestRecomendacionInteligente:
 
     def test_focalizada_sin_cats_usa_producto(self):
         productos = [self._prod("Escolar Pro", 3.0, stock=20, ventas_rec=12)]
-        rec = _build_recommendation("baja", 1.1, [], productos, "campana-focalizada", "focalizada")
+        rec = _build_recommendation("baja", 1.1, [], productos, "campana-focalizada")
         assert rec is not None
         assert "Escolar Pro" in rec or "focaliz" in rec.lower()
 
@@ -760,7 +760,7 @@ class TestRecomendacionInteligente:
 
     def test_cyber_wow_menciona_fabricantes(self):
         productos = [self._prod("Max Runner", UPLIFT_ALTA, stock=5, ventas_rec=20)]
-        rec = _build_recommendation("alta", UPLIFT_ALTA, self._CAT_ALTA, productos, "cyber-wow", "global")
+        rec = _build_recommendation("alta", UPLIFT_ALTA, self._CAT_ALTA, productos, "cyber-wow")
         assert rec is not None
         assert "fabricante" in rec.lower() or "banner" in rec.lower() or "urgente" in rec.lower()
 
@@ -769,7 +769,7 @@ class TestRecomendacionInteligente:
     def test_outlet_menciona_descuento(self):
         # stock OK: ventas_rec=5, stock=30 → ok
         productos = [self._prod("Clásico Suela", UPLIFT_MEDIA, stock=30, ventas_rec=5)]
-        rec = _build_recommendation("media", UPLIFT_MEDIA, self._CAT_MEDIA, productos, "outlet", "global")
+        rec = _build_recommendation("media", UPLIFT_MEDIA, self._CAT_MEDIA, productos, "outlet")
         assert rec is not None
         assert "descuento" in rec.lower() or "liquidar" in rec.lower() or "outlet" in rec.lower()
 

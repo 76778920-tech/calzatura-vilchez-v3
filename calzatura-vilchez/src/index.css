@@ -7545,7 +7545,12 @@ button.dash-today-card:hover { transform: translateY(-1px); }
   border-radius: var(--radius-sm); text-align: center;
 }
 .image-preview-overlay { z-index: 460; background: rgba(0,0,0,0.78); }
+.image-preview-backdrop-dismiss {
+  position: absolute; inset: 0; margin: 0; padding: 0; border: none;
+  background: transparent; cursor: pointer; z-index: 0;
+}
 .document-preview-modal {
+  position: relative; z-index: 1;
   width: min(980px, calc(100vw - 2rem)); max-height: 92vh;
   display: flex; flex-direction: column; overflow: hidden;
   border-radius: var(--radius-md); background: var(--white); box-shadow: var(--shadow-lg);

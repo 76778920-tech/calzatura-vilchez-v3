@@ -11,6 +11,7 @@ v3 improvements:
 """
 
 from collections import defaultdict
+from dataclasses import dataclass
 from datetime import date, timedelta
 
 import numpy as np
@@ -164,7 +165,6 @@ def _consecutive_normal_days(
 def _aggregate_sales_for_campaign(
     daily_sales: list[dict],
     product_category: dict[str, str],
-    product_stock: dict[str, int],
 ) -> tuple[
     dict[str, float],
     dict[str, float],
@@ -381,90 +381,94 @@ def _resolve_focus_and_impacto(
     return foco_tipo, foco_nombre, foco_uplift, impacto_focalizado
 
 
-def _detect_campaign_success_payload(
-    *,
-    today: date,
-    recent_start: date,
-    baseline_start: date,
-    baseline_end: date,
-    n_recent: int,
-    dates_baseline: list[str],
-    bs: dict,
-    rec: dict,
-    consecutive_up: int,
-    consecutive_down: int,
-    nivel: str,
-    tipo_sugerido: str | None,
-    scope: str | None,
-    label: str,
-    campaign_detected: bool,
-    cierre_estado: str | None,
-    _prods_sin_stock: list[str],
-    _prods_criticos: list[str],
-    riesgo_stock: bool,
-    confidence: float,
-    mensaje: str,
-    recomendacion: str | None,
-    affected_cats: list[dict],
-    top_productos: list[dict],
-    uplift: float,
-    sum_uplift: float,
-    z: float,
-    actual_sum: float,
-    expected_sum: float,
-    expected_dow_sum: float,
-    actual_soles_sum: float,
-    expected_soles_sum: float,
-    impacto_soles: float,
-    impacto_focalizado: float,
-    foco_tipo: str | None,
-    foco_nombre: str | None,
-    foco_uplift: float | None,
-) -> dict:
+@dataclass(slots=True, kw_only=True)
+class _CampaignSuccessPayloadInput:
+    """Snapshot of detection outputs for JSON payload (keeps arity low for Sonar)."""
+
+    today: date
+    recent_start: date
+    baseline_start: date
+    baseline_end: date
+    n_recent: int
+    dates_baseline: list[str]
+    bs: dict
+    rec: dict
+    consecutive_up: int
+    consecutive_down: int
+    nivel: str
+    tipo_sugerido: str | None
+    scope: str | None
+    campaign_detected: bool
+    cierre_estado: str | None
+    prods_sin_stock: list[str]
+    prods_criticos: list[str]
+    riesgo_stock: bool
+    confidence: float
+    mensaje: str
+    recomendacion: str | None
+    affected_cats: list[dict]
+    top_productos: list[dict]
+    uplift: float
+    sum_uplift: float
+    z: float
+    actual_sum: float
+    expected_sum: float
+    expected_dow_sum: float
+    actual_soles_sum: float
+    expected_soles_sum: float
+    impacto_soles: float
+    impacto_focalizado: float
+    foco_tipo: str | None
+    foco_nombre: str | None
+    foco_uplift: float | None
+
+
+def _detect_campaign_success_payload(inp: _CampaignSuccessPayloadInput) -> dict:
+    p = inp
     return {
         "status": "ok",
-        "campaign_detected": campaign_detected,
-        "nivel": nivel,
-        "scope": scope,
-        "foco_tipo": foco_tipo,
-        "foco_nombre": foco_nombre,
-        "foco_uplift": foco_uplift,
-        "cierre_estado": cierre_estado,
-        "riesgo_stock": riesgo_stock,
-        "productos_sin_stock": _prods_sin_stock,
-        "productos_stock_critico": _prods_criticos,
-        "tipo_sugerido": tipo_sugerido,
-        "confidence_pct": confidence,
-        "mensaje": mensaje,
+        "campaign_detected": p.campaign_detected,
+        "nivel": p.nivel,
+        "scope": p.scope,
+        "foco_tipo": p.foco_tipo,
+        "foco_nombre": p.foco_nombre,
+        "foco_uplift": p.foco_uplift,
+        "cierre_estado": p.cierre_estado,
+        "riesgo_stock": p.riesgo_stock,
+        "productos_sin_stock": p.prods_sin_stock,
+        "productos_stock_critico": p.prods_criticos,
+        "tipo_sugerido": p.tipo_sugerido,
+        "confidence_pct": p.confidence,
+        "mensaje": p.mensaje,
         "consistencia": {
-            "dias_consecutivos_elevados": consecutive_up,
-            "dias_consecutivos_normales": consecutive_down,
+            "dias_consecutivos_elevados": p.consecutive_up,
+            "dias_consecutivos_normales": p.consecutive_down,
             "minimo_requerido": MIN_CONSISTENT_DAYS,
         },
         "metricas": {
-            "baseline": bs,
-            "reciente": rec,
-            "uplift_ratio": round(uplift, 3),
-            "uplift_pct": round((uplift - 1) * 100, 1),
-            "sum_uplift": round(sum_uplift, 3),
-            "uplift_dow_ajustado": round(uplift, 3),
-            "z_score": round(z, 2),
-            "actual_sum": round(actual_sum, 2),
-            "expected_sum": round(expected_sum, 2),
-            "expected_dow_sum": round(expected_dow_sum, 2),
-            "ventas_soles_recientes": round(actual_soles_sum, 2),
-            "ventas_soles_esperadas": round(expected_soles_sum, 2),
+            "baseline": p.bs,
+            "reciente": p.rec,
+            "uplift_ratio": round(p.uplift, 3),
+            "uplift_pct": round((p.uplift - 1) * 100, 1),
+            "sum_uplift": round(p.sum_uplift, 3),
+            "uplift_dow_ajustado": round(p.uplift, 3),
+            "z_score": round(p.z, 2),
+            "actual_sum": round(p.actual_sum, 2),
+            "expected_sum": round(p.expected_sum, 2),
+            "expected_dow_sum": round(p.expected_dow_sum, 2),
+            "ventas_soles_recientes": round(p.actual_soles_sum, 2),
+            "ventas_soles_esperadas": round(p.expected_soles_sum, 2),
         },
-        "impacto_estimado_soles": impacto_soles,
-        "impacto_estimado_soles_focalizado": round(impacto_focalizado, 2),
-        "categorias_afectadas": affected_cats,
-        "top_productos": top_productos,
-        "recomendacion": recomendacion,
+        "impacto_estimado_soles": p.impacto_soles,
+        "impacto_estimado_soles_focalizado": round(p.impacto_focalizado, 2),
+        "categorias_afectadas": p.affected_cats,
+        "top_productos": p.top_productos,
+        "recomendacion": p.recomendacion,
         "ventanas": {
-            "reciente": f"{recent_start.isoformat()} -> {today.isoformat()} ({n_recent} dias)",
+            "reciente": f"{p.recent_start.isoformat()} -> {p.today.isoformat()} ({p.n_recent} dias)",
             "baseline": (
-                f"{baseline_start.isoformat()} -> {baseline_end.isoformat()} "
-                f"({len(dates_baseline)} dias)"
+                f"{p.baseline_start.isoformat()} -> {p.baseline_end.isoformat()} "
+                f"({len(p.dates_baseline)} dias)"
             ),
         },
     }
@@ -514,7 +518,7 @@ def detect_campaign(
         raw_by_product,
         raw_by_prod_soles,
         product_meta,
-    ) = _aggregate_sales_for_campaign(daily_sales, product_category, product_stock)
+    ) = _aggregate_sales_for_campaign(daily_sales, product_category)
 
     baseline_vals = _fill_zeros(raw_global, dates_baseline)
     recent_vals   = _fill_zeros(raw_global, dates_recent)
@@ -594,47 +598,48 @@ def detect_campaign(
     )
 
     # ── Messages ──────────────────────────────────────────────────────────────
-    recomendacion = _build_recommendation(nivel, uplift, affected_cats, top_productos, tipo_sugerido, scope, n_recent)
+    recomendacion = _build_recommendation(nivel, uplift, affected_cats, top_productos, tipo_sugerido)
     mensaje       = _build_message(nivel, label, uplift, z, confidence, affected_cats, consecutive_up, scope, uplift_baja=_uplift_baja)
 
     return _detect_campaign_success_payload(
-        today=today,
-        recent_start=recent_start,
-        baseline_start=baseline_start,
-        baseline_end=baseline_end,
-        n_recent=n_recent,
-        dates_baseline=dates_baseline,
-        bs=bs,
-        rec=rec,
-        consecutive_up=consecutive_up,
-        consecutive_down=consecutive_down,
-        nivel=nivel,
-        tipo_sugerido=tipo_sugerido,
-        scope=scope,
-        label=label,
-        campaign_detected=campaign_detected,
-        cierre_estado=cierre_estado,
-        _prods_sin_stock=_prods_sin_stock,
-        _prods_criticos=_prods_criticos,
-        riesgo_stock=riesgo_stock,
-        confidence=confidence,
-        mensaje=mensaje,
-        recomendacion=recomendacion,
-        affected_cats=affected_cats,
-        top_productos=top_productos,
-        uplift=uplift,
-        sum_uplift=sum_uplift,
-        z=z,
-        actual_sum=actual_sum,
-        expected_sum=expected_sum,
-        expected_dow_sum=expected_dow_sum,
-        actual_soles_sum=actual_soles_sum,
-        expected_soles_sum=expected_soles_sum,
-        impacto_soles=impacto_soles,
-        impacto_focalizado=impacto_focalizado,
-        foco_tipo=foco_tipo,
-        foco_nombre=foco_nombre,
-        foco_uplift=foco_uplift,
+        _CampaignSuccessPayloadInput(
+            today=today,
+            recent_start=recent_start,
+            baseline_start=baseline_start,
+            baseline_end=baseline_end,
+            n_recent=n_recent,
+            dates_baseline=dates_baseline,
+            bs=bs,
+            rec=rec,
+            consecutive_up=consecutive_up,
+            consecutive_down=consecutive_down,
+            nivel=nivel,
+            tipo_sugerido=tipo_sugerido,
+            scope=scope,
+            campaign_detected=campaign_detected,
+            cierre_estado=cierre_estado,
+            prods_sin_stock=_prods_sin_stock,
+            prods_criticos=_prods_criticos,
+            riesgo_stock=riesgo_stock,
+            confidence=confidence,
+            mensaje=mensaje,
+            recomendacion=recomendacion,
+            affected_cats=affected_cats,
+            top_productos=top_productos,
+            uplift=uplift,
+            sum_uplift=sum_uplift,
+            z=z,
+            actual_sum=actual_sum,
+            expected_sum=expected_sum,
+            expected_dow_sum=expected_dow_sum,
+            actual_soles_sum=actual_soles_sum,
+            expected_soles_sum=expected_soles_sum,
+            impacto_soles=impacto_soles,
+            impacto_focalizado=impacto_focalizado,
+            foco_tipo=foco_tipo,
+            foco_nombre=foco_nombre,
+            foco_uplift=foco_uplift,
+        )
     )
 
 
@@ -978,8 +983,6 @@ def _build_recommendation(
     affected_cats: list[dict],
     top_productos: list[dict],
     tipo: str | None,
-    scope: str | None,
-    n_recent: int = 7,
 ) -> str | None:
     """
     Smart recommendation using real stock, uplift and economic impact per product.

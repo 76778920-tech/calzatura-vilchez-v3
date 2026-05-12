@@ -35,6 +35,14 @@ export default function HeaderMobileNav({
 }: Props) {
   if (!open) return null;
 
+  let accountHref = PUBLIC_ROUTES.login;
+  if (user && hasVerifiedAccess) {
+    accountHref = CLIENT_ROUTES.profile;
+  } else if (user && !hasVerifiedAccess) {
+    accountHref = PUBLIC_ROUTES.verifyEmail;
+  }
+  const accountLabel = user && !hasVerifiedAccess ? "Verificar correo" : "Mi cuenta";
+
   return (
     <nav
       className="nav-mobile"
@@ -44,13 +52,13 @@ export default function HeaderMobileNav({
         <div
           key={menu.id}
           className="nav-mobile-group"
-          onMouseEnter={() => setActiveMobileMenuId(menu.id)}
         >
           <button
             type="button"
             className={`nav-mobile-link nav-mobile-trigger ${activeMobileMenuId === menu.id ? "active" : ""} ${
               currentRouteMenuId === menu.id ? "route-current" : ""
             }`}
+            onMouseEnter={() => setActiveMobileMenuId(menu.id)}
             onClick={() => setActiveMobileMenuId((current) => (current === menu.id ? null : menu.id))}
             onFocus={() => setActiveMobileMenuId(menu.id)}
             aria-expanded={activeMobileMenuId === menu.id}
@@ -144,12 +152,8 @@ export default function HeaderMobileNav({
           <Phone size={18} /> Contáctanos
         </a>
         <span className="nav-mobile-divider" aria-hidden="true" />
-        <Link
-          to={user ? (hasVerifiedAccess ? CLIENT_ROUTES.profile : PUBLIC_ROUTES.verifyEmail) : PUBLIC_ROUTES.login}
-          className="nav-mobile-link"
-          onClick={onClose}
-        >
-          <UserIcon size={18} /> {user && !hasVerifiedAccess ? "Verificar correo" : "Mi cuenta"}
+        <Link to={accountHref} className="nav-mobile-link" onClick={onClose}>
+          <UserIcon size={18} /> {accountLabel}
         </Link>
         <Link to={CLIENT_ROUTES.favorites} className="nav-mobile-link" onClick={onClose}>
           <Heart size={18} /> Favoritos

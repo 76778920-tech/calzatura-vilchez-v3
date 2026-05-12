@@ -25,12 +25,23 @@ export default function ImagePreviewModal({
   const activeIndex = Math.min(Math.max(selectedIndex, 0), galleryImages.length - 1);
 
   return (
-    <div className="modal-overlay image-preview-overlay" onClick={onClose}>
-      <div className="document-preview-modal" onClick={(event) => event.stopPropagation()}>
+    <div className="modal-overlay image-preview-overlay">
+      <button
+        type="button"
+        className="image-preview-backdrop-dismiss"
+        onClick={onClose}
+        aria-label="Cerrar vista previa de imagen"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="image-preview-title"
+        className="document-preview-modal"
+      >
         <div className="document-preview-header">
           <div>
             {subtitle && <span>{subtitle}</span>}
-            <strong>{title}</strong>
+            <strong id="image-preview-title">{title}</strong>
           </div>
           <button type="button" onClick={onClose} aria-label="Cerrar imagen">
             <X size={20} />
