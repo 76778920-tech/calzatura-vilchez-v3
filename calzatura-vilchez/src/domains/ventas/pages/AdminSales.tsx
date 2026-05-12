@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Calculator, CircleDollarSign, Eye, FileText, IdCard, PackageSearch, Plus, RotateCcw, Trash2, TrendingUp, Truck, X } from "lucide-react";
+import { Calculator, CircleDollarSign, FileText, IdCard, PackageSearch, Plus, Trash2, TrendingUp, Truck } from "lucide-react";
 import toast from "react-hot-toast";
 import { addDailySale, decrementProductStock, fetchDailySales, fetchProductFinancials, markSaleReturned, restoreProductStock } from "@/domains/ventas/services/finance";
 import { fetchProductCodes, fetchProducts } from "@/domains/productos/services/products";
@@ -9,6 +9,9 @@ import type { DailySale, Product, ProductFinancial, SaleCustomer, SaleDocumentTy
 import { getProductColors } from "@/utils/colors";
 import { closeSaleDocumentWindow, openSaleDocumentWindow, renderSaleDocument, type SaleDocumentLine } from "@/utils/saleDocument";
 import { getAvailableSizes, getSizeStock } from "@/utils/stock";
+import { AdminSaleDetailModal } from "./AdminSaleDetailModal";
+import { AdminSalesHistorialTable } from "./AdminSalesHistorialTable";
+import { computeAdminSalesTotals } from "./adminSalesTotals";
 
 type SaleProduct = Product & { codigo?: string; finanzas?: ProductFinancial };
 type PendingSaleLine = {
@@ -21,12 +24,6 @@ type PendingSaleLine = {
 };
 
 const EMPTY_SALE_CUSTOMER: SaleCustomer = { dni: "", nombres: "", apellidos: "" };
-
-const SALE_DOCUMENT_LABELS: Record<SaleDocumentType, string> = {
-  ninguno: "Sin comprobante",
-  nota_venta: "Nota de venta",
-  guia_remision: "Guia de remision",
-};
 
 function todayISO() {
   const today = new Date();
@@ -386,35 +383,11 @@ export default function AdminSales() {
     .reduce((sum, line) => sum + line.quantity, 0);
   const availableForSelected = Math.max(0, selectedSizeStock - reservedForSelected);
 
-  const totals = useMemo(() => {
-    const registered = sales
-      .filter((s) => s.fecha === date && !s.devuelto)
-      .reduce(
-        (acc, sale) => ({
-          cantidad: acc.cantidad + sale.cantidad,
-          total: acc.total + sale.total,
-          ganancia: acc.ganancia + sale.ganancia,
-        }),
-        { cantidad: 0, total: 0, ganancia: 0 }
-      );
-    const pending = pendingLines.reduce(
-      (acc, line) => {
-        const product = products.find((p) => p.id === line.productId);
-        return {
-          cantidad: acc.cantidad + line.quantity,
-          total: acc.total + saleLineTotal(line),
-          ganancia: acc.ganancia + saleLineProfit(line, product),
-        };
-      },
-      { cantidad: 0, total: 0, ganancia: 0 }
-    );
-    return {
-      cantidad: registered.cantidad + pending.cantidad,
-      total: registered.total + pending.total,
-      ganancia: registered.ganancia + pending.ganancia,
-      pending,
-    };
-  }, [sales, pendingLines, products, date]);
+  const totals = useMemo(
+    () =>
+      computeAdminSalesTotals(sales, pendingLines, products, date, saleLineTotal, saleLineProfit),
+    [sales, pendingLines, products, date],
+  );
 
   const resetProductSelection = () => {
     setProductId("");
@@ -965,181 +938,28 @@ export default function AdminSales() {
           </button>
         </div>
 
-        <div className="admin-table-wrapper product-table-wrapper">
-          <div className="admin-section-header" style={{ padding: "0.5rem 0 0.25rem" }}>
-            <h2 style={{ fontSize: "13px", fontWeight: 700 }}>Historial de ventas</h2>
-            <span style={{ fontSize: "12px" }}>Haz clic en una venta para ver el detalle o registrar una devolución</span>
-          </div>
-          <div className="admin-search-wrapper" style={{ marginBottom: "0.75rem" }}>
-            <PackageSearch size={15} />
-            <input
-              value={historialSearch}
-              onChange={(e) => setHistorialSearch(e.target.value)}
-              placeholder="Buscar por código, producto, color, talla, DNI..."
-              style={{ fontSize: "13px" }}
-            />
-            {historialSearch && (
-              <button
-                type="button"
-                onClick={() => setHistorialSearch("")}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: "0 4px", color: "var(--text-muted)" }}
-                aria-label="Limpiar búsqueda"
-              >
-                <X size={14} />
-              </button>
-            )}
-          </div>
-          {(() => {
-            const term = historialSearch.trim().toLowerCase();
-            const filtered = sales.filter((s) => {
-              if (!term) return true;
-              return [
-                s.codigo, s.nombre, s.color, s.talla,
-                s.cliente?.dni, s.cliente?.nombres, s.cliente?.apellidos,
-                s.documentoNumero,
-              ].some((v) => v?.toLowerCase().includes(term));
-            });
-            return (
-              <table className="admin-table">
-                <thead>
-                  <tr>
-                    <th>Código</th>
-                    <th>Producto</th>
-                    <th>Color</th>
-                    <th>Talla</th>
-                    <th>Cant.</th>
-                    <th>Hora</th>
-                    <th>Total</th>
-                    <th>Ganancia</th>
-                    <th>Documento</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 && (
-                    <tr><td colSpan={9} className="admin-empty-cell">
-                      {sales.length === 0 ? "No hay ventas para esta fecha." : "Sin resultados para esa búsqueda."}
-                    </td></tr>
-                  )}
-                  {filtered.map((sale) => (
-                    <tr
-                      key={sale.id}
-                      className={`sale-row-clickable${sale.devuelto ? " sale-row-devuelto" : ""}`}
-                      onClick={() => { setSelectedSale(sale); setReturnMotivo(""); }}
-                    >
-                      <td><span className="admin-code-badge">{sale.codigo}</span></td>
-                      <td>{sale.nombre}</td>
-                      <td>{sale.color || "-"}</td>
-                      <td>{sale.talla || "-"}</td>
-                      <td>{sale.cantidad}</td>
-                      <td>{new Date(sale.creadoEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</td>
-                      <td>S/ {sale.total.toFixed(2)}</td>
-                      <td><strong>S/ {sale.ganancia.toFixed(2)}</strong></td>
-                      <td>
-                        <div className="admin-sale-document-cell">
-                          <strong>{SALE_DOCUMENT_LABELS[sale.documentoTipo ?? "ninguno"]}</strong>
-                          {sale.devuelto
-                            ? <span className="sale-devuelto-badge">Devuelto</span>
-                            : sale.cliente
-                              ? <span>{sale.cliente.dni} - {sale.cliente.nombres}</span>
-                              : <span>Venta simple</span>}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            );
-          })()}
-        </div>
+        <AdminSalesHistorialTable
+          sales={sales}
+          historialSearch={historialSearch}
+          onHistorialSearchChange={setHistorialSearch}
+          onClearHistorialSearch={() => setHistorialSearch("")}
+          onSelectSale={(sale) => {
+            setSelectedSale(sale);
+            setReturnMotivo("");
+          }}
+        />
       </div>
 
       {selectedSale && (
-        <div className="sale-modal-overlay" onClick={() => setSelectedSale(null)}>
-          <div className="sale-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="sale-modal-header">
-              <div>
-                <h2>Detalle de venta</h2>
-                {selectedSale.devuelto && <span className="sale-devuelto-badge">Devuelto</span>}
-              </div>
-              <button type="button" className="sale-modal-close" onClick={() => setSelectedSale(null)} aria-label="Cerrar">
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="sale-modal-body">
-              <div className="sale-modal-product">
-                <span className="admin-code-badge">{selectedSale.codigo}</span>
-                <div>
-                  <strong>{selectedSale.nombre}</strong>
-                  {(selectedSale.color || selectedSale.talla) && (
-                    <span>
-                      {[selectedSale.color && `Color: ${selectedSale.color}`, selectedSale.talla && `Talla: ${selectedSale.talla}`].filter(Boolean).join(" · ")}
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              <div className="sale-modal-grid">
-                <div className="sale-modal-info">
-                  <label>Fecha y hora</label>
-                  <span>{new Date(selectedSale.creadoEn).toLocaleString("es-PE", { dateStyle: "long", timeStyle: "short" })}</span>
-                </div>
-                <div className="sale-modal-info">
-                  <label>Comprobante</label>
-                  <span>{SALE_DOCUMENT_LABELS[selectedSale.documentoTipo ?? "ninguno"]}</span>
-                </div>
-              </div>
-
-              <div className="sale-modal-amounts">
-                <div><span>Cantidad</span><strong>{selectedSale.cantidad} ud.</strong></div>
-                <div><span>Precio unitario</span><strong>S/ {selectedSale.precioVenta.toFixed(2)}</strong></div>
-                <div><span>Total vendido</span><strong>S/ {selectedSale.total.toFixed(2)}</strong></div>
-                <div><span>Ganancia</span><strong>S/ {selectedSale.ganancia.toFixed(2)}</strong></div>
-              </div>
-
-              {selectedSale.cliente && (
-                <div className="sale-modal-customer">
-                  <label>Cliente</label>
-                  <strong>{selectedSale.cliente.nombres} {selectedSale.cliente.apellidos}</strong>
-                  <span>DNI: {selectedSale.cliente.dni}</span>
-                </div>
-              )}
-
-              {selectedSale.devuelto && (
-                <div className="sale-modal-return-info">
-                  <strong>Devolución registrada</strong>
-                  {selectedSale.devueltoEn && (
-                    <span>{new Date(selectedSale.devueltoEn).toLocaleString("es-PE", { dateStyle: "long", timeStyle: "short" })}</span>
-                  )}
-                  <p>Motivo: {selectedSale.motivoDevolucion}</p>
-                </div>
-              )}
-
-              {selectedSale.documentoTipo && selectedSale.documentoTipo !== "ninguno" && selectedSale.cliente && (
-                <button type="button" className="btn-outline sale-modal-doc-btn" onClick={() => handleViewDocument(selectedSale)}>
-                  <Eye size={15} /> Ver comprobante (PDF)
-                </button>
-              )}
-
-              {!selectedSale.devuelto && (
-                <div className="sale-modal-return">
-                  <h3><RotateCcw size={14} /> Devolución o corrección</h3>
-                  <p>Indica el motivo. El stock será restaurado automáticamente.</p>
-                  <textarea
-                    value={returnMotivo}
-                    onChange={(e) => setReturnMotivo(e.target.value)}
-                    placeholder="Ej: Talla equivocada, venta duplicada, cliente desistió..."
-                    rows={3}
-                    className="form-input"
-                  />
-                  <button type="button" onClick={handleReturn} disabled={returning} className="btn-danger sale-modal-return-btn">
-                    {returning ? "Procesando..." : "Confirmar devolución"}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <AdminSaleDetailModal
+          sale={selectedSale}
+          onClose={() => setSelectedSale(null)}
+          returnMotivo={returnMotivo}
+          onReturnMotivoChange={setReturnMotivo}
+          onReturn={handleReturn}
+          returning={returning}
+          onViewDocument={handleViewDocument}
+        />
       )}
     </div>
   );

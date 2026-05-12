@@ -55,6 +55,13 @@ import {
 import { buildVariantCreationPlan, isValidVariantCode, normalizeVariantCode } from "@/domains/productos/utils/variantCreation";
 import { IMAGE_RULES, imageValidationMessage, validateImageFile, validateImageUrlDimensions } from "@/domains/productos/utils/imageRules";
 import toast from "react-hot-toast";
+import {
+  computeAdminProductStats,
+  filterAdminProducts,
+  hasActiveAdminProductFilters,
+  type FeaturedFilter,
+  type StockFilter,
+} from "./adminProductsListFilters";
 
 type AdminProduct = Product & { codigo?: string; finanzas?: ProductFinancial };
 type ProductForm = Omit<Product, "id"> & {
@@ -127,9 +134,6 @@ const EMPTY_FORM: ProductForm = {
   margenMaximo: 75,
   familiaId: "",
 };
-
-type StockFilter = "todos" | "con-stock" | "bajo-stock" | "sin-stock";
-type FeaturedFilter = "todos" | "destacados" | "normales";
 
 function sanitizeDecimal(value: string) {
   const cleaned = value.replace(/[^\d.]/g, "");
@@ -704,52 +708,29 @@ export default function AdminProducts() {
     setIsDraggingVariants(false);
   };
 
-  const stats = useMemo(() => {
-    const bajoStock = products.filter((p) => p.stock > 0 && p.stock <= LOW_STOCK_LIMIT).length;
-    const destacados = products.filter((p) => p.destacado).length;
-    const stockTotal = products.reduce((sum, p) => sum + p.stock, 0);
-    return { bajoStock, destacados, stockTotal };
-  }, [products]);
+  const stats = useMemo(
+    () => computeAdminProductStats(products, LOW_STOCK_LIMIT),
+    [products],
+  );
 
-  const filteredProducts = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    return products.filter((product) => {
-      const searchable = [
-        product.codigo,
-        product.nombre,
-        product.marca,
-        product.material,
-        product.color,
-        product.categoria,
-        product.tipoCalzado,
-        categoryLabel(product.categoria),
-        product.descripcion,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
+  const filteredProducts = useMemo(
+    () =>
+      filterAdminProducts(products, {
+        searchTerm,
+        categoryFilter,
+        stockFilter,
+        featuredFilter,
+        lowStockLimit: LOW_STOCK_LIMIT,
+      }),
+    [products, searchTerm, categoryFilter, stockFilter, featuredFilter],
+  );
 
-      const matchesSearch = term === "" || searchable.includes(term);
-      const matchesCategory = categoryFilter === "todos" || product.categoria === categoryFilter;
-      const matchesStock =
-        stockFilter === "todos" ||
-        (stockFilter === "con-stock" && product.stock > LOW_STOCK_LIMIT) ||
-        (stockFilter === "bajo-stock" && product.stock > 0 && product.stock <= LOW_STOCK_LIMIT) ||
-        (stockFilter === "sin-stock" && product.stock === 0);
-      const matchesFeatured =
-        featuredFilter === "todos" ||
-        (featuredFilter === "destacados" && Boolean(product.destacado)) ||
-        (featuredFilter === "normales" && !product.destacado);
-
-      return matchesSearch && matchesCategory && matchesStock && matchesFeatured;
-    });
-  }, [products, searchTerm, categoryFilter, stockFilter, featuredFilter]);
-
-  const hasActiveFilters =
-    searchTerm.trim() !== "" ||
-    categoryFilter !== "todos" ||
-    stockFilter !== "todos" ||
-    featuredFilter !== "todos";
+  const hasActiveFilters = hasActiveAdminProductFilters(
+    searchTerm,
+    categoryFilter,
+    stockFilter,
+    featuredFilter,
+  );
 
   const formPriceRange = useMemo(
     () => calculatePriceRange(

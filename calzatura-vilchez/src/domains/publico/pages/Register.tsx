@@ -4,11 +4,10 @@ import { IdCard, User, Mail, Lock, Eye, EyeOff, Search } from "lucide-react";
 import { checkDisposableEmail, registerUser } from "@/domains/usuarios/services/auth";
 import { PUBLIC_ROUTES } from "@/routes/paths";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
-import { normalizeEmailInput, validateEmailFormat } from "@/utils/emailValidation";
+import { getNormalizedRegisterEmail, getRegisterBlockingMessage } from "./registerFormValidation";
 import { savePendingVerificationEmail } from "@/utils/pendingVerification";
 import toast from "react-hot-toast";
-
-const MIN_PASSWORD_LENGTH = 8;
+import { toastRegisterCreateError } from "./registerErrors";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -60,29 +59,20 @@ export default function Register() {
 
   const handleRegister = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    const normalizedDni = normalizeDni(dni);
-    if (!isValidDni(normalizedDni)) {
-      toast.error("El DNI debe tener 8 digitos");
+    const blocking = getRegisterBlockingMessage({
+      dni,
+      validatedDni,
+      nombres,
+      apellidos,
+      password,
+      confirmPass,
+      email,
+    });
+    if (blocking) {
+      toast.error(blocking);
       return;
     }
-    if (!validatedDni || !nombres || !apellidos) {
-      toast.error("Primero busca tu DNI con el boton de busqueda");
-      return;
-    }
-    if (password !== confirmPass) {
-      toast.error("Las contraseñas no coinciden");
-      return;
-    }
-    if (password.length < MIN_PASSWORD_LENGTH) {
-      toast.error(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
-      return;
-    }
-    const emailErr = validateEmailFormat(email);
-    if (emailErr) {
-      toast.error(emailErr);
-      return;
-    }
-    const emailNorm = normalizeEmailInput(email);
+    const emailNorm = getNormalizedRegisterEmail(email);
 
     setLoading(true);
     try {
@@ -98,25 +88,7 @@ export default function Register() {
       navigate(PUBLIC_ROUTES.verifyEmail, { replace: true });
     } catch (err: unknown) {
       console.error("[Register] error al crear cuenta:", err);
-      const code = (err as { code?: string })?.code ?? "";
-      const msg = err instanceof Error ? err.message : "";
-      if (msg === "DISPOSABLE_EMAIL") {
-        toast.error("Este correo es temporal o desechable. Usa un correo real.");
-      } else if (msg === "PASSWORD_TOO_SHORT") {
-        toast.error(`La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres`);
-      } else if (code.includes("weak-password")) {
-        toast.error("La contraseña es demasiado débil. Usa más caracteres o combina letras, números y símbolos.");
-      } else if (code.includes("email-already-in-use") || msg.includes("email-already-in-use")) {
-        toast.error(
-          "No se pudo crear la cuenta con ese correo. Si ya tenías cuenta, inicia sesión; si no, revisa los datos o intenta más tarde.",
-        );
-      } else if (code.includes("permission-denied") || msg.includes("insufficient permissions")) {
-        toast.error("Error de permisos. Intenta de nuevo o contacta al soporte.");
-      } else if (code.includes("network-request-failed") || msg.includes("Failed to fetch")) {
-        toast.error("Sin conexion. Verifica tu internet");
-      } else {
-        toast.error("No se pudo crear la cuenta. Intenta de nuevo o contacta al soporte.");
-      }
+      toastRegisterCreateError(err);
     } finally {
       setLoading(false);
     }
