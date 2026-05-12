@@ -284,7 +284,7 @@ interface PromptInputProps {
   onDragLeave?: (e: React.DragEvent) => void;
   onDrop?: (e: React.DragEvent) => void;
 }
-const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
+const PromptInput = React.forwardRef<HTMLElement, PromptInputProps>(
   ({ className, isLoading = false, maxHeight = 240, value, onValueChange, onSubmit, children, disabled = false, onDragOver, onDragLeave, onDrop }, ref) => {
     const [internalValue, setInternalValue] = React.useState(value || "");
     const mergedValue = value ?? internalValue;
@@ -303,15 +303,14 @@ const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     return (
       <TooltipProvider>
         <PromptInputContext.Provider value={contextValue}>
-          <div
+          <section
             ref={ref}
-            role="region"
             aria-label="Entrada de mensaje. Puedes arrastrar imágenes aquí para adjuntarlas."
             className={cn("rounded-3xl border border-[#444444] bg-[#1F2023] p-2 shadow-[0_8px_30px_rgba(0,0,0,0.24)] transition-all duration-300", isLoading && "border-red-500/70", className)}
             onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
           >
             {children}
-          </div>
+          </section>
         </PromptInputContext.Provider>
       </TooltipProvider>
     );
@@ -540,6 +539,11 @@ function PromptInputDefaultToolbar({
   if (isRecording) voiceButtonClass = "bg-transparent hover:bg-gray-600/30 text-red-500";
   else if (hasContent) voiceButtonClass = "bg-white hover:bg-white/80 text-[#1F2023]";
 
+  let voiceActionTooltip = "Hablar";
+  if (isLoading) voiceActionTooltip = "Detener";
+  else if (isRecording) voiceActionTooltip = "Parar grabación";
+  else if (hasContent) voiceActionTooltip = "Enviar";
+
   return (
     <>
       <div className={cn("flex items-center gap-1 transition-opacity duration-300", isRecording ? "opacity-0 invisible h-0" : "opacity-100 visible")}>
@@ -562,7 +566,7 @@ function PromptInputDefaultToolbar({
         />
       </div>
 
-      <PromptInputAction tooltip={isLoading ? "Detener" : isRecording ? "Parar grabación" : hasContent ? "Enviar" : "Hablar"}>
+      <PromptInputAction tooltip={voiceActionTooltip}>
         <Button variant="default" size="icon"
           className={cn("h-8 w-8 rounded-full transition-all duration-200", voiceButtonClass)}
           onClick={onVoicePrimary}
@@ -594,7 +598,7 @@ interface PromptInputBoxProps {
   quickActions?: PromptPanelQuickAction[];
 }
 
-export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxProps>((props, ref) => {
+export const PromptInputBox = React.forwardRef<HTMLElement, PromptInputBoxProps>((props, ref) => {
   const {
     onSend = () => {},
     isLoading = false,
@@ -613,7 +617,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
   const [showThink, setShowThink] = React.useState(false);
   const [showCanvas, setShowCanvas] = React.useState(false);
   const uploadInputRef = React.useRef<HTMLInputElement>(null);
-  const promptBoxRef = React.useRef<HTMLDivElement>(null);
+  const promptBoxRef = React.useRef<HTMLElement | null>(null);
   const recognitionRef = React.useRef<ISpeechRecognition | null>(null);
 
   const processFile = React.useCallback((file: File) => {
@@ -700,7 +704,7 @@ export const PromptInputBox = React.forwardRef<HTMLDivElement, PromptInputBoxPro
   const hasContent = input.trim() !== "" || files.length > 0;
 
   const assignContainerRef = React.useCallback(
-    (node: HTMLDivElement | null) => {
+    (node: HTMLElement | null) => {
       promptBoxRef.current = node;
       if (typeof ref === "function") ref(node);
       else if (ref != null) ref.current = node;

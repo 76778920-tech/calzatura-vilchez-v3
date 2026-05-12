@@ -37,7 +37,7 @@ export default function HeaderMobileNav({
   onClose,
   user,
   hasVerifiedAccess,
-}: Props) {
+}: Readonly<Props>) {
   if (!open) return null;
 
   let accountHref: AccountNavHref = PUBLIC_ROUTES.login;

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, type FormEventHandler, type ReactNode } from "react";
+import { useState, useRef, useEffect, useMemo, type FormEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ShoppingCart,
@@ -857,7 +857,7 @@ export default function Header() {
     [headerSearch, products]
   );
 
-  const handleHeaderSearch: FormEventHandler<HTMLFormElement> = (event) => {
+  const handleHeaderSearch = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const query = headerSearch.trim();
     closeMegaMenu();
@@ -914,8 +914,9 @@ export default function Header() {
 
   return (
     <>
-      <header className="header" onMouseLeave={closeMegaMenu}>
-        <div className="header-inner">
+      <header className="header">
+        <div className="header-leave-dismiss" onMouseLeave={closeMegaMenu}>
+          <div className="header-inner">
           <button
             className="mobile-menu-btn"
             onClick={() => {
@@ -1103,6 +1104,7 @@ export default function Header() {
           user={user}
           hasVerifiedAccess={hasVerifiedAccess}
         />
+        </div>
       </header>
 
       <CartSidebar />
