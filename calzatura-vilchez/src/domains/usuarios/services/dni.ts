@@ -47,5 +47,10 @@ export async function lookupDni(dni: string): Promise<DniLookupResult> {
     throw new Error(response.status === 404 ? "DNI_NOT_FOUND" : "DNI_LOOKUP_FAILED");
   }
 
+  if (import.meta.env.DEV) {
+    const provider = response.headers.get("X-DNI-Provider");
+    if (provider) console.debug(`[lookupDni] proveedor: ${provider}`);
+  }
+
   return normalizeResponse(payload as Partial<DniLookupResult>, normalized);
 }

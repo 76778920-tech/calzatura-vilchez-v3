@@ -315,6 +315,10 @@ export default async function handler(req, res) {
       if (httpStatus !== 404) all404 = false;
 
       if (person) {
+        if (origin && allowedOrigins.has(origin)) {
+          res.setHeader("Access-Control-Expose-Headers", "X-DNI-Provider");
+        }
+        res.setHeader("X-DNI-Provider", name);
         return res.status(200).json(person);
       }
     }
