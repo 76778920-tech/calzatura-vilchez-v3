@@ -95,7 +95,16 @@ function validStripeImage(image) {
 
 // Inserta en la tabla auditoria desde el contexto de Cloud Functions.
 // No lanza: un fallo de auditoría nunca interrumpe la operación principal.
-async function logAuditFn(supabase, accion, entidad, entidadId, entidadNombre, usuarioUid, usuarioEmail, detalle) {
+async function logAuditFn({
+  supabase,
+  accion,
+  entidad,
+  entidadId,
+  entidadNombre,
+  usuarioUid,
+  usuarioEmail,
+  detalle,
+}) {
   try {
     await supabase.from("auditoria").insert({
       accion,
@@ -113,7 +122,7 @@ async function logAuditFn(supabase, accion, entidad, entidadId, entidadNombre, u
 }
 
 function publicError(error) {
-  if (error && error.status && error.status < 500) {
+  if (error?.status && error.status < 500) {
     return error.message;
   }
   return "No se pudo procesar la solicitud";
@@ -729,21 +738,21 @@ exports.stripeWebhook = onRequest(
               stripeSessionId: session.id,
               pagadoEn: new Date().toISOString(),
             });
-            await logAuditFn(
+            await logAuditFn({
               supabase,
-              "cambiar_estado",
-              "pedido",
-              orderId,
-              `#${orderId.slice(-8).toUpperCase()}`,
-              session.metadata?.userId ?? null,
-              order.userEmail ?? null,
-              {
+              accion: "cambiar_estado",
+              entidad: "pedido",
+              entidadId: orderId,
+              entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
+              usuarioUid: session.metadata?.userId ?? null,
+              usuarioEmail: order.userEmail ?? null,
+              detalle: {
                 estado: "pagado",
                 source: "stripe_webhook",
                 stripeEventId: event.id,
                 stripeSessionId: session.id,
               },
-            );
+            });
           }
           // Si order.estado === "pagado": Stripe está reintentando un evento ya procesado.
           // No actualizamos ni auditamos de nuevo para evitar duplicados.
@@ -908,8 +917,8 @@ const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
 
 /** @returns {{ ok: true, upstreamUrl: string, method: string } | { ok: false, status?: number, error: string }} */
 function aiProxyCombined(base, req) {
-  const horizon = parseInt(String(req.query.horizon ?? "30"), 10);
-  const history = parseInt(String(req.query.history ?? "120"), 10);
+  const horizon = Number.parseInt(String(req.query.horizon ?? "30"), 10);
+  const history = Number.parseInt(String(req.query.history ?? "120"), 10);
   if (!Number.isFinite(horizon) || horizon < 7 || horizon > 90) return { ok: false, error: "horizon invalido" };
   if (!Number.isFinite(history) || history < 30 || history > 365) return { ok: false, error: "history invalido" };
   const upstreamUrl = `${base}/api/predict/combined?horizon=${encodeURIComponent(horizon)}&history=${encodeURIComponent(history)}`;
@@ -917,7 +926,7 @@ function aiProxyCombined(base, req) {
 }
 
 function aiProxyWeeklyChart(base, req) {
-  const weeks = parseInt(String(req.query.weeks ?? "8"), 10);
+  const weeks = Number.parseInt(String(req.query.weeks ?? "8"), 10);
   if (!Number.isFinite(weeks) || weeks < 2 || weeks > 24) return { ok: false, error: "weeks invalido" };
   const upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
   return { ok: true, upstreamUrl, method: "GET" };
@@ -928,7 +937,7 @@ function aiProxyModelMetrics(base) {
 }
 
 function aiProxyIreHistorial(base, req) {
-  const days = parseInt(String(req.query.days ?? "30"), 10);
+  const days = Number.parseInt(String(req.query.days ?? "30"), 10);
   if (!Number.isFinite(days) || days < 1 || days > 365) return { ok: false, error: "days invalido" };
   const upstreamUrl = `${base}/api/ire/historial?days=${encodeURIComponent(days)}`;
   return { ok: true, upstreamUrl, method: "GET" };
@@ -949,8 +958,8 @@ function aiProxyCampaignFeedback(base, req) {
 }
 
 function aiProxyCampaignDetection(base, req) {
-  const recentDays = parseInt(String(req.query.recent_days ?? "7"), 10);
-  const baselineDays = parseInt(String(req.query.baseline_days ?? "60"), 10);
+  const recentDays = Number.parseInt(String(req.query.recent_days ?? "7"), 10);
+  const baselineDays = Number.parseInt(String(req.query.baseline_days ?? "60"), 10);
   if (!Number.isFinite(recentDays) || recentDays < 3 || recentDays > 14) return { ok: false, error: "recent_days invalido" };
   if (!Number.isFinite(baselineDays) || baselineDays < 30 || baselineDays > 120) {
     return { ok: false, error: "baseline_days invalido" };
@@ -1083,8 +1092,8 @@ exports.authLogin = onRequest(
       }
 
       try {
-        const rawEmail = req.body && req.body.email;
-        const rawPassword = req.body && req.body.password;
+        const rawEmail = req.body?.email;
+        const rawPassword = req.body?.password;
         if (!isValidLoginEmail(rawEmail) || !isValidLoginPassword(rawPassword)) {
           return res.status(200).json({ ok: false });
         }
