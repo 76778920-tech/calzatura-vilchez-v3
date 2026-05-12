@@ -8,6 +8,11 @@ import { CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 const WHATSAPP_CONTACT_URL =
   "https://wa.me/51964052530?text=Hola%20Calzatura%20Vilchez%2C%20quiero%20hacer%20una%20consulta%20sobre%20sus%20calzados.";
 
+type AccountNavHref =
+  | (typeof PUBLIC_ROUTES)["login"]
+  | (typeof CLIENT_ROUTES)["profile"]
+  | (typeof PUBLIC_ROUTES)["verifyEmail"];
+
 type Props = {
   menus: readonly MegaMenu[];
   open: boolean;
@@ -35,7 +40,7 @@ export default function HeaderMobileNav({
 }: Props) {
   if (!open) return null;
 
-  let accountHref = PUBLIC_ROUTES.login;
+  let accountHref: AccountNavHref = PUBLIC_ROUTES.login;
   if (user && hasVerifiedAccess) {
     accountHref = CLIENT_ROUTES.profile;
   } else if (user && !hasVerifiedAccess) {
