@@ -2,15 +2,14 @@
  * E2E: admin → rastro de auditoría (audit trail)
  *
  * Semáforo:
- *   🟢 TC-AUDIT-001: crear un producto genera entrada en la tabla auditoria — VERIFICADO
+ *   🟢 TC-AUDIT-001: al crear producto (guardar en modal) se inserta auditoría con accion='crear' — VERIFICADO
  *   🟢 TC-AUDIT-002: editar un producto genera entrada en la tabla auditoria — VERIFICADO
  *   🟢 TC-AUDIT-003: eliminar un producto genera entrada en la tabla auditoria — VERIFICADO
  *   🟢 TC-AUDIT-004: la tabla del dashboard muestra la acción más reciente primero — VERIFICADO
  *   🟢 TC-AUDIT-005: auditoría vacía muestra mensaje "Sin actividad registrada aún" — VERIFICADO
  *
- * Estrategia: mockear Supabase REST para capturar las llamadas INSERT a la tabla
- * auditoria y verificar que se realizan con el payload correcto. Se usa
- * injectFakeAdminAuth para simular la sesión de administrador.
+ * Estrategia: mockear Supabase REST (incl. RPC de creación en TC-AUDIT-001) y capturar
+ * INSERT en auditoria. Se usa injectFakeAdminAuth para simular la sesión de administrador.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth, FAKE_ADMIN_UID, FAKE_ADMIN_EMAIL } from "./helpers/mockFirebaseAuth";
@@ -26,10 +25,18 @@ const MOCK_PRODUCT = {
   imagenes: [],
   stock: 5,
   categoria: "hombre",
+  tipoCalzado: "Zapatillas",
+  tallaStock: { "40": 5, "41": 0 },
+  marca: "Marca Audit",
+  material: null,
+  estilo: null,
   color: "Marrón",
   tallas: ["40", "41"],
   activo: true,
   codigo: "AUD-001",
+  familiaId: "e2e-audit-prod-001",
+  destacado: false,
+  descuento: null,
 };
 
 const AUDIT_ROW_CREAR = {
@@ -132,6 +139,21 @@ async function setupAdminMocks(
   });
 }
 
+/** Códigos de producto (GET) para que la tabla admin cargue sin llamadas reales. */
+async function setupProductoCodigosMock(page: Page) {
+  await page.route("**/rest/v1/productoCodigos*", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([{ productoId: MOCK_PRODUCT.id, codigo: MOCK_PRODUCT.codigo }]),
+      });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+}
+
 async function goToAdmin(page: Page) {
   await page.goto("/admin");
   await page.waitForLoadState("domcontentloaded");
@@ -151,12 +173,23 @@ test.describe("admin → rastro de auditoría", () => {
   // ──────────────────────────────────────────────────────────────────────────
   // TC-AUDIT-001: crear producto genera entrada en auditoría
   // ──────────────────────────────────────────────────────────────────────────
+  // TC-AUDIT-001: logAudit("crear", ...) se dispara tras create_product_variants_atomic exitoso,
+  // no al pulsar solo «Producto nuevo». Flujo mínimo de creación (una variante + imagen URL).
   test("crear un producto registra una entrada de auditoría con accion='crear' (TC-AUDIT-001)", async ({ page }) => {
     const insertedPayloads: unknown[] = [];
 
     await setupAdminMocks(page, { auditoria: [] });
+    await setupProductoCodigosMock(page);
 
-    // Interceptar INSERT a auditoria para capturar el payload
+    await page.route("**/rest/v1/rpc/create_product_variants_atomic*", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ids: ["e2e-audit-new-1"] }),
+      });
+    });
+
+    // Interceptar INSERT a auditoria para capturar el payload (LIFO: prevalece sobre setupAdminMocks)
     await page.route("**/rest/v1/auditoria*", async (route) => {
       if (route.request().method() === "POST") {
         const body = route.request().postDataJSON();
@@ -171,17 +204,33 @@ test.describe("admin → rastro de auditoría", () => {
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
     });
 
-    // Navegar al panel de productos y crear uno
     await page.goto("/admin/productos");
     await page.waitForLoadState("domcontentloaded");
-    // Esperar a que el guard de autenticación resuelva y la página se renderice
     await expect(page.locator("h1.admin-page-title", { hasText: /Productos/ })).toBeVisible({ timeout: 20_000 });
 
     const createBtn = page.getByRole("button", { name: /producto nuevo|nuevo producto|agregar producto|crear producto/i }).first();
     await expect(createBtn).toBeVisible({ timeout: 10_000 });
     await createBtn.click();
+    await expect(page.locator(".product-modal--create")).toBeVisible({ timeout: 10_000 });
 
-    // El POST a auditoría puede llegar unos ms después del click (guardas, efectos).
+    await page.getByPlaceholder("CV-FOR-001").fill("CV-AUDIT-E2E-01");
+    await page.locator(".form-group").filter({ hasText: /^Nombre/ }).locator("input").fill("Producto audit trail TC001");
+    await page.locator(".form-group").filter({ hasText: /^Marca/ }).locator("input").fill("Marca E2E");
+    await page.locator(".form-group").filter({ hasText: /^Categoría/ }).locator("select").selectOption("hombre");
+    await page.locator(".form-group").filter({ hasText: /Tipo de calzado/ }).locator("select").selectOption("Zapatillas");
+
+    await page.locator(".admin-finance-box input").first().fill("60");
+    await page.locator(".product-core-row input[placeholder='0.00']").fill("90").catch(() => null);
+
+    await page.locator(".variant-chip").first().click();
+    await page.locator(".admin-color-popover-item").filter({ hasText: "Negro" }).first().click();
+    await page.waitForSelector(".variant-tallas-list", { timeout: 5_000 });
+    await page.locator(".variant-tallas-list .admin-size-stock-item input").first().fill("5");
+    await page.getByPlaceholder("URL imagen 1").first().fill("https://example.com/audit-tc001.jpg");
+
+    await page.getByRole("button", { name: /crear producto/i }).click();
+    await expect(page.getByText(/variante.*creada/i)).toBeVisible({ timeout: 15_000 });
+
     await expect
       .poll(
         () =>
@@ -198,6 +247,7 @@ test.describe("admin → rastro de auditoría", () => {
     expect(crearPayload, "POST a auditoría con acción crear").toBeDefined();
     expect(crearPayload!.accion).toBe("crear");
     expect(crearPayload!.entidad).toBe("producto");
+    expect(crearPayload!.entidadId).toBe("e2e-audit-new-1");
     expect(typeof crearPayload!.realizadoEn).toBe("string");
   });
 
