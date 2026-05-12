@@ -54,9 +54,9 @@ export function scenarioLabel(key: string | null | undefined): string {
 export function validateProducto(row: Row): string | null {
   if (!deriveProductImportId(row)) return "Debes incluir 'id' o 'codigo' para identificar el producto";
   if (!row.nombre) return "Falta el campo 'nombre'";
-  if (row.precio === undefined || isNaN(Number(row.precio)))
+  if (row.precio === undefined || Number.isNaN(Number(row.precio)))
     return "El campo 'precio' debe ser un número";
-  if (row.stock === undefined || isNaN(Number(row.stock)))
+  if (row.stock === undefined || Number.isNaN(Number(row.stock)))
     return "El campo 'stock' debe ser un número";
   if (!row.categoria) return "Falta el campo 'categoria'";
   return null;
@@ -116,11 +116,11 @@ export function transformFabricante(row: Row, ctx: ImportContext): Row {
 export function validateVentaDiaria(row: Row): string | null {
   if (!row.productId) return "Falta el campo 'productId'";
   if (!row.fecha) return "Falta el campo 'fecha'";
-  if (row.cantidad === undefined || isNaN(Number(row.cantidad)))
+  if (row.cantidad === undefined || Number.isNaN(Number(row.cantidad)))
     return "El campo 'cantidad' debe ser un número";
-  if (row.precioVenta === undefined || isNaN(Number(row.precioVenta)))
+  if (row.precioVenta === undefined || Number.isNaN(Number(row.precioVenta)))
     return "El campo 'precioVenta' debe ser un número";
-  if (row.total === undefined || isNaN(Number(row.total)))
+  if (row.total === undefined || Number.isNaN(Number(row.total)))
     return "El campo 'total' debe ser un número";
   return null;
 }

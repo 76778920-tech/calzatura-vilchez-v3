@@ -1766,6 +1766,15 @@ h1, h2, h3, h4, h5 { font-weight: 600; color: var(--text); line-height: 1.3; }
   position: fixed; inset: 0; background: rgba(0,0,0,0.6);
   z-index: 300; animation: fadeIn 0.2s;
 }
+button.cart-overlay {
+  appearance: none;
+  font: inherit;
+  border: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+}
 .cart-sidebar {
   position: fixed; right: 0; top: 0; bottom: 0; width: min(400px, 100vw);
   background: var(--white); z-index: 301; display: flex; flex-direction: column;
@@ -7549,8 +7558,12 @@ button.dash-today-card:hover { transform: translateY(-1px); }
   position: absolute; inset: 0; margin: 0; padding: 0; border: none;
   background: transparent; cursor: pointer; z-index: 0;
 }
-.document-preview-modal {
+.document-preview-modal,
+dialog.document-preview-modal {
   position: relative; z-index: 1;
+  margin: 0;
+  border: none;
+  padding: 0;
   width: min(980px, calc(100vw - 2rem)); max-height: 92vh;
   display: flex; flex-direction: column; overflow: hidden;
   border-radius: var(--radius-md); background: var(--white); box-shadow: var(--shadow-lg);

@@ -123,7 +123,7 @@ def _request_context(request: Annotated[Request, None]) -> dict:
     }
 
 
-def _require_service_auth(request: Annotated[Request, None], location: str) -> None:
+def _require_service_auth(request: Annotated[Request, None]) -> None:
     auth_header = request.headers.get("authorization") or ""
     if not auth_header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -244,7 +244,7 @@ def health():
     })
 def debug_supabase(request: Annotated[Request, None]):
     """Diagnose Supabase connection — use only to troubleshoot."""
-    _require_service_auth(request, "ai-service/main.py:debug_supabase")
+    _require_service_auth(request)
     result: dict = {
         "SUPABASE_URL": bool(os.getenv("SUPABASE_URL")),
         "SUPABASE_SERVICE_KEY": bool(os.getenv("SUPABASE_SERVICE_KEY")),
@@ -282,7 +282,7 @@ def demand_prediction(
 ):
     """Predicts product demand for the next horizon days."""
     try:
-        _require_service_auth(request, "ai-service/main.py:demand_prediction")
+        _require_service_auth(request)
         lookback_days = max(history, 120)
         daily_sales, orders, products, product_codes = _load_data(lookback_days=lookback_days)
         predictions, training_meta = predict_demand(
@@ -361,7 +361,7 @@ def combined_prediction(
     eliminating the second cache-miss penalty on the first page load.
     """
     try:
-        _require_service_auth(request, "ai-service/main.py:combined_prediction")
+        _require_service_auth(request)
         lookback_days = max(history, 120)
         daily_sales, orders, products, product_codes = _load_data(lookback_days=lookback_days)
 
@@ -457,7 +457,7 @@ def ire_historial(
     days: Annotated[int, Query(ge=7, le=90, description="Días de historial a retornar")] = 30,
 ):
     """Devuelve el historial de IRE de los últimos N días."""
-    _require_service_auth(request, "api/ire/historial")
+    _require_service_auth(request)
     try:
         rows = fetch_ire_historial(days)
         return {"historial": rows, "days": days}
@@ -489,7 +489,7 @@ def stock_alerts(
 ):
     """Returns products predicted to run out of stock within the requested threshold."""
     try:
-        _require_service_auth(request, "ai-service/main.py:stock_alerts")
+        _require_service_auth(request)
         lookback_days = max(days_threshold, 90)
         daily_sales, orders, products, product_codes = _load_data(lookback_days=lookback_days)
         predictions, _ = predict_demand(
@@ -533,7 +533,7 @@ def revenue_prediction(
 ):
     """Returns future revenue forecast for the next week and month."""
     try:
-        _require_service_auth(request, "ai-service/main.py:revenue_prediction")
+        _require_service_auth(request)
         lookback_days = max(history, 120)
         daily_sales, orders, *_ = _load_data(lookback_days=lookback_days)
         return forecast_revenue(
@@ -568,7 +568,7 @@ def weekly_chart(
 ):
     """Returns weekly sales volume for the last weeks."""
     try:
-        _require_service_auth(request, "ai-service/main.py:weekly_chart")
+        _require_service_auth(request)
         lookback_days = max(weeks * 7, 56)
         daily_sales, orders, *_ = _load_data(lookback_days=lookback_days)
         chart = get_weekly_chart(daily_sales, orders, weeks=weeks)
@@ -595,7 +595,7 @@ def weekly_chart(
 @limiter.limit("5/minute")
 def invalidate_cache(request: Annotated[Request, None]):
     """Force a cache refresh on the next request."""
-    _require_service_auth(request, "ai-service/main.py:invalidate_cache")
+    _require_service_auth(request)
     _cache["expires_at"] = 0.0
     _cache["lookback_days"] = 0
     return {"status": "cache invalidated"}
@@ -624,7 +624,7 @@ def model_info(request: Annotated[Request, None]):
     explainability fields (feature_importances sorted by importance), and
     drift baseline (feature_stats mean/std per lag feature).
     """
-    _require_service_auth(request, "ai-service/main.py:model_info")
+    _require_service_auth(request)
     if not _model_registry:
         return {
             "status": "sin_datos",
@@ -656,7 +656,7 @@ def model_metrics(request: Annotated[Request, None]):
     Returns MAE (units/day per product) and MAPE (%).
     Note: log is in-memory — data resets on each Render deploy/restart.
     """
-    _require_service_auth(request, "ai-service/main.py:model_metrics")
+    _require_service_auth(request)
 
     if not _prediction_log:
         return {
@@ -932,7 +932,7 @@ def campaign_detection(
         observando → inicio → activa → finalizando → finalizada
                                      ↘ en_riesgo_stock ↗
     """
-    _require_service_auth(request, "ai-service/main.py:campaign_detection")
+    _require_service_auth(request)
 
     lookback = baseline_days + recent_days + 7
     daily_sales, _, products, _ = _load_data(lookback_days=lookback)
@@ -1033,7 +1033,7 @@ def campaign_active(request: Annotated[Request, None]):
     Devuelve la campaña activa más reciente con top_productos para el panel admin.
     Incluye historial de las últimas 10 campañas detectadas.
     """
-    _require_service_auth(request, "api/campaign/active")
+    _require_service_auth(request)
     try:
         last   = get_last_campana_activa()
         detail = fetch_campana_detail(last["id"]) if last else None
@@ -1071,7 +1071,7 @@ def campaign_feedback(
     Registra feedback del administrador sobre una campaña detectada.
     accion: 'confirmar' | 'descartar' | 'nota'
     """
-    _require_service_auth(request, "api/campaign/feedback")
+    _require_service_auth(request)
     try:
         confirmada = None
         if payload.accion == "confirmar":
@@ -1122,7 +1122,7 @@ def campaign_learning_stats(request: Annotated[Request, None]):
     Estadisticas de aprendizaje por feedback del admin.
     Devuelve conteos por scope, precision, umbrales base y umbrales activos aprendidos.
     """
-    _require_service_auth(request, "api/campaign/learning-stats")
+    _require_service_auth(request)
     try:
         from models.campaign import (
             MIN_FEEDBACK_SAMPLES,

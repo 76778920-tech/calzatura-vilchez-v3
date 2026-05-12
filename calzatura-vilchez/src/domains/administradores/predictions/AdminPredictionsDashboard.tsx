@@ -29,7 +29,9 @@ export function AdminPredictionsDashboard(props: AdminPredictionsModelState) {
         <div className="pred-warnings-banner" role="alert">
           <AlertTriangle size={16} aria-hidden="true" />
           <ul className="pred-warnings-list">
-            {aiWarnings.map((w, i) => <li key={i}>{w}</li>)}
+            {aiWarnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
           </ul>
         </div>
       )}
@@ -92,7 +94,7 @@ export function AdminPredictionsDashboard(props: AdminPredictionsModelState) {
       </div>
 
       {/* ── Navegación por pestañas ────────────────────────── */}
-      <nav className="pred-tabs" role="tablist" aria-label="Secciones del panel">
+      <div className="pred-tabs" role="tablist" aria-label="Secciones del panel">
         <button type="button" role="tab" aria-selected={activeTab === "resumen"} className={`pred-tab ${activeTab === "resumen" ? "active" : ""}`} onClick={() => changeTab("resumen")}>
           Resumen
           {enRiesgo > 0 && <span className="pred-tab-count pred-tab-count-alert">{enRiesgo}</span>}
@@ -121,7 +123,7 @@ export function AdminPredictionsDashboard(props: AdminPredictionsModelState) {
             <span className="pred-tab-count pred-tab-count-alert">!</span>
           )}
         </button>
-      </nav>
+      </div>
 
       {TabPanel ? <TabPanel {...props} /> : null}
     </div>

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { DELIVERY_CONFIG } from "@/config/delivery";
 import type { DeliveryQuote, GeocodeCandidate } from "@/services/deliveryOpenRoute";
 import CheckoutDeliveryMap from "@/domains/carrito/components/CheckoutDeliveryMap";
@@ -40,6 +41,26 @@ export default function CheckoutDeliveryBox({
   deliveryQuoteError,
   deliveryQuote,
 }: Props) {
+  let deliveryQuoteStatus: ReactNode = null;
+  if (!deliveryQuoteLoading && !deliveryQuoteError && deliveryQuote) {
+    const q = deliveryQuote;
+    if (q.isOutOfRange) {
+      deliveryQuoteStatus = (
+        <p className="checkout-delivery-error">
+          Fuera de zona de reparto (máximo {DELIVERY_CONFIG.maxDeliveryKm} km).
+        </p>
+      );
+    } else if (q.isFreeDelivery) {
+      deliveryQuoteStatus = <p className="checkout-delivery-ok">Envío gratis en tu zona.</p>;
+    } else {
+      deliveryQuoteStatus = (
+        <p className="checkout-delivery-line">
+          Costo de envío: <strong>{q.costFormatted}</strong>
+        </p>
+      );
+    }
+  }
+
   return (
     <div className="checkout-delivery-box">
       <p className="checkout-delivery-title">Envío (OpenRouteService)</p>
@@ -49,8 +70,9 @@ export default function CheckoutDeliveryBox({
       </p>
 
       <div className="form-group checkout-delivery-search-group">
-        <label>Buscar ubicación en el mapa</label>
+        <label htmlFor="checkout-delivery-map-search">Buscar ubicación en el mapa</label>
         <input
+          id="checkout-delivery-map-search"
           type="text"
           value={mapSearchInput}
           onChange={(e) => onMapSearchChange(e.target.value)}
@@ -63,7 +85,7 @@ export default function CheckoutDeliveryBox({
           <p className="checkout-delivery-error">{searchSuggestError}</p>
         )}
         {!searchSuggestLoading && !searchSuggestError && searchSuggestions.length > 0 && (
-          <ul className="checkout-delivery-suggest-list" role="listbox" aria-label="Resultados de búsqueda">
+          <ul className="checkout-delivery-suggest-list" aria-label="Resultados de búsqueda">
             {searchSuggestions.map((c, i) => (
               <li key={`s-${i}-${c.lat}-${c.lng}`}>
                 <button
@@ -94,7 +116,7 @@ export default function CheckoutDeliveryBox({
             <p className="checkout-delivery-muted">No hay resultados; probá el buscador de arriba.</p>
           )}
           {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length > 0 && (
-            <ul className="checkout-delivery-suggest-list" role="listbox" aria-label="Sugerencias por dirección">
+            <ul className="checkout-delivery-suggest-list" aria-label="Sugerencias por dirección">
               {addressSuggestions.map((c, i) => (
                 <li key={`a-${i}-${c.lat}-${c.lng}`}>
                   <button
@@ -137,17 +159,7 @@ export default function CheckoutDeliveryBox({
             Distancia aprox.: <strong>{deliveryQuote.distanceFormatted}</strong>
             {deliveryQuote.label ? <span className="checkout-delivery-muted"> — {deliveryQuote.label}</span> : null}
           </p>
-          {deliveryQuote.isOutOfRange ? (
-            <p className="checkout-delivery-error">
-              Fuera de zona de reparto (máximo {DELIVERY_CONFIG.maxDeliveryKm} km).
-            </p>
-          ) : deliveryQuote.isFreeDelivery ? (
-            <p className="checkout-delivery-ok">Envío gratis en tu zona.</p>
-          ) : (
-            <p className="checkout-delivery-line">
-              Costo de envío: <strong>{deliveryQuote.costFormatted}</strong>
-            </p>
-          )}
+          {deliveryQuoteStatus}
         </>
       )}
 

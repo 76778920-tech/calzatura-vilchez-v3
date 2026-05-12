@@ -9,7 +9,12 @@ export default function CartSidebar() {
 
   return (
     <>
-      <div className="cart-overlay" onClick={() => setIsOpen(false)} />
+      <button
+        type="button"
+        className="cart-overlay"
+        onClick={() => setIsOpen(false)}
+        aria-label="Cerrar carrito"
+      />
       <aside className="cart-sidebar">
         {/* Header */}
         <div className="cart-header">

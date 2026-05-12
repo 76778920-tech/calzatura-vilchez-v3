@@ -32,11 +32,10 @@ export default function ImagePreviewModal({
         onClick={onClose}
         aria-label="Cerrar vista previa de imagen"
       />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="image-preview-title"
+      <dialog
+        open
         className="document-preview-modal"
+        aria-labelledby="image-preview-title"
       >
         <div className="document-preview-header">
           <div>
@@ -87,7 +86,7 @@ export default function ImagePreviewModal({
             ))}
           </div>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }
