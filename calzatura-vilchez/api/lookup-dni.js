@@ -306,6 +306,9 @@ export default async function handler(req, res) {
 
   let sawHttp = false;
   let all404 = true;
+  /** Último proveedor que sí llamó a red (no skipped), para diagnosticar 502 en Network. */
+  let lastProvider = "";
+  let lastHttpStatus = null;
 
   try {
     for (const { name, run } of PROVIDERS) {
@@ -315,6 +318,8 @@ export default async function handler(req, res) {
       } catch (err) {
         console.error(`[lookup-dni] ${name} error:`, err?.message || err);
         all404 = false;
+        lastProvider = name;
+        lastHttpStatus = null;
         continue;
       }
 
@@ -322,6 +327,8 @@ export default async function handler(req, res) {
       if (skipped) continue;
 
       sawHttp = true;
+      lastProvider = name;
+      lastHttpStatus = httpStatus;
       if (httpStatus !== 404) all404 = false;
 
       if (person) {
@@ -334,7 +341,25 @@ export default async function handler(req, res) {
     }
 
     const status = sawHttp && all404 ? 404 : 502;
-    return res.status(status).json({ error: toPublicError(status) });
+    const body = { error: toPublicError(status) };
+    if (status === 502) {
+      if (lastProvider) {
+        body.detail = `Ningun proveedor devolvio datos validos. Ultimo intento: ${lastProvider} (HTTP ${lastHttpStatus ?? "error"}). En Vercel: Logs de esta funcion, variables de entorno en el mismo proyecto que despliega esta URL (LATINFO/CLAVE_API_LATINFO, PERUAPI/TOKEN_PERUAPI, etc.). Si usas peruapi.com en plan free, revisa IP permitida.`;
+      } else {
+        body.detail =
+          "Ninguna llamada HTTP a proveedores se completó (timeouts o excepciones). Revisa Vercel Logs de esta funcion.";
+      }
+      if (origin && allowedOrigins.has(origin)) {
+        res.setHeader(
+          "Access-Control-Expose-Headers",
+          "X-DNI-Last-Provider,X-DNI-Last-Status,X-DNI-Saw-Http"
+        );
+        res.setHeader("X-DNI-Last-Provider", lastProvider || "none");
+        res.setHeader("X-DNI-Last-Status", lastHttpStatus != null ? String(lastHttpStatus) : "");
+        res.setHeader("X-DNI-Saw-Http", sawHttp ? "1" : "0");
+      }
+    }
+    return res.status(status).json(body);
   } catch (error) {
     console.error("[lookup-dni] fatal:", error);
     return res.status(502).json({ error: toPublicError(502) });
