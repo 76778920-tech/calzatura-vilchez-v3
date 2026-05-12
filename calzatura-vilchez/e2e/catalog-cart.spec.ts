@@ -54,13 +54,12 @@ test.describe("catálogo → detalle → carrito", () => {
     const addBtn = page.getByRole("button", { name: /Agregar al Carrito/i });
     await expect(addBtn).toBeVisible({ timeout: 15_000 });
 
-    // E2E condicional: si el mock o la talla no habilitan "Agregar al carrito", no ejecutamos
-    // el resto del flujo (evita falso rojo). El motivo queda en el segundo argumento de skip.
+    // El mock y la talla deben dejar el botón habilitado; si no, fallamos con mensaje claro (no test.skip: Sonar).
     const addDisabled = await addBtn.isDisabled();
-    test.skip(
+    expect(
       addDisabled,
-      "El primer producto del listado no tiene stock/talla seleccionable para agregar al carrito."
-    );
+      "El mock E2E debe permitir agregar al carrito (talla visible/seleccionada y stock). Si el botón sigue deshabilitado, revisar selectores o MOCK_PRODUCT."
+    ).toBe(false);
 
     await addBtn.click();
 

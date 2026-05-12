@@ -74,7 +74,7 @@ def _decode_jwt_header_for_kid(id_token: str) -> str:
     try:
         raw = base64.urlsafe_b64decode(header_b64 + padding)
         header = json.loads(raw.decode("utf-8"))
-    except (ValueError, UnicodeDecodeError) as exc:
+    except ValueError as exc:
         raise ValueError("cabecera JWT invalida") from exc
     if not isinstance(header, dict):
         raise ValueError("cabecera JWT invalida")
