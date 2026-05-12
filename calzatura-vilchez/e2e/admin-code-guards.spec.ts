@@ -9,6 +9,12 @@ function isExpectedMockedConflict(text: string): boolean {
   return /Failed to load resource: the server responded with a status of 409 \(Conflict\)/.test(text);
 }
 
+/** Ruido habitual de Chromium/Playwright (recargas, abortos, HTTP/2); no indica fallo del flujo bajo prueba. */
+function isIgnorableBrowserLoadError(text: string): boolean {
+  if (!text.includes("Failed to load resource")) return false;
+  return /ERR_HTTP2_PROTOCOL_ERROR|ERR_CONNECTION_RESET|ERR_ABORTED|ERR_BLOCKED_BY_CLIENT/.test(text);
+}
+
 async function getExistingCodes(page: Page) {
   const codes = await page.locator(".admin-code-badge").allInnerTexts();
   return codes
@@ -107,6 +113,7 @@ test.describe("admin productos → guardas de código único", () => {
     page.on("console", (msg) => {
       if (msg.type() === "error") {
         if (isExpectedMockedConflict(msg.text())) return;
+        if (isIgnorableBrowserLoadError(msg.text())) return;
         console.log(`[admin-code-guards] browser console error -> ${msg.text()}`);
       }
     });
