@@ -35,8 +35,8 @@ describe("normalizeAdminCategory", () => {
     expect(normalizeAdminCategory("")).toBe("hombre");
   });
 
-  it("devuelve 'hombre' para undefined", () => {
-    expect(normalizeAdminCategory(undefined)).toBe("hombre");
+  it("devuelve 'hombre' sin argumentos (default)", () => {
+    expect(normalizeAdminCategory()).toBe("hombre");
   });
 
   it.each(["hombre", "dama", "juvenil", "nino", "bebe"])(
@@ -173,22 +173,22 @@ describe("normalizeEstiloField", () => {
 });
 
 // ─── validateCommercialProductDraft ──────────────────────────────────────────
-describe("validateCommercialProductDraft", () => {
-  function validDraft(overrides: Partial<CommercialDraft> = {}): CommercialDraft {
-    return {
-      categoria: "hombre",
-      tipoCalzado: "Zapatillas",
-      estilo: "Urbanas",
-      precio: 120,
-      costoCompra: 80,
-      margenMinimo: 20,
-      margenObjetivo: 45,
-      margenMaximo: 80,
-      material: "Cuero",
-      ...overrides,
-    };
-  }
+function validDraft(overrides: Partial<CommercialDraft> = {}): CommercialDraft {
+  return {
+    categoria: "hombre",
+    tipoCalzado: "Zapatillas",
+    estilo: "Urbanas",
+    precio: 120,
+    costoCompra: 80,
+    margenMinimo: 20,
+    margenObjetivo: 45,
+    margenMaximo: 80,
+    material: "Cuero",
+    ...overrides,
+  };
+}
 
+describe("validateCommercialProductDraft", () => {
   it("draft válido no produce errores", () => {
     expect(validateCommercialProductDraft(validDraft())).toEqual([]);
   });
@@ -284,5 +284,19 @@ describe("validateCommercialProductDraft", () => {
       validDraft({ tipoCalzado: "", material: "Plastico", costoCompra: 0 })
     );
     expect(errors.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("márgenes cero no lanzan excepción (cubre rama falsy de || 0)", () => {
+    const errors = validateCommercialProductDraft(
+      validDraft({ margenMinimo: 0, margenObjetivo: 0, margenMaximo: 0, costoCompra: 100, precio: 100 })
+    );
+    expect(Array.isArray(errors)).toBe(true);
+  });
+
+  it("obj > max con min válido produce error de márgenes (segunda condición del ||)", () => {
+    const errors = validateCommercialProductDraft(
+      validDraft({ margenMinimo: 20, margenObjetivo: 90, margenMaximo: 80 })
+    );
+    expect(errors.some((e) => e.includes("márgenes"))).toBe(true);
   });
 });

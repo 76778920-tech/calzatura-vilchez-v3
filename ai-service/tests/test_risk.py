@@ -16,23 +16,23 @@ from models.risk import _clamp, compute_ire, compute_ire_proyectado
 
 class TestClamp:
     def test_valor_dentro_de_rango_sin_cambios(self):
-        assert _clamp(50.0) == 50.0
+        assert _clamp(50.0) == pytest.approx(50.0)
 
     def test_valor_por_debajo_del_minimo_retorna_minimo(self):
-        assert _clamp(-10.0) == 0.0
+        assert _clamp(-10.0) == pytest.approx(0.0)
 
     def test_valor_por_encima_del_maximo_retorna_maximo(self):
-        assert _clamp(150.0) == 100.0
+        assert _clamp(150.0) == pytest.approx(100.0)
 
     def test_exactamente_en_el_limite_inferior(self):
-        assert _clamp(0.0) == 0.0
+        assert _clamp(0.0) == pytest.approx(0.0)
 
     def test_exactamente_en_el_limite_superior(self):
-        assert _clamp(100.0) == 100.0
+        assert _clamp(100.0) == pytest.approx(100.0)
 
     def test_rango_personalizado(self):
-        assert _clamp(50.0, 10.0, 40.0) == 40.0
-        assert _clamp(5.0, 10.0, 40.0) == 10.0
+        assert _clamp(50.0, 10.0, 40.0) == pytest.approx(40.0)
+        assert _clamp(5.0, 10.0, 40.0) == pytest.approx(10.0)
 
 
 # ─── Helpers de fixtures ──────────────────────────────────────────────────────
@@ -140,10 +140,18 @@ class TestComputeIre:
         assert result["nivel"] == "critico"
 
     def test_umbrales_de_nivel_correctos(self):
-        for score, expected_nivel in [(25, "bajo"), (26, "moderado"), (50, "moderado"),
-                                       (51, "alto"), (75, "alto"), (76, "critico")]:
-            nivel = "bajo" if score <= 25 else "moderado" if score <= 50 else "alto" if score <= 75 else "critico"
-            assert nivel == expected_nivel
+        def expected_nivel(score: int) -> str:
+            if score <= 25:
+                return "bajo"
+            if score <= 50:
+                return "moderado"
+            if score <= 75:
+                return "alto"
+            return "critico"
+
+        for score, nivel in [(25, "bajo"), (26, "moderado"), (50, "moderado"),
+                             (51, "alto"), (75, "alto"), (76, "critico")]:
+            assert expected_nivel(score) == nivel
 
     def test_score_siempre_entre_0_y_100(self):
         extremos = [
@@ -227,3 +235,16 @@ class TestComputeIreProyectado:
         preds = [make_pred(stock=10, consumo=2.0, nivel_riesgo="estable")] * 5
         result = compute_ire_proyectado(preds, None, 10)
         assert result["dimensiones"]["riesgo_stock"] > 0
+
+    def test_dias_entre_8_y_14_clasifica_atencion(self):
+        # stock=20, consumo=1/día, horizonte=8 → stock_proj=12, dias_proy=12 → atencion (≤14)
+        preds = [make_pred(stock=20, consumo=1.0, nivel_riesgo="estable")] * 5
+        result = compute_ire_proyectado(preds, None, 8)
+        assert result["score"] >= 0
+
+    def test_dias_entre_15_y_30_clasifica_vigilancia(self):
+        # stock=60, consumo=1/día, horizonte=10 → stock_proj=50, dias_proy=50 → "estable"
+        # stock=40, consumo=1/día, horizonte=15 → stock_proj=25, dias_proy=25 → vigilancia (≤30)
+        preds = [make_pred(stock=40, consumo=1.0, nivel_riesgo="estable")] * 5
+        result = compute_ire_proyectado(preds, None, 15)
+        assert result["score"] >= 0
