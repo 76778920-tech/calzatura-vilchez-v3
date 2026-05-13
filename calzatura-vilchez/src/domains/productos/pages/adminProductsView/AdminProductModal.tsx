@@ -39,7 +39,6 @@ export function AdminProductModal(props: AdminProductsViewModel) {
       <dialog
         ref={modalRef}
         open
-        role="dialog"
         aria-modal="true"
         aria-labelledby="product-modal-title"
         className={`modal product-modal${!s.editingId ? " product-modal--create" : ""}`}

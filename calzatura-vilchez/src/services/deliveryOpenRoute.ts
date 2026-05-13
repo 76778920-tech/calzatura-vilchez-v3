@@ -116,17 +116,17 @@ export function parseStreetHousenumber(input: string): { street: string; housenu
   const q = input.replace(/\s+/g, " ").trim();
   if (!q) return { street: "" };
 
-  const hash = q.match(/^(.+?)[\s,]*#\s*(\d{1,6}[A-Za-z]?)\s*$/);
+  const hash = q.match(/^(.+?)[\s,]*#\s*(\d{1,6}[A-Z]?)\s*$/);
   if (hash && hash[1].trim().length >= 2) {
     return { street: hash[1].trim(), housenumber: hash[2] };
   }
 
-  const nro = q.match(/^(.+?)\s+N(?:°|ro\.?)\s*(\d{1,6}[A-Za-z]?)\s*$/i);
+  const nro = q.match(/^(.+?)\s+N(?:°|ro\.?)\s*(\d{1,6}[A-Z]?)\s*$/i);
   if (nro && nro[1].trim().length >= 2) {
     return { street: nro[1].trim(), housenumber: nro[2] };
   }
 
-  const endNum = q.match(/^(.+?)\s(\d{1,5}[A-Za-z]?)$/);
+  const endNum = q.match(/^(.+?)\s(\d{1,5}[A-Z]?)$/);
   if (endNum && endNum[1].trim().length >= 4) {
     const num = endNum[2];
     if (/^(19|20)\d{2}$/.test(num)) return { street: q };

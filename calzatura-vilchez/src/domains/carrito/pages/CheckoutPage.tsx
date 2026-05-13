@@ -149,8 +149,9 @@ export default function CheckoutPage() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Nombre *</label>
+                  <label htmlFor="checkout-nombre">Nombre *</label>
                   <input
+                    id="checkout-nombre"
                     value={direccion.nombre}
                     onChange={(e) => setDireccion({ ...direccion, nombre: e.target.value })}
                     required
@@ -159,8 +160,9 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Apellido *</label>
+                  <label htmlFor="checkout-apellido">Apellido *</label>
                   <input
+                    id="checkout-apellido"
                     value={direccion.apellido}
                     onChange={(e) => setDireccion({ ...direccion, apellido: e.target.value })}
                     required
@@ -171,8 +173,9 @@ export default function CheckoutPage() {
               </div>
 
               <div className="form-group">
-                <label>Dirección *</label>
+                <label htmlFor="checkout-direccion">Dirección *</label>
                 <input
+                  id="checkout-direccion"
                   value={direccion.direccion}
                   onChange={(e) => setDireccion({ ...direccion, direccion: e.target.value })}
                   required
@@ -183,8 +186,9 @@ export default function CheckoutPage() {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Ciudad *</label>
+                  <label htmlFor="checkout-ciudad">Ciudad *</label>
                   <input
+                    id="checkout-ciudad"
                     value={direccion.ciudad}
                     onChange={(e) => setDireccion({ ...direccion, ciudad: e.target.value })}
                     required
@@ -192,8 +196,9 @@ export default function CheckoutPage() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Distrito *</label>
+                  <label htmlFor="checkout-distrito">Distrito *</label>
                   <input
+                    id="checkout-distrito"
                     value={direccion.distrito}
                     onChange={(e) => setDireccion({ ...direccion, distrito: e.target.value })}
                     required
@@ -204,8 +209,9 @@ export default function CheckoutPage() {
               </div>
 
               <div className="form-group">
-                <label>Teléfono *</label>
+                <label htmlFor="checkout-telefono">Teléfono *</label>
                 <input
+                  id="checkout-telefono"
                   type="tel"
                   value={direccion.telefono}
                   onChange={(e) =>
@@ -224,8 +230,9 @@ export default function CheckoutPage() {
               </div>
 
               <div className="form-group">
-                <label>Referencia</label>
+                <label htmlFor="checkout-referencia">Referencia</label>
                 <input
+                  id="checkout-referencia"
                   value={direccion.referencia ?? ""}
                   onChange={(e) => setDireccion({ ...direccion, referencia: e.target.value })}
                   className="form-input"

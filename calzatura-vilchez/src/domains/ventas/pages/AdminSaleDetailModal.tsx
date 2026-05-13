@@ -22,8 +22,9 @@ export function AdminSaleDetailModal({
   onViewDocument,
 }: AdminSaleDetailModalProps) {
   return (
-    <div className="sale-modal-overlay" onClick={onClose}>
-      <div className="sale-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="sale-modal-overlay">
+      <button type="button" className="manufacturer-modal-backdrop" aria-label="Cerrar" onClick={onClose} />
+      <div className="sale-modal">
         <div className="sale-modal-header">
           <div>
             <h2>Detalle de venta</h2>
@@ -49,11 +50,11 @@ export function AdminSaleDetailModal({
 
           <div className="sale-modal-grid">
             <div className="sale-modal-info">
-              <label>Fecha y hora</label>
+              <span className="sale-modal-info-label">Fecha y hora</span>
               <span>{new Date(sale.creadoEn).toLocaleString("es-PE", { dateStyle: "long", timeStyle: "short" })}</span>
             </div>
             <div className="sale-modal-info">
-              <label>Comprobante</label>
+              <span className="sale-modal-info-label">Comprobante</span>
               <span>{SALE_DOCUMENT_LABELS[sale.documentoTipo ?? "ninguno"]}</span>
             </div>
           </div>
@@ -79,7 +80,7 @@ export function AdminSaleDetailModal({
 
           {sale.cliente && (
             <div className="sale-modal-customer">
-              <label>Cliente</label>
+              <span className="sale-modal-info-label">Cliente</span>
               <strong>
                 {sale.cliente.nombres} {sale.cliente.apellidos}
               </strong>
@@ -110,6 +111,7 @@ export function AdminSaleDetailModal({
               </h3>
               <p>Indica el motivo. El stock será restaurado automáticamente.</p>
               <textarea
+                aria-label="Motivo de devolución"
                 value={returnMotivo}
                 onChange={(e) => onReturnMotivoChange(e.target.value)}
                 placeholder="Ej: Talla equivocada, venta duplicada, cliente desistió..."

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import {
   BadgeDollarSign,
+  Eye,
   FileImage,
   IdCard,
   Pencil,
@@ -426,19 +427,7 @@ export default function AdminManufacturers() {
               </tr>
             )}
             {filteredManufacturers.map((item) => (
-              <tr
-                key={item.id}
-                className="sale-row-clickable"
-                role="button"
-                tabIndex={0}
-                onClick={() => setDetailManufacturer(item)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    setDetailManufacturer(item);
-                  }
-                }}
-              >
+              <tr key={item.id}>
                 <td><span className="admin-code-badge">{item.dni}</span></td>
                 <td>
                   <div className="admin-product-cell">
@@ -461,6 +450,9 @@ export default function AdminManufacturers() {
                 </td>
                 <td>
                   <div className="admin-actions">
+                    <button type="button" onClick={() => setDetailManufacturer(item)} className="action-btn" aria-label="Ver detalle">
+                      <Eye size={15} />
+                    </button>
                     <button type="button" onClick={(e) => { e.stopPropagation(); openEdit(item); }} className="action-btn edit-btn" aria-label="Editar">
                       <Pencil size={15} />
                     </button>

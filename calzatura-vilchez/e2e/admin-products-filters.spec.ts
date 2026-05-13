@@ -149,12 +149,12 @@ test.describe("admin productos → filtros y accesibilidad del modal", () => {
 
     // Abrir modal de creación
     await page.getByRole("button", { name: /producto nuevo/i }).click();
-    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 8_000 });
 
     // Presionar Escape dentro del modal
-    await page.locator('[role="dialog"]').press("Escape");
+    await page.getByRole("dialog").press("Escape");
 
-    await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5_000 });
   });
 
   // ──────────────────────────────────────────────────────────────────────────────
@@ -165,10 +165,10 @@ test.describe("admin productos → filtros y accesibilidad del modal", () => {
 
     const openBtn = page.getByRole("button", { name: /producto nuevo/i });
     await openBtn.click();
-    await expect(page.locator('[role="dialog"]')).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByRole("dialog")).toBeVisible({ timeout: 8_000 });
 
-    await page.locator('[role="dialog"]').press("Escape");
-    await expect(page.locator('[role="dialog"]')).not.toBeVisible({ timeout: 5_000 });
+    await page.getByRole("dialog").press("Escape");
+    await expect(page.getByRole("dialog")).not.toBeVisible({ timeout: 5_000 });
 
     // El foco debe estar en el botón de apertura
     await expect(openBtn).toBeFocused({ timeout: 3_000 });

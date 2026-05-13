@@ -112,10 +112,11 @@ export default function Register() {
 
         <form onSubmit={handleRegister} className="auth-form">
           <div className="input-group">
-            <label>DNI</label>
+            <label htmlFor="register-dni">DNI</label>
             <div className="input-wrapper">
               <IdCard size={16} className="input-icon" />
               <input
+                id="register-dni"
                 type="text"
                 inputMode="numeric"
                 value={dni}
@@ -148,10 +149,11 @@ export default function Register() {
 
           <div className="form-row">
             <div className="input-group">
-              <label>Nombres</label>
+              <label htmlFor="register-nombres">Nombres</label>
               <div className="input-wrapper">
                 <User size={16} className="input-icon" />
                 <input
+                  id="register-nombres"
                   type="text"
                   value={nombres}
                   disabled
@@ -163,10 +165,11 @@ export default function Register() {
             </div>
 
             <div className="input-group">
-              <label>Apellidos</label>
+              <label htmlFor="register-apellidos">Apellidos</label>
               <div className="input-wrapper">
                 <User size={16} className="input-icon" />
                 <input
+                  id="register-apellidos"
                   type="text"
                   value={apellidos}
                   disabled
@@ -179,10 +182,11 @@ export default function Register() {
           </div>
 
           <div className="input-group">
-            <label>Correo electronico</label>
+            <label htmlFor="register-email">Correo electronico</label>
             <div className="input-wrapper">
               <Mail size={16} className="input-icon" />
               <input
+                id="register-email"
                 type="email"
                 inputMode="email"
                 autoComplete="email"
@@ -198,10 +202,11 @@ export default function Register() {
 
           <div className="form-row">
             <div className="input-group">
-              <label>Contrasena</label>
+              <label htmlFor="register-password">Contrasena</label>
               <div className="input-wrapper">
                 <Lock size={16} className="input-icon" />
                 <input
+                  id="register-password"
                   type={showPass ? "text" : "password"}
                   autoComplete="new-password"
                   value={password}
@@ -218,10 +223,11 @@ export default function Register() {
             </div>
 
             <div className="input-group">
-              <label>Confirmar contraseña</label>
+              <label htmlFor="register-confirm-password">Confirmar contraseña</label>
               <div className="input-wrapper">
                 <Lock size={16} className="input-icon" />
                 <input
+                  id="register-confirm-password"
                   type={showPass ? "text" : "password"}
                   autoComplete="new-password"
                   value={confirmPass}

@@ -52,16 +52,27 @@ export function isDniLookupError(err: unknown) {
   return ["DNI_INVALID", "DNI_LOOKUP_NOT_CONFIGURED", "DNI_NOT_FOUND", "DNI_LOOKUP_FAILED"].includes(msg);
 }
 
-export function messageForInvalidAddSaleLine(
-  selectedProduct: SaleProduct | undefined,
-  availableColors: string[],
-  selectedColor: string,
-  availableSizes: string[],
-  selectedTalla: string,
-  quantity: number,
-  availableForSelected: number,
-  salePrice: number
-): string | null {
+type AddSaleLineValidation = {
+  selectedProduct: SaleProduct | undefined;
+  availableColors: string[];
+  selectedColor: string;
+  availableSizes: string[];
+  selectedTalla: string;
+  quantity: number;
+  availableForSelected: number;
+  salePrice: number;
+};
+
+export function messageForInvalidAddSaleLine({
+  selectedProduct,
+  availableColors,
+  selectedColor,
+  availableSizes,
+  selectedTalla,
+  quantity,
+  availableForSelected,
+  salePrice,
+}: AddSaleLineValidation): string | null {
   if (!selectedProduct) return "Selecciona un producto";
   if (!selectedProduct.finanzas) return "Este producto no tiene costo ni rango de venta registrado";
   if (availableColors.length > 0 && !selectedColor) return "Selecciona un color";

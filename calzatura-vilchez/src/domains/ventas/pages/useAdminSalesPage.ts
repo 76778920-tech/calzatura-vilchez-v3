@@ -291,7 +291,7 @@ export function useAdminSalesPage(): AdminSalesPageModel {
   };
 
   const addLine = () => {
-    const invalidMsg = messageForInvalidAddSaleLine(
+    const invalidMsg = messageForInvalidAddSaleLine({
       selectedProduct,
       availableColors,
       selectedColor,
@@ -299,8 +299,8 @@ export function useAdminSalesPage(): AdminSalesPageModel {
       selectedTalla,
       quantity,
       availableForSelected,
-      salePrice
-    );
+      salePrice,
+    });
     if (invalidMsg) {
       toast.error(invalidMsg);
       return;

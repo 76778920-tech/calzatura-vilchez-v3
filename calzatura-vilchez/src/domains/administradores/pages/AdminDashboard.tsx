@@ -174,7 +174,6 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
         className="modal dash-order-modal"
         aria-modal="true"
         aria-labelledby="dash-order-modal-title"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
           <div>
