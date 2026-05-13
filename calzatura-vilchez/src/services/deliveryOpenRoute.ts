@@ -96,7 +96,8 @@ function parseGeocodeFeatures(data: { features?: GeoJsonFeature[] }, fallbackLab
 }
 
 function escapeRegExp(s: string): string {
-  return s.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+  const specialChars = new Set([".", "*", "+", "?", "^", "$", "{", "}", "(", ")", "|", "[", "]", "\\"]);
+  return Array.from(s, (char) => (specialChars.has(char) ? `\\${char}` : char)).join("");
 }
 
 /** Normaliza #, N°, Nro. para que el geocoder reciba "calle 215". */

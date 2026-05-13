@@ -8,9 +8,8 @@ export function isChunkLoadError(error: unknown) {
     message = error.message;
   } else if (typeof error === "string") {
     message = error;
-  } else if (error !== null && error !== undefined) {
-    const encoded = JSON.stringify(error);
-    message = typeof encoded === "string" ? encoded : "";
+  } else if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+    message = error.message;
   }
   return CHUNK_ERROR_RE.test(message);
 }

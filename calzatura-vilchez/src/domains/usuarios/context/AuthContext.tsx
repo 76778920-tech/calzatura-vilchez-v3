@@ -54,9 +54,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     try {
-      let profile = await getUserProfile(currentUser.uid);
-
-      profile ??= await ensureVerifiedUserProfile(currentUser);
+      let profile =
+        (await getUserProfile(currentUser.uid)) ??
+        (await ensureVerifiedUserProfile(currentUser));
 
       if (!profile && isSuperAdmin) {
         const newProfile: UserProfile = { ...memoryProfile, nombre: "Administrador" };
