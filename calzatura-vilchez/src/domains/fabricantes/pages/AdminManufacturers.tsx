@@ -61,18 +61,17 @@ function fullName(item: Manufacturer) {
 }
 
 function documentLabel(type: DocumentType) {
-  return type === "boleta" ? "Boletas" : "Guías";
+  return type === "boleta" ? "Boleta" : "Guía";
 }
+
+const DNI_ERROR_MESSAGES: Record<string, string> = {
+  DNI_LOOKUP_NOT_CONFIGURED: "Configura VITE_DNI_LOOKUP_URL para validar el DNI",
+  DNI_NOT_FOUND: "No se encontraron datos para este DNI",
+};
 
 function showDniLookupError(error: unknown) {
   const message = error instanceof Error ? error.message : "";
-  if (message === "DNI_LOOKUP_NOT_CONFIGURED") {
-    toast.error("Configura VITE_DNI_LOOKUP_URL para validar el DNI");
-  } else if (message === "DNI_NOT_FOUND") {
-    toast.error("No se encontraron datos para este DNI");
-  } else {
-    toast.error("No se pudo validar el DNI");
-  }
+  toast.error(DNI_ERROR_MESSAGES[message] ?? "No se pudo validar el DNI");
 }
 
 export default function AdminManufacturers() {
@@ -155,10 +154,7 @@ export default function AdminManufacturers() {
         item.ultimoIngresoFecha,
       ].filter(Boolean).join(" ").toLowerCase();
       const matchesSearch = term === "" || searchable.includes(term);
-      const matchesStatus =
-        statusFilter === "todos" ||
-        (statusFilter === "activos" && item.activo) ||
-        (statusFilter === "inactivos" && !item.activo);
+      const matchesStatus = statusFilter === "todos" || item.activo === (statusFilter === "activos");
       return matchesSearch && matchesStatus;
     });
   }, [manufacturers, searchTerm, statusFilter]);
@@ -261,7 +257,7 @@ export default function AdminManufacturers() {
       toast.error("El DNI debe tener 8 dígitos");
       return;
     }
-    if (!form.nombres.trim() || !form.apellidos.trim() || !form.marca.trim()) {
+    if ([form.nombres, form.apellidos, form.marca].some((v) => !v.trim())) {
       toast.error("Completa nombres, apellidos y marca");
       return;
     }
@@ -648,7 +644,7 @@ export default function AdminManufacturers() {
                         <img src={item.imagen} alt={item.nombre} />
                       </button>
                       <div>
-                        <span>{item.tipo === "boleta" ? "Boleta" : "Guía"}</span>
+                        <span>{documentLabel(item.tipo)}</span>
                         <strong>{item.nombre}</strong>
                         <input
                           id={`manufacturer-doc-observation-${item.id}`}
@@ -688,7 +684,7 @@ export default function AdminManufacturers() {
         <ImagePreviewModal
           src={previewDocument.imagen}
           title={previewDocument.nombre}
-          subtitle={previewDocument.tipo === "boleta" ? "Boleta" : "Guía"}
+          subtitle={documentLabel(previewDocument.tipo)}
           onClose={() => setPreviewDocument(null)}
         />
       )}
@@ -789,7 +785,7 @@ export default function AdminManufacturers() {
                             <img src={doc.imagen} alt={doc.nombre} />
                           </button>
                           <div className="mfr-detail-doc-footer">
-                            <span className="mfr-detail-doc-tipo">{doc.tipo === "boleta" ? "Boleta" : "Guía"}</span>
+                            <span className="mfr-detail-doc-tipo">{documentLabel(doc.tipo)}</span>
                             <span className="mfr-detail-doc-date">
                               {new Date(doc.creadoEn).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}
                             </span>

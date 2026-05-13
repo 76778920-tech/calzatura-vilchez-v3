@@ -197,36 +197,18 @@ export function buildRouteFilteredCatalogProducts(input: CatalogRouteFilterInput
     result = result.filter((product) => productMatchesBrandSlug(product, marcaSlug));
   }
 
-  if (campana) {
-    result = result.filter((product) => productMatchesTaxonomy(product, "campana", campana));
-  }
-
-  if (promocion) {
-    result = result.filter((product) => productMatchesTaxonomy(product, "promocion", promocion));
-  }
-
-  if (coleccion) {
-    result = result.filter((product) => productMatchesTaxonomy(product, "coleccion", coleccion));
-  }
-
-  if (tipo) {
-    result = result.filter((product) => productMatchesTaxonomy(product, "tipo", tipo));
-  }
-
-  if (linea) {
-    result = result.filter((product) => productMatchesTaxonomy(product, "linea", linea));
-  }
-
-  if (estilo) {
-    result = result.filter((product) => productMatchesTaxonomy(product, "estilo", estilo));
-  }
-
-  if (segmento) {
-    result = result.filter((product) => productMatchesTaxonomy(product, "segmento", segmento));
-  }
-
-  if (rangoEdad) {
-    result = result.filter((product) => productMatchesTaxonomy(product, "rangoEdad", rangoEdad));
+  const taxonomyFilters = [
+    { key: "campana" as const, value: campana },
+    { key: "promocion" as const, value: promocion },
+    { key: "coleccion" as const, value: coleccion },
+    { key: "tipo" as const, value: tipo },
+    { key: "linea" as const, value: linea },
+    { key: "estilo" as const, value: estilo },
+    { key: "segmento" as const, value: segmento },
+    { key: "rangoEdad" as const, value: rangoEdad },
+  ];
+  for (const { key, value } of taxonomyFilters) {
+    if (value) result = result.filter((p) => productMatchesTaxonomy(p, key, value));
   }
 
   if (color && !color.includes(",")) {
@@ -710,83 +692,65 @@ export function buildCatalogBreadcrumbs(input: CatalogBreadcrumbsInput): Catalog
     pushCrumb(categoryLabel(categoria), { ...sectionParams });
   }
 
+  const ctx: Record<string, string | undefined> = { ...sectionParams };
+
+  const opt = (v: string) => v || undefined;
+
   if (campana) {
-    const params: Record<string, string | undefined> = { ...sectionParams, campana };
-    if (linea) params.linea = linea;
-    pushCrumb(humanizeSlug(campana), params);
+    ctx.campana = campana;
+    pushCrumb(humanizeSlug(campana), { ...ctx, ...(linea ? { linea } : {}) });
   }
-
   if (coleccion) {
-    pushCrumb(humanizeSlug(coleccion), {
-      ...sectionParams,
-      campana: campana || undefined,
-      coleccion,
-    });
+    ctx.campana = opt(campana);
+    ctx.coleccion = coleccion;
+    pushCrumb(humanizeSlug(coleccion), { ...ctx });
   }
-
   if (linea) {
-    pushCrumb(humanizeSlug(linea), {
-      ...sectionParams,
-      campana: campana || undefined,
-      coleccion: coleccion || undefined,
-      linea,
-    });
+    ctx.campana = opt(campana);
+    ctx.coleccion = opt(coleccion);
+    ctx.linea = linea;
+    pushCrumb(humanizeSlug(linea), { ...ctx });
   }
-
   if (tipo) {
-    pushCrumb(humanizeSlug(tipo), {
-      ...sectionParams,
-      campana: campana || undefined,
-      coleccion: coleccion || undefined,
-      linea: linea || undefined,
-      tipo,
-    });
+    ctx.campana = opt(campana);
+    ctx.coleccion = opt(coleccion);
+    ctx.linea = opt(linea);
+    ctx.tipo = tipo;
+    pushCrumb(humanizeSlug(tipo), { ...ctx });
   }
-
   if (estilo) {
-    pushCrumb(humanizeSlug(estilo), {
-      ...sectionParams,
-      campana: campana || undefined,
-      coleccion: coleccion || undefined,
-      linea: linea || undefined,
-      tipo: tipo || undefined,
-      estilo,
-    });
+    ctx.campana = opt(campana);
+    ctx.coleccion = opt(coleccion);
+    ctx.linea = opt(linea);
+    ctx.tipo = opt(tipo);
+    ctx.estilo = estilo;
+    pushCrumb(humanizeSlug(estilo), { ...ctx });
   }
-
   if (segmento) {
-    pushCrumb(categoryLabel(segmento), {
-      ...sectionParams,
-      campana: campana || undefined,
-      coleccion: coleccion || undefined,
-      linea: linea || undefined,
-      tipo: tipo || undefined,
-      segmento,
-    });
+    ctx.campana = opt(campana);
+    ctx.coleccion = opt(coleccion);
+    ctx.linea = opt(linea);
+    ctx.tipo = opt(tipo);
+    ctx.segmento = segmento;
+    pushCrumb(categoryLabel(segmento), { ...ctx });
   }
-
   if (rangoEdad) {
-    pushCrumb(`${rangoEdad} años`, {
-      ...sectionParams,
-      campana: campana || undefined,
-      coleccion: coleccion || undefined,
-      linea: linea || undefined,
-      tipo: tipo || undefined,
-      segmento: segmento || undefined,
-      rangoEdad,
-    });
+    ctx.campana = opt(campana);
+    ctx.coleccion = opt(coleccion);
+    ctx.linea = opt(linea);
+    ctx.tipo = opt(tipo);
+    ctx.segmento = opt(segmento);
+    ctx.rangoEdad = rangoEdad;
+    pushCrumb(`${rangoEdad} años`, { ...ctx });
   }
-
   if (color) {
-    pushCrumb(humanizeSlug(color), {
-      ...sectionParams,
-      campana: campana || undefined,
-      coleccion: coleccion || undefined,
-      linea: linea || undefined,
-      tipo: tipo || undefined,
-      segmento: segmento || undefined,
-      color,
-    });
+    ctx.campana = opt(campana);
+    ctx.coleccion = opt(coleccion);
+    ctx.linea = opt(linea);
+    ctx.tipo = opt(tipo);
+    ctx.segmento = opt(segmento);
+    ctx.color = color;
+    pushCrumb(humanizeSlug(color), { ...ctx });
   }
 
   if (marca !== "todas") {
