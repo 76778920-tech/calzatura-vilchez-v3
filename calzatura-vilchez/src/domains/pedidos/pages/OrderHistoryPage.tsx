@@ -79,19 +79,12 @@ export default function OrderHistoryPage() {
         <div className="orders-list">
           {orders.map((order) => (
             <div key={order.id} className="order-card">
-              <div
-                role="button"
-                tabIndex={0}
+              <button
+                type="button"
+                className="order-card-header"
                 aria-expanded={expanded === order.id}
                 aria-label={`Ver u ocultar detalle del pedido ${order.id.slice(-8).toUpperCase()}`}
-                className="order-card-header"
                 onClick={() => setExpanded(expanded === order.id ? null : order.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setExpanded(expanded === order.id ? null : order.id);
-                  }
-                }}
               >
                 <div className="order-card-meta">
                   <span className="order-id">#{order.id.slice(-8).toUpperCase()}</span>
@@ -108,7 +101,7 @@ export default function OrderHistoryPage() {
                 <span className="order-expand-btn" aria-hidden="true">
                   {expanded === order.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </span>
-              </div>
+              </button>
 
               {expanded === order.id && (
                 <div className="order-card-body">

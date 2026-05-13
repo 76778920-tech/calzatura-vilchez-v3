@@ -1,6 +1,7 @@
 import { MATERIAL_PRESETS } from "@/domains/productos/utils/commercialRules";
 import { normalizeVariantCode } from "@/domains/productos/utils/variantCreation";
 import type { Dispatch, SetStateAction } from "react";
+import { useId } from "react";
 import type { ProductForm } from "../adminProductsInternals";
 
 type Props = {
@@ -9,12 +10,14 @@ type Props = {
 };
 
 export function AdminProductFormBasics({ form, setForm }: Props) {
+  const id = useId();
   return (
     <>
       <div className="form-row">
         <div className="form-group">
-          <label>Código interno *</label>
+          <label htmlFor={`${id}-codigo`}>Código interno *</label>
           <input
+            id={`${id}-codigo`}
             value={form.codigo ?? ""}
             onChange={(event) => setForm({ ...form, codigo: normalizeVariantCode(event.target.value) })}
             required
@@ -23,8 +26,9 @@ export function AdminProductFormBasics({ form, setForm }: Props) {
           />
         </div>
         <div className="form-group">
-          <label>Nombre *</label>
+          <label htmlFor={`${id}-nombre`}>Nombre *</label>
           <input
+            id={`${id}-nombre`}
             value={form.nombre}
             onChange={(event) => setForm({ ...form, nombre: event.target.value })}
             required
@@ -36,8 +40,9 @@ export function AdminProductFormBasics({ form, setForm }: Props) {
 
       <div className="form-row">
         <div className="form-group">
-          <label>Marca *</label>
+          <label htmlFor={`${id}-marca`}>Marca *</label>
           <input
+            id={`${id}-marca`}
             value={form.marca ?? ""}
             onChange={(event) => setForm({ ...form, marca: event.target.value })}
             required
@@ -46,8 +51,9 @@ export function AdminProductFormBasics({ form, setForm }: Props) {
           />
         </div>
         <div className="form-group">
-          <label>Material</label>
+          <label htmlFor={`${id}-material`}>Material</label>
           <select
+            id={`${id}-material`}
             value={form.material ?? ""}
             onChange={(event) => setForm({ ...form, material: event.target.value || undefined })}
             className="form-input"

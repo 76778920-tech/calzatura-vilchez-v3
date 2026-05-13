@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import type { Dispatch, RefObject, SetStateAction } from "react";
+import { useId } from "react";
 import { CATEGORIAS, STYLE_OPTIONS } from "@/domains/productos/utils/commercialRules";
 import { categoryLabel } from "@/utils/labels";
 import { toPositiveNumber, type ProductForm } from "../adminProductsInternals";
@@ -29,11 +30,14 @@ export function AdminProductFormCategoryStylePrice({
   estiloChipTokens,
   toggleEstiloOption,
 }: Props) {
+  const id = useId();
+  const estiloLabelId = `${id}-estilo-lbl`;
+  const estiloTriggerId = `${id}-estilo-trigger`;
   return (
     <div className="form-row product-core-row">
       <div className="form-group">
-        <label>Categoría</label>
-        <select value={form.categoria} onChange={(event) => updateCategory(event.target.value)} className="form-input" required>
+        <label htmlFor={`${id}-categoria`}>Categoría</label>
+        <select id={`${id}-categoria`} value={form.categoria} onChange={(event) => updateCategory(event.target.value)} className="form-input" required>
           <option value="">Selecciona la categoría</option>
           {CATEGORIAS.map((category) => (
             <option key={category} value={category}>{categoryLabel(category)}</option>
@@ -41,8 +45,9 @@ export function AdminProductFormCategoryStylePrice({
         </select>
       </div>
       <div className="form-group">
-        <label>Tipo de calzado *</label>
+        <label htmlFor={`${id}-tipo`}>Tipo de calzado *</label>
         <select
+          id={`${id}-tipo`}
           value={form.tipoCalzado ?? ""}
           onChange={(event) => setForm({ ...form, tipoCalzado: event.target.value })}
           required
@@ -56,28 +61,26 @@ export function AdminProductFormCategoryStylePrice({
         </select>
       </div>
       <div className="form-group">
-        <label id="admin-estilo-label">Estilo</label>
+        <label id={estiloLabelId} htmlFor={estiloTriggerId}>Estilo</label>
         <div className="admin-estilo-dropdown" ref={estiloSelectRef}>
           <button
+            id={estiloTriggerId}
             type="button"
             className={`admin-estilo-dropdown-trigger${estiloSelectOpen ? " active" : ""}`}
-            aria-haspopup="listbox"
+            aria-haspopup="true"
             aria-expanded={estiloSelectOpen}
-            aria-labelledby="admin-estilo-label"
             onClick={() => setEstiloSelectOpen((o) => !o)}
           >
             <span className="admin-estilo-dropdown-value">{estiloSummaryLabel}</span>
             <ChevronDown size={18} aria-hidden />
           </button>
           {estiloSelectOpen && (
-            <div
+            <fieldset
               className="admin-estilo-dropdown-panel"
-              role="listbox"
-              aria-multiselectable="true"
-              aria-labelledby="admin-estilo-label"
+              aria-labelledby={estiloLabelId}
             >
               {STYLE_OPTIONS.map((opt) => (
-                <label key={opt} className="admin-estilo-check-row" role="option" aria-selected={estiloChipTokens.includes(opt)}>
+                <label key={opt} className="admin-estilo-check-row">
                   <input
                     type="checkbox"
                     checked={estiloChipTokens.includes(opt)}
@@ -86,13 +89,14 @@ export function AdminProductFormCategoryStylePrice({
                   <span>{opt}</span>
                 </label>
               ))}
-            </div>
+            </fieldset>
           )}
         </div>
       </div>
       <div className="form-group">
-        <label>Precio (S/) *</label>
+        <label htmlFor={`${id}-precio`}>Precio (S/) *</label>
         <input
+          id={`${id}-precio`}
           type="text"
           inputMode="decimal"
           value={form.precio === 0 ? "" : form.precio}

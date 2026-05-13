@@ -915,7 +915,7 @@ export default function Header() {
   return (
     <>
       <header className="header">
-        <div className="header-leave-dismiss" onMouseLeave={closeMegaMenu}>
+        <section className="header-leave-dismiss" aria-label="Cabecera" onMouseLeave={closeMegaMenu}>
           <div className="header-inner">
           <button
             className="mobile-menu-btn"
@@ -1104,7 +1104,7 @@ export default function Header() {
           user={user}
           hasVerifiedAccess={hasVerifiedAccess}
         />
-        </div>
+        </section>
       </header>
 
       <CartSidebar />

@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useId } from "react";
 import type { ProductForm } from "../adminProductsInternals";
 import { toPositiveNumber } from "../adminProductsInternals";
 
@@ -15,6 +16,7 @@ type Props = {
 };
 
 export function AdminProductFormFinanceBox({ form, setForm, formPriceRange }: Props) {
+  const id = useId();
   return (
     <div className="admin-finance-box">
       <div>
@@ -22,8 +24,9 @@ export function AdminProductFormFinanceBox({ form, setForm, formPriceRange }: Pr
       </div>
       <div className="form-row">
         <div className="form-group">
-          <label>Costo real de compra (S/) *</label>
+          <label htmlFor={`${id}-costo`}>Costo real de compra (S/) *</label>
           <input
+            id={`${id}-costo`}
             type="text"
             inputMode="decimal"
             value={form.costoCompra === 0 ? "" : form.costoCompra}
@@ -35,8 +38,9 @@ export function AdminProductFormFinanceBox({ form, setForm, formPriceRange }: Pr
           />
         </div>
         <div className="form-group">
-          <label>Margen objetivo (%)</label>
+          <label htmlFor={`${id}-margen-obj`}>Margen objetivo (%)</label>
           <input
+            id={`${id}-margen-obj`}
             type="text"
             inputMode="decimal"
             value={form.margenObjetivo}
@@ -47,8 +51,9 @@ export function AdminProductFormFinanceBox({ form, setForm, formPriceRange }: Pr
       </div>
       <div className="form-row">
         <div className="form-group">
-          <label>Margen mínimo (%)</label>
+          <label htmlFor={`${id}-margen-min`}>Margen mínimo (%)</label>
           <input
+            id={`${id}-margen-min`}
             type="text"
             inputMode="decimal"
             value={form.margenMinimo}
@@ -57,8 +62,9 @@ export function AdminProductFormFinanceBox({ form, setForm, formPriceRange }: Pr
           />
         </div>
         <div className="form-group">
-          <label>Margen máximo (%)</label>
+          <label htmlFor={`${id}-margen-max`}>Margen máximo (%)</label>
           <input
+            id={`${id}-margen-max`}
             type="text"
             inputMode="decimal"
             value={form.margenMaximo}

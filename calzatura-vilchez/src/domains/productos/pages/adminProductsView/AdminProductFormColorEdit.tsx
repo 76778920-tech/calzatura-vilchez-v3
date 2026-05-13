@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 import type { Dispatch, RefObject, SetStateAction } from "react";
+import { useId } from "react";
 import { capitalizeWords } from "@/utils/colors";
 import { COLOR_PALETTE, type ProductForm } from "../adminProductsInternals";
 
@@ -18,10 +19,11 @@ export function AdminProductFormColorEdit({
   setColorPaletteOpen,
   colorPaletteRef,
 }: Props) {
+  const id = useId();
   return (
     <div className="form-row form-row-single">
-      <div className="form-group">
-        <label>Color *</label>
+      <fieldset className="form-group" style={{ border: "none", margin: 0, padding: 0, minWidth: 0 }}>
+        <legend style={{ padding: 0, marginBottom: "0.35rem", fontSize: "inherit", fontWeight: 600 }}>Color *</legend>
         <div className="admin-material-select" ref={colorPaletteRef}>
           <button
             type="button"
@@ -36,7 +38,7 @@ export function AdminProductFormColorEdit({
             <ChevronDown size={14} />
           </button>
           {colorPaletteOpen && (
-            <div className="admin-color-popover" role="dialog" aria-label="Paleta de colores">
+            <dialog open className="admin-color-popover" aria-label="Paleta de colores">
               <div className="admin-color-popover-grid">
                 <button
                   type="button"
@@ -65,18 +67,20 @@ export function AdminProductFormColorEdit({
                   );
                 })}
               </div>
-            </div>
+            </dialog>
           )}
         </div>
+        <label htmlFor={`${id}-color-text`} className="sr-only">Escribir color</label>
         <input
+          id={`${id}-color-text`}
           value={form.color ?? ""}
           onChange={(event) => setForm({ ...form, color: capitalizeWords(event.target.value) })}
           className="form-input"
-          list="admin-color-suggestions"
+          list={`${id}-color-suggestions`}
           placeholder="Escribe un color (ej. Negro, Blanco, Azul Marino)"
           style={{ marginTop: "0.55rem" }}
         />
-        <datalist id="admin-color-suggestions">
+        <datalist id={`${id}-color-suggestions`}>
           {COLOR_PALETTE.map((preset) => (
             <option key={preset.name} value={preset.name} />
           ))}
@@ -84,7 +88,7 @@ export function AdminProductFormColorEdit({
         <small className="admin-help-text">
           Si no se abre la paleta o no encuentras el color, escríbelo aquí.
         </small>
-      </div>
+      </fieldset>
     </div>
   );
 }

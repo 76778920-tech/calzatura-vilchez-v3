@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, KeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import {
   calculatePriceRange,
   deleteProductFinancial,
@@ -149,8 +149,19 @@ export function useAdminProductsPage() {
       variantsDragStateRef.current.active = false;
       setIsDraggingVariants(false);
     };
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        variantsDragStateRef.current.active = false;
+        setIsDraggingVariants(false);
+      }
+    };
     window.addEventListener("mouseup", handleMouseUp);
-    return () => window.removeEventListener("mouseup", handleMouseUp);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [isDraggingVariants]);
 
   useEffect(() => {
@@ -167,7 +178,7 @@ export function useAdminProductsPage() {
     window.setTimeout(() => triggerRef.current?.focus(), 0);
   };
 
-  const trapFocus = (event: KeyboardEvent<HTMLDivElement>) => {
+  const trapFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") { event.preventDefault(); closeModal(); return; }
     if (event.key !== "Tab" || !modalRef.current) return;
     const focusable = Array.from(

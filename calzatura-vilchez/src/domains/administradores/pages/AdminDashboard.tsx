@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Package, ShoppingBag, Users, TrendingUp, CircleDollarSign,
@@ -10,7 +10,7 @@ import { fetchAllOrders } from "@/domains/pedidos/services/orders";
 import { fetchDailySales, fetchProductFinancials } from "@/domains/ventas/services/finance";
 import { fetchAllUsers } from "@/domains/usuarios/services/users";
 import { fetchRecentAudit } from "@/services/audit";
-import type { Order, Product, ProductFinancial, DailySale, UserProfile } from "@/types";
+import type { Order, Product, ProductFinancial, DailySale, UserProfile, CartItem } from "@/types";
 import type { AuditEntry } from "@/services/audit";
 import { ADMIN_ROUTES } from "@/routes/paths";
 import toast from "react-hot-toast";
@@ -150,6 +150,11 @@ const STATUS_LABEL: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
+function dashboardOrderLineKey(item: CartItem, lineIndex: number) {
+  const pid = item.product?.id ?? "unknown";
+  return `${pid}-${item.color ?? ""}-${item.talla ?? ""}-q${item.quantity}-i${lineIndex}`;
+}
+
 // ─── Order Detail Modal ─────────────────────────────────────────────────────
 
 function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
@@ -162,12 +167,19 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
   }, [onClose]);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal dash-order-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="dash-order-modal-root">
+      <button type="button" className="dash-order-modal-backdrop" aria-label="Cerrar" onClick={onClose} />
+      <div
+        className="modal dash-order-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="dash-order-modal-title"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <div>
             <p className="dash-modal-kicker">Detalle del Pedido</p>
-            <h2 className="dash-modal-title">#{order.id.slice(-8).toUpperCase()}</h2>
+            <h2 id="dash-order-modal-title" className="dash-modal-title">#{order.id.slice(-8).toUpperCase()}</h2>
           </div>
           <button type="button" className="modal-close" onClick={onClose}>
             <X size={20} />
@@ -213,7 +225,7 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
             <p className="dash-modal-section-title">Productos ({order.items.length})</p>
             <div className="dash-modal-items">
               {order.items.map((item, idx) => (
-                <div key={idx} className="dash-modal-item-row">
+                <div key={dashboardOrderLineKey(item, idx)} className="dash-modal-item-row">
                   {item.product.imagen && (
                     <img src={item.product.imagen} alt={item.product.nombre} className="dash-modal-item-img" />
                   )}
@@ -383,6 +395,48 @@ export default function AdminDashboard() {
     );
   }
 
+  let auditBlock: ReactNode;
+  if (auditError) {
+    auditBlock = <p className="admin-empty">No se pudo cargar el historial de actividad.</p>;
+  } else if (auditLog.length === 0) {
+    auditBlock = <p className="admin-empty">Sin actividad registrada aún.</p>;
+  } else {
+    auditBlock = (
+      <div className="admin-table-wrapper">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Acción</th>
+              <th>Entidad</th>
+              <th>Nombre</th>
+              <th>Usuario</th>
+              <th>Fecha</th>
+            </tr>
+          </thead>
+          <tbody>
+            {auditLog.map((entry) => (
+              <tr key={entry.id}>
+                <td>
+                  <span className={`order-status-badge audit-badge-${entry.accion}`}>
+                    {entry.accion}
+                  </span>
+                </td>
+                <td>{entry.entidad}</td>
+                <td className="dash-order-email">{entry.entidadNombre ?? "—"}</td>
+                <td className="dash-order-email">{entry.usuarioEmail ?? "—"}</td>
+                <td style={{ whiteSpace: "nowrap", fontSize: "12px", color: "var(--text-muted)" }}>
+                  {entry.realizadoEn
+                    ? new Date(entry.realizadoEn).toLocaleString("es-PE")
+                    : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
+
   return (
     <div className="dash-root">
       {/* Header */}
@@ -510,30 +564,26 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {recentOrders.map((o) => (
-                    <tr
-                      key={o.id}
-                      className="dash-order-row"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSelectedOrder(o)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          setSelectedOrder(o);
-                        }
-                      }}
-                      title="Ver detalle"
-                    >
-                      <td className="order-id-cell">#{o.id.slice(-8).toUpperCase()}</td>
-                      <td className="dash-order-email">{o.userEmail}</td>
-                      <td><strong>{formatCurrency(o.total ?? 0)}</strong></td>
-                      <td>
-                        <span
-                          className="order-status-badge"
-                          style={{ background: STATUS_COLOR[o.estado] + "22", color: STATUS_COLOR[o.estado] }}
+                    <tr key={o.id} className="dash-order-row">
+                      <td colSpan={4} className="dash-order-row-cell">
+                        <button
+                          type="button"
+                          className="dash-order-row-btn"
+                          onClick={() => setSelectedOrder(o)}
+                          title="Ver detalle"
                         >
-                          {STATUS_LABEL[o.estado] ?? o.estado}
-                        </span>
+                          <span className="order-id-cell">#{o.id.slice(-8).toUpperCase()}</span>
+                          <span className="dash-order-email">{o.userEmail}</span>
+                          <span><strong>{formatCurrency(o.total ?? 0)}</strong></span>
+                          <span>
+                            <span
+                              className="order-status-badge"
+                              style={{ background: STATUS_COLOR[o.estado] + "22", color: STATUS_COLOR[o.estado] }}
+                            >
+                              {STATUS_LABEL[o.estado] ?? o.estado}
+                            </span>
+                          </span>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -619,44 +669,7 @@ export default function AdminDashboard() {
             <h2 className="dash-card-title">Actividad reciente</h2>
           </div>
         </div>
-        {auditError ? (
-          <p className="admin-empty">No se pudo cargar el historial de actividad.</p>
-        ) : auditLog.length === 0 ? (
-          <p className="admin-empty">Sin actividad registrada aún.</p>
-        ) : (
-          <div className="admin-table-wrapper">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Acción</th>
-                  <th>Entidad</th>
-                  <th>Nombre</th>
-                  <th>Usuario</th>
-                  <th>Fecha</th>
-                </tr>
-              </thead>
-              <tbody>
-                {auditLog.map((entry) => (
-                  <tr key={entry.id}>
-                    <td>
-                      <span className={`order-status-badge audit-badge-${entry.accion}`}>
-                        {entry.accion}
-                      </span>
-                    </td>
-                    <td>{entry.entidad}</td>
-                    <td className="dash-order-email">{entry.entidadNombre ?? "—"}</td>
-                    <td className="dash-order-email">{entry.usuarioEmail ?? "—"}</td>
-                    <td style={{ whiteSpace: "nowrap", fontSize: "12px", color: "var(--text-muted)" }}>
-                      {entry.realizadoEn
-                        ? new Date(entry.realizadoEn).toLocaleString("es-PE")
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {auditBlock}
       </div>
 
       {/* Order detail modal */}

@@ -1028,6 +1028,46 @@ export default function AdminData() {
     }
   };
 
+  let testBatchesBlock: ReactNode;
+  if (batchLoading) {
+    testBatchesBlock = <p className="data-clean-note">Cargando lotes recientes...</p>;
+  } else if (testBatches.length === 0) {
+    testBatchesBlock = (
+      <p className="data-clean-note">Todavía no hay lotes de prueba marcados para eliminar.</p>
+    );
+  } else {
+    testBatchesBlock = (
+      <div style={{ display: "grid", gap: "0.85rem" }}>
+        {testBatches.slice(0, 8).map((batch) => (
+          <div key={batch.loteImportacion} className="data-clean-actions" style={{ alignItems: "flex-start" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p className="data-card-title" style={{ fontSize: "14px", marginBottom: "0.15rem" }}>
+                {scenarioLabel(batch.escenario)} — {batch.total} registros
+              </p>
+              <p className="data-clean-note" style={{ marginBottom: "0.3rem" }}>
+                <code>{batch.loteImportacion}</code>
+              </p>
+              <p className="data-clean-note">
+                {Object.entries(batch.counts)
+                  .map(([colId, count]) => `${colId}: ${count}`)
+                  .join(" · ")}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="btn data-btn-danger"
+              disabled={deletingBatch === batch.loteImportacion}
+              onClick={() => void handleDeleteBatch(batch.loteImportacion)}
+            >
+              {deletingBatch === batch.loteImportacion ? <Loader size={14} className="data-spin" /> : <Trash2 size={14} />}
+              {deletingBatch === batch.loteImportacion ? "Eliminando..." : "Eliminar lote"}
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="pred-root">
       <div className="dash-header">
@@ -1133,8 +1173,8 @@ export default function AdminData() {
 
                     {errors.length > 0 && (
                       <div className="data-errors">
-                        {errors.slice(0, 8).map((err, i) => (
-                          <p key={i} className="data-error-line">• {err}</p>
+                        {errors.slice(0, 8).map((err) => (
+                          <p key={`${config.id}:${err}`} className="data-error-line">• {err}</p>
                         ))}
                         {errors.length > 8 && (
                           <p className="data-error-more">...y {errors.length - 8} errores más</p>
@@ -1167,40 +1207,7 @@ export default function AdminData() {
           </div>
         </div>
 
-        {batchLoading ? (
-          <p className="data-clean-note">Cargando lotes recientes...</p>
-        ) : testBatches.length === 0 ? (
-          <p className="data-clean-note">Todavía no hay lotes de prueba marcados para eliminar.</p>
-        ) : (
-          <div style={{ display: "grid", gap: "0.85rem" }}>
-            {testBatches.slice(0, 8).map((batch) => (
-              <div key={batch.loteImportacion} className="data-clean-actions" style={{ alignItems: "flex-start" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p className="data-card-title" style={{ fontSize: "14px", marginBottom: "0.15rem" }}>
-                    {scenarioLabel(batch.escenario)} — {batch.total} registros
-                  </p>
-                  <p className="data-clean-note" style={{ marginBottom: "0.3rem" }}>
-                    <code>{batch.loteImportacion}</code>
-                  </p>
-                  <p className="data-clean-note">
-                    {Object.entries(batch.counts)
-                      .map(([colId, count]) => `${colId}: ${count}`)
-                      .join(" · ")}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  className="btn data-btn-danger"
-                  disabled={deletingBatch === batch.loteImportacion}
-                  onClick={() => void handleDeleteBatch(batch.loteImportacion)}
-                >
-                  {deletingBatch === batch.loteImportacion ? <Loader size={14} className="data-spin" /> : <Trash2 size={14} />}
-                  {deletingBatch === batch.loteImportacion ? "Eliminando..." : "Eliminar lote"}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        {testBatchesBlock}
       </div>
 
       <div className="dash-card data-clean-card" style={{ marginTop: "1.5rem" }}>

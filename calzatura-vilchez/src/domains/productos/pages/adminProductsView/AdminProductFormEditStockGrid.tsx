@@ -8,10 +8,10 @@ type Props = {
 
 export function AdminProductFormEditStockGrid({ currentSizes, form, updateTallaStock }: Props) {
   return (
-    <div className="form-group">
-      <div className="admin-stock-heading">
-        <label>Stock por talla</label>
-      </div>
+    <fieldset className="form-group" style={{ border: "none", margin: 0, padding: 0, minWidth: 0 }}>
+      <legend className="admin-stock-heading" style={{ padding: 0, width: "100%", marginBottom: "0.35rem", fontSize: "inherit", fontWeight: 600 }}>
+        Stock por talla
+      </legend>
       {currentSizes.length === 0 ? (
         <p className="admin-empty">Selecciona la categoría para ver sus tallas.</p>
       ) : (
@@ -29,6 +29,6 @@ export function AdminProductFormEditStockGrid({ currentSizes, form, updateTallaS
           ))}
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }

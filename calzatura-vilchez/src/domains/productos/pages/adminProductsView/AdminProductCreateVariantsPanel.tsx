@@ -41,20 +41,15 @@ export function AdminProductCreateVariantsPanel({
   }
 
   return (
-    <div
-      ref={variantsCarouselRef}
-      role="region"
-      aria-label="Carrusel de variantes. Arrastra para desplazar. Escape suelta el arrastre."
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") stopVariantsDrag();
-      }}
-      className={`admin-variants-carousel${isDraggingVariants ? " dragging" : ""}`}
-      onMouseDown={handleVariantsMouseDown}
-      onMouseMove={handleVariantsMouseMove}
-      onMouseUp={stopVariantsDrag}
-      onMouseLeave={stopVariantsDrag}
-    >
+    <section aria-label="Carrusel de variantes. Arrastra para desplazar. Escape suelta el arrastre.">
+      <div
+        ref={variantsCarouselRef}
+        className={`admin-variants-carousel${isDraggingVariants ? " dragging" : ""}`}
+        onMouseDown={handleVariantsMouseDown}
+        onMouseMove={handleVariantsMouseMove}
+        onMouseUp={stopVariantsDrag}
+        onMouseLeave={stopVariantsDrag}
+      >
       {variantSlots.map((slot, slotIndex) => {
         if (!slot.color) return null;
         return (
@@ -71,6 +66,7 @@ export function AdminProductCreateVariantsPanel({
           />
         );
       })}
-    </div>
+      </div>
+    </section>
   );
 }

@@ -1,4 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
+import { useId } from "react";
 import type { ProductForm } from "../adminProductsInternals";
 
 type Props = {
@@ -14,12 +15,14 @@ export function AdminProductFormCampaignAndDescription({
   editingId,
   isMultiColorCreate,
 }: Props) {
+  const id = useId();
   return (
     <>
       <div className="form-row">
         <div className="form-group">
-          <label>Campaña</label>
+          <label htmlFor={`${id}-campana`}>Campaña</label>
           <select
+            id={`${id}-campana`}
             value={form.campana ?? ""}
             onChange={(event) => setForm({ ...form, campana: event.target.value || undefined })}
             className="form-input"
@@ -33,8 +36,9 @@ export function AdminProductFormCampaignAndDescription({
           </select>
         </div>
         <div className="form-group">
-          <label>Descuento Cyber Wow</label>
+          <label htmlFor={`${id}-descuento`}>Descuento Cyber Wow</label>
           <select
+            id={`${id}-descuento`}
             value={form.descuento ?? ""}
             onChange={(event) => {
               const val = event.target.value;
@@ -48,23 +52,25 @@ export function AdminProductFormCampaignAndDescription({
             <option value="30">30%</option>
           </select>
         </div>
-        <label className="checkbox-label" style={{ alignSelf: "flex-end", paddingBottom: "0.5rem" }}>
+        <div className="form-group checkbox-label-wrap" style={{ alignSelf: "flex-end", paddingBottom: "0.5rem" }}>
           <input
+            id={`${id}-destacado`}
             type="checkbox"
             checked={form.destacado ?? false}
             onChange={(event) => setForm({ ...form, destacado: event.target.checked })}
           />
-          Producto destacado
-        </label>
+          <label htmlFor={`${id}-destacado`}>Producto destacado</label>
+        </div>
         {(editingId || !isMultiColorCreate) && (
-          <label className="checkbox-label" style={{ alignSelf: "flex-end", paddingBottom: "0.5rem" }}>
+          <div className="form-group checkbox-label-wrap" style={{ alignSelf: "flex-end", paddingBottom: "0.5rem" }}>
             <input
+              id={`${id}-activo`}
               type="checkbox"
               checked={form.activo ?? true}
               onChange={(event) => setForm({ ...form, activo: event.target.checked })}
             />
-            Visible en tienda
-          </label>
+            <label htmlFor={`${id}-activo`}>Visible en tienda</label>
+          </div>
         )}
       </div>
 
@@ -75,8 +81,9 @@ export function AdminProductFormCampaignAndDescription({
       )}
 
       <div className="form-group">
-        <label>{isMultiColorCreate ? "Descripción común (respaldo)" : "Descripción"}</label>
+        <label htmlFor={`${id}-descripcion`}>{isMultiColorCreate ? "Descripción común (respaldo)" : "Descripción"}</label>
         <textarea
+          id={`${id}-descripcion`}
           value={form.descripcion}
           onChange={(event) => setForm({ ...form, descripcion: event.target.value })}
           rows={isMultiColorCreate ? 2 : 3}

@@ -165,7 +165,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     const sel = selectedDelivery;
     startTransition(() => {
       setDeliveryQuote((prev) => {
-        if (!prev || prev.customerLat !== sel.lat || prev.customerLng !== sel.lng) {
+        if (prev?.customerLat !== sel.lat || prev?.customerLng !== sel.lng) {
           return prev;
         }
         if (prev.label === sel.label) return prev;

@@ -1,6 +1,8 @@
 import type { Dispatch, RefObject, SetStateAction } from "react";
 import { COLOR_PALETTE, getColorHex, type ProductForm, type VariantSlot } from "../adminProductsInternals";
 
+const VARIANT_COLOR_ROW_KEYS = ["vc-slot-0", "vc-slot-1", "vc-slot-2", "vc-slot-3", "vc-slot-4"] as const;
+
 type Props = {
   variantSlots: VariantSlot[];
   form: ProductForm;
@@ -23,15 +25,17 @@ export function AdminProductFormColorChipsRow({
   setSlotColor,
 }: Props) {
   return (
-    <div className="form-group">
-      <label>Colores del producto</label>
-      <div className="variant-chips-row">
+    <fieldset className="form-group" style={{ border: "none", margin: 0, padding: 0, minWidth: 0 }}>
+      <legend style={{ float: "left", width: "100%", padding: 0, marginBottom: "0.35rem", fontSize: "inherit", fontWeight: 600 }}>
+        Colores del producto
+      </legend>
+      <div className="variant-chips-row" style={{ clear: "both" }}>
         {variantSlots.map((slot, index) => {
           const isAvailable = index === 0 || Boolean(variantSlots[index - 1].color);
           const colorHex = slot.color ? getColorHex(slot.color) : null;
           return (
             <div
-              key={index}
+              key={VARIANT_COLOR_ROW_KEYS[index] ?? `vc-slot-${index}`}
               className="variant-chip-wrap"
               ref={activeColorSlot === index ? activeColorSlotRef : null}
             >
@@ -94,6 +98,6 @@ export function AdminProductFormColorChipsRow({
       {!form.categoria && (
         <small className="admin-help-text">Selecciona la categoría para habilitar las tallas.</small>
       )}
-    </div>
+    </fieldset>
   );
 }

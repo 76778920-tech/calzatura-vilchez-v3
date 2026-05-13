@@ -80,33 +80,27 @@ export default function AdminOrders() {
         <div className="orders-list">
           {filtered.map((order) => (
             <div key={order.id} className="order-card">
-              <div
-                role="button"
-                tabIndex={0}
-                aria-expanded={expanded === order.id}
-                aria-label={`Ver u ocultar detalle del pedido ${order.id.slice(-8).toUpperCase()}`}
-                className="order-card-header"
-                onClick={() => setExpanded(expanded === order.id ? null : order.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setExpanded(expanded === order.id ? null : order.id);
-                  }
-                }}
-              >
-                <div className="order-card-meta">
-                  <span className="order-id">#{order.id.slice(-8).toUpperCase()}</span>
-                  <span className="order-email">{order.userEmail}</span>
-                </div>
-                <div className="order-card-info">
+              <div className="order-card-header">
+                <button
+                  type="button"
+                  className="order-card-header-toggle"
+                  aria-expanded={expanded === order.id}
+                  aria-label={`Ver u ocultar detalle del pedido ${order.id.slice(-8).toUpperCase()}`}
+                  onClick={() => setExpanded(expanded === order.id ? null : order.id)}
+                >
+                  <div className="order-card-meta">
+                    <span className="order-id">#{order.id.slice(-8).toUpperCase()}</span>
+                    <span className="order-email">{order.userEmail}</span>
+                  </div>
                   <span className="order-total">S/ {order.total?.toFixed(2)}</span>
+                  <span className="order-expand-btn" aria-hidden="true">
+                    {expanded === order.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </span>
+                </button>
+                <div className="order-card-info">
                   <select
                     value={order.estado}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      handleStatusChange(order.id, e.target.value as OrderStatus);
-                    }}
-                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
                     className="status-select"
                     style={{ color: STATUS_COLOR[order.estado] }}
                   >
@@ -115,9 +109,6 @@ export default function AdminOrders() {
                     ))}
                   </select>
                 </div>
-                <span className="order-expand-btn" aria-hidden="true">
-                  {expanded === order.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </span>
               </div>
 
               {expanded === order.id && (

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { collection, onSnapshot } from "firebase/firestore";
 import toast from "react-hot-toast";
@@ -104,8 +104,13 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
     }
   }, [user]);
 
+  const value = useMemo(
+    () => ({ favoriteIds, toggle, loading }),
+    [favoriteIds, toggle, loading],
+  );
+
   return (
-    <FavoritesContext.Provider value={{ favoriteIds, toggle, loading }}>
+    <FavoritesContext.Provider value={value}>
       {children}
     </FavoritesContext.Provider>
   );
