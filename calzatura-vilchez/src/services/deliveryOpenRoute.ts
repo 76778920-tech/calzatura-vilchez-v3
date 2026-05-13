@@ -100,6 +100,87 @@ function escapeRegExp(s: string): string {
   return Array.from(s, (char) => (specialChars.has(char) ? `\\${char}` : char)).join("");
 }
 
+function isAsciiDigit(char: string): boolean {
+  return char >= "0" && char <= "9";
+}
+
+function isAsciiLetter(char: string): boolean {
+  const upper = char.toUpperCase();
+  return upper >= "A" && upper <= "Z";
+}
+
+function isWhitespace(char: string): boolean {
+  return char === " " || char === "\t" || char === "\n" || char === "\r";
+}
+
+function normalizeHouseNumber(value: string, maxDigits: number): string | null {
+  const candidate = value.trim().toUpperCase();
+  if (!candidate) return null;
+
+  let digitCount = 0;
+  for (let index = 0; index < candidate.length; index += 1) {
+    const char = candidate[index];
+    if (isAsciiDigit(char)) {
+      digitCount += 1;
+      if (digitCount > maxDigits) return null;
+      continue;
+    }
+
+    if (index !== candidate.length - 1 || !isAsciiLetter(char)) return null;
+  }
+
+  return digitCount > 0 ? candidate : null;
+}
+
+function splitByHashMarker(value: string): { street: string; housenumber: string } | null {
+  const markerIndex = value.lastIndexOf("#");
+  if (markerIndex <= 0) return null;
+
+  const street = value.slice(0, markerIndex).replaceAll(",", " ").trim();
+  const housenumber = normalizeHouseNumber(value.slice(markerIndex + 1), 6);
+  return street.length >= 2 && housenumber ? { street, housenumber } : null;
+}
+
+function splitByNroMarker(value: string): { street: string; housenumber: string } | null {
+  const lower = value.toLowerCase();
+  for (let index = 1; index < lower.length; index += 1) {
+    if (lower[index] !== "n" || !isWhitespace(lower[index - 1])) continue;
+
+    const tail = lower.slice(index + 1);
+    let markerLength = 0;
+    if (tail.startsWith("ro.")) {
+      markerLength = 4;
+    } else if (tail.startsWith("ro")) {
+      markerLength = 3;
+    } else if (tail.startsWith("°") || tail.startsWith("º")) {
+      markerLength = 2;
+    }
+    if (markerLength === 0) continue;
+
+    const street = value.slice(0, index).trim();
+    const housenumber = normalizeHouseNumber(value.slice(index + markerLength), 6);
+    if (street.length >= 2 && housenumber) return { street, housenumber };
+  }
+
+  return null;
+}
+
+function splitTrailingHouseNumber(value: string): { street: string; housenumber: string } | null {
+  const lastSpace = value.lastIndexOf(" ");
+  if (lastSpace <= 0) return null;
+
+  const street = value.slice(0, lastSpace).trim();
+  const housenumber = normalizeHouseNumber(value.slice(lastSpace + 1), 5);
+  if (street.length < 4 || !housenumber) return null;
+
+  const numberPart = Number.parseInt(housenumber, 10);
+  if ((numberPart >= 1900 && numberPart <= 2099 && housenumber.length === 4) || numberPart < 1 || numberPart > 99999) {
+    return null;
+  }
+
+  return { street, housenumber };
+}
+
 /** Normaliza #, N°, Nro. para que el geocoder reciba "calle 215". */
 export function normalizeGeocodeQuery(q: string): string {
   return q
@@ -117,24 +198,19 @@ export function parseStreetHousenumber(input: string): { street: string; housenu
   const q = input.replaceAll(/\s+/g, " ").trim();
   if (!q) return { street: "" };
 
-  const hash = /^(.+?)[\s,]*#\s*(\d{1,6}[A-Z]?)\s*$/.exec(q);
-  if (hash && hash[1].trim().length >= 2) {
-    return { street: hash[1].trim(), housenumber: hash[2] };
+  const hash = splitByHashMarker(q);
+  if (hash) {
+    return hash;
   }
 
-  const nro = /^(.+?)\s+N(?:°|ro\.?)\s*(\d{1,6}[A-Z]?)\s*$/i.exec(q);
-  if (nro && nro[1].trim().length >= 2) {
-    return { street: nro[1].trim(), housenumber: nro[2] };
+  const nro = splitByNroMarker(q);
+  if (nro) {
+    return nro;
   }
 
-  const endNum = /^(.+?)\s(\d{1,5}[A-Z]?)$/.exec(q);
-  if (endNum && endNum[1].trim().length >= 4) {
-    const num = endNum[2];
-    if (/^(19|20)\d{2}$/.test(num)) return { street: q };
-    const n = Number.parseInt(num, 10);
-    if (n >= 1 && n <= 99999) {
-      return { street: endNum[1].trim(), housenumber: num };
-    }
+  const endNum = splitTrailingHouseNumber(q);
+  if (endNum) {
+    return endNum;
   }
 
   return { street: q };

@@ -16,8 +16,15 @@ export function todayISO() {
   return `${year}-${month}-${day}`;
 }
 
+let saleLineIdCounter = 0;
+
 export function newLineId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  if (globalThis.crypto?.randomUUID) {
+    return `${Date.now()}-${globalThis.crypto.randomUUID().slice(0, 8)}`;
+  }
+
+  saleLineIdCounter = (saleLineIdCounter + 1) % Number.MAX_SAFE_INTEGER;
+  return `${Date.now()}-${saleLineIdCounter.toString(36).padStart(4, "0")}`;
 }
 
 export function saleLineTotal(line: PendingSaleLine) {
