@@ -108,10 +108,12 @@ function filterProductsByHeaderSearch(products: Product[], headerSearch: string)
 }
 
 function slugifyRouteValue(value: string) {
-  return normalizeRouteToken(value)
-    .replaceAll(/[^a-z0-9]+/g, "-")
-    .replace(/^-+/, "")
-    .replace(/-+$/, "");
+  const slug = normalizeRouteToken(value).replaceAll(/[^a-z0-9]+/g, "-");
+  let i = 0;
+  let j = slug.length;
+  while (i < j && slug[i] === "-") i++;
+  while (j > i && slug[j - 1] === "-") j--;
+  return slug.slice(i, j);
 }
 
 type CatalogRouteMenuTokens = {

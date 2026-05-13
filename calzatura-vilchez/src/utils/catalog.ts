@@ -17,11 +17,16 @@ function normalizeSlug(value = "") {
     .replaceAll(/[\u0300-\u036f]/g, "");
 }
 
+function trimHyphens(s: string): string {
+  let i = 0;
+  let j = s.length;
+  while (i < j && s[i] === "-") i++;
+  while (j > i && s[j - 1] === "-") j--;
+  return s.slice(i, j);
+}
+
 export function slugifyCatalogValue(value = "") {
-  return normalizeSlug(value)
-    .replaceAll(/[^a-z0-9]+/g, "-")
-    .replace(/^-+/, "")
-    .replace(/-+$/, "");
+  return trimHyphens(normalizeSlug(value).replaceAll(/[^a-z0-9]+/g, "-"));
 }
 
 export function normalizeCategorySlug(category = "") {
