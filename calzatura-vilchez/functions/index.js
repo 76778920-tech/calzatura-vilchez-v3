@@ -81,7 +81,7 @@ async function assertAdminRole(supabase, uid) {
 }
 
 function toCents(amount) {
-  return Math.round(Number(amount || 0) * 100);
+  return Math.round(toN(amount) * 100);
 }
 
 function validStripeImage(image) {
@@ -219,14 +219,14 @@ function normalizeAddress(address) {
 }
 
 function sumSizeStock(tallaStock) {
-  return Object.values(tallaStock || {}).reduce(
-    (sum, qty) => sum + Math.max(0, Number(qty) || 0),
+  return Object.values(objOr(tallaStock)).reduce(
+    (sum, qty) => sum + Math.max(0, toN(qty)),
     0
   );
 }
 
 function sumColorSizeStock(colorStock) {
-  return Object.values(colorStock || {}).reduce(
+  return Object.values(objOr(colorStock)).reduce(
     (sum, stockBySize) => sum + sumSizeStock(stockBySize),
     0
   );
@@ -235,9 +235,9 @@ function sumColorSizeStock(colorStock) {
 function aggregateColorStock(colorStock) {
   const aggregate = {};
 
-  Object.values(colorStock || {}).forEach((stockBySize) => {
-    Object.entries(stockBySize || {}).forEach(([talla, qty]) => {
-      aggregate[talla] = (aggregate[talla] || 0) + Math.max(0, Number(qty) || 0);
+  Object.values(objOr(colorStock)).forEach((stockBySize) => {
+    Object.entries(objOr(stockBySize)).forEach(([talla, qty]) => {
+      aggregate[talla] = toN(aggregate[talla]) + Math.max(0, toN(qty));
     });
   });
 
@@ -264,23 +264,23 @@ function deriveTotalStock(product) {
   if (product.tallaStock) {
     return sumSizeStock(product.tallaStock);
   }
-  return Math.max(0, Number(product.stock) || 0);
+  return Math.max(0, toN(product.stock));
 }
 
 function getSizeStock(product, talla, color) {
   if (product.colorStock && talla) {
     if (color && typeof product.colorStock[color]?.[talla] === "number") {
-      return Math.max(0, Number(product.colorStock[color][talla]) || 0);
+      return Math.max(0, toN(product.colorStock[color][talla]));
     }
 
     return Object.values(product.colorStock).reduce(
-      (sum, stockBySize) => sum + Math.max(0, Number(stockBySize?.[talla]) || 0),
+      (sum, stockBySize) => sum + Math.max(0, toN(stockBySize?.[talla])),
       0
     );
   }
 
   if (talla && product.tallaStock && typeof product.tallaStock[talla] === "number") {
-    return Math.max(0, Number(product.tallaStock[talla]) || 0);
+    return Math.max(0, toN(product.tallaStock[talla]));
   }
 
   return deriveTotalStock(product);
@@ -290,7 +290,7 @@ function sanitizeOrderProduct(product) {
   return {
     id: product.id,
     nombre: product.nombre,
-    precio: Number(product.precio || 0),
+    precio: toN(product.precio),
     descripcion: strOr(product.descripcion),
     imagen: strOr(product.imagen),
     imagenes: arrOr(product.imagenes),
@@ -320,7 +320,7 @@ function extractProductId(item) {
 function extractItemFields(item) {
   return {
     productId: extractProductId(item),
-    quantity: Number(item?.quantity || 0),
+    quantity: toN(item?.quantity),
     talla: typeof item?.talla === "string" ? item.talla.trim() : "",
     color: typeof item?.color === "string" ? item.color.trim() : "",
   };
@@ -336,6 +336,18 @@ function strOr(v, d = "") {
 
 function arrOr(v) {
   return Array.isArray(v) ? v : [];
+}
+
+function toN(v) {
+  return Number(v) || 0;
+}
+
+function orUndef(v) {
+  return v || undefined;
+}
+
+function objOr(v) {
+  return v || {};
 }
 
 async function fetchProductsByIds(supabase, ids) {
@@ -359,20 +371,18 @@ async function fetchProductOrThrow(supabase, productId) {
 
 function calculateStoredSubtotal(items) {
   return (items || []).reduce((sum, item) => {
-    const quantity = Number(item?.quantity || 0);
-    const price = Number(item?.product?.precio || 0);
-    return sum + (quantity * price);
+    return sum + toN(item?.quantity) * toN(item?.product?.precio);
   }, 0);
 }
 
 function assertStoredTotals(order) {
   const subtotal = calculateStoredSubtotal(order.items);
-  const envio = Number(order.envio || 0);
+  const envio = toN(order.envio);
   const total = subtotal + envio;
 
   if (
-    Math.abs(Number(order.subtotal || 0) - subtotal) > 0.01 ||
-    Math.abs(Number(order.total || 0) - total) > 0.01
+    Math.abs(toN(order.subtotal) - subtotal) > 0.01 ||
+    Math.abs(toN(order.total) - total) > 0.01
   ) {
     throw Object.assign(new Error("Los totales del pedido no coinciden"), { status: 409 });
   }
@@ -387,9 +397,9 @@ async function assertOrderStockAvailability(supabase, items) {
     }
 
     const product = await fetchProductOrThrow(supabase, productId);
-    const price = Number(product.precio || 0);
+    const price = toN(product.precio);
     const totalStock = deriveTotalStock(product);
-    const sizeStock = getSizeStock(product, talla || undefined, color || undefined);
+    const sizeStock = getSizeStock(product, orUndef(talla), orUndef(color));
 
     if (price <= 0 || totalStock < quantity || sizeStock < quantity) {
       throw Object.assign(new Error("Stock o precio invalido"), { status: 409 });
@@ -430,9 +440,9 @@ async function buildOrderDraft(supabase, rawItems) {
       throw Object.assign(new Error("Producto no encontrado"), { status: 400 });
     }
 
-    const price = Number(product.precio || 0);
+    const price = toN(product.precio);
     const totalStock = deriveTotalStock(product);
-    const sizeStock = getSizeStock(product, item.talla || undefined, item.color || undefined);
+    const sizeStock = getSizeStock(product, orUndef(item.talla), orUndef(item.color));
 
     if (price <= 0 || totalStock < item.quantity || sizeStock < item.quantity) {
       throw Object.assign(new Error("Stock o precio invalido"), { status: 409 });
@@ -442,8 +452,8 @@ async function buildOrderDraft(supabase, rawItems) {
     items.push({
       product: sanitizeOrderProduct(product),
       quantity: item.quantity,
-      talla: item.talla || undefined,
-      color: item.color || undefined,
+      talla: orUndef(item.talla),
+      color: orUndef(item.color),
     });
   }
 
@@ -481,7 +491,7 @@ function resolveColorBucket(colorStock, talla, quantity, preferredColor) {
   }
 
   return Object.keys(colorStock).find((colorKey) => {
-    return Math.max(0, Number(colorStock[colorKey]?.[talla]) || 0) >= quantity;
+    return Math.max(0, toN(colorStock[colorKey]?.[talla])) >= quantity;
   });
 }
 
@@ -494,7 +504,7 @@ async function discountOrderItemStock(supabase, item) {
 
   const product = await fetchProductOrThrow(supabase, productId);
   const currentTotalStock = deriveTotalStock(product);
-  const currentSizeStock = getSizeStock(product, talla || undefined, color || undefined);
+  const currentSizeStock = getSizeStock(product, orUndef(talla), orUndef(color));
 
   if (currentTotalStock < quantity || currentSizeStock < quantity) {
     throw new Error("Stock insuficiente al descontar");
@@ -506,7 +516,7 @@ async function discountOrderItemStock(supabase, item) {
     const colorStock = {
       ...product.colorStock,
     };
-    const colorKey = resolveColorBucket(colorStock, talla, quantity, color || undefined);
+    const colorKey = resolveColorBucket(colorStock, talla, quantity, orUndef(color));
 
     if (!colorKey) {
       throw new Error("No se encontro stock de color para descontar");
@@ -514,7 +524,7 @@ async function discountOrderItemStock(supabase, item) {
 
     colorStock[colorKey] = {
       ...colorStock[colorKey],
-      [talla]: Math.max(0, Number(colorStock[colorKey][talla] || 0) - quantity),
+      [talla]: Math.max(0, toN(colorStock[colorKey][talla]) - quantity),
     };
 
     updates.colorStock = colorStock;
@@ -523,16 +533,16 @@ async function discountOrderItemStock(supabase, item) {
   } else if (product.tallaStock && talla) {
     const tallaStock = {
       ...product.tallaStock,
-      [talla]: Math.max(0, Number(product.tallaStock[talla] || 0) - quantity),
+      [talla]: Math.max(0, toN(product.tallaStock[talla]) - quantity),
     };
 
     updates.tallaStock = tallaStock;
     updates.tallas = Object.keys(tallaStock)
-      .filter((size) => Number(tallaStock[size] || 0) > 0)
+      .filter((size) => toN(tallaStock[size]) > 0)
       .sort((a, b) => Number(a) - Number(b));
     updates.stock = sumSizeStock(tallaStock);
   } else {
-    updates.stock = Math.max(0, Number(product.stock || 0) - quantity);
+    updates.stock = Math.max(0, toN(product.stock) - quantity);
   }
 
   const { data, error } = await supabase
@@ -662,10 +672,10 @@ exports.createCheckoutSession = onRequest(
         const lineItems = [];
 
         for (const item of order.items) {
-          const quantity = Number(item?.quantity || 0);
-          const price = Number(item?.product?.precio || 0);
+          const quantity = toN(item?.quantity);
+          const price = toN(item?.product?.precio);
           const name = item?.product?.nombre || "Producto";
-          const image = item?.product?.imagen || "";
+          const image = strOr(item?.product?.imagen);
 
           if (!Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT || price <= 0) {
             return res.status(400).json({ error: "Producto invalido en el pedido" });
@@ -684,7 +694,7 @@ exports.createCheckoutSession = onRequest(
           });
         }
 
-        const envio = Number(order.envio || 0);
+        const envio = toN(order.envio);
         if (envio > 0) {
           lineItems.push({
             price_data: {
