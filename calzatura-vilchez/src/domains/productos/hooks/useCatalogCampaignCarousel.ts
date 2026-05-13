@@ -149,7 +149,9 @@ export function useCatalogCampaignCarousel(
     [campaignTransition],
   );
 
-  const campaignDragDirection = campaignDragOffset < 0 ? 1 : campaignDragOffset > 0 ? -1 : 0;
+  let campaignDragDirection = 0;
+  if (campaignDragOffset < 0) campaignDragDirection = 1;
+  else if (campaignDragOffset > 0) campaignDragDirection = -1;
   const campaignDragTarget =
     campaignDragDirection === 0
       ? null

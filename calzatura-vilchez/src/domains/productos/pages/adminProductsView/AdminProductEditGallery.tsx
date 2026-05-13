@@ -1,6 +1,8 @@
 import { Link as LinkIcon, Upload, X } from "lucide-react";
 import type { ChangeEvent, MutableRefObject } from "react";
-import type { ProductForm } from "../adminProductsInternals";
+import { IMAGE_SLOTS, type ProductForm } from "../adminProductsInternals";
+
+const EDIT_GALLERY_SLOT_KEYS = Array.from({ length: IMAGE_SLOTS }, (_, i) => `edit-gallery-slot-${i}`);
 
 type Props = {
   currentImages: string[];
@@ -30,7 +32,7 @@ export function AdminProductEditGallery({
   return (
     <div className="admin-image-grid">
       {currentImages.map((image, index) => (
-        <div key={index} className="admin-image-slot">
+        <div key={EDIT_GALLERY_SLOT_KEYS[index] ?? `edit-gallery-slot-${index}`} className="admin-image-slot">
           <button
             type="button"
             className="image-upload-area"

@@ -43,6 +43,12 @@ export function AdminProductCreateVariantsPanel({
   return (
     <div
       ref={variantsCarouselRef}
+      role="region"
+      aria-label="Carrusel de variantes. Arrastra para desplazar. Escape suelta el arrastre."
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") stopVariantsDrag();
+      }}
       className={`admin-variants-carousel${isDraggingVariants ? " dragging" : ""}`}
       onMouseDown={handleVariantsMouseDown}
       onMouseMove={handleVariantsMouseMove}
@@ -53,7 +59,7 @@ export function AdminProductCreateVariantsPanel({
         if (!slot.color) return null;
         return (
           <AdminProductVariantCarouselCard
-            key={slotIndex}
+            key={slot.color}
             slot={slot}
             slotIndex={slotIndex}
             compressing={compressing}

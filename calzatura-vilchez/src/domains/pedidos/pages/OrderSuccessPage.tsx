@@ -8,6 +8,12 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { downloadReceipt, openReceiptPreview } from "@/utils/receipt";
 import toast from "react-hot-toast";
 
+function successPageEstadoLabel(estado: Order["estado"]): string {
+  if (estado === "pagado") return "Pagado";
+  if (estado === "pendiente") return "Pendiente de pago";
+  return estado;
+}
+
 export default function OrderSuccessPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -97,8 +103,7 @@ export default function OrderSuccessPage() {
             <div className="success-detail-row">
               <span>Estado:</span>
               <span className={`order-status-badge status-${order.estado}`}>
-                {order.estado === "pagado" ? "Pagado" :
-                 order.estado === "pendiente" ? "Pendiente de pago" : order.estado}
+                {successPageEstadoLabel(order.estado)}
               </span>
             </div>
             <div className="success-detail-row">

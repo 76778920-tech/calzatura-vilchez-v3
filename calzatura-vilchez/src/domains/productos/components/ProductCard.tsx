@@ -33,11 +33,10 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const [failedHoverImage, setFailedHoverImage] = useState<string | null>(null);
   const imageSrc = failedImage === primaryImage ? FALLBACK_PRODUCT_IMAGE : primaryImage;
-  const hoverImageSrc = secondaryImage
-    ? failedHoverImage === secondaryImage
-      ? imageSrc
-      : secondaryImage
-    : null;
+  let hoverImageSrc: string | null = null;
+  if (secondaryImage) {
+    hoverImageSrc = failedHoverImage === secondaryImage ? imageSrc : secondaryImage;
+  }
   const isLiked = Boolean(user) && favoriteIds.has(product.id);
 
   const handleOpenSizePicker = (e: React.MouseEvent) => {

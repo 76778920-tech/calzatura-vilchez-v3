@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { fetchAllOrders, updateOrderStatus } from "@/domains/pedidos/services/orders";
 import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
-import type { Order, OrderStatus } from "@/types";
+import type { CartItem, Order, OrderStatus } from "@/types";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import toast from "react-hot-toast";
 
@@ -23,6 +23,13 @@ const STATUS_COLOR: Record<string, string> = {
   entregado: "#10b981",
   cancelado: "#ef4444",
 };
+
+const ADMIN_ORDERS_SKELETON_KEYS = ["sk-1", "sk-2", "sk-3", "sk-4"] as const;
+
+function orderItemLineKey(item: CartItem, lineIndex: number) {
+  const pid = item.product?.id ?? "unknown";
+  return `${pid}-${item.color ?? ""}-${item.talla ?? ""}-q${item.quantity}-i${lineIndex}`;
+}
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -57,36 +64,35 @@ export default function AdminOrders() {
     ? orders
     : orders.filter((o) => o.estado === filterEstado);
 
-  return (
-    <div>
-      <div className="admin-page-header">
-        <h1 className="admin-page-title">Pedidos ({filtered.length})</h1>
-        <select
-          value={filterEstado}
-          onChange={(e) => setFilterEstado(e.target.value)}
-          className="form-input"
-          style={{ width: "auto" }}
-        >
-          <option value="todos">Todos los estados</option>
-          {ESTADOS.map((e) => (
-            <option key={e} value={e}>{ESTADO_LABEL[e]}</option>
-          ))}
-        </select>
+  let ordersMain: ReactNode;
+  if (loading) {
+    ordersMain = (
+      <div className="orders-skeleton">
+        {ADMIN_ORDERS_SKELETON_KEYS.map((id) => (
+          <div key={id} className="skeleton-card" style={{ height: "80px" }} />
+        ))}
       </div>
-
-      {loading ? (
-        <div className="orders-skeleton">
-          {[...Array(4)].map((_, i) => <div key={i} className="skeleton-card" style={{ height: "80px" }} />)}
-        </div>
-      ) : filtered.length === 0 ? (
-        <p className="admin-empty">No hay pedidos con este estado.</p>
-      ) : (
+    );
+  } else if (filtered.length === 0) {
+    ordersMain = <p className="admin-empty">No hay pedidos con este estado.</p>;
+  } else {
+    ordersMain = (
         <div className="orders-list">
           {filtered.map((order) => (
             <div key={order.id} className="order-card">
               <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={expanded === order.id}
+                aria-label={`Ver u ocultar detalle del pedido ${order.id.slice(-8).toUpperCase()}`}
                 className="order-card-header"
                 onClick={() => setExpanded(expanded === order.id ? null : order.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setExpanded(expanded === order.id ? null : order.id);
+                  }
+                }}
               >
                 <div className="order-card-meta">
                   <span className="order-id">#{order.id.slice(-8).toUpperCase()}</span>
@@ -109,16 +115,16 @@ export default function AdminOrders() {
                     ))}
                   </select>
                 </div>
-                <button className="order-expand-btn">
+                <span className="order-expand-btn" aria-hidden="true">
                   {expanded === order.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
+                </span>
               </div>
 
               {expanded === order.id && (
                 <div className="order-card-body">
                   <div className="order-items-list">
                     {order.items?.map((item, idx) => (
-                      <div key={idx} className="order-item">
+                      <div key={orderItemLineKey(item, idx)} className="order-item">
                         <button
                           type="button"
                           className="order-item-img-button"
@@ -166,7 +172,27 @@ export default function AdminOrders() {
             </div>
           ))}
         </div>
-      )}
+    );
+  }
+
+  return (
+    <div>
+      <div className="admin-page-header">
+        <h1 className="admin-page-title">Pedidos ({filtered.length})</h1>
+        <select
+          value={filterEstado}
+          onChange={(e) => setFilterEstado(e.target.value)}
+          className="form-input"
+          style={{ width: "auto" }}
+        >
+          <option value="todos">Todos los estados</option>
+          {ESTADOS.map((e) => (
+            <option key={e} value={e}>{ESTADO_LABEL[e]}</option>
+          ))}
+        </select>
+      </div>
+
+      {ordersMain}
 
       {previewImage && (
         <ImagePreviewModal

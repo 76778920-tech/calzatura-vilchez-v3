@@ -104,7 +104,14 @@ export function toPositiveInteger(value: string) {
 }
 
 export function normalizeImageSlots(images?: string[], fallback = "") {
-  const source = images && images.length > 0 ? images : fallback ? [fallback] : [];
+  let source: string[];
+  if (images && images.length > 0) {
+    source = images;
+  } else if (fallback) {
+    source = [fallback];
+  } else {
+    source = [];
+  }
   return Array.from({ length: IMAGE_SLOTS }, (_, index) => source[index] ?? "");
 }
 

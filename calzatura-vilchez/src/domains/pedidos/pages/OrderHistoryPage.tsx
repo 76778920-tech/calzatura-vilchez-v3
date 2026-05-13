@@ -4,7 +4,7 @@ import { Package, ChevronDown, ChevronUp } from "lucide-react";
 import { fetchOrdersByUser } from "@/domains/pedidos/services/orders";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
-import type { Order } from "@/types";
+import type { CartItem, Order } from "@/types";
 
 const STATUS_LABELS: Record<string, string> = {
   pendiente: "Pendiente",
@@ -13,6 +13,13 @@ const STATUS_LABELS: Record<string, string> = {
   entregado: "Entregado",
   cancelado: "Cancelado",
 };
+
+const ORDER_HISTORY_SKELETON_KEYS = ["sk-1", "sk-2", "sk-3"] as const;
+
+function historyOrderItemKey(item: CartItem, lineIndex: number) {
+  const pid = item.product?.id ?? "unknown";
+  return `${pid}-${item.color ?? ""}-${item.talla ?? ""}-q${item.quantity}-i${lineIndex}`;
+}
 
 export default function OrderHistoryPage() {
   const { user } = useAuth();
@@ -50,7 +57,9 @@ export default function OrderHistoryPage() {
       <main className="orders-page">
         <h1>Mis Pedidos</h1>
         <div className="orders-skeleton">
-          {[...Array(3)].map((_, i) => <div key={i} className="skeleton-card" style={{ height: "80px" }} />)}
+          {ORDER_HISTORY_SKELETON_KEYS.map((id) => (
+            <div key={id} className="skeleton-card" style={{ height: "80px" }} />
+          ))}
         </div>
       </main>
     );
@@ -71,8 +80,18 @@ export default function OrderHistoryPage() {
           {orders.map((order) => (
             <div key={order.id} className="order-card">
               <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={expanded === order.id}
+                aria-label={`Ver u ocultar detalle del pedido ${order.id.slice(-8).toUpperCase()}`}
                 className="order-card-header"
                 onClick={() => setExpanded(expanded === order.id ? null : order.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setExpanded(expanded === order.id ? null : order.id);
+                  }
+                }}
               >
                 <div className="order-card-meta">
                   <span className="order-id">#{order.id.slice(-8).toUpperCase()}</span>
@@ -86,16 +105,16 @@ export default function OrderHistoryPage() {
                     {order.items?.reduce((a, i) => a + i.quantity, 0)} producto(s)
                   </span>
                 </div>
-                <button className="order-expand-btn">
+                <span className="order-expand-btn" aria-hidden="true">
                   {expanded === order.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
+                </span>
               </div>
 
               {expanded === order.id && (
                 <div className="order-card-body">
                   <div className="order-items-list">
                     {order.items?.map((item, idx) => (
-                      <div key={idx} className="order-item">
+                      <div key={historyOrderItemKey(item, idx)} className="order-item">
                         <img
                           src={item.product?.imagen || "/placeholder-product.svg"}
                           alt={item.product?.nombre}
