@@ -46,7 +46,7 @@ const EMPTY_FORM: ManufacturerForm = {
 const DOCUMENT_LIMIT = 8;
 
 function toPositiveNumber(value: string) {
-  const clean = value.replace(/[^\d.]/g, "");
+  const clean = value.replaceAll(/[^\d.]/g, "");
   const parts = clean.split(".");
   const normalized = parts.length > 1 ? `${parts[0]}.${parts.slice(1).join("")}` : clean;
   return Math.max(0, Number(normalized) || 0);
@@ -254,7 +254,7 @@ export default function AdminManufacturers() {
     }
   };
 
-  const handleSave = async (event: React.SyntheticEvent<HTMLFormElement>) => {
+  const handleSave = async (event: { preventDefault: () => void }) => {
     event.preventDefault();
     const normalizedDni = normalizeDni(form.dni);
     if (!isValidDni(normalizedDni)) {
@@ -545,7 +545,7 @@ export default function AdminManufacturers() {
                       <input
                         id="manufacturer-phone"
                         value={form.telefono ?? ""}
-                        onChange={(event) => setForm({ ...form, telefono: event.target.value.replace(/\D/g, "").slice(0, 9) })}
+                        onChange={(event) => setForm({ ...form, telefono: event.target.value.replaceAll(/\D/g, "").slice(0, 9) })}
                         className="form-input"
                         placeholder="999999999"
                       />

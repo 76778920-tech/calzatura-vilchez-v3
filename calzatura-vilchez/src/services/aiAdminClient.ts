@@ -30,7 +30,7 @@ async function authHeaders(): Promise<Record<string, string>> {
 function toProxyUrl(pathAndQuery: string): string {
   const u = new URL(pathAndQuery, "https://placeholder.local");
   const q = new URLSearchParams();
-  const proxyBase = PROXY_URL?.replace(/\/$/, "");
+  const proxyBase = PROXY_URL?.replaceAll(/\/$/g, "");
   if (!proxyBase) {
     throw new Error("Proxy de IA no configurado.");
   }
@@ -89,7 +89,7 @@ export async function aiAdminFetch(pathAndQuery: string, init?: RequestInit): Pr
   if (PROXY_URL) {
     return fetch(toProxyUrl(rel), { ...init, headers });
   }
-  const base = DIRECT_BASE.replace(/\/$/, "");
+  const base = DIRECT_BASE.replaceAll(/\/$/g, "");
   return fetch(`${base}${rel}`, { ...init, headers });
 }
 
@@ -102,7 +102,7 @@ export function aiAdminUsesProxy(): boolean {
  * Fire-and-forget: nunca lanza ni bloquea.
  */
 export function wakeAIService(): void {
-  const base = DIRECT_BASE.replace(/\/$/, "");
+  const base = DIRECT_BASE.replaceAll(/\/$/g, "");
   const controller = new AbortController();
   const timer = globalThis.setTimeout(() => controller.abort(), 6_000);
   fetch(`${base}/api/health`, { signal: controller.signal })

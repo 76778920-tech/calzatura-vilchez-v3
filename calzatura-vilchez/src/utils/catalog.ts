@@ -14,13 +14,13 @@ function normalizeSlug(value = "") {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+    .replaceAll(/[\u0300-\u036f]/g, "");
 }
 
 export function slugifyCatalogValue(value = "") {
   return normalizeSlug(value)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "");
 }
 
 export function normalizeCategorySlug(category = "") {

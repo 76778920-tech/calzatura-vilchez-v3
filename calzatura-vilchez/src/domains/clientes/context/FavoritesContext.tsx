@@ -12,13 +12,17 @@ type FavoritesContextType = Readonly<{
   loading: boolean;
 }>;
 
+type FavoritesProviderProps = Readonly<{
+  children: ReactNode;
+}>;
+
 const FavoritesContext = createContext<FavoritesContextType>({
   favoriteIds: new Set(),
   toggle: async () => {},
   loading: true,
 });
 
-export function FavoritesProvider({ children }: Readonly<{ children: ReactNode }>) {
+export function FavoritesProvider({ children }: FavoritesProviderProps) {
   const { user } = useAuth();
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, type ReactNode, type SyntheticEvent } from "react";
+import { useState, useRef, useEffect, useMemo, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ShoppingCart,
@@ -54,7 +54,7 @@ function normalizeRouteToken(value: string | null | undefined) {
   return decodeURIComponent(value ?? "")
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll(/[\u0300-\u036f]/g, "")
     .replaceAll("+", " ")
     .trim();
 }
@@ -109,8 +109,8 @@ function filterProductsByHeaderSearch(products: Product[], headerSearch: string)
 
 function slugifyRouteValue(value: string) {
   return normalizeRouteToken(value)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "");
 }
 
 type CatalogRouteMenuTokens = {
@@ -857,7 +857,7 @@ export default function Header() {
     [headerSearch, products]
   );
 
-  const handleHeaderSearch = (event: SyntheticEvent<HTMLFormElement>) => {
+  const handleHeaderSearch = (event: { preventDefault: () => void }) => {
     event.preventDefault();
     const query = headerSearch.trim();
     closeMegaMenu();

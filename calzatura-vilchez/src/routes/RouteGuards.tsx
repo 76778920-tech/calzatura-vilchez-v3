@@ -21,7 +21,11 @@ type AreaRouteProps = Readonly<{
   children: ReactNode;
 }>;
 
-export function AuthenticatedRoute({ children }: Readonly<{ children: ReactNode }>) {
+type AuthenticatedRouteProps = Readonly<{
+  children: ReactNode;
+}>;
+
+export function AuthenticatedRoute({ children }: AuthenticatedRouteProps) {
   const { user, loading, requiresEmailVerification } = useAuth();
   const location = useLocation();
 

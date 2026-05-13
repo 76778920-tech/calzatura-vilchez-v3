@@ -19,6 +19,10 @@ type CartContextType = Readonly<{
   setIsOpen: (open: boolean) => void;
 }>;
 
+type CartProviderProps = Readonly<{
+  children: ReactNode;
+}>;
+
 const CartContext = createContext<CartContextType>({
   items: [],
   addItem: () => {},
@@ -41,7 +45,7 @@ function cartStorageKey(userUid?: string | null) {
     : CART_STORAGE_KEY;
 }
 
-export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
+export function CartProvider({ children }: CartProviderProps) {
   const { user } = useAuth();
   const userUid = user?.uid ?? null;
   const [items, setItems] = useState<CartItem[]>([]);
