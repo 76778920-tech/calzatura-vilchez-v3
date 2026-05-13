@@ -291,18 +291,18 @@ function sanitizeOrderProduct(product) {
     id: product.id,
     nombre: product.nombre,
     precio: Number(product.precio || 0),
-    descripcion: product.descripcion || "",
-    imagen: product.imagen || "",
-    imagenes: Array.isArray(product.imagenes) ? product.imagenes : [],
+    descripcion: strOr(product.descripcion),
+    imagen: strOr(product.imagen),
+    imagenes: arrOr(product.imagenes),
     stock: deriveTotalStock(product),
-    categoria: product.categoria || "",
-    tipoCalzado: product.tipoCalzado || "",
+    categoria: strOr(product.categoria),
+    tipoCalzado: strOr(product.tipoCalzado),
     tallas: getAvailableSizes(product),
     tallaStock: product.tallaStock || null,
     colorStock: product.colorStock || null,
-    marca: product.marca || "",
-    color: product.color || "",
-    colores: Array.isArray(product.colores) ? product.colores : [],
+    marca: strOr(product.marca),
+    color: strOr(product.color),
+    colores: arrOr(product.colores),
     destacado: Boolean(product.destacado),
   };
 }
@@ -315,6 +315,27 @@ function extractProductId(item) {
     return item.productId.trim();
   }
   return "";
+}
+
+function extractItemFields(item) {
+  return {
+    productId: extractProductId(item),
+    quantity: Number(item?.quantity || 0),
+    talla: typeof item?.talla === "string" ? item.talla.trim() : "",
+    color: typeof item?.color === "string" ? item.color.trim() : "",
+  };
+}
+
+function isInvalidOrderQty(productId, quantity) {
+  return !productId || !Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT;
+}
+
+function strOr(v, d = "") {
+  return v || d;
+}
+
+function arrOr(v) {
+  return Array.isArray(v) ? v : [];
 }
 
 async function fetchProductsByIds(supabase, ids) {
@@ -359,12 +380,9 @@ function assertStoredTotals(order) {
 
 async function assertOrderStockAvailability(supabase, items) {
   for (const item of items || []) {
-    const productId = extractProductId(item);
-    const quantity = Number(item?.quantity || 0);
-    const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
-    const color = typeof item?.color === "string" ? item.color.trim() : "";
+    const { productId, quantity, talla, color } = extractItemFields(item);
 
-    if (!productId || !Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT) {
+    if (isInvalidOrderQty(productId, quantity)) {
       throw Object.assign(new Error("Producto invalido en el pedido"), { status: 400 });
     }
 
@@ -385,12 +403,9 @@ async function buildOrderDraft(supabase, rawItems) {
   }
 
   const normalizedItems = rawItems.map((item) => {
-    const productId = extractProductId(item);
-    const quantity = Number(item?.quantity || 0);
-    const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
-    const color = typeof item?.color === "string" ? item.color.trim() : "";
+    const { productId, quantity, talla, color } = extractItemFields(item);
 
-    if (!productId || !Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT) {
+    if (isInvalidOrderQty(productId, quantity)) {
       throw Object.assign(new Error("Producto invalido en el pedido"), { status: 400 });
     }
 
@@ -471,10 +486,7 @@ function resolveColorBucket(colorStock, talla, quantity, preferredColor) {
 }
 
 async function discountOrderItemStock(supabase, item) {
-  const productId = extractProductId(item);
-  const quantity = Number(item?.quantity || 0);
-  const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
-  const color = typeof item?.color === "string" ? item.color.trim() : "";
+  const { productId, quantity, talla, color } = extractItemFields(item);
 
   if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
     throw new Error("Producto invalido al descontar stock");
@@ -875,6 +887,12 @@ async function favoritesHandleDelete(supabase, userId, productId, res) {
   return res.status(200).json({ success: true });
 }
 
+const FAVORITES_HANDLERS = {
+  GET: favoritesHandleGet,
+  POST: favoritesHandlePost,
+  DELETE: favoritesHandleDelete,
+};
+
 exports.favorites = onRequest(
   { secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
   async (req, res) => {
@@ -890,19 +908,9 @@ exports.favorites = onRequest(
         const rawProductId = req.method === "GET" ? req.query.productId : req.body?.productId;
         const productId = typeof rawProductId === "string" ? rawProductId.trim() : "";
 
-        if (req.method === "GET") {
-          return favoritesHandleGet(supabase, userId, productId, res);
-        }
-
-        if (req.method === "POST") {
-          return favoritesHandlePost(supabase, userId, productId, res);
-        }
-
-        if (req.method === "DELETE") {
-          return favoritesHandleDelete(supabase, userId, productId, res);
-        }
-
-        return res.status(405).json({ error: "Metodo no permitido" });
+        const handler = FAVORITES_HANDLERS[req.method];
+        if (!handler) return res.status(405).json({ error: "Metodo no permitido" });
+        return handler(supabase, userId, productId, res);
       } catch (error) {
         console.error("Favorites error:", error);
         return res.status(error.status || 500).json({ error: publicError(error) });
