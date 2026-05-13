@@ -135,10 +135,11 @@ export default function ProfilePage() {
 
           <form onSubmit={handleSave} className="profile-form">
             <div className="input-group">
-              <label>DNI</label>
+              <label htmlFor="profile-dni">DNI</label>
               <div className="input-wrapper">
                 <IdCard size={16} className="input-icon" />
                 <input
+                  id="profile-dni"
                   type="text"
                   value={userProfile?.dni ?? ""}
                   disabled
@@ -150,10 +151,11 @@ export default function ProfilePage() {
 
             <div className="form-row">
               <div className="input-group">
-                <label>Nombres</label>
+                <label htmlFor="profile-nombres">Nombres</label>
                 <div className="input-wrapper">
                   <User size={16} className="input-icon" />
                   <input
+                    id="profile-nombres"
                     type="text"
                     value={nombres}
                     disabled
@@ -164,10 +166,11 @@ export default function ProfilePage() {
               </div>
 
               <div className="input-group">
-                <label>Apellidos</label>
+                <label htmlFor="profile-apellidos">Apellidos</label>
                 <div className="input-wrapper">
                   <User size={16} className="input-icon" />
                   <input
+                    id="profile-apellidos"
                     type="text"
                     value={apellidos}
                     disabled
@@ -179,10 +182,11 @@ export default function ProfilePage() {
             </div>
 
             <div className="input-group">
-              <label>Correo electronico</label>
+              <label htmlFor="profile-email">Correo electronico</label>
               <div className="input-wrapper">
                 <Mail size={16} className="input-icon" />
                 <input
+                  id="profile-email"
                   type="email"
                   value={user.email ?? ""}
                   disabled
@@ -196,10 +200,11 @@ export default function ProfilePage() {
             </div>
 
             <div className="input-group">
-              <label>Telefono</label>
+              <label htmlFor="profile-telefono">Telefono</label>
               <div className="input-wrapper">
                 <Phone size={16} className="input-icon" />
                 <input
+                  id="profile-telefono"
                   type="tel"
                   value={telefono}
                   onChange={(e) => setTelefono(normalizePeruPhoneInput(e.target.value))}
@@ -274,13 +279,16 @@ export default function ProfilePage() {
       </div>
 
       {deleteOpen && (
-        <div
-          className="profile-delete-modal-overlay"
-          onClick={() => {
-            if (!deleting) resetDeleteForm();
-          }}
-        >
-          <div className="profile-delete-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="profile-delete-modal-overlay">
+          <button
+            type="button"
+            className="profile-delete-modal-backdrop"
+            onClick={() => {
+              if (!deleting) resetDeleteForm();
+            }}
+            aria-label="Cerrar confirmacion"
+          />
+          <div className="profile-delete-modal">
             <div className="profile-delete-modal-header">
               <div>
                 <h2>Confirmar eliminacion</h2>

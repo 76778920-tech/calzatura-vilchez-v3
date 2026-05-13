@@ -238,7 +238,7 @@ export async function resetPassword(email: string): Promise<void> {
 
 export async function deleteOwnAccount(): Promise<void> {
   const user = auth.currentUser;
-  if (!user || !user.email) throw new Error("NO_USER");
+  if (!user?.email) throw new Error("NO_USER");
 
   const profile = await getUserProfile(user.uid).catch(() => null);
   const entityName = profile?.nombre?.trim() || user.email;

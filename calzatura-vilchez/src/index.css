@@ -7890,7 +7890,15 @@ dialog.document-preview-modal {
   display: flex; align-items: center; justify-content: center;
   padding: 1rem; background: rgba(10, 10, 10, 0.62); backdrop-filter: blur(4px);
 }
+.profile-delete-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
 .profile-delete-modal {
+  position: relative;
   width: min(520px, 100%);
   background: var(--white);
   border: 1px solid rgba(220,38,38,0.18);

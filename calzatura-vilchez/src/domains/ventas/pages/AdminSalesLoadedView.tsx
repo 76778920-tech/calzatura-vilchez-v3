@@ -54,10 +54,11 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
 
             <div className="admin-sale-lookup-grid">
               <div className="form-group admin-suggest-field">
-                <label>Marca</label>
+                <label htmlFor="admin-sale-brand-search">Marca</label>
                 <div className="admin-search-wrapper">
                   <PackageSearch size={17} />
                   <input
+                    id="admin-sale-brand-search"
                     value={p.brandSearch}
                     onChange={(e) => p.handleBrandSearchChange(e.target.value)}
                     onFocus={() => p.setBrandFocused(true)}
@@ -82,10 +83,11 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
               </div>
 
               <div className="form-group admin-suggest-field">
-                <label>Codigo o modelo</label>
+                <label htmlFor="admin-sale-code-search">Codigo o modelo</label>
                 <div className="admin-search-wrapper">
                   <PackageSearch size={17} />
                   <input
+                    id="admin-sale-code-search"
                     value={p.codeSearch}
                     onChange={(e) => p.handleCodeSearchChange(e.target.value)}
                     onFocus={() => p.setCodeFocused(true)}
@@ -137,7 +139,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
 
               {p.availableColors.length > 0 && (
                 <div className="form-group">
-                  <label>Color</label>
+                  <span className="form-label">Color</span>
                   <div className="admin-choice-grid">
                     {p.availableColors.map((color) => (
                       <button
@@ -157,7 +159,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
                 <p className="admin-empty">Selecciona un color para ver sus tallas disponibles.</p>
               ) : p.availableSizes.length > 0 ? (
                 <div className="form-group">
-                  <label>Talla</label>
+                  <span className="form-label">Talla</span>
                   <div className="admin-size-picker">
                     {p.availableSizes.map((size) => {
                       const stock = p.availableForSize(size);
@@ -201,8 +203,9 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
 
           <div className="form-row">
             <div className="form-group">
-              <label>Cantidad</label>
+              <label htmlFor="admin-sale-quantity">Cantidad</label>
               <input
+                id="admin-sale-quantity"
                 type="number"
                 min={1}
                 max={p.availableForSelected || 1}
@@ -212,8 +215,9 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
               />
             </div>
             <div className="form-group">
-              <label>Precio de venta</label>
+              <label htmlFor="admin-sale-price">Precio de venta</label>
               <input
+                id="admin-sale-price"
                 type="number"
                 min={0}
                 step={0.01}
@@ -305,8 +309,9 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
               <div className="admin-sale-customer-box">
                 <div className="admin-sale-dni-row">
                   <div className="form-group">
-                    <label>DNI del cliente</label>
+                    <label htmlFor="admin-sale-customer-dni">DNI del cliente</label>
                     <input
+                      id="admin-sale-customer-dni"
                       value={p.customer.dni}
                       onChange={(e) => p.handleCustomerDniChange(e.target.value)}
                       maxLength={8}
@@ -322,12 +327,12 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
 
                 <div className="admin-sale-customer-grid">
                   <div className="form-group">
-                    <label>Nombres</label>
-                    <input value={p.customer.nombres} readOnly className="form-input" placeholder="Se completa al validar" />
+                    <label htmlFor="admin-sale-customer-nombres">Nombres</label>
+                    <input id="admin-sale-customer-nombres" value={p.customer.nombres} readOnly className="form-input" placeholder="Se completa al validar" />
                   </div>
                   <div className="form-group">
-                    <label>Apellidos</label>
-                    <input value={p.customer.apellidos} readOnly className="form-input" placeholder="Se completa al validar" />
+                    <label htmlFor="admin-sale-customer-apellidos">Apellidos</label>
+                    <input id="admin-sale-customer-apellidos" value={p.customer.apellidos} readOnly className="form-input" placeholder="Se completa al validar" />
                   </div>
                 </div>
 
