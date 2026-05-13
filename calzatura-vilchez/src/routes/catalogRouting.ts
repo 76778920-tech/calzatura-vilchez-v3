@@ -12,7 +12,7 @@ export const CATALOG_SHELF = {
   clubCalzadoLanding: "/club-vilchez-calzado",
 } as const;
 
-/** Descuento por defecto en enlaces Cyber Wow (alineado con el filtro “Todo con descuento”). */
+/** Descuento por defecto en enlaces Cyber Wow para incluir productos con descuento. */
 export const CYBER_WOW_DEFAULT_DESCUENTO = "all" as const;
 
 /** Parámetros que definen la “estantería” y taxonomía (comparten lógica con el listado). */

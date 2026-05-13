@@ -142,7 +142,7 @@ type ProductEditFinancials = {
 
 /**
  * Edita producto, código y finanzas en una sola transacción de BD vía RPC.
- * Si cualquier operación falla (constraint, trigger), todo se revierte.
+ * La RPC revierte la transaccion completa ante fallos de constraint o trigger.
  */
 export async function updateProductAtomic(
   id: string,
