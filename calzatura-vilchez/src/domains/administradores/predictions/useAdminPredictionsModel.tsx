@@ -224,10 +224,10 @@ export function useAdminPredictionsModel() {
   }, [loadCampana]);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       load(horizon, history).catch(() => undefined);
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => globalThis.clearTimeout(timer);
   }, [horizon, history, load]);
 
   useEffect(() => {

@@ -157,7 +157,7 @@ function dashboardOrderLineKey(item: CartItem, lineIndex: number) {
 
 // ─── Order Detail Modal ─────────────────────────────────────────────────────
 
-function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => void }) {
+function OrderDetailModal({ order, onClose }: Readonly<{ order: Order; onClose: () => void }>) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -272,7 +272,7 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
 
 // ─── Bar Chart ──────────────────────────────────────────────────────────────
 
-function SalesBarChart({ days, values }: { days: string[]; values: number[] }) {
+function SalesBarChart({ days, values }: Readonly<{ days: string[]; values: number[] }>) {
   const max = Math.max(...values, 1);
   return (
     <div className="dash-chart-bars">
@@ -294,7 +294,7 @@ function SalesBarChart({ days, values }: { days: string[]; values: number[] }) {
 
 // ─── Status Donut ────────────────────────────────────────────────────────────
 
-function OrderStatusSummary({ orders }: { orders: Order[] }) {
+function OrderStatusSummary({ orders }: Readonly<{ orders: Order[] }>) {
   const statuses = ["pendiente", "pagado", "enviado", "entregado", "cancelado"];
   const counts = statuses.map((s) => ({ status: s, count: orders.filter((o) => o.estado === s).length }));
   const total = orders.length || 1;
@@ -327,7 +327,7 @@ export default function AdminDashboard() {
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
-  const [chartData, setChartData] = useState<number[]>(Array(7).fill(0));
+  const [chartData, setChartData] = useState<number[]>(new Array(7).fill(0));
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -347,13 +347,12 @@ export default function AdminDashboard() {
       fetchProductFinancials(),
       fetchAllUsers(),
     ]).then(([products, orders, sales, financials, users]) => {
-      const salesTyped = sales as DailySale[];
       const { stats, chart } = computeDashboardFromFetchedData(
         today,
         last7Days,
         products,
         orders,
-        salesTyped,
+        sales,
         financials,
         users
       );
@@ -386,7 +385,7 @@ export default function AdminDashboard() {
           type="button"
           className="btn btn-primary"
           style={{ marginTop: "0.75rem" }}
-          onClick={() => window.location.reload()}
+          onClick={() => globalThis.location.reload()}
         >
           Reintentar
         </button>

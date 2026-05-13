@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, type FormEvent, type ReactNode } from "react";
+import { useState, useRef, useEffect, useMemo, type FormEventHandler, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ShoppingCart,
@@ -857,7 +857,7 @@ export default function Header() {
     [headerSearch, products]
   );
 
-  const handleHeaderSearch = (event: FormEvent<HTMLFormElement>) => {
+  const handleHeaderSearch: FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
     const query = headerSearch.trim();
     closeMegaMenu();

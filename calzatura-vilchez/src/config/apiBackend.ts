@@ -3,6 +3,6 @@
  * Mismas rutas que las Cloud Functions (`/createOrder`, `/authLogin`, …).
  */
 export function getBackendApiBaseUrl(): string {
-  const raw = (import.meta.env.VITE_BACKEND_API_URL as string | undefined)?.trim();
+  const raw = import.meta.env.VITE_BACKEND_API_URL?.trim();
   return raw ? raw.replace(/\/$/, "") : "";
 }
