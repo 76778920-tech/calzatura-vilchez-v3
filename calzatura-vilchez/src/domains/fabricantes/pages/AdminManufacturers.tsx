@@ -381,6 +381,7 @@ export default function AdminManufacturers() {
         <div className="admin-search-wrapper">
           <Search size={17} />
           <input
+            aria-label="Buscar fabricantes"
             value={searchTerm}
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Buscar por DNI, fabricante, marca o teléfono"
@@ -388,6 +389,7 @@ export default function AdminManufacturers() {
         </div>
         <div className="admin-filter-grid admin-manufacturer-filter-grid">
           <select
+            aria-label="Filtrar fabricantes por estado"
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
             className="form-input"
@@ -424,7 +426,19 @@ export default function AdminManufacturers() {
               </tr>
             )}
             {filteredManufacturers.map((item) => (
-              <tr key={item.id} className="sale-row-clickable" onClick={() => setDetailManufacturer(item)}>
+              <tr
+                key={item.id}
+                className="sale-row-clickable"
+                role="button"
+                tabIndex={0}
+                onClick={() => setDetailManufacturer(item)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setDetailManufacturer(item);
+                  }
+                }}
+              >
                 <td><span className="admin-code-badge">{item.dni}</span></td>
                 <td>
                   <div className="admin-product-cell">
@@ -446,11 +460,11 @@ export default function AdminManufacturers() {
                   </span>
                 </td>
                 <td>
-                  <div className="admin-actions" onClick={(e) => e.stopPropagation()}>
-                    <button type="button" onClick={() => openEdit(item)} className="action-btn edit-btn" aria-label="Editar">
+                  <div className="admin-actions">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); openEdit(item); }} className="action-btn edit-btn" aria-label="Editar">
                       <Pencil size={15} />
                     </button>
-                    <button type="button" onClick={() => handleDelete(item)} className="action-btn delete-btn" aria-label="Eliminar">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); void handleDelete(item); }} className="action-btn delete-btn" aria-label="Eliminar">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -462,8 +476,9 @@ export default function AdminManufacturers() {
       </div>
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal manufacturer-modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-overlay">
+          <button type="button" className="manufacturer-modal-backdrop" aria-label="Cerrar" onClick={() => setShowModal(false)} />
+          <div className="modal manufacturer-modal">
             <div className="modal-header">
               <h2>{editingId ? "Editar fabricante" : "Nuevo fabricante"}</h2>
               <button onClick={() => setShowModal(false)} className="modal-close" aria-label="Cerrar">
@@ -478,10 +493,11 @@ export default function AdminManufacturers() {
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label>DNI *</label>
+                      <label htmlFor="manufacturer-dni">DNI *</label>
                       <div className="input-wrapper">
                         <IdCard size={15} className="input-icon" />
                         <input
+                          id="manufacturer-dni"
                           value={form.dni}
                           onChange={(event) => {
                             const dni = normalizeDni(event.target.value);
@@ -498,8 +514,9 @@ export default function AdminManufacturers() {
                       </div>
                     </div>
                     <div className="form-group">
-                      <label>Marca *</label>
+                      <label htmlFor="manufacturer-brand">Marca *</label>
                       <input
+                        id="manufacturer-brand"
                         value={form.marca}
                         onChange={(event) => setForm({ ...form, marca: event.target.value })}
                         className="form-input"
@@ -510,8 +527,9 @@ export default function AdminManufacturers() {
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Nombres *</label>
+                      <label htmlFor="manufacturer-names">Nombres *</label>
                       <input
+                        id="manufacturer-names"
                         value={form.nombres}
                         onChange={(event) => setForm({ ...form, nombres: event.target.value })}
                         className="form-input"
@@ -519,8 +537,9 @@ export default function AdminManufacturers() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Apellidos *</label>
+                      <label htmlFor="manufacturer-lastnames">Apellidos *</label>
                       <input
+                        id="manufacturer-lastnames"
                         value={form.apellidos}
                         onChange={(event) => setForm({ ...form, apellidos: event.target.value })}
                         className="form-input"
@@ -530,8 +549,9 @@ export default function AdminManufacturers() {
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Teléfono</label>
+                      <label htmlFor="manufacturer-phone">Teléfono</label>
                       <input
+                        id="manufacturer-phone"
                         value={form.telefono ?? ""}
                         onChange={(event) => setForm({ ...form, telefono: event.target.value.replace(/\D/g, "").slice(0, 9) })}
                         className="form-input"
@@ -539,8 +559,9 @@ export default function AdminManufacturers() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Estado</label>
+                      <label htmlFor="manufacturer-status">Estado</label>
                       <select
+                        id="manufacturer-status"
                         value={form.activo ? "activo" : "inactivo"}
                         onChange={(event) => setForm({ ...form, activo: event.target.value === "activo" })}
                         className="form-input"
@@ -558,8 +579,9 @@ export default function AdminManufacturers() {
                   </div>
                   <div className="form-row">
                     <div className="form-group">
-                      <label>Fecha del último ingreso</label>
+                      <label htmlFor="manufacturer-last-income-date">Fecha del último ingreso</label>
                       <input
+                        id="manufacturer-last-income-date"
                         type="date"
                         value={form.ultimoIngresoFecha ?? ""}
                         onChange={(event) => setForm({ ...form, ultimoIngresoFecha: event.target.value })}
@@ -567,8 +589,9 @@ export default function AdminManufacturers() {
                       />
                     </div>
                     <div className="form-group">
-                      <label>Monto del último ingreso (S/)</label>
+                      <label htmlFor="manufacturer-last-income-amount">Monto del último ingreso (S/)</label>
                       <input
+                        id="manufacturer-last-income-amount"
                         type="text"
                         inputMode="decimal"
                         value={form.ultimoIngresoMonto === 0 ? "" : form.ultimoIngresoMonto}
@@ -580,8 +603,9 @@ export default function AdminManufacturers() {
                     </div>
                   </div>
                   <div className="form-group">
-                    <label>Observaciones</label>
+                    <label htmlFor="manufacturer-notes">Observaciones</label>
                     <textarea
+                      id="manufacturer-notes"
                       value={form.observaciones ?? ""}
                       onChange={(event) => setForm({ ...form, observaciones: event.target.value })}
                       className="form-input"
@@ -635,7 +659,9 @@ export default function AdminManufacturers() {
                         <span>{item.tipo === "boleta" ? "Boleta" : "Guía"}</span>
                         <strong>{item.nombre}</strong>
                         <input
+                          id={`manufacturer-doc-observation-${item.id}`}
                           type="text"
+                          aria-label={`Observación de ${item.nombre}`}
                           className="form-input manufacturer-doc-obs-input"
                           placeholder="Observación (opcional)"
                           value={item.observaciones ?? ""}
@@ -676,8 +702,9 @@ export default function AdminManufacturers() {
       )}
 
       {detailManufacturer && !previewDocument && (
-        <div className="sale-modal-overlay" onClick={() => setDetailManufacturer(null)}>
-          <div className="sale-modal mfr-detail-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="sale-modal-overlay">
+          <button type="button" className="manufacturer-modal-backdrop" aria-label="Cerrar" onClick={() => setDetailManufacturer(null)} />
+          <div className="sale-modal mfr-detail-modal">
 
             <div className="sale-modal-header">
               <div className="mfr-detail-title">
@@ -709,11 +736,11 @@ export default function AdminManufacturers() {
               {/* Contacto */}
               <div className="sale-modal-grid">
                 <div className="sale-modal-info">
-                  <label><IdCard size={11} style={{ display: "inline", marginRight: 4 }} />DNI</label>
+                  <span className="sale-modal-info-label"><IdCard size={11} style={{ display: "inline", marginRight: 4 }} />DNI</span>
                   <span>{detailManufacturer.dni}</span>
                 </div>
                 <div className="sale-modal-info">
-                  <label><Phone size={11} style={{ display: "inline", marginRight: 4 }} />Teléfono</label>
+                  <span className="sale-modal-info-label"><Phone size={11} style={{ display: "inline", marginRight: 4 }} />Teléfono</span>
                   <span>{detailManufacturer.telefono || "No registrado"}</span>
                 </div>
               </div>
@@ -721,11 +748,11 @@ export default function AdminManufacturers() {
               {/* Último ingreso */}
               <div className="mfr-detail-income">
                 <div>
-                  <label>Último ingreso</label>
+                  <span className="sale-modal-info-label">Último ingreso</span>
                   <strong>{formatMoney(detailManufacturer.ultimoIngresoMonto)}</strong>
                 </div>
                 <div>
-                  <label>Fecha</label>
+                  <span className="sale-modal-info-label">Fecha</span>
                   <span>
                     {detailManufacturer.ultimoIngresoFecha
                       ? new Date(detailManufacturer.ultimoIngresoFecha + "T12:00:00").toLocaleDateString("es-PE", { day: "numeric", month: "long", year: "numeric" })
@@ -737,7 +764,7 @@ export default function AdminManufacturers() {
               {/* Observaciones */}
               {detailManufacturer.observaciones && (
                 <div className="mfr-detail-obs">
-                  <label>Observaciones</label>
+                  <span className="sale-modal-info-label">Observaciones</span>
                   <p>{detailManufacturer.observaciones}</p>
                 </div>
               )}

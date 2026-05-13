@@ -6584,6 +6584,9 @@ button.dash-order-row-btn:hover { background: var(--bg-alt); }
 
 /* Modal */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 400; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.manufacturer-modal-backdrop { position: absolute; inset: 0; border: 0; background: transparent; padding: 0; cursor: default; }
+.modal-overlay > .modal,
+.sale-modal-overlay > .sale-modal { position: relative; z-index: 1; }
 .modal { background: var(--white); border-radius: var(--radius-lg); width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-lg); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--white); z-index: 1; }
 .modal-header h2 { font-family: var(--font-display); font-size: 1.15rem; }
@@ -7970,7 +7973,8 @@ dialog.document-preview-modal {
 .sale-modal-product > div span { font-size: 13px; color: var(--text-muted); }
 .sale-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 .sale-modal-info { background: var(--bg-alt); border-radius: var(--radius-sm); padding: 0.75rem; }
-.sale-modal-info label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 5px; }
+.sale-modal-info label,
+.sale-modal-info-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 5px; }
 .sale-modal-info span { font-size: 14px; font-weight: 600; }
 .sale-modal-amounts { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .sale-modal-amounts > div { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.875rem; border-bottom: 1px solid var(--bg-alt); font-size: 14px; }
@@ -8005,11 +8009,13 @@ dialog.document-preview-modal {
 .mfr-detail-header-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
 .mfr-detail-income { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
 .mfr-detail-income > div { background: var(--bg-alt); border-radius: var(--radius-sm); padding: 0.875rem; display: flex; flex-direction: column; gap: 4px; }
-.mfr-detail-income label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
+.mfr-detail-income label,
+.mfr-detail-income .sale-modal-info-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); }
 .mfr-detail-income strong { font-size: 1.25rem; font-weight: 800; color: var(--gold); }
 .mfr-detail-income span { font-size: 14px; font-weight: 600; }
 .mfr-detail-obs { background: var(--bg-alt); border-radius: var(--radius-sm); padding: 0.875rem; }
-.mfr-detail-obs label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 6px; }
+.mfr-detail-obs label,
+.mfr-detail-obs .sale-modal-info-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 6px; }
 .mfr-detail-obs p { font-size: 14px; margin: 0; line-height: 1.55; color: var(--text); }
 .mfr-detail-doc-title { font-size: 13px; font-weight: 700; margin: 0 0 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
 .mfr-detail-doc-title span { font-size: 12px; font-weight: 500; background: var(--bg-alt); color: var(--text-muted); padding: 2px 8px; border-radius: 100px; }
