@@ -15,6 +15,8 @@ export default defineConfig({
       include: [
         "src/domains/**/utils/*.ts",
         "src/domains/**/services/*.ts",
+        "src/utils/*.ts",
+        "src/security/*.ts",
       ],
       exclude: ["src/**/*.test.*", "src/__tests__/**"],
       thresholds: {
