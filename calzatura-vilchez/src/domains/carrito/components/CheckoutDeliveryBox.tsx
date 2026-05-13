@@ -4,6 +4,33 @@ import type { DeliveryQuote, GeocodeCandidate } from "@/services/deliveryOpenRou
 import CheckoutDeliveryMap from "@/domains/carrito/components/CheckoutDeliveryMap";
 import { checkoutGeoLayerHint } from "@/domains/carrito/utils/checkoutGeoHints";
 
+function SuggestionList({ candidates, keyPrefix, ariaLabel, onPick }: Readonly<{
+  candidates: GeocodeCandidate[];
+  keyPrefix: string;
+  ariaLabel: string;
+  onPick: (c: GeocodeCandidate) => void;
+}>) {
+  return (
+    <ul className="checkout-delivery-suggest-list" aria-label={ariaLabel}>
+      {candidates.map((c, i) => (
+        <li key={`${keyPrefix}-${i}-${c.lat}-${c.lng}`}>
+          <button
+            type="button"
+            className="checkout-delivery-suggest-btn"
+            title={c.label}
+            onClick={() => onPick(c)}
+          >
+            <span className="checkout-delivery-suggest-label">{c.label}</span>
+            {checkoutGeoLayerHint(c.layer) ? (
+              <span className="checkout-delivery-layer-hint">{checkoutGeoLayerHint(c.layer)}</span>
+            ) : null}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 type Props = Readonly<{
   addressLineLength: number;
   mapSearchInput: string;
@@ -85,23 +112,12 @@ export default function CheckoutDeliveryBox({
           <p className="checkout-delivery-error">{searchSuggestError}</p>
         )}
         {!searchSuggestLoading && !searchSuggestError && searchSuggestions.length > 0 && (
-          <ul className="checkout-delivery-suggest-list" aria-label="Resultados de búsqueda">
-            {searchSuggestions.map((c, i) => (
-              <li key={`s-${i}-${c.lat}-${c.lng}`}>
-                <button
-                  type="button"
-                  className="checkout-delivery-suggest-btn"
-                  title={c.label}
-                  onClick={() => onPickCandidate(c, true)}
-                >
-                  <span className="checkout-delivery-suggest-label">{c.label}</span>
-                  {checkoutGeoLayerHint(c.layer) ? (
-                    <span className="checkout-delivery-layer-hint">{checkoutGeoLayerHint(c.layer)}</span>
-                  ) : null}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <SuggestionList
+            candidates={searchSuggestions}
+            keyPrefix="s"
+            ariaLabel="Resultados de búsqueda"
+            onPick={(c) => onPickCandidate(c, true)}
+          />
         )}
       </div>
 
@@ -116,23 +132,12 @@ export default function CheckoutDeliveryBox({
             <p className="checkout-delivery-muted">No hay resultados; probá el buscador de arriba.</p>
           )}
           {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length > 0 && (
-            <ul className="checkout-delivery-suggest-list" aria-label="Sugerencias por dirección">
-              {addressSuggestions.map((c, i) => (
-                <li key={`a-${i}-${c.lat}-${c.lng}`}>
-                  <button
-                    type="button"
-                    className="checkout-delivery-suggest-btn"
-                    title={c.label}
-                    onClick={() => onPickCandidate(c, true)}
-                  >
-                    <span className="checkout-delivery-suggest-label">{c.label}</span>
-                    {checkoutGeoLayerHint(c.layer) ? (
-                      <span className="checkout-delivery-layer-hint">{checkoutGeoLayerHint(c.layer)}</span>
-                    ) : null}
-                  </button>
-                </li>
-              ))}
-            </ul>
+            <SuggestionList
+              candidates={addressSuggestions}
+              keyPrefix="a"
+              ariaLabel="Sugerencias por dirección"
+              onPick={(c) => onPickCandidate(c, true)}
+            />
           )}
         </div>
       )}

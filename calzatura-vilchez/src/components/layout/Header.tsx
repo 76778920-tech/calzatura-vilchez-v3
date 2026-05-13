@@ -110,7 +110,8 @@ function filterProductsByHeaderSearch(products: Product[], headerSearch: string)
 function slugifyRouteValue(value: string) {
   return normalizeRouteToken(value)
     .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "");
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
 }
 
 type CatalogRouteMenuTokens = {

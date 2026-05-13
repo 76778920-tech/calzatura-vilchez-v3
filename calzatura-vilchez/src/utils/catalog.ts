@@ -20,7 +20,8 @@ function normalizeSlug(value = "") {
 export function slugifyCatalogValue(value = "") {
   return normalizeSlug(value)
     .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "");
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
 }
 
 export function normalizeCategorySlug(category = "") {

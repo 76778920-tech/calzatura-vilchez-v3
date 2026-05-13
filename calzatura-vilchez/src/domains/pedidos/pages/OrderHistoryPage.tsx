@@ -4,22 +4,10 @@ import { Package, ChevronDown, ChevronUp } from "lucide-react";
 import { fetchOrdersByUser } from "@/domains/pedidos/services/orders";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
-import type { CartItem, Order } from "@/types";
-
-const STATUS_LABELS: Record<string, string> = {
-  pendiente: "Pendiente",
-  pagado: "Pagado",
-  enviado: "Enviado",
-  entregado: "Entregado",
-  cancelado: "Cancelado",
-};
+import type { Order } from "@/types";
+import { ORDER_STATUS_LABELS, orderItemLineKey, OrderAddressBlock, OrderItemDetails, handleProductImageError } from "@/domains/pedidos/components/orderShared";
 
 const ORDER_HISTORY_SKELETON_KEYS = ["sk-1", "sk-2", "sk-3"] as const;
-
-function historyOrderItemKey(item: CartItem, lineIndex: number) {
-  const pid = item.product?.id ?? "unknown";
-  return `${pid}-${item.color ?? ""}-${item.talla ?? ""}-q${item.quantity}-i${lineIndex}`;
-}
 
 export default function OrderHistoryPage() {
   const { user } = useAuth();
@@ -89,7 +77,7 @@ export default function OrderHistoryPage() {
                 <div className="order-card-meta">
                   <span className="order-id">#{order.id.slice(-8).toUpperCase()}</span>
                   <span className={`order-status-badge status-${order.estado}`}>
-                    {STATUS_LABELS[order.estado] ?? order.estado}
+                    {ORDER_STATUS_LABELS[order.estado] ?? order.estado}
                   </span>
                 </div>
                 <div className="order-card-info">
@@ -107,32 +95,18 @@ export default function OrderHistoryPage() {
                 <div className="order-card-body">
                   <div className="order-items-list">
                     {order.items?.map((item, idx) => (
-                      <div key={historyOrderItemKey(item, idx)} className="order-item">
+                      <div key={orderItemLineKey(item, idx)} className="order-item">
                         <img
                           src={item.product?.imagen || "/placeholder-product.svg"}
                           alt={item.product?.nombre}
                           className="order-item-img"
-                          onError={(e) => {
-                            const image = e.target as HTMLImageElement;
-                            image.onerror = null;
-                            image.src = "/placeholder-product.svg";
-                          }}
+                          onError={handleProductImageError}
                         />
-                        <div>
-                          <p>{item.product?.nombre}</p>
-                          {item.color && <p className="order-item-talla">Color: {item.color}</p>}
-                          {item.talla && <p className="order-item-talla">Talla: {item.talla}</p>}
-                          <p>x{item.quantity} — S/ {((item.product?.precio ?? 0) * item.quantity).toFixed(2)}</p>
-                        </div>
+                        <OrderItemDetails item={item} />
                       </div>
                     ))}
                   </div>
-                  <div className="order-address">
-                    <strong>Dirección de entrega:</strong>
-                    <p>{order.direccion?.nombre} {order.direccion?.apellido}</p>
-                    <p>{order.direccion?.direccion}, {order.direccion?.distrito}, {order.direccion?.ciudad}</p>
-                    <p>Tel: {order.direccion?.telefono}</p>
-                  </div>
+                  <OrderAddressBlock order={order} />
                 </div>
               )}
             </div>

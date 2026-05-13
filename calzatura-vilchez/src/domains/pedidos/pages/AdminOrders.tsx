@@ -2,19 +2,14 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { fetchAllOrders, updateOrderStatus } from "@/domains/pedidos/services/orders";
 import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
-import type { CartItem, Order, OrderStatus } from "@/types";
+import type { Order, OrderStatus } from "@/types";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import toast from "react-hot-toast";
+import { ORDER_STATUS_LABELS, orderItemLineKey, OrderAddressBlock, OrderItemDetails, handleProductImageError } from "@/domains/pedidos/components/orderShared";
 
 const ESTADOS: OrderStatus[] = ["pendiente", "pagado", "enviado", "entregado", "cancelado"];
 
-const ESTADO_LABEL: Record<OrderStatus, string> = {
-  pendiente: "Pendiente",
-  pagado: "Pagado",
-  enviado: "Enviado",
-  entregado: "Entregado",
-  cancelado: "Cancelado",
-};
+const ESTADO_LABEL = ORDER_STATUS_LABELS as Record<OrderStatus, string>;
 
 const STATUS_COLOR: Record<string, string> = {
   pendiente: "#f59e0b",
@@ -25,11 +20,6 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 const ADMIN_ORDERS_SKELETON_KEYS = ["sk-1", "sk-2", "sk-3", "sk-4"] as const;
-
-function orderItemLineKey(item: CartItem, lineIndex: number) {
-  const pid = item.product?.id ?? "unknown";
-  return `${pid}-${item.color ?? ""}-${item.talla ?? ""}-q${item.quantity}-i${lineIndex}`;
-}
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -130,28 +120,14 @@ export default function AdminOrders() {
                             src={item.product?.imagen || "/placeholder-product.svg"}
                             alt={item.product?.nombre}
                             className="order-item-img"
-                            onError={(e) => {
-                              const image = e.target as HTMLImageElement;
-                              image.onerror = null;
-                              image.src = "/placeholder-product.svg";
-                            }}
+                            onError={handleProductImageError}
                           />
                         </button>
-                        <div>
-                          <p>{item.product?.nombre}</p>
-                          {item.color && <p className="order-item-talla">Color: {item.color}</p>}
-                          {item.talla && <p className="order-item-talla">Talla: {item.talla}</p>}
-                          <p>x{item.quantity} — S/ {((item.product?.precio ?? 0) * item.quantity).toFixed(2)}</p>
-                        </div>
+                        <OrderItemDetails item={item} />
                       </div>
                     ))}
                   </div>
-                  <div className="order-address">
-                    <strong>Dirección de entrega:</strong>
-                    <p>{order.direccion?.nombre} {order.direccion?.apellido}</p>
-                    <p>{order.direccion?.direccion}, {order.direccion?.distrito}, {order.direccion?.ciudad}</p>
-                    <p>Tel: {order.direccion?.telefono}</p>
-                  </div>
+                  <OrderAddressBlock order={order} />
                   <div className="order-payment-info">
                     <p><strong>Método de pago:</strong> {order.metodoPago}</p>
                     {order.stripeSessionId && (

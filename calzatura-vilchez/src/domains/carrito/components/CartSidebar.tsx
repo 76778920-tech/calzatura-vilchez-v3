@@ -1,6 +1,7 @@
 import { X, ShoppingBag, Trash2, Plus, Minus } from "lucide-react";
 import { Link } from "react-router-dom";
-import { useCart, COSTO_ENVIO } from "@/domains/carrito/context/CartContext";
+import { useCart } from "@/domains/carrito/context/CartContext";
+import { handleProductImageError, CartSummaryRows } from "@/domains/carrito/components/cartShared";
 
 export default function CartSidebar() {
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, subtotal, total, itemCount } = useCart();
@@ -44,11 +45,7 @@ export default function CartSidebar() {
                   src={item.product.imagen || "/placeholder-product.svg"}
                   alt={item.product.nombre}
                   className="cart-item-img"
-                  onError={(e) => {
-                    const image = e.target as HTMLImageElement;
-                    image.onerror = null;
-                    image.src = "/placeholder-product.svg";
-                  }}
+                  onError={handleProductImageError}
                 />
                 <div className="cart-item-info">
                   <p className="cart-item-name">{item.product.nombre}</p>
@@ -88,18 +85,7 @@ export default function CartSidebar() {
         {items.length > 0 && (
           <div className="cart-footer">
             <div className="cart-summary">
-              <div className="cart-summary-row">
-                <span>Subtotal</span>
-                <span>S/ {subtotal.toFixed(2)}</span>
-              </div>
-              <div className="cart-summary-row">
-                <span>Envío</span>
-                <span>{COSTO_ENVIO === 0 ? "Gratis" : `S/ ${Number(COSTO_ENVIO).toFixed(2)}`}</span>
-              </div>
-              <div className="cart-summary-row cart-summary-total">
-                <span>Total</span>
-                <span>S/ {total.toFixed(2)}</span>
-              </div>
+              <CartSummaryRows subtotal={subtotal} total={total} rowClass="cart-summary-row" totalClass="cart-summary-total" />
             </div>
             <Link
               to="/checkout"

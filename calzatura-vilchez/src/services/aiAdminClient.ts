@@ -26,57 +26,37 @@ async function authHeaders(): Promise<Record<string, string>> {
   return firebaseUserHeaders();
 }
 
+const PROXY_ROUTES: Record<string, { op: string; forwardParams?: boolean }> = {
+  "/api/predict/combined":           { op: "combined",         forwardParams: true },
+  "/api/sales/weekly-chart":         { op: "weeklyChart",      forwardParams: true },
+  "/api/model/metrics":              { op: "modelMetrics" },
+  "/api/ire/historial":              { op: "ireHistorial",     forwardParams: true },
+  "/api/cache/invalidate":           { op: "cacheInvalidate" },
+  "/api/campaign/active":            { op: "campaignActive" },
+  "/api/campaign/feedback":          { op: "campaignFeedback" },
+  "/api/predict/campaign-detection": { op: "campaignDetection", forwardParams: true },
+  "/api/campaign/learning-stats":    { op: "learningStats" },
+};
+
 /** Convierte ruta del servicio IA directo en query de la Cloud Function (lista blanca). */
 function toProxyUrl(pathAndQuery: string): string {
   const u = new URL(pathAndQuery, "https://placeholder.local");
-  const q = new URLSearchParams();
   const proxyBase = PROXY_URL?.replaceAll(/\/$/g, "");
   if (!proxyBase) {
     throw new Error("Proxy de IA no configurado.");
   }
 
-  if (u.pathname === "/api/predict/combined") {
-    q.set("op", "combined");
-    u.searchParams.forEach((val, key) => q.set(key, val));
-    return `${proxyBase}?${q.toString()}`;
-  }
-  if (u.pathname === "/api/sales/weekly-chart") {
-    q.set("op", "weeklyChart");
-    u.searchParams.forEach((val, key) => q.set(key, val));
-    return `${proxyBase}?${q.toString()}`;
-  }
-  if (u.pathname === "/api/model/metrics") {
-    q.set("op", "modelMetrics");
-    return `${proxyBase}?${q.toString()}`;
-  }
-  if (u.pathname === "/api/ire/historial") {
-    q.set("op", "ireHistorial");
-    u.searchParams.forEach((val, key) => q.set(key, val));
-    return `${proxyBase}?${q.toString()}`;
-  }
-  if (u.pathname === "/api/cache/invalidate") {
-    q.set("op", "cacheInvalidate");
-    return `${proxyBase}?${q.toString()}`;
-  }
-  if (u.pathname === "/api/campaign/active") {
-    q.set("op", "campaignActive");
-    return `${proxyBase}?${q.toString()}`;
-  }
-  if (u.pathname === "/api/campaign/feedback") {
-    q.set("op", "campaignFeedback");
-    return `${proxyBase}?${q.toString()}`;
-  }
-  if (u.pathname === "/api/predict/campaign-detection") {
-    q.set("op", "campaignDetection");
-    u.searchParams.forEach((val, key) => q.set(key, val));
-    return `${proxyBase}?${q.toString()}`;
-  }
-  if (u.pathname === "/api/campaign/learning-stats") {
-    q.set("op", "learningStats");
-    return `${proxyBase}?${q.toString()}`;
+  const route = PROXY_ROUTES[u.pathname];
+  if (!route) {
+    throw new Error(`Ruta de IA no permitida en proxy: ${u.pathname}`);
   }
 
-  throw new Error(`Ruta de IA no permitida en proxy: ${u.pathname}`);
+  const q = new URLSearchParams();
+  q.set("op", route.op);
+  if (route.forwardParams) {
+    u.searchParams.forEach((val, key) => q.set(key, val));
+  }
+  return `${proxyBase}?${q.toString()}`;
 }
 
 /**

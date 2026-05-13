@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ShoppingBag, Trash2, Plus, Minus, ArrowRight } from "lucide-react";
-import { useCart, COSTO_ENVIO } from "@/domains/carrito/context/CartContext";
+import { useCart } from "@/domains/carrito/context/CartContext";
+import { handleProductImageError, CartSummaryRows } from "@/domains/carrito/components/cartShared";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal, total, clearCart } = useCart();
@@ -36,11 +37,7 @@ export default function CartPage() {
                 src={item.product.imagen || "/placeholder-product.svg"}
                 alt={item.product.nombre}
                 className="cart-page-item-img"
-                onError={(e) => {
-                  const image = e.target as HTMLImageElement;
-                  image.onerror = null;
-                  image.src = "/placeholder-product.svg";
-                }}
+                onError={handleProductImageError}
               />
               <div className="cart-page-item-details">
                 <h3>{item.product.nombre}</h3>
@@ -80,18 +77,7 @@ export default function CartPage() {
         <div className="cart-page-summary">
           <h2>Resumen del Pedido</h2>
           <div className="summary-rows">
-            <div className="summary-row">
-              <span>Subtotal</span>
-              <span>S/ {subtotal.toFixed(2)}</span>
-            </div>
-            <div className="summary-row">
-              <span>Envío</span>
-              <span>{COSTO_ENVIO === 0 ? "Gratis" : `S/ ${Number(COSTO_ENVIO).toFixed(2)}`}</span>
-            </div>
-            <div className="summary-row summary-total">
-              <span>Total</span>
-              <span>S/ {total.toFixed(2)}</span>
-            </div>
+            <CartSummaryRows subtotal={subtotal} total={total} rowClass="summary-row" totalClass="summary-total" />
           </div>
           <Link to="/checkout" className="btn-primary btn-full">
             Proceder al Pago <ArrowRight size={16} />
