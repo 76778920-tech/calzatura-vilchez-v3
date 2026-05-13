@@ -72,8 +72,12 @@ function loadingHtml() {
 export function openSaleDocumentWindow() {
   const preview = globalThis.open("", "_blank", "width=900,height=760");
   if (!preview) return null;
+  const parsed = new DOMParser().parseFromString(loadingHtml(), "text/html");
   preview.document.open();
-  preview.document.write(loadingHtml());
+  preview.document.replaceChild(
+    preview.document.importNode(parsed.documentElement, true),
+    preview.document.documentElement,
+  );
   preview.document.close();
   return preview;
 }
@@ -203,8 +207,12 @@ export function buildSaleDocumentHtml(input: SaleDocumentInput) {
 
 export function renderSaleDocument(preview: Window, input: SaleDocumentInput) {
   if (preview.closed) return false;
+  const parsed = new DOMParser().parseFromString(buildSaleDocumentHtml(input), "text/html");
   preview.document.open();
-  preview.document.write(buildSaleDocumentHtml(input));
+  preview.document.replaceChild(
+    preview.document.importNode(parsed.documentElement, true),
+    preview.document.documentElement,
+  );
   preview.document.close();
   preview.focus();
   return true;

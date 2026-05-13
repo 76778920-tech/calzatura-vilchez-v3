@@ -6,7 +6,7 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { db } from "@/firebase/config";
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
-interface CartContextType {
+type CartContextType = Readonly<{
   items: CartItem[];
   addItem: (product: Product, quantity?: number, talla?: string, color?: string) => void;
   removeItem: (productId: string, talla?: string, color?: string) => void;
@@ -17,7 +17,7 @@ interface CartContextType {
   itemCount: number;
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
-}
+}>;
 
 const CartContext = createContext<CartContextType>({
   items: [],
@@ -41,7 +41,7 @@ function cartStorageKey(userUid?: string | null) {
     : CART_STORAGE_KEY;
 }
 
-export function CartProvider({ children }: { children: ReactNode }) {
+export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   const { user } = useAuth();
   const userUid = user?.uid ?? null;
   const [items, setItems] = useState<CartItem[]>([]);

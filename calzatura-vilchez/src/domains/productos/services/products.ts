@@ -45,7 +45,7 @@ export async function fetchRelatedProductsInFamily(product: Pick<Product, "id" |
 export async function fetchProductFamilyGroupCounts(): Promise<Record<string, number>> {
   const { data, error } = await supabase.from(COL).select("id, familiaId").eq("activo", true);
   if (error) throw error;
-  return tallyFamilyGroupSizes((data ?? []) as Pick<Product, "id" | "familiaId">[]);
+  return tallyFamilyGroupSizes(data ?? []);
 }
 
 export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {

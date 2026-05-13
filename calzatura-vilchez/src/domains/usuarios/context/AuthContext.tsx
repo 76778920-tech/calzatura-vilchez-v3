@@ -8,7 +8,7 @@ import { getUserProfile, saveUserProfile } from "@/domains/usuarios/services/use
 import type { UserProfile } from "@/types";
 import { isSuperAdminEmail } from "@/config/security";
 
-interface AuthContextType {
+type AuthContextType = Readonly<{
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
@@ -16,7 +16,7 @@ interface AuthContextType {
   requiresEmailVerification: boolean;
   hasVerifiedAccess: boolean;
   refreshProfile: () => Promise<void>;
-}
+}>;
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
@@ -28,7 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   refreshProfile: async () => {},
 });
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await saveUserProfile(newProfile);
         profile = newProfile;
       } else if (profile && isSuperAdmin && profile.rol !== "admin") {
-        const upgraded = { ...profile, rol: "admin" as const };
+        const upgraded: UserProfile = { ...profile, rol: "admin" };
         await saveUserProfile(upgraded);
         profile = upgraded;
       }

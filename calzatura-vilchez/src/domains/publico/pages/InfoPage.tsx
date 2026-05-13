@@ -348,14 +348,18 @@ const PAGE_ROUTE_MAP: Record<keyof typeof INFO_CONTENT, string> = {
   cuotas: INFO_ROUTES.beneficiosCuotas,
 };
 
+function infoContentEntries() {
+  return Object.entries(INFO_CONTENT) as Array<[keyof typeof INFO_CONTENT, InfoContent]>;
+}
+
 export default function InfoPage({ pageKey }: Props) {
   const content = INFO_CONTENT[pageKey];
-  const relatedPages = Object.entries(INFO_CONTENT)
+  const relatedPages = infoContentEntries()
     .filter(([key, page]) => page.group === content.group && key !== pageKey)
     .map(([key, page]) => ({
       key,
       title: page.title,
-      to: PAGE_ROUTE_MAP[key as keyof typeof INFO_CONTENT],
+      to: PAGE_ROUTE_MAP[key],
     }));
 
   return (

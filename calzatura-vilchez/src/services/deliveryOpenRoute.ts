@@ -96,16 +96,16 @@ function parseGeocodeFeatures(data: { features?: GeoJsonFeature[] }, fallbackLab
 }
 
 function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return s.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /** Normaliza #, N°, Nro. para que el geocoder reciba "calle 215". */
 export function normalizeGeocodeQuery(q: string): string {
   return q
-    .replace(/#/g, " ")
-    .replace(/\bN°\s*/gi, " ")
-    .replace(/\bNro\.?\s*/gi, " ")
-    .replace(/\s+/g, " ")
+    .replaceAll("#", " ")
+    .replaceAll(/\bN°\s*/gi, " ")
+    .replaceAll(/\bNro\.?\s*/gi, " ")
+    .replaceAll(/\s+/g, " ")
     .trim();
 }
 
@@ -113,20 +113,20 @@ export function normalizeGeocodeQuery(q: string): string {
  * Intenta separar vía y número de puerta (p. ej. "Av. Arica #215" → street + 215).
  */
 export function parseStreetHousenumber(input: string): { street: string; housenumber?: string } {
-  const q = input.replace(/\s+/g, " ").trim();
+  const q = input.replaceAll(/\s+/g, " ").trim();
   if (!q) return { street: "" };
 
-  const hash = q.match(/^(.+?)[\s,]*#\s*(\d{1,6}[A-Z]?)\s*$/);
+  const hash = /^(.+?)[\s,]*#\s*(\d{1,6}[A-Z]?)\s*$/.exec(q);
   if (hash && hash[1].trim().length >= 2) {
     return { street: hash[1].trim(), housenumber: hash[2] };
   }
 
-  const nro = q.match(/^(.+?)\s+N(?:°|ro\.?)\s*(\d{1,6}[A-Z]?)\s*$/i);
+  const nro = /^(.+?)\s+N(?:°|ro\.?)\s*(\d{1,6}[A-Z]?)\s*$/i.exec(q);
   if (nro && nro[1].trim().length >= 2) {
     return { street: nro[1].trim(), housenumber: nro[2] };
   }
 
-  const endNum = q.match(/^(.+?)\s(\d{1,5}[A-Z]?)$/);
+  const endNum = /^(.+?)\s(\d{1,5}[A-Z]?)$/.exec(q);
   if (endNum && endNum[1].trim().length >= 4) {
     const num = endNum[2];
     if (/^(19|20)\d{2}$/.test(num)) return { street: q };
@@ -140,7 +140,7 @@ export function parseStreetHousenumber(input: string): { street: string; housenu
 }
 
 function labelContainsHousenumber(label: string, housenumber: string): boolean {
-  const re = new RegExp(`(?:^|[\\s,.-])${escapeRegExp(housenumber)}(?:$|[\\s,.-])`);
+  const re = new RegExp(String.raw`(?:^|[\s,.-])${escapeRegExp(housenumber)}(?:$|[\s,.-])`);
   return re.test(label);
 }
 
@@ -172,7 +172,7 @@ function structuredAddressLine(
   parsed: { street: string; housenumber?: string },
 ): string {
   if (parsed.housenumber) {
-    return `${parsed.street} ${parsed.housenumber}`.replace(/\s+/g, " ").trim();
+    return `${parsed.street} ${parsed.housenumber}`.replaceAll(/\s+/g, " ").trim();
   }
   return normalizedQuery;
 }
@@ -494,7 +494,7 @@ async function drivingDistanceKm(storeLng: number, storeLat: number, destLng: nu
   const data = (await response.json()) as { distances?: number[][] };
   const d = data.distances?.[0]?.[1];
   if (typeof d !== "number" || !Number.isFinite(d)) {
-    throw new Error("No se pudo calcular la distancia");
+    throw new TypeError("No se pudo calcular la distancia");
   }
   return d;
 }

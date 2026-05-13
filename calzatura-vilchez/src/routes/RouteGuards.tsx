@@ -16,7 +16,12 @@ function PageLoader() {
   );
 }
 
-export function AuthenticatedRoute({ children }: { children: ReactNode }) {
+type AreaRouteProps = Readonly<{
+  area: AccessArea;
+  children: ReactNode;
+}>;
+
+export function AuthenticatedRoute({ children }: Readonly<{ children: ReactNode }>) {
   const { user, loading, requiresEmailVerification } = useAuth();
   const location = useLocation();
 
@@ -32,10 +37,7 @@ export function AuthenticatedRoute({ children }: { children: ReactNode }) {
 export function AreaRoute({
   area,
   children,
-}: {
-  area: AccessArea;
-  children: ReactNode;
-}) {
+}: AreaRouteProps) {
   const { user, userProfile, loading, requiresEmailVerification } = useAuth();
   const location = useLocation();
 

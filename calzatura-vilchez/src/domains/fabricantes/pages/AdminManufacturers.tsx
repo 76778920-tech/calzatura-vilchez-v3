@@ -254,7 +254,7 @@ export default function AdminManufacturers() {
     }
   };
 
-  const handleSave = async (event: React.FormEvent) => {
+  const handleSave = async (event: React.SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
     const normalizedDni = normalizeDni(form.dni);
     if (!isValidDni(normalizedDni)) {

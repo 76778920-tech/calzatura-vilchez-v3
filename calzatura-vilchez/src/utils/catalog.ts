@@ -158,7 +158,7 @@ function getTaxonomyTerms(key: TaxonomyKey, value: string) {
   const normalized = slugifyCatalogValue(value);
   const mapped = TAXONOMY_TERM_MAP[key][normalized];
   if (mapped) return mapped;
-  const fallback = normalized.replace(/-/g, " ").trim();
+  const fallback = normalized.replaceAll("-", " ").trim();
   return fallback ? [fallback] : [];
 }
 

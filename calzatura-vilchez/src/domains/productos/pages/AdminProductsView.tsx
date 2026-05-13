@@ -5,7 +5,7 @@ import { AdminProductsCatalogBody } from "./adminProductsView/AdminProductsCatal
 import { AdminProductsStatsBar } from "./adminProductsView/AdminProductsStatsBar";
 import { AdminProductsToolbar } from "./adminProductsView/AdminProductsToolbar";
 
-export function AdminProductsView(p: AdminProductsViewModel) {
+export function AdminProductsView(p: Readonly<AdminProductsViewModel>) {
   return (
     <div className="admin-products-page">
       <div className="admin-page-header">

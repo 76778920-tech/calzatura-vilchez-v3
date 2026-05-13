@@ -6,11 +6,11 @@ import { db } from "@/firebase/config";
 import { fetchFavoriteProductIds, toggleFavoriteProduct } from "@/domains/clientes/services/favorites";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 
-interface FavoritesContextType {
+type FavoritesContextType = Readonly<{
   favoriteIds: Set<string>;
   toggle: (productId: string) => Promise<void>;
   loading: boolean;
-}
+}>;
 
 const FavoritesContext = createContext<FavoritesContextType>({
   favoriteIds: new Set(),
@@ -18,7 +18,7 @@ const FavoritesContext = createContext<FavoritesContextType>({
   loading: true,
 });
 
-export function FavoritesProvider({ children }: { children: ReactNode }) {
+export function FavoritesProvider({ children }: Readonly<{ children: ReactNode }>) {
   const { user } = useAuth();
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);

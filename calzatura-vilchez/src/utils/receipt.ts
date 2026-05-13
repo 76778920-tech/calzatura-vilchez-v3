@@ -184,8 +184,12 @@ export function openReceiptPreview(order: Order, userProfile?: UserProfile | nul
   const html = buildReceiptHtml(order, userProfile);
   const preview = globalThis.open("", "_blank", "noopener,noreferrer,width=900,height=760");
   if (!preview) return false;
+  const parsed = new DOMParser().parseFromString(html, "text/html");
   preview.document.open();
-  preview.document.write(html);
+  preview.document.replaceChild(
+    preview.document.importNode(parsed.documentElement, true),
+    preview.document.documentElement,
+  );
   preview.document.close();
   return true;
 }

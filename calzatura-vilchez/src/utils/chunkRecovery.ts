@@ -3,7 +3,7 @@ const CHUNK_ERROR_RE =
 const RELOAD_KEY = "cv_chunk_reload_attempted";
 
 export function isChunkLoadError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error ?? "");
+  const message = error instanceof Error ? error.message : (error ?? "").toString();
   return CHUNK_ERROR_RE.test(message);
 }
 

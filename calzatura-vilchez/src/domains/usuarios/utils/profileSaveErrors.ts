@@ -1,19 +1,20 @@
 function pickMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
+  const record = err && typeof err === "object" ? err : null;
   if (
-    typeof err === "object" &&
-    err &&
-    "message" in err &&
-    typeof (err as { message: unknown }).message === "string"
+    record &&
+    "message" in record &&
+    typeof record.message === "string"
   ) {
-    return (err as { message: string }).message;
+    return record.message;
   }
   return "";
 }
 
 function pickCode(err: unknown): string {
-  if (typeof err === "object" && err && "code" in err) {
-    return String((err as { code: unknown }).code);
+  const record = err && typeof err === "object" ? err : null;
+  if (record && "code" in record) {
+    return String(record.code);
   }
   return "";
 }

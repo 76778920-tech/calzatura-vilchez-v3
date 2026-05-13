@@ -80,7 +80,7 @@ export default function CheckoutPage() {
     );
   }
 
-  const handleDireccionSubmit = (e: React.FormEvent) => {
+  const handleDireccionSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const err = validateCheckoutDireccionStep({
       direccion,

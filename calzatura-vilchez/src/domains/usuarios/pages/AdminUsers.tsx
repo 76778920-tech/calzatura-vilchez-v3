@@ -63,13 +63,13 @@ function userMatchesAdminFilters(
 
 function toastRoleUpdateFailure(err: unknown) {
   let msg = "";
+  const record = err && typeof err === "object" ? err : null;
   if (err instanceof Error) {
     msg = err.message;
-  } else if (typeof err === "object" && err && "message" in err) {
-    msg = String((err as { message: unknown }).message);
+  } else if (record && "message" in record) {
+    msg = String(record.message);
   }
-  const code =
-    typeof err === "object" && err && "code" in err ? String((err as { code: unknown }).code) : "";
+  const code = record && "code" in record ? String(record.code) : "";
   const isPermissionError = code === "42501" || msg.toLowerCase().includes("row-level security");
   if (isPermissionError) {
     toast.error("Sin permisos para realizar esta operación.");

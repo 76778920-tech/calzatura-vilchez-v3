@@ -3,7 +3,7 @@ import type { AdminPredictionsModelState } from "./useAdminPredictionsModel";
 import { ALERT_OPTIONS, HISTORY_OPTIONS, HORIZON_OPTIONS } from "./adminPredictionsLogic";
 import { predictionTabPanels } from "./predictionTabRegistry";
 
-export function AdminPredictionsDashboard(props: AdminPredictionsModelState) {
+export function AdminPredictionsDashboard(props: Readonly<AdminPredictionsModelState>) {
   const {
     aiWarnings,
     activeTab,
