@@ -1,7 +1,8 @@
 import { Link } from "react-router-dom";
 import { ShoppingBag, Trash2, Plus, Minus, ArrowRight } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
-import { handleProductImageError, CartSummaryRows } from "@/domains/carrito/components/cartShared";
+import { CartSummaryRows } from "@/domains/carrito/components/cartShared";
+import { handleProductImageError } from "@/utils/imgUtils";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal, total, clearCart } = useCart();

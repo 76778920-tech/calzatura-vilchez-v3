@@ -5,7 +5,9 @@ import { fetchOrdersByUser } from "@/domains/pedidos/services/orders";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
 import type { Order } from "@/types";
-import { ORDER_STATUS_LABELS, orderItemLineKey, OrderAddressBlock, OrderItemDetails, handleProductImageError } from "@/domains/pedidos/components/orderShared";
+import { ORDER_STATUS_LABELS, orderItemLineKey } from "@/domains/pedidos/utils/orderUtils";
+import { OrderAddressBlock, OrderItemDetails } from "@/domains/pedidos/components/orderShared";
+import { handleProductImageError } from "@/utils/imgUtils";
 
 const ORDER_HISTORY_SKELETON_KEYS = ["sk-1", "sk-2", "sk-3"] as const;
 

@@ -1,24 +1,4 @@
-import type { SyntheticEvent } from "react";
 import type { CartItem, Order } from "@/types";
-
-export function handleProductImageError(e: SyntheticEvent<HTMLImageElement>) {
-  const image = e.target as HTMLImageElement;
-  image.onerror = null;
-  image.src = "/placeholder-product.svg";
-}
-
-export const ORDER_STATUS_LABELS: Record<string, string> = {
-  pendiente: "Pendiente",
-  pagado: "Pagado",
-  enviado: "Enviado",
-  entregado: "Entregado",
-  cancelado: "Cancelado",
-};
-
-export function orderItemLineKey(item: CartItem, lineIndex: number) {
-  const pid = item.product?.id ?? "unknown";
-  return `${pid}-${item.color ?? ""}-${item.talla ?? ""}-q${item.quantity}-i${lineIndex}`;
-}
 
 export function OrderAddressBlock({ order }: Readonly<{ order: Order }>) {
   return (

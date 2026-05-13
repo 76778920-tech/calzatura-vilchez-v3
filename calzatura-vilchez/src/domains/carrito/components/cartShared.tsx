@@ -1,11 +1,4 @@
-import type { SyntheticEvent } from "react";
 import { COSTO_ENVIO } from "@/domains/carrito/context/CartContext";
-
-export function handleProductImageError(e: SyntheticEvent<HTMLImageElement>) {
-  const image = e.target as HTMLImageElement;
-  image.onerror = null;
-  image.src = "/placeholder-product.svg";
-}
 
 export function CartSummaryRows({ subtotal, total, rowClass, totalClass }: Readonly<{
   subtotal: number;

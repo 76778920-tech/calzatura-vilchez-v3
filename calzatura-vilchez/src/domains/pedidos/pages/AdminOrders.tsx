@@ -5,7 +5,9 @@ import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
 import type { Order, OrderStatus } from "@/types";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import toast from "react-hot-toast";
-import { ORDER_STATUS_LABELS, orderItemLineKey, OrderAddressBlock, OrderItemDetails, handleProductImageError } from "@/domains/pedidos/components/orderShared";
+import { ORDER_STATUS_LABELS, orderItemLineKey } from "@/domains/pedidos/utils/orderUtils";
+import { OrderAddressBlock, OrderItemDetails } from "@/domains/pedidos/components/orderShared";
+import { handleProductImageError } from "@/utils/imgUtils";
 
 const ESTADOS: OrderStatus[] = ["pendiente", "pagado", "enviado", "entregado", "cancelado"];
 
