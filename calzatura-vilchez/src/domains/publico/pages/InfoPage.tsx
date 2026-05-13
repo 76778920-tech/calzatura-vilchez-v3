@@ -329,9 +329,9 @@ const INFO_CONTENT: Record<string, InfoContent> = {
   },
 };
 
-interface Props {
+type Props = Readonly<{
   pageKey: keyof typeof INFO_CONTENT;
-}
+}>;
 
 const PAGE_ROUTE_MAP: Record<keyof typeof INFO_CONTENT, string> = {
   quienesSomos: INFO_ROUTES.corporativoQuienesSomos,

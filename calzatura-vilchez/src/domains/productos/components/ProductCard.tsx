@@ -9,12 +9,12 @@ import { getAvailableSizes } from "@/utils/stock";
 import { useFavorites } from "@/domains/clientes/context/FavoritesContext";
 import toast from "react-hot-toast";
 
-interface Props {
+type Props = Readonly<{
   product: Product;
   /** Total de productos en BD que comparten la misma familia (incluye este). Solo catálogo. */
   familyGroupSize?: number;
   onFavoriteChange?: (productId: string, isFavorite: boolean) => void;
-}
+}>;
 
 const FALLBACK_PRODUCT_IMAGE = "/placeholder-product.svg";
 

@@ -1,21 +1,21 @@
 import { Link as LinkIcon, Upload, X } from "lucide-react";
-import type { ChangeEvent, MutableRefObject } from "react";
+import type { ChangeEvent, RefObject } from "react";
 import { IMAGE_SLOTS, type ProductForm } from "../adminProductsInternals";
 
 const EDIT_GALLERY_SLOT_KEYS = Array.from({ length: IMAGE_SLOTS }, (_, i) => `edit-gallery-slot-${i}`);
 
-type Props = {
+type Props = Readonly<{
   currentImages: string[];
   form: ProductForm;
   compressing: boolean;
   setPreviewImage: (v: { src: string; title: string; subtitle?: string }) => void;
-  fileInputRefs: MutableRefObject<Array<HTMLInputElement | null>>;
+  fileInputRefs: RefObject<Array<HTMLInputElement | null>>;
   setFileInputRef: (index: number) => (element: HTMLInputElement | null) => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>, index: number) => void;
   updateImageUrl: (index: number, value: string) => void;
   validateImageUrl: (index: number, value: string) => void;
   clearImage: (index: number) => void;
-};
+}>;
 
 export function AdminProductEditGallery({
   currentImages,

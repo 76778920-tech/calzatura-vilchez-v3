@@ -6,11 +6,11 @@ const AI_FETCH_TIMEOUT_MS = 90_000;
 /** `pathAndQuery` p. ej. `/api/predict/combined?horizon=30&history=120` (véase `aiAdminClient`). */
 export async function fetchAI(pathAndQuery: string, options?: RequestInit): Promise<Response> {
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS);
+  const timer = globalThis.setTimeout(() => controller.abort(), AI_FETCH_TIMEOUT_MS);
   try {
     return await aiAdminFetch(pathAndQuery, { ...options, signal: controller.signal });
   } finally {
-    window.clearTimeout(timer);
+    globalThis.clearTimeout(timer);
   }
 }
 

@@ -5,9 +5,9 @@ export type ThemeMode = "light" | "dark";
 const THEME_STORAGE_KEY = "calzatura_theme";
 
 function getInitialTheme(): ThemeMode {
-  if (typeof window === "undefined") return "light";
+  if (typeof globalThis.window === "undefined") return "light";
 
-  const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+  const stored = globalThis.localStorage.getItem(THEME_STORAGE_KEY);
   return stored === "dark" ? "dark" : "light";
 }
 
@@ -16,7 +16,7 @@ export function useThemeMode() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem(THEME_STORAGE_KEY, theme);
+    globalThis.localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
   const toggleTheme = () => {

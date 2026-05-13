@@ -5,7 +5,7 @@ import { CATEGORIAS, STYLE_OPTIONS } from "@/domains/productos/utils/commercialR
 import { categoryLabel } from "@/utils/labels";
 import { toPositiveNumber, type ProductForm } from "../adminProductsInternals";
 
-type Props = {
+type Props = Readonly<{
   form: ProductForm;
   setForm: Dispatch<SetStateAction<ProductForm>>;
   updateCategory: (categoria: string) => void;
@@ -16,7 +16,7 @@ type Props = {
   estiloSummaryLabel: string;
   estiloChipTokens: string[];
   toggleEstiloOption: (opt: (typeof STYLE_OPTIONS)[number]) => void;
-};
+}>;
 
 export function AdminProductFormCategoryStylePrice({
   form,

@@ -11,7 +11,7 @@ import {
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-type Props = {
+type Props = Readonly<{
   storeLat: number;
   storeLng: number;
   customerLat: number;
@@ -20,7 +20,7 @@ type Props = {
   fitBoundsNonce: number;
   interactive?: boolean;
   onCustomerPositionChange?: (lat: number, lng: number) => void;
-};
+}>;
 
 function FitBoundsToSignal({
   storeLat,
@@ -38,14 +38,14 @@ function FitBoundsToSignal({
   const map = useMap();
 
   useEffect(() => {
-    const id = window.requestAnimationFrame(() => {
+    const id = globalThis.requestAnimationFrame(() => {
       map.invalidateSize();
       map.fitBounds(L.latLngBounds([storeLat, storeLng], [customerLat, customerLng]), {
         padding: [48, 48],
         maxZoom: 17,
       });
     });
-    return () => window.cancelAnimationFrame(id);
+    return () => globalThis.cancelAnimationFrame(id);
   }, [map, storeLat, storeLng, customerLat, customerLng, fitBoundsNonce]);
   return null;
 }

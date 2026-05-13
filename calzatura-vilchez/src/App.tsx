@@ -6,7 +6,7 @@ import { FavoritesProvider } from "@/domains/clientes/context/FavoritesContext";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  useEffect(() => { globalThis.scrollTo(0, 0); }, [pathname]);
   return null;
 }
 import Header from "./components/layout/Header";

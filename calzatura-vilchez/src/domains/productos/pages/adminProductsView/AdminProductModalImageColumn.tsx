@@ -1,9 +1,9 @@
-import type { ChangeEvent, MouseEvent, MutableRefObject, RefObject } from "react";
+import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import type { ProductForm, VariantSlot } from "../adminProductsInternals";
 import { AdminProductCreateVariantsPanel } from "./AdminProductCreateVariantsPanel";
 import { AdminProductEditGallery } from "./AdminProductEditGallery";
 
-type Props = {
+type Props = Readonly<{
   editingId: string | null;
   currentStock: number;
   variantTotalStock: number;
@@ -12,7 +12,7 @@ type Props = {
   variantSlots: VariantSlot[];
   compressing: boolean;
   isDraggingVariants: boolean;
-  fileInputRefs: MutableRefObject<Array<HTMLInputElement | null>>;
+  fileInputRefs: RefObject<Array<HTMLInputElement | null>>;
   variantsCarouselRef: RefObject<HTMLDivElement | null>;
   setPreviewImage: (v: { src: string; title: string; subtitle?: string }) => void;
   setFileInputRef: (index: number) => (element: HTMLInputElement | null) => void;
@@ -28,13 +28,13 @@ type Props = {
   validateVariantSlotImageUrl: (slotIndex: number, imageIndex: number, value: string) => void;
   updateVariantSlot: (slotIndex: number, updater: (slot: VariantSlot) => VariantSlot) => void;
   setSlotColor: (slotIndex: number, color: string) => void;
-};
+}>;
 
 export function AdminProductModalImageColumn(p: Props) {
   const isEdit = Boolean(p.editingId);
 
   return (
-    <aside className={`admin-form-card admin-image-card${!isEdit ? " admin-variants-card" : ""}`}>
+    <aside className={`admin-form-card admin-image-card${isEdit ? "" : " admin-variants-card"}`}>
       <div className="admin-form-card-header">
         <strong>{isEdit ? "Galería" : "Variantes"}</strong>
         <span className="admin-stock-pill">Stock: <strong>{isEdit ? p.currentStock : p.variantTotalStock}</strong></span>

@@ -58,7 +58,7 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
   );
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const mediaQuery = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
     const syncPreference = () => setPrefersReducedMotion(mediaQuery.matches);
 
     syncPreference();
@@ -70,11 +70,11 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
   useEffect(() => {
     if (!isHeroAutoRotationActive) return undefined;
 
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       setActiveHeroIndex((current) => (current + 1) % heroSlides.length);
     }, HERO_ROTATION_MS);
 
-    return () => window.clearTimeout(timer);
+    return () => globalThis.clearTimeout(timer);
   }, [activeHeroIndex, heroSlides.length, isHeroAutoRotationActive]);
 
   const updateHeroDrag = (clientX: number, clientY: number) => {

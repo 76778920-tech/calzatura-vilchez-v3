@@ -106,14 +106,14 @@ export default function AdminManufacturers() {
   };
 
   useEffect(() => {
-    const timer = window.setTimeout(loadManufacturers, 0);
-    return () => window.clearTimeout(timer);
+    const timer = globalThis.setTimeout(loadManufacturers, 0);
+    return () => globalThis.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (!isValidDni(form.dni) || form.dni === lookupDoneFor) return;
     let cancelled = false;
-    const timer = window.setTimeout(async () => {
+    const timer = globalThis.setTimeout(async () => {
       try {
         const data = await lookupDni(form.dni);
         if (cancelled) return;
@@ -133,7 +133,7 @@ export default function AdminManufacturers() {
     }, 500);
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      globalThis.clearTimeout(timer);
     };
   }, [form.dni, lookupDoneFor]);
 

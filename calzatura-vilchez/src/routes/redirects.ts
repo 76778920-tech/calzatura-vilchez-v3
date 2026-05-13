@@ -4,7 +4,7 @@ import { ADMIN_ROUTES, PUBLIC_ROUTES } from "./paths";
 
 function hasAsciiControlChars(path: string): boolean {
   for (let i = 0; i < path.length; i++) {
-    const c = path.charCodeAt(i);
+    const c = path.codePointAt(i) ?? 0;
     if (c < 32 || c === 127) return true;
   }
   return false;

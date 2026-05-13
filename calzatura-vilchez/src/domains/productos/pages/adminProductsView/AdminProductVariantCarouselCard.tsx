@@ -2,7 +2,7 @@ import { Link as LinkIcon, Upload, X } from "lucide-react";
 import type { ChangeEvent } from "react";
 import { getColorHex, normalizeImageSlots, type VariantSlot } from "../adminProductsInternals";
 
-type Props = {
+type Props = Readonly<{
   slot: VariantSlot;
   slotIndex: number;
   compressing: boolean;
@@ -11,7 +11,7 @@ type Props = {
   validateVariantSlotImageUrl: (slotIndex: number, imageIndex: number, value: string) => void;
   updateVariantSlot: (slotIndex: number, updater: (slot: VariantSlot) => VariantSlot) => void;
   setSlotColor: (slotIndex: number, color: string) => void;
-};
+}>;
 
 export function AdminProductVariantCarouselCard({
   slot,

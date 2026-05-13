@@ -1,7 +1,7 @@
 import type { AdminProduct } from "../adminProductsInternals";
 import { AdminProductsTableRow } from "./AdminProductsTableRow";
 
-type Props = {
+type Props = Readonly<{
   loading: boolean;
   filteredProducts: AdminProduct[];
   products: AdminProduct[];
@@ -9,7 +9,7 @@ type Props = {
   openVariant: (product: AdminProduct) => void;
   openEdit: (product: AdminProduct) => void;
   handleDelete: (product: AdminProduct) => void;
-};
+}>;
 
 export function AdminProductsCatalogBody({
   loading,

@@ -2,7 +2,7 @@ import { Eye, RotateCcw, X } from "lucide-react";
 import type { DailySale } from "@/types";
 import { SALE_DOCUMENT_LABELS } from "./adminSaleDocumentLabels";
 
-type AdminSaleDetailModalProps = {
+type AdminSaleDetailModalProps = Readonly<{
   sale: DailySale;
   onClose: () => void;
   returnMotivo: string;
@@ -10,7 +10,7 @@ type AdminSaleDetailModalProps = {
   onReturn: () => void;
   returning: boolean;
   onViewDocument: (sale: DailySale) => void;
-};
+}>;
 
 export function AdminSaleDetailModal({
   sale,

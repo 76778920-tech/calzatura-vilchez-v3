@@ -46,7 +46,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
       return;
     }
     const ctrl = new AbortController();
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       const line = buildCheckoutAddressLine(direccion);
       if (line.length < 10) {
         setAddressSuggestions([]);
@@ -81,7 +81,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
 
     return () => {
       ctrl.abort();
-      window.clearTimeout(timer);
+      globalThis.clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo dirección compuesta (evita re-fetch en cada campo)
   }, [direccion.direccion, direccion.distrito, direccion.ciudad, orsEnabled]);
@@ -90,7 +90,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     if (!orsEnabled) return;
     const ctrl = new AbortController();
     const q = mapSearchInput.trim();
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       if (q.length < 3) {
         setSearchSuggestions([]);
         setSearchSuggestError("");
@@ -118,7 +118,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     }, 450);
     return () => {
       ctrl.abort();
-      window.clearTimeout(timer);
+      globalThis.clearTimeout(timer);
     };
   }, [mapSearchInput, orsEnabled, direccion.ciudad, direccion.distrito]);
 

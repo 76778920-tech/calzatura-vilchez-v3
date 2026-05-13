@@ -90,11 +90,11 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (previewOpen) return;
     if (productImages.length <= 1) return;
-    const interval = window.setInterval(() => {
+    const interval = globalThis.setInterval(() => {
       setSelectedImageIndex((current) => (current + 1) % productImages.length);
     }, 4500);
 
-    return () => window.clearInterval(interval);
+    return () => globalThis.clearInterval(interval);
   }, [previewOpen, productImages.length]);
 
   const moveImage = (direction: 1 | -1) => {

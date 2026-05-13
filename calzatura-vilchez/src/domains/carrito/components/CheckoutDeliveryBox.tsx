@@ -4,7 +4,7 @@ import type { DeliveryQuote, GeocodeCandidate } from "@/services/deliveryOpenRou
 import CheckoutDeliveryMap from "@/domains/carrito/components/CheckoutDeliveryMap";
 import { checkoutGeoLayerHint } from "@/domains/carrito/utils/checkoutGeoHints";
 
-type Props = {
+type Props = Readonly<{
   addressLineLength: number;
   mapSearchInput: string;
   onMapSearchChange: (value: string) => void;
@@ -21,7 +21,7 @@ type Props = {
   deliveryQuoteLoading: boolean;
   deliveryQuoteError: string;
   deliveryQuote: DeliveryQuote | null;
-};
+}>;
 
 export default function CheckoutDeliveryBox({
   addressLineLength,

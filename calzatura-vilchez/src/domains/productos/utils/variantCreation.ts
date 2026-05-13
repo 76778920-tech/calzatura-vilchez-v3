@@ -80,7 +80,7 @@ export function buildVariantCreationPlan(
       color: slot.color,
       familiaId: base.familiaId,
       destacado: base.destacado,
-      activo: slot.activo !== undefined ? slot.activo : (base.activo ?? true),
+      activo: slot.activo ?? base.activo ?? true,
       descuento: base.descuento,
       campana: base.campana,
     };

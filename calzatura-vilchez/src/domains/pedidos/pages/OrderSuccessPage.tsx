@@ -44,7 +44,7 @@ export default function OrderSuccessPage() {
         }
 
         if (sessionId && o?.estado === "pendiente") {
-          pollTimer = window.setTimeout(() => {
+          pollTimer = globalThis.setTimeout(() => {
             void load();
           }, 2000);
         }
@@ -57,7 +57,7 @@ export default function OrderSuccessPage() {
 
     return () => {
       active = false;
-      if (pollTimer) window.clearTimeout(pollTimer);
+      if (pollTimer) globalThis.clearTimeout(pollTimer);
     };
   }, [clearCart, id, searchParams, userProfile]);
 

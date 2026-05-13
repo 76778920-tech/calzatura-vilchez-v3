@@ -10,7 +10,7 @@ export function isChunkLoadError(error: unknown) {
 export function reloadOnceForFreshAssets() {
   if (sessionStorage.getItem(RELOAD_KEY) === "true") return false;
   sessionStorage.setItem(RELOAD_KEY, "true");
-  window.location.reload();
+  globalThis.location.reload();
   return true;
 }
 
@@ -19,13 +19,13 @@ export function resetChunkReloadAttempt() {
 }
 
 export function installChunkErrorRecovery() {
-  window.addEventListener("unhandledrejection", (event) => {
+  globalThis.addEventListener("unhandledrejection", (event) => {
     if (isChunkLoadError(event.reason)) {
       reloadOnceForFreshAssets();
     }
   });
 
-  window.addEventListener("error", (event) => {
+  globalThis.addEventListener("error", (event) => {
     if (isChunkLoadError(event.error) || isChunkLoadError(event.message)) {
       reloadOnceForFreshAssets();
     }

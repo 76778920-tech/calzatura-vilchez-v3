@@ -2,13 +2,13 @@ import { Copy, Pencil, Trash2 } from "lucide-react";
 import { categoryLabel } from "@/utils/labels";
 import { FALLBACK_PRODUCT_IMAGE, LOW_STOCK_LIMIT, type AdminProduct } from "../adminProductsInternals";
 
-type Props = {
+type Props = Readonly<{
   product: AdminProduct;
   setPreviewImage: (v: { src: string; title: string; subtitle?: string }) => void;
   openVariant: (product: AdminProduct) => void;
   openEdit: (product: AdminProduct) => void;
   handleDelete: (product: AdminProduct) => void;
-};
+}>;
 
 export function AdminProductsTableRow({
   product,

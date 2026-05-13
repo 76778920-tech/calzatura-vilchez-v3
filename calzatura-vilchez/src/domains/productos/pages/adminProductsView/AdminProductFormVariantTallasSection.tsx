@@ -1,12 +1,12 @@
 import { sumSizeStock } from "@/utils/stock";
 import { getColorHex, toPositiveInteger, type ProductForm, type VariantSlot } from "../adminProductsInternals";
 
-type Props = {
+type Props = Readonly<{
   variantSlots: VariantSlot[];
   form: ProductForm;
   currentSizes: string[];
   updateVariantSlotStock: (slotIndex: number, talla: string, quantity: number) => void;
-};
+}>;
 
 export function AdminProductFormVariantTallasSection({
   variantSlots,
@@ -22,9 +22,7 @@ export function AdminProductFormVariantTallasSection({
       <legend style={{ padding: 0, marginBottom: "0.35rem", fontWeight: 600, fontSize: "inherit" }}>
         Tallas y stock por color
       </legend>
-      {!form.categoria ? (
-        <p className="admin-empty">Selecciona la categoría para ver las tallas.</p>
-      ) : (
+      {form.categoria ? (
         <div className="variant-tallas-list">
           {variantSlots.map((slot, slotIndex) => {
             if (!slot.color) return null;
@@ -52,6 +50,8 @@ export function AdminProductFormVariantTallasSection({
             );
           })}
         </div>
+      ) : (
+        <p className="admin-empty">Selecciona la categoría para ver las tallas.</p>
       )}
     </fieldset>
   );

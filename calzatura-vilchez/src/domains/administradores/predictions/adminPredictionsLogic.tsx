@@ -1964,44 +1964,44 @@ export type TabPrefetchScheduleInput = {
 };
 
 export function scheduleTabPrefetchTimeouts(p: TabPrefetchScheduleInput): () => void {
-  const timers: ReturnType<typeof window.setTimeout>[] = [];
+  const timers: ReturnType<typeof globalThis.setTimeout>[] = [];
   if (p.activeTab === "ventas" && !p.weeklyChartFetched && !p.weeklyChartLoading) {
     timers.push(
-      window.setTimeout(() => {
+      globalThis.setTimeout(() => {
         void p.loadWeeklyChart().catch(() => undefined);
       }, 0),
     );
   }
   if (p.activeTab === "modelo" && !p.modelMetricsFetched && !p.modelMetricsLoading && p.modeloMeta) {
     timers.push(
-      window.setTimeout(() => {
+      globalThis.setTimeout(() => {
         void p.loadModelMetrics().catch(() => undefined);
       }, 0),
     );
   }
   if ((p.activeTab === "resumen" || p.activeTab === "ire") && !p.ireHistorialFetched) {
     timers.push(
-      window.setTimeout(() => {
+      globalThis.setTimeout(() => {
         void p.loadIreHistorial().catch(() => undefined);
       }, 0),
     );
   }
   if (p.activeTab === "campanas" && !p.campanaFetched && !p.campanaLoading) {
     timers.push(
-      window.setTimeout(() => {
+      globalThis.setTimeout(() => {
         void p.loadCampana().catch(() => undefined);
       }, 0),
     );
   }
   if (p.activeTab === "campanas" && !p.learningStatsFetched) {
     timers.push(
-      window.setTimeout(() => {
+      globalThis.setTimeout(() => {
         void p.loadLearningStats().catch(() => undefined);
       }, 0),
     );
   }
   return () => {
-    timers.forEach((id) => window.clearTimeout(id));
+    timers.forEach((id) => globalThis.clearTimeout(id));
   };
 }
 

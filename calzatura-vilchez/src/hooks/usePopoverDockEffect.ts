@@ -1,4 +1,4 @@
-import { useEffect, type MutableRefObject, type RefObject } from "react";
+import { useEffect, type RefObject } from "react";
 
 type Viewport = { innerWidth: number; innerHeight: number };
 
@@ -9,7 +9,7 @@ type Viewport = { innerWidth: number; innerHeight: number };
 export function usePopoverDockEffect(
   isActive: boolean,
   triggerRef: RefObject<HTMLElement | null>,
-  frameRef: MutableRefObject<number | null>,
+  frameRef: RefObject<number | null>,
   setStyle: (next: { top: number; left: number; width: number }) => void,
   measure: (rect: DOMRect, viewport: Viewport) => { top: number; left: number; width: number },
 ): void {
@@ -19,26 +19,26 @@ export function usePopoverDockEffect(
     const syncPopoverPosition = () => {
       if (!triggerRef.current) return;
       if (frameRef.current) {
-        window.cancelAnimationFrame(frameRef.current);
+        globalThis.cancelAnimationFrame(frameRef.current);
       }
 
-      frameRef.current = window.requestAnimationFrame(() => {
+      frameRef.current = globalThis.requestAnimationFrame(() => {
         if (!triggerRef.current) return;
         const rect = triggerRef.current.getBoundingClientRect();
-        setStyle(measure(rect, { innerWidth: window.innerWidth, innerHeight: window.innerHeight }));
+        setStyle(measure(rect, { innerWidth: globalThis.innerWidth, innerHeight: globalThis.innerHeight }));
       });
     };
 
     syncPopoverPosition();
-    window.addEventListener("resize", syncPopoverPosition);
-    window.addEventListener("scroll", syncPopoverPosition, true);
+    globalThis.addEventListener("resize", syncPopoverPosition);
+    globalThis.addEventListener("scroll", syncPopoverPosition, true);
     return () => {
       if (frameRef.current) {
-        window.cancelAnimationFrame(frameRef.current);
+        globalThis.cancelAnimationFrame(frameRef.current);
         frameRef.current = null;
       }
-      window.removeEventListener("resize", syncPopoverPosition);
-      window.removeEventListener("scroll", syncPopoverPosition, true);
+      globalThis.removeEventListener("resize", syncPopoverPosition);
+      globalThis.removeEventListener("scroll", syncPopoverPosition, true);
     };
   }, [frameRef, isActive, measure, setStyle, triggerRef]);
 }

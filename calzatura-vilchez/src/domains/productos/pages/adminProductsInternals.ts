@@ -469,9 +469,9 @@ export async function runAdminProductSaveFlow(ctx: AdminProductSaveFlowContext):
   setSaving(true);
   try {
     const familiaId =
-      editingId != null
-        ? (form.familiaId?.trim() || editingId)
-        : (form.familiaId?.trim() || crypto.randomUUID());
+      editingId == null
+        ? (form.familiaId?.trim() || crypto.randomUUID())
+        : (form.familiaId?.trim() || editingId);
     const financialPayload = { costoCompra: form.costoCompra, ...range };
 
     if (editingId) {

@@ -284,7 +284,7 @@ export function buildFacetFilteredCatalogProducts(routeFiltered: Product[], face
     const hasAllDiscount = selectedDiscounts.includes("all");
     const selectedPercents = selectedDiscounts
       .filter((item) => item !== "all")
-      .map((item) => Number(item))
+      .map(Number)
       .filter(Number.isFinite);
 
     result = result.filter((product) => {

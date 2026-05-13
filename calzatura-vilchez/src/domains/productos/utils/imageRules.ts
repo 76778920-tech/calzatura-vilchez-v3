@@ -6,7 +6,7 @@
 export const IMAGE_RULES = {
   minWidth: 600,
   minHeight: 600,
-  minAspectRatio: 0.65,          // ~2:3 retrato — más vertical que esto se rechaza
+  minAspectRatio: .65,          // ~2:3 retrato — más vertical que esto se rechaza
   maxAspectRatio: 1.60,          // ~8:5 apaisado — más horizontal que esto se rechaza
   maxCompressedBytes: 1.5 * 1024 * 1024,  // 1.5 MB post-compresión
 } as const;

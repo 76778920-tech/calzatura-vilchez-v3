@@ -2,12 +2,12 @@ import type { Dispatch, SetStateAction } from "react";
 import { useId } from "react";
 import type { ProductForm } from "../adminProductsInternals";
 
-type Props = {
+type Props = Readonly<{
   form: ProductForm;
   setForm: Dispatch<SetStateAction<ProductForm>>;
   editingId: string | null;
   isMultiColorCreate: boolean;
-};
+}>;
 
 export function AdminProductFormCampaignAndDescription({
   form,

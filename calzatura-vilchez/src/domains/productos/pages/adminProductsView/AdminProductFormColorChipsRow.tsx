@@ -3,7 +3,7 @@ import { COLOR_PALETTE, getColorHex, type ProductForm, type VariantSlot } from "
 
 const VARIANT_COLOR_ROW_KEYS = ["vc-slot-0", "vc-slot-1", "vc-slot-2", "vc-slot-3", "vc-slot-4"] as const;
 
-type Props = {
+type Props = Readonly<{
   variantSlots: VariantSlot[];
   form: ProductForm;
   activeColorSlot: number | null;
@@ -12,7 +12,7 @@ type Props = {
   setPopoverAbove: Dispatch<SetStateAction<boolean>>;
   setActiveColorSlot: Dispatch<SetStateAction<number | null>>;
   setSlotColor: (slotIndex: number, color: string) => void;
-};
+}>;
 
 export function AdminProductFormColorChipsRow({
   variantSlots,
@@ -42,12 +42,12 @@ export function AdminProductFormColorChipsRow({
               <button
                 type="button"
                 disabled={!isAvailable}
-                className={`variant-chip${slot.color ? " variant-chip--active" : ""}${!isAvailable ? " variant-chip--locked" : ""}`}
+                className={`variant-chip${slot.color ? " variant-chip--active" : ""}${isAvailable ? "" : " variant-chip--locked"}`}
                 onClick={(e) => {
                   if (!isAvailable) return;
                   if (activeColorSlot === index) { setActiveColorSlot(null); return; }
                   const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  setPopoverAbove(window.innerHeight - rect.bottom < 300);
+                  setPopoverAbove(globalThis.innerHeight - rect.bottom < 300);
                   setActiveColorSlot(index);
                 }}
               >
@@ -64,7 +64,7 @@ export function AdminProductFormColorChipsRow({
                   <div className="admin-color-popover-grid">
                     <button
                       type="button"
-                      className={`admin-color-popover-item${!slot.color ? " active" : ""}`}
+                      className={`admin-color-popover-item${slot.color ? "" : " active"}`}
                       onClick={() => setSlotColor(index, "")}
                     >
                       <span className="admin-color-popover-swatch admin-color-popover-swatch-empty" aria-hidden="true" />

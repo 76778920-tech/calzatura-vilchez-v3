@@ -2,7 +2,7 @@ import type { ChangeEvent, MouseEvent, RefObject } from "react";
 import type { VariantSlot } from "../adminProductsInternals";
 import { AdminProductVariantCarouselCard } from "./AdminProductVariantCarouselCard";
 
-type Props = {
+type Props = Readonly<{
   variantSlots: VariantSlot[];
   compressing: boolean;
   isDraggingVariants: boolean;
@@ -15,7 +15,7 @@ type Props = {
   validateVariantSlotImageUrl: (slotIndex: number, imageIndex: number, value: string) => void;
   updateVariantSlot: (slotIndex: number, updater: (slot: VariantSlot) => VariantSlot) => void;
   setSlotColor: (slotIndex: number, color: string) => void;
-};
+}>;
 
 export function AdminProductCreateVariantsPanel({
   variantSlots,

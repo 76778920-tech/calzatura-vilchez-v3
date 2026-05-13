@@ -23,7 +23,7 @@ export default function VerifyEmail() {
   const handleVerifiedSuccess = useCallback(() => {
     clearPendingVerificationEmail();
     toast.success("Correo verificado. Bienvenido.");
-    window.location.replace(PUBLIC_ROUTES.home);
+    globalThis.location.replace(PUBLIC_ROUTES.home);
   }, []);
 
   const checkVerificationStatus = useCallback(async () => {
@@ -58,12 +58,12 @@ export default function VerifyEmail() {
       void checkVerificationStatus().catch(() => undefined);
     };
 
-    window.addEventListener("focus", handleWindowFocus);
+    globalThis.addEventListener("focus", handleWindowFocus);
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener("focus", handleWindowFocus);
+      globalThis.removeEventListener("focus", handleWindowFocus);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [checkVerificationStatus, verificationUser]);

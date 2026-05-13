@@ -16,9 +16,9 @@ export function useProductsRealtime(onProductChange: () => void): void {
   useEffect(() => {
     const handleChange = () => {
       if (debounceRef.current !== null) {
-        window.clearTimeout(debounceRef.current);
+        globalThis.clearTimeout(debounceRef.current);
       }
-      debounceRef.current = window.setTimeout(() => {
+      debounceRef.current = globalThis.setTimeout(() => {
         callbackRef.current();
         debounceRef.current = null;
       }, 300);
@@ -32,7 +32,7 @@ export function useProductsRealtime(onProductChange: () => void): void {
 
     return () => {
       if (debounceRef.current !== null) {
-        window.clearTimeout(debounceRef.current);
+        globalThis.clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
       supabase.removeChannel(channel);

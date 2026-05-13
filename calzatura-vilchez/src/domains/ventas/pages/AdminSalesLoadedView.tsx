@@ -62,7 +62,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
                     value={p.brandSearch}
                     onChange={(e) => p.handleBrandSearchChange(e.target.value)}
                     onFocus={() => p.setBrandFocused(true)}
-                    onBlur={() => window.setTimeout(() => p.setBrandFocused(false), 120)}
+                    onBlur={() => globalThis.setTimeout(() => p.setBrandFocused(false), 120)}
                     placeholder="Escribe la marca"
                   />
                 </div>
@@ -91,7 +91,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
                     value={p.codeSearch}
                     onChange={(e) => p.handleCodeSearchChange(e.target.value)}
                     onFocus={() => p.setCodeFocused(true)}
-                    onBlur={() => window.setTimeout(() => p.setCodeFocused(false), 120)}
+                    onBlur={() => globalThis.setTimeout(() => p.setCodeFocused(false), 120)}
                     placeholder="Escribe codigo o nombre"
                   />
                 </div>

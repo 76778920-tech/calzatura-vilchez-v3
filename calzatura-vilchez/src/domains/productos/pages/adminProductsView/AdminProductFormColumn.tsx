@@ -8,7 +8,7 @@ import { AdminProductFormEditStockGrid } from "./AdminProductFormEditStockGrid";
 import { AdminProductFormFinanceBox } from "./AdminProductFormFinanceBox";
 import { AdminProductFormVariantTallasSection } from "./AdminProductFormVariantTallasSection";
 
-type Props = Pick<
+type Props = Readonly<Pick<
   AdminProductsViewModel,
   | "activeColorSlot"
   | "activeColorSlotRef"
@@ -36,7 +36,7 @@ type Props = Pick<
   | "updateTallaStock"
   | "updateVariantSlotStock"
   | "variantSlots"
->;
+>>;
 
 export function AdminProductFormColumn(p: Props) {
   return (

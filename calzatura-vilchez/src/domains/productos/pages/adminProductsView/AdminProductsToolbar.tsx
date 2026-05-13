@@ -3,7 +3,7 @@ import { CATEGORIAS } from "@/domains/productos/utils/commercialRules";
 import { categoryLabel } from "@/utils/labels";
 import type { FeaturedFilter, StockFilter } from "../adminProductsListFilters";
 
-type Props = {
+type Props = Readonly<{
   searchTerm: string;
   setSearchTerm: (value: string) => void;
   categoryFilter: string;
@@ -15,7 +15,7 @@ type Props = {
   hasActiveFilters: boolean;
   clearFilters: () => void;
   openCreate: () => void;
-};
+}>;
 
 export function AdminProductsToolbar({
   searchTerm,

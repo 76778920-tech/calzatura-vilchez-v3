@@ -107,8 +107,8 @@ export function useAdminProductsPage() {
   };
 
   useEffect(() => {
-    const timer = window.setTimeout(load, 0);
-    return () => window.clearTimeout(timer);
+    const timer = globalThis.setTimeout(load, 0);
+    return () => globalThis.clearTimeout(timer);
   }, []);
 
   useProductsRealtime(load);
@@ -156,11 +156,11 @@ export function useAdminProductsPage() {
         setIsDraggingVariants(false);
       }
     };
-    window.addEventListener("mouseup", handleMouseUp);
-    window.addEventListener("keydown", handleKeyDown);
+    globalThis.addEventListener("mouseup", handleMouseUp);
+    globalThis.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener("mouseup", handleMouseUp);
-      window.removeEventListener("keydown", handleKeyDown);
+      globalThis.removeEventListener("mouseup", handleMouseUp);
+      globalThis.removeEventListener("keydown", handleKeyDown);
     };
   }, [isDraggingVariants]);
 
@@ -175,7 +175,7 @@ export function useAdminProductsPage() {
   const closeModal = () => {
     setEstiloSelectOpen(false);
     setShowModal(false);
-    window.setTimeout(() => triggerRef.current?.focus(), 0);
+    globalThis.setTimeout(() => triggerRef.current?.focus(), 0);
   };
 
   const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
@@ -188,7 +188,8 @@ export function useAdminProductsPage() {
     ).filter((el) => el.offsetParent !== null);
     if (focusable.length === 0) return;
     const first = focusable[0];
-    const last = focusable[focusable.length - 1];
+    const last = focusable.at(-1);
+    if (!last) return;
     if (event.shiftKey && document.activeElement === first) {
       event.preventDefault(); last.focus();
     } else if (!event.shiftKey && document.activeElement === last) {

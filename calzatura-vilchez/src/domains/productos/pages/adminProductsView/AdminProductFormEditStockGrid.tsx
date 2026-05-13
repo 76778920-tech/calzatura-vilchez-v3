@@ -1,10 +1,10 @@
 import { toPositiveInteger, type ProductForm } from "../adminProductsInternals";
 
-type Props = {
+type Props = Readonly<{
   currentSizes: string[];
   form: ProductForm;
   updateTallaStock: (talla: string, quantity: number) => void;
-};
+}>;
 
 export function AdminProductFormEditStockGrid({ currentSizes, form, updateTallaStock }: Props) {
   return (

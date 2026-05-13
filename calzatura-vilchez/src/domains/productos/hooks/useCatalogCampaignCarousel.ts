@@ -127,10 +127,10 @@ export function useCatalogCampaignCarousel(
 
   useEffect(() => {
     if (catalogCampaignSlides.length < 2 || isCampaignDragging || campaignTransition) return undefined;
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       advanceCampaignSlide();
     }, rotationMs);
-    return () => window.clearTimeout(timer);
+    return () => globalThis.clearTimeout(timer);
   }, [
     activeCampaignSlide,
     advanceCampaignSlide,
@@ -182,12 +182,12 @@ export function useCatalogCampaignCarousel(
       if (!isCampaignDragging || campaignDragDirection === 0 || campaignWidth <= 0) return undefined;
 
       if (index === activeCampaignSlide) {
-        return { transform: `translate3d(${campaignDragOffset}px, 0, 0)`, opacity: 1, zIndex: 2 } as CSSProperties;
+        return { transform: `translate3d(${campaignDragOffset}px, 0, 0)`, opacity: 1, zIndex: 2 };
       }
 
       if (index === campaignDragTarget) {
         const origin = campaignDragDirection === 1 ? campaignWidth : -campaignWidth;
-        return { transform: `translate3d(${origin + campaignDragOffset}px, 0, 0)`, opacity: 1, zIndex: 1 } as CSSProperties;
+        return { transform: `translate3d(${origin + campaignDragOffset}px, 0, 0)`, opacity: 1, zIndex: 1 };
       }
 
       return undefined;

@@ -4,13 +4,13 @@ import { useId } from "react";
 import { capitalizeWords } from "@/utils/colors";
 import { COLOR_PALETTE, type ProductForm } from "../adminProductsInternals";
 
-type Props = {
+type Props = Readonly<{
   form: ProductForm;
   setForm: Dispatch<SetStateAction<ProductForm>>;
   colorPaletteOpen: boolean;
   setColorPaletteOpen: Dispatch<SetStateAction<boolean>>;
   colorPaletteRef: RefObject<HTMLDivElement | null>;
-};
+}>;
 
 export function AdminProductFormColorEdit({
   form,
@@ -42,7 +42,7 @@ export function AdminProductFormColorEdit({
               <div className="admin-color-popover-grid">
                 <button
                   type="button"
-                  className={`admin-color-popover-item ${!form.color ? "active" : ""}`}
+                  className={`admin-color-popover-item ${form.color ? "" : "active"}`}
                   onClick={() => { setForm({ ...form, color: "" }); setColorPaletteOpen(false); }}
                 >
                   <span className="admin-color-popover-swatch admin-color-popover-swatch-empty" aria-hidden="true" />

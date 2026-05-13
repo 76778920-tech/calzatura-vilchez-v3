@@ -70,7 +70,7 @@ function loadingHtml() {
 }
 
 export function openSaleDocumentWindow() {
-  const preview = window.open("", "_blank", "width=900,height=760");
+  const preview = globalThis.open("", "_blank", "width=900,height=760");
   if (!preview) return null;
   preview.document.open();
   preview.document.write(loadingHtml());
@@ -193,8 +193,8 @@ export function buildSaleDocumentHtml(input: SaleDocumentInput) {
     </footer>
   </article>
   <script>
-    window.addEventListener("load", () => {
-      window.setTimeout(() => window.print(), 350);
+    globalThis.addEventListener("load", () => {
+      globalThis.setTimeout(() => globalThis.print(), 350);
     });
   </script>
 </body>

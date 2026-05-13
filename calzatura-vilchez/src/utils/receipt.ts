@@ -177,12 +177,12 @@ export function downloadReceipt(order: Order, userProfile?: UserProfile | null) 
   document.body.appendChild(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 800);
+  globalThis.setTimeout(() => URL.revokeObjectURL(url), 800);
 }
 
 export function openReceiptPreview(order: Order, userProfile?: UserProfile | null) {
   const html = buildReceiptHtml(order, userProfile);
-  const preview = window.open("", "_blank", "noopener,noreferrer,width=900,height=760");
+  const preview = globalThis.open("", "_blank", "noopener,noreferrer,width=900,height=760");
   if (!preview) return false;
   preview.document.open();
   preview.document.write(html);

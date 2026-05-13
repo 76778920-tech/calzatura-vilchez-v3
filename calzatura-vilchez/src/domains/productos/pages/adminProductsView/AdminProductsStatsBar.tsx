@@ -6,10 +6,10 @@ type Stats = {
   destacados: number;
 };
 
-type Props = {
+type Props = Readonly<{
   productCount: number;
   stats: Stats;
-};
+}>;
 
 export function AdminProductsStatsBar({ productCount, stats }: Props) {
   return (

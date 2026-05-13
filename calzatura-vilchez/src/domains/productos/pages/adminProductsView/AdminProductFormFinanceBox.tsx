@@ -9,11 +9,11 @@ type Range = {
   precioMaximo: number;
 };
 
-type Props = {
+type Props = Readonly<{
   form: ProductForm;
   setForm: Dispatch<SetStateAction<ProductForm>>;
   formPriceRange: Range;
-};
+}>;
 
 export function AdminProductFormFinanceBox({ form, setForm, formPriceRange }: Props) {
   const id = useId();

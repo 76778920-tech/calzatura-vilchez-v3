@@ -55,13 +55,13 @@ function triggerRefForMenuKey(
   return undefined;
 }
 
-type CatalogFilterRailProps = {
+type CatalogFilterRailProps = Readonly<{
   filterRailRef: RefObject<HTMLDivElement | null>;
   menus: CatalogFilterRailMenu[];
   activeMenu: string | null;
   toggleMenu: (menuKey: string) => void;
   triggerRefs: CatalogFilterTriggerRefs;
-};
+}>;
 
 export function CatalogFilterRail({
   filterRailRef,
@@ -81,7 +81,7 @@ export function CatalogFilterRail({
         return (
           <div
             key={menu.key}
-            className={`catalog-filter-item ${isOpen ? "is-open" : ""} ${!isExpandable ? "is-static" : ""}`}
+            className={`catalog-filter-item ${isOpen ? "is-open" : ""} ${isExpandable ? "" : "is-static"}`}
           >
             <button
               type="button"

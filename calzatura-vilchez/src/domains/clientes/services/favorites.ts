@@ -20,7 +20,7 @@ function e2eFavoriteKey(userId: string) {
 function readE2EFavorites(userId: string): string[] {
   if (import.meta.env.VITE_E2E !== "true") return [];
   try {
-    const raw = window.localStorage.getItem(e2eFavoriteKey(userId));
+    const raw = globalThis.localStorage.getItem(e2eFavoriteKey(userId));
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : [];
   } catch {
@@ -29,7 +29,7 @@ function readE2EFavorites(userId: string): string[] {
 }
 
 function writeE2EFavorites(userId: string, productIds: string[]) {
-  window.localStorage.setItem(e2eFavoriteKey(userId), JSON.stringify([...new Set(productIds)]));
+  globalThis.localStorage.setItem(e2eFavoriteKey(userId), JSON.stringify([...new Set(productIds)]));
 }
 
 export async function fetchFavoriteProductIds(userId: string): Promise<string[]> {
