@@ -188,7 +188,7 @@ export async function ensureVerifiedUserProfile(user: User) {
 }
 
 function resolveAuthLoginProxyUrl(): string | null {
-  const explicit = String(import.meta.env.VITE_AUTH_PROXY_LOGIN_URL ?? "").trim();
+  const explicit = import.meta.env.VITE_AUTH_PROXY_LOGIN_URL?.trim() ?? "";
   if (explicit === "0" || explicit === "false") return null;
   if (explicit) return explicit.replaceAll(/\/$/g, "");
   const backend = getBackendApiBaseUrl();
