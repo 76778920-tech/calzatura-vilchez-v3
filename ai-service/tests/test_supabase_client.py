@@ -109,6 +109,21 @@ def test_fetch_ire_historial_solicita_campos_de_auditoria(monkeypatch):
 
 # ── fetch helpers ─────────────────────────────────────────────────────────────
 
+def test_get_headers_lanza_error_sin_credenciales(monkeypatch):
+    monkeypatch.setattr(supabase_client, "_SUPABASE_URL", None)
+    monkeypatch.setattr(supabase_client, "_HEADERS", None)
+    monkeypatch.setenv("SUPABASE_URL", "")
+    monkeypatch.setenv("SUPABASE_SERVICE_KEY", "")
+    with pytest.raises(RuntimeError, match="SUPABASE_URL"):
+        supabase_client._get_headers()
+
+
+def test_get_client_devuelve_url_y_headers(monkeypatch):
+    url, headers = supabase_client.get_client()
+    assert url == "https://example.supabase.co"
+    assert "apikey" in headers
+
+
 def test_fetch_daily_sales_sin_days(monkeypatch):
     def fake_get(url, headers, params, timeout):
         return FakeResponse(200, [{"productId": "p1", "fecha": "2026-05-01"}])
