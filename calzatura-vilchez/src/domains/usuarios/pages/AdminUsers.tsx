@@ -62,12 +62,12 @@ function userMatchesAdminFilters(
 }
 
 function toastRoleUpdateFailure(err: unknown) {
-  const msg =
-    err instanceof Error
-      ? err.message
-      : typeof err === "object" && err && "message" in err
-        ? String((err as { message: unknown }).message)
-        : "";
+  let msg = "";
+  if (err instanceof Error) {
+    msg = err.message;
+  } else if (typeof err === "object" && err && "message" in err) {
+    msg = String((err as { message: unknown }).message);
+  }
   const code =
     typeof err === "object" && err && "code" in err ? String((err as { code: unknown }).code) : "";
   const isPermissionError = code === "42501" || msg.toLowerCase().includes("row-level security");

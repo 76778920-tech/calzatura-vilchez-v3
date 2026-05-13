@@ -116,7 +116,7 @@ export function parseStreetHousenumber(input: string): { street: string; housenu
   const q = input.replace(/\s+/g, " ").trim();
   if (!q) return { street: "" };
 
-  const hash = q.match(/^(.+?)[\s,]*[#]\s*(\d{1,6}[A-Za-z]?)\s*$/);
+  const hash = q.match(/^(.+?)[\s,]*#\s*(\d{1,6}[A-Za-z]?)\s*$/);
   if (hash && hash[1].trim().length >= 2) {
     return { street: hash[1].trim(), housenumber: hash[2] };
   }
@@ -130,7 +130,7 @@ export function parseStreetHousenumber(input: string): { street: string; housenu
   if (endNum && endNum[1].trim().length >= 4) {
     const num = endNum[2];
     if (/^(19|20)\d{2}$/.test(num)) return { street: q };
-    const n = parseInt(num, 10);
+    const n = Number.parseInt(num, 10);
     if (n >= 1 && n <= 99999) {
       return { street: endNum[1].trim(), housenumber: num };
     }
@@ -488,7 +488,8 @@ async function drivingDistanceKm(storeLng: number, storeLat: number, destLng: nu
   });
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(`Matrix: HTTP ${response.status}${errText ? ` — ${errText.slice(0, 120)}` : ""}`);
+    const errSnippet = errText ? ` — ${errText.slice(0, 120)}` : "";
+    throw new Error(`Matrix: HTTP ${response.status}${errSnippet}`);
   }
   const data = (await response.json()) as { distances?: number[][] };
   const d = data.distances?.[0]?.[1];

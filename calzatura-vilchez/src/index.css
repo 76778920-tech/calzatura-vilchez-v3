@@ -5575,10 +5575,56 @@ button.dash-today-card:hover { transform: translateY(-1px); }
   background: rgba(0, 0, 0, 0.65);
   cursor: pointer;
 }
-.dash-order-modal-root .modal.dash-order-modal {
+.dash-order-modal-root .modal.dash-order-modal,
+.dash-order-modal-root dialog.modal.dash-order-modal {
   position: relative;
   z-index: 1;
   width: min(100%, 560px);
+  margin: 0;
+  max-width: none;
+  border: none;
+  padding: 0;
+}
+
+/* Product modal: backdrop + native dialog (Sonar / a11y) */
+.product-modal-host {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.product-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: rgba(0, 0, 0, 0.65);
+  cursor: pointer;
+}
+.product-modal-host dialog.modal.product-modal {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  max-width: none;
+  border: none;
+  padding: 0;
+}
+
+/* Screen reader only (native <progress> companion) */
+.home-hero-progress-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 .dash-orders-table tbody tr.dash-order-row > td.dash-order-row-cell { padding: 0; vertical-align: middle; }
 button.dash-order-row-btn {

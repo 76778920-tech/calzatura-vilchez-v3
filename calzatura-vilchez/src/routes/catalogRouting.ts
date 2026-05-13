@@ -303,8 +303,9 @@ export function isProductCatalogPath(pathname: string) {
  */
 export function getCatalogUrlKey(pathname: string, search: string): string {
   if (!isCatalogShelfPath(pathname)) {
-    // Sin normalizar query: enlaces no-catálogo salen de helpers/rutas fijas; no comparamos %20 vs + aquí.
-    const q = search.startsWith("?") ? search : search ? `?${search}` : "";
+    let q = "";
+    if (search.startsWith("?")) q = search;
+    else if (search) q = `?${search}`;
     return `${pathname}${q}`;
   }
   const rp = catalogRouteParamsFromPathname(pathname);

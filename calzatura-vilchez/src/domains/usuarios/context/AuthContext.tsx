@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import type { User } from "firebase/auth";
@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadProfile = async (currentUser: User) => {
+  const loadProfile = useCallback(async (currentUser: User) => {
     const isSuperAdmin = isSuperAdminEmail(currentUser.email);
 
     if (!currentUser.emailVerified && !isSuperAdmin) {
@@ -70,11 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setUserProfile(isSuperAdmin ? { ...memoryProfile, nombre: "Administrador" } : null);
     }
-  };
+  }, []);
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) await loadProfile(user);
-  };
+  }, [user, loadProfile]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -99,7 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [loadProfile]);
 
   const isAdmin =
     userProfile?.rol === "admin" || isSuperAdminEmail(user?.email);
@@ -108,18 +108,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const hasVerifiedAccess =
     Boolean(user && (user.emailVerified || isAdmin));
 
+  const contextValue = useMemo(
+    () => ({
+      user,
+      userProfile,
+      loading,
+      isAdmin,
+      requiresEmailVerification,
+      hasVerifiedAccess,
+      refreshProfile,
+    }),
+    [user, userProfile, loading, isAdmin, requiresEmailVerification, hasVerifiedAccess, refreshProfile],
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        userProfile,
-        loading,
-        isAdmin,
-        requiresEmailVerification,
-        hasVerifiedAccess,
-        refreshProfile,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

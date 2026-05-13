@@ -169,9 +169,9 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
   return (
     <div className="dash-order-modal-root">
       <button type="button" className="dash-order-modal-backdrop" aria-label="Cerrar" onClick={onClose} />
-      <div
+      <dialog
+        open
         className="modal dash-order-modal"
-        role="dialog"
         aria-modal="true"
         aria-labelledby="dash-order-modal-title"
         onClick={(e) => e.stopPropagation()}
@@ -266,7 +266,7 @@ function OrderDetailModal({ order, onClose }: { order: Order; onClose: () => voi
             </Link>
           </div>
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

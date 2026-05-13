@@ -34,19 +34,19 @@ export function AdminProductModal(props: AdminProductsViewModel) {
   const s: ModalState = m;
 
   return (
-    <div className="modal-overlay" onClick={s.closeModal}>
-      <div
+    <div className="product-modal-host">
+      <button type="button" className="product-modal-backdrop" aria-label="Cerrar" onClick={s.closeModal} />
+      <dialog
         ref={modalRef}
-        role="dialog"
+        open
         aria-modal="true"
         aria-labelledby="product-modal-title"
         className={`modal product-modal${!s.editingId ? " product-modal--create" : ""}`}
-        onClick={(event) => event.stopPropagation()}
         onKeyDown={s.trapFocus}
       >
         <div className="modal-header">
           <h2 id="product-modal-title">{s.editingId ? "Editar producto" : "Nuevo producto"}</h2>
-          <button onClick={s.closeModal} className="modal-close" aria-label="Cerrar">
+          <button type="button" onClick={s.closeModal} className="modal-close" aria-label="Cerrar">
             <X size={20} />
           </button>
         </div>
@@ -116,7 +116,7 @@ export function AdminProductModal(props: AdminProductsViewModel) {
             </button>
           </div>
         </form>
-      </div>
+      </dialog>
     </div>
   );
 }

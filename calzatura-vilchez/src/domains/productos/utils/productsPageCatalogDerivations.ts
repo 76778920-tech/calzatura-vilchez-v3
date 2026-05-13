@@ -132,33 +132,17 @@ export function parsePriceRange(value: string, fallbackMin: number, fallbackMax:
   };
 }
 
-export function parseSizeSelection(value: string) {
+export function parseCommaSeparatedTokens(value: string): string[] {
   return value
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
 }
 
-export function parseColorSelection(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-export function parseMaterialSelection(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-export function parseDiscountSelection(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
+export const parseSizeSelection = parseCommaSeparatedTokens;
+export const parseColorSelection = parseCommaSeparatedTokens;
+export const parseMaterialSelection = parseCommaSeparatedTokens;
+export const parseDiscountSelection = parseCommaSeparatedTokens;
 
 export function inferProductDiscountPercent(product: Product) {
   return product.descuento ?? null;
@@ -280,11 +264,11 @@ export function buildFacetFilteredCatalogProducts(routeFiltered: Product[], face
     });
   }
 
-  if (color && color.includes(",")) {
+  if (color?.includes(",")) {
     const selectedColors = parseColorSelection(color);
     result = result.filter((product) => {
-      const productColors = getProductColors(product).map((value) => slugifyCatalogValue(value));
-      return selectedColors.some((selected) => productColors.includes(selected));
+      const productColorSet = new Set(getProductColors(product).map((value) => slugifyCatalogValue(value)));
+      return selectedColors.some((selected) => productColorSet.has(selected));
     });
   }
 

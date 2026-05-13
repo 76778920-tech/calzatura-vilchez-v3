@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { MailCheck, RefreshCw, LogIn, ShieldCheck, Clock3, Sparkles } from "lucide-react";
 import { getCurrentAuthUser, reloadCurrentUser, resendVerificationEmail } from "@/domains/usuarios/services/auth";
@@ -117,6 +117,30 @@ export default function VerifyEmail() {
     }
   };
 
+  const primaryButtonContent = useMemo((): ReactNode => {
+    if (checking) return "Verificando...";
+    if (verificationUser) {
+      return (
+        <>
+          <RefreshCw size={15} />
+          Ya confirme mi correo
+        </>
+      );
+    }
+    return (
+      <>
+        <LogIn size={15} />
+        Ya confirme, iniciar sesion
+      </>
+    );
+  }, [checking, verificationUser]);
+
+  const resendButtonLabel = useMemo(() => {
+    if (resending) return "Enviando correo...";
+    if (cooldown > 0) return `Reenviar disponible en ${cooldown}s`;
+    return "Reenviar correo de confirmacion";
+  }, [resending, cooldown]);
+
   return (
     <main className="auth-page verify-email-page">
       <div className="auth-card verify-email-card">
@@ -177,11 +201,7 @@ export default function VerifyEmail() {
             disabled={checking}
             className="btn-primary btn-full verify-email-primary"
           >
-            {checking
-              ? "Verificando..."
-              : verificationUser
-                ? <><RefreshCw size={15} />Ya confirme mi correo</>
-                : <><LogIn size={15} />Ya confirme, iniciar sesion</>}
+            {primaryButtonContent}
           </button>
 
           <button
@@ -190,11 +210,7 @@ export default function VerifyEmail() {
             disabled={resending || cooldown > 0}
             className="verify-email-secondary"
           >
-            {resending
-              ? "Enviando correo..."
-              : cooldown > 0
-                ? `Reenviar disponible en ${cooldown}s`
-                : "Reenviar correo de confirmacion"}
+            {resendButtonLabel}
           </button>
         </div>
 

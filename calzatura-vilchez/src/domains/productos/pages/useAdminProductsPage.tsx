@@ -78,7 +78,7 @@ export function useAdminProductsPage() {
   const estiloSelectRef = useRef<HTMLDivElement | null>(null);
   const activeColorSlotRef = useRef<HTMLDivElement | null>(null);
   const variantsCarouselRef = useRef<HTMLDivElement | null>(null);
-  const modalRef = useRef<HTMLDivElement | null>(null);
+  const modalRef = useRef<HTMLDialogElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const variantsDragStateRef = useRef({
     active: false,
@@ -178,7 +178,7 @@ export function useAdminProductsPage() {
     window.setTimeout(() => triggerRef.current?.focus(), 0);
   };
 
-  const trapFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+  const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
     if (event.key === "Escape") { event.preventDefault(); closeModal(); return; }
     if (event.key !== "Tab" || !modalRef.current) return;
     const focusable = Array.from(
@@ -422,8 +422,8 @@ export function useAdminProductsPage() {
       setForm((current) => {
         const imagenes = editableImageSlots(current.imagenes, current.imagen);
         imagenes[index] = imageUrl;
-        const cleanImages = imagenes.filter(Boolean);
-        return { ...current, imagenes, imagen: cleanImages[0] ?? "" };
+        const primaryImage = imagenes.find(Boolean) ?? "";
+        return { ...current, imagenes, imagen: primaryImage };
       });
     } catch {
       toast.error("No se pudo subir la imagen a Cloudinary");
@@ -436,8 +436,8 @@ export function useAdminProductsPage() {
   const updateImageUrl = (index: number, value: string) => {
     const imagenes = editableImageSlots(form.imagenes, form.imagen);
     imagenes[index] = value.trim();
-    const cleanImages = imagenes.filter(Boolean);
-    setForm({ ...form, imagenes, imagen: cleanImages[0] ?? "" });
+    const primaryImage = imagenes.find(Boolean) ?? "";
+    setForm({ ...form, imagenes, imagen: primaryImage });
   };
 
   const validateImageUrl = async (index: number, value: string) => {
@@ -462,8 +462,8 @@ export function useAdminProductsPage() {
   const clearImage = (index: number) => {
     const imagenes = editableImageSlots(form.imagenes, form.imagen);
     imagenes[index] = "";
-    const cleanImages = imagenes.filter(Boolean);
-    setForm({ ...form, imagenes, imagen: cleanImages[0] ?? "" });
+    const primaryImage = imagenes.find(Boolean) ?? "";
+    setForm({ ...form, imagenes, imagen: primaryImage });
   };
 
   const updateVariantSlot = (slotIndex: number, updater: (slot: VariantSlot) => VariantSlot) => {

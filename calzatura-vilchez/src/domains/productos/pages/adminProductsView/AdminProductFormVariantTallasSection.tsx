@@ -18,8 +18,10 @@ export function AdminProductFormVariantTallasSection({
   if (!hasColor) return null;
 
   return (
-    <div className="variant-tallas-section">
-      <label>Tallas y stock por color</label>
+    <fieldset className="variant-tallas-section" style={{ border: "none", margin: 0, padding: 0, minWidth: 0 }}>
+      <legend style={{ padding: 0, marginBottom: "0.35rem", fontWeight: 600, fontSize: "inherit" }}>
+        Tallas y stock por color
+      </legend>
       {!form.categoria ? (
         <p className="admin-empty">Selecciona la categoría para ver las tallas.</p>
       ) : (
@@ -27,7 +29,7 @@ export function AdminProductFormVariantTallasSection({
           {variantSlots.map((slot, slotIndex) => {
             if (!slot.color) return null;
             return (
-              <div key={slotIndex} className="variant-tallas-block">
+              <div key={`variant-tallas-${slot.color}-${slotIndex}`} className="variant-tallas-block">
                 <div className="variant-tallas-block-head">
                   <span className="admin-variant-color-dot" style={{ background: getColorHex(slot.color) }} />
                   <span className="variant-tallas-color-name">{slot.color}</span>
@@ -51,6 +53,6 @@ export function AdminProductFormVariantTallasSection({
           })}
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }

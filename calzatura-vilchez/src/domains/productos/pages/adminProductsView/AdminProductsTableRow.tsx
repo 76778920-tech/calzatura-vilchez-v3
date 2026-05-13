@@ -18,8 +18,9 @@ export function AdminProductsTableRow({
   handleDelete,
 }: Props) {
   const thumb = product.imagen || FALLBACK_PRODUCT_IMAGE;
-  const stockClass =
-    product.stock === 0 ? "stock-badge out" : product.stock <= LOW_STOCK_LIMIT ? "stock-badge low" : "stock-badge in";
+  let stockClass = "stock-badge in";
+  if (product.stock === 0) stockClass = "stock-badge out";
+  else if (product.stock <= LOW_STOCK_LIMIT) stockClass = "stock-badge low";
 
   return (
     <tr>

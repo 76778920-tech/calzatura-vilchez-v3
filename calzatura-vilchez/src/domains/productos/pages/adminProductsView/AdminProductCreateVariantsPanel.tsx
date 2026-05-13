@@ -41,31 +41,34 @@ export function AdminProductCreateVariantsPanel({
   }
 
   return (
-    <section aria-label="Carrusel de variantes. Arrastra para desplazar. Escape suelta el arrastre.">
+    <section>
       <div
         ref={variantsCarouselRef}
+        role="application"
+        tabIndex={0}
+        aria-label="Carrusel de variantes. Arrastra para desplazar. Escape suelta el arrastre."
         className={`admin-variants-carousel${isDraggingVariants ? " dragging" : ""}`}
         onMouseDown={handleVariantsMouseDown}
         onMouseMove={handleVariantsMouseMove}
         onMouseUp={stopVariantsDrag}
         onMouseLeave={stopVariantsDrag}
       >
-      {variantSlots.map((slot, slotIndex) => {
-        if (!slot.color) return null;
-        return (
-          <AdminProductVariantCarouselCard
-            key={slot.color}
-            slot={slot}
-            slotIndex={slotIndex}
-            compressing={compressing}
-            handleVariantFileChange={handleVariantFileChange}
-            updateVariantSlotImageUrl={updateVariantSlotImageUrl}
-            validateVariantSlotImageUrl={validateVariantSlotImageUrl}
-            updateVariantSlot={updateVariantSlot}
-            setSlotColor={setSlotColor}
-          />
-        );
-      })}
+        {variantSlots.map((slot, slotIndex) => {
+          if (!slot.color) return null;
+          return (
+            <AdminProductVariantCarouselCard
+              key={slot.color}
+              slot={slot}
+              slotIndex={slotIndex}
+              compressing={compressing}
+              handleVariantFileChange={handleVariantFileChange}
+              updateVariantSlotImageUrl={updateVariantSlotImageUrl}
+              validateVariantSlotImageUrl={validateVariantSlotImageUrl}
+              updateVariantSlot={updateVariantSlot}
+              setSlotColor={setSlotColor}
+            />
+          );
+        })}
       </div>
     </section>
   );

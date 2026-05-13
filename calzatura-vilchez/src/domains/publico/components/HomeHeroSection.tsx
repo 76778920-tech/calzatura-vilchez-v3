@@ -45,7 +45,9 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
   const activeHero = heroSlides[activeHeroIndex] ?? heroSlides[0];
   const canAutoRotateHero = !prefersReducedMotion && heroSlides.length > 1;
   const isHeroAutoRotationActive = canAutoRotateHero && !isHeroInteractionPaused;
-  const heroDragDirection = heroDragOffset > 0 ? "right" : heroDragOffset < 0 ? "left" : "idle";
+  let heroDragDirection: "left" | "right" | "idle" = "idle";
+  if (heroDragOffset > 0) heroDragDirection = "right";
+  else if (heroDragOffset < 0) heroDragDirection = "left";
 
   const shiftHeroSlide = useCallback(
     (direction: 1 | -1) => {
@@ -202,6 +204,9 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
     <section className="home-hero" aria-roledescription="carousel" aria-label="Promociones destacadas">
       <div
         ref={heroCarouselRef}
+        role="application"
+        tabIndex={0}
+        aria-label="Carrusel de promociones. Desliza o arrastra para cambiar de slide."
         className={`home-hero-carousel ${isHeroDragging ? "is-dragging" : ""}`}
         data-drag-direction={heroDragDirection}
         style={
@@ -311,15 +316,13 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
             </aside>
           </div>
         </div>
-        <div
-          className="home-hero-progress"
-          role="progressbar"
-          aria-label="Progreso del carrusel"
-          aria-valuemin={1}
-          aria-valuemax={heroSlides.length}
-          aria-valuenow={activeHeroIndex + 1}
-          aria-valuetext={`${activeHeroIndex + 1} de ${heroSlides.length}`}
-        >
+        <progress
+          className="home-hero-progress-sr-only"
+          max={heroSlides.length}
+          value={activeHeroIndex + 1}
+          aria-label={`Progreso del carrusel: ${activeHeroIndex + 1} de ${heroSlides.length}`}
+        />
+        <div className="home-hero-progress" aria-hidden="true">
           <span className="home-hero-progress-track">
             <span
               key={`hero-progress-${activeHeroIndex}`}

@@ -44,7 +44,7 @@ export function AdminProductVariantCarouselCard({
       </div>
       <div className="admin-image-grid">
         {slotImages.map((image, imageIndex) => (
-          <div key={imageIndex} className="admin-image-slot">
+          <div key={`variant-${slot.color}-${slotIndex}-img-${imageIndex}`} className="admin-image-slot">
             <button
               type="button"
               className="image-upload-area"
@@ -90,12 +90,13 @@ export function AdminProductVariantCarouselCard({
       <details className="admin-variant-details">
         <summary>Texto y visibilidad ({slot.color})</summary>
         <div className="admin-variant-details-body">
-          <label className="checkbox-label admin-variant-details-check">
+          <label className="checkbox-label admin-variant-details-check" htmlFor={`variant-activo-${slotIndex}`}>
             <input
+              id={`variant-activo-${slotIndex}`}
               type="checkbox"
               checked={slot.activo}
               onChange={(event) => updateVariantSlot(slotIndex, (s) => ({ ...s, activo: event.target.checked }))}
-            />
+            />{" "}
             Visible en tienda (solo este color)
           </label>
           <label className="admin-variant-details-label" htmlFor={`variant-desc-${slotIndex}`}>

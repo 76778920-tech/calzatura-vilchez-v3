@@ -23,7 +23,9 @@ export function AdminProductsCatalogBody({
   if (loading) {
     return (
       <div className="products-grid">
-        {[...Array(6)].map((_, index) => <div key={index} className="skeleton-card" />)}
+        {["sk1", "sk2", "sk3", "sk4", "sk5", "sk6"].map((id) => (
+          <div key={id} className="skeleton-card" />
+        ))}
       </div>
     );
   }
