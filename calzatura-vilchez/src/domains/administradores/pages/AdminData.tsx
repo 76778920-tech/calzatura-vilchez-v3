@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { read, utils, writeFile } from "xlsx";
 import { AlertTriangle, CheckCircle, Download, FileSpreadsheet, Loader, Trash2, Upload } from "lucide-react";
 import toast from "react-hot-toast";
@@ -81,6 +81,25 @@ function createImportContext(fileName: string): ImportContext {
 
 function scenarioLabel(key: string | null | undefined) {
   return SCENARIO_OPTIONS.find((item) => item.key === key)?.label ?? "General";
+}
+
+/** Evita "[object Object]" al exportar celdas tipadas como unknown (Sonar / Row). */
+function cellString(value: unknown): string {
+  if (value == null) return "";
+  if (typeof value === "string") return value;
+  const t = typeof value;
+  if (t === "number" || t === "boolean" || t === "bigint") return String(value);
+  if (t !== "object") return "";
+  if (value instanceof Date) return value.toISOString();
+  const maybeTs = value as { toDate?: () => Date };
+  if (typeof maybeTs.toDate === "function") {
+    try {
+      return maybeTs.toDate().toISOString();
+    } catch {
+      return "";
+    }
+  }
+  return "";
 }
 
 function normalizeImportId(value: unknown): string {
@@ -179,22 +198,25 @@ const COLLECTIONS: CollectionConfig[] = [
         return acc;
       }, {});
     },
-    exportTransform: (d, extra) => ({
-      id: d.id ?? "",
-      codigo: (extra as Record<string, string> | undefined)?.[String(d.id ?? "")] ?? "",
-      nombre: d.nombre ?? "",
-      precio: d.precio ?? 0,
-      stock: d.stock ?? 0,
-      categoria: d.categoria ?? "",
-      tipoCalzado: d.tipoCalzado ?? "",
-      descripcion: d.descripcion ?? "",
-      marca: d.marca ?? "",
-      color: d.color ?? "",
-      familiaId: d.familiaId ?? "",
-      tallas: JSON.stringify(d.tallas ?? []),
-      tallaStock: JSON.stringify(d.tallaStock ?? {}),
-      destacado: d.destacado ?? false,
-    }),
+    exportTransform: (d, extra) => {
+      const id = cellString(d.id);
+      return {
+        id,
+        codigo: (extra as Record<string, string> | undefined)?.[id] ?? "",
+        nombre: cellString(d.nombre),
+        precio: d.precio ?? 0,
+        stock: d.stock ?? 0,
+        categoria: cellString(d.categoria),
+        tipoCalzado: cellString(d.tipoCalzado),
+        descripcion: cellString(d.descripcion),
+        marca: cellString(d.marca),
+        color: cellString(d.color),
+        familiaId: cellString(d.familiaId),
+        tallas: JSON.stringify(d.tallas ?? []),
+        tallaStock: JSON.stringify(d.tallaStock ?? {}),
+        destacado: d.destacado ?? false,
+      };
+    },
     importTransform: (row, context) => ({
       nombre: String(row.nombre ?? "").trim(),
       precio: Number(row.precio ?? 0),
@@ -218,8 +240,8 @@ const COLLECTIONS: CollectionConfig[] = [
     importValidate: (row) => {
       if (!deriveProductImportId(row)) return "Debes incluir 'id' o 'codigo' para identificar el producto";
       if (!row.nombre) return "Falta el campo 'nombre'";
-      if (row.precio === undefined || isNaN(Number(row.precio))) return "El campo 'precio' debe ser un número";
-      if (row.stock === undefined || isNaN(Number(row.stock))) return "El campo 'stock' debe ser un número";
+      if (row.precio === undefined || Number.isNaN(Number(row.precio))) return "El campo 'precio' debe ser un número";
+      if (row.stock === undefined || Number.isNaN(Number(row.stock))) return "El campo 'stock' debe ser un número";
       if (!row.categoria) return "Falta el campo 'categoria'";
       return null;
     },
@@ -245,7 +267,7 @@ const COLLECTIONS: CollectionConfig[] = [
       precioMaximo: 111.6,
     },
     exportTransform: (d) => ({
-      productId: d.productId ?? "",
+      productId: cellString(d.productId),
       costoCompra: d.costoCompra ?? 0,
       margenMinimo: d.margenMinimo ?? 0,
       margenObjetivo: d.margenObjetivo ?? 0,
@@ -253,7 +275,7 @@ const COLLECTIONS: CollectionConfig[] = [
       precioMinimo: d.precioMinimo ?? 0,
       precioSugerido: d.precioSugerido ?? 0,
       precioMaximo: d.precioMaximo ?? 0,
-      actualizadoEn: d.actualizadoEn ?? "",
+      actualizadoEn: cellString(d.actualizadoEn),
     }),
     importTransform: (row, context) => ({
       productId: String(row.productId ?? "").trim(),
@@ -272,8 +294,8 @@ const COLLECTIONS: CollectionConfig[] = [
     }),
     importValidate: (row) => {
       if (!row.productId) return "Falta el campo 'productId'";
-      if (row.costoCompra === undefined || isNaN(Number(row.costoCompra))) return "El campo 'costoCompra' debe ser un número";
-      if (row.margenObjetivo === undefined || isNaN(Number(row.margenObjetivo))) return "El campo 'margenObjetivo' debe ser un número";
+      if (row.costoCompra === undefined || Number.isNaN(Number(row.costoCompra))) return "El campo 'costoCompra' debe ser un número";
+      if (row.margenObjetivo === undefined || Number.isNaN(Number(row.margenObjetivo))) return "El campo 'margenObjetivo' debe ser un número";
       return null;
     },
     upsertOnConflict: "productId",
@@ -293,15 +315,15 @@ const COLLECTIONS: CollectionConfig[] = [
       observaciones: "",
     },
     exportTransform: (d) => ({
-      id: d.id ?? "",
-      dni: d.dni ?? "",
-      nombres: d.nombres ?? "",
-      apellidos: d.apellidos ?? "",
-      marca: d.marca ?? "",
-      telefono: d.telefono ?? "",
+      id: cellString(d.id),
+      dni: cellString(d.dni),
+      nombres: cellString(d.nombres),
+      apellidos: cellString(d.apellidos),
+      marca: cellString(d.marca),
+      telefono: cellString(d.telefono),
       activo: d.activo ?? true,
-      observaciones: d.observaciones ?? "",
-      creadoEn: d.creadoEn ?? "",
+      observaciones: cellString(d.observaciones),
+      creadoEn: cellString(d.creadoEn),
     }),
     importTransform: (row, context) => ({
       dni: String(row.dni ?? "").trim(),
@@ -348,30 +370,30 @@ const COLLECTIONS: CollectionConfig[] = [
       cantidad: 2,
       precioVenta: 89.90,
       total: 179.80,
-      costoUnitario: 60.00,
-      costoTotal: 120.00,
+      costoUnitario: 60,
+      costoTotal: 120,
       ganancia: 59.80,
       documentoTipo: "ninguno",
       documentoNumero: "",
     },
     exportTransform: (d) => ({
-      id: d.id ?? "",
-      productId: d.productId ?? "",
-      codigo: d.codigo ?? "",
-      nombre: d.nombre ?? "",
-      color: d.color ?? "",
-      talla: d.talla ?? "",
-      fecha: d.fecha ?? "",
+      id: cellString(d.id),
+      productId: cellString(d.productId),
+      codigo: cellString(d.codigo),
+      nombre: cellString(d.nombre),
+      color: cellString(d.color),
+      talla: cellString(d.talla),
+      fecha: cellString(d.fecha),
       cantidad: d.cantidad ?? 0,
       precioVenta: d.precioVenta ?? 0,
       total: d.total ?? 0,
       costoUnitario: d.costoUnitario ?? 0,
       costoTotal: d.costoTotal ?? 0,
       ganancia: d.ganancia ?? 0,
-      documentoTipo: d.documentoTipo ?? "ninguno",
-      documentoNumero: d.documentoNumero ?? "",
+      documentoTipo: cellString(d.documentoTipo) || "ninguno",
+      documentoNumero: cellString(d.documentoNumero),
       devuelto: d.devuelto ?? false,
-      creadoEn: d.creadoEn ?? "",
+      creadoEn: cellString(d.creadoEn),
     }),
     importTransform: (row, context) => ({
       productId: String(row.productId ?? "").trim(),
@@ -398,9 +420,9 @@ const COLLECTIONS: CollectionConfig[] = [
     importValidate: (row) => {
       if (!row.productId) return "Falta el campo 'productId'";
       if (!row.fecha) return "Falta el campo 'fecha'";
-      if (row.cantidad === undefined || isNaN(Number(row.cantidad))) return "El campo 'cantidad' debe ser un número";
-      if (row.precioVenta === undefined || isNaN(Number(row.precioVenta))) return "El campo 'precioVenta' debe ser un número";
-      if (row.total === undefined || isNaN(Number(row.total))) return "El campo 'total' debe ser un número";
+      if (row.cantidad === undefined || Number.isNaN(Number(row.cantidad))) return "El campo 'cantidad' debe ser un número";
+      if (row.precioVenta === undefined || Number.isNaN(Number(row.precioVenta))) return "El campo 'precioVenta' debe ser un número";
+      if (row.total === undefined || Number.isNaN(Number(row.total))) return "El campo 'total' debe ser un número";
       return null;
     },
   },
@@ -411,27 +433,18 @@ const COLLECTIONS: CollectionConfig[] = [
     canImport: false,
     templateHeaders: [],
     templateExample: {},
-    exportTransform: (d) => {
-      const creadoEn = d.creadoEn;
-      const fecha =
-        creadoEn !== null &&
-        typeof creadoEn === "object" &&
-        "toDate" in (creadoEn as object)
-          ? (creadoEn as { toDate(): Date }).toDate().toISOString()
-          : String(creadoEn ?? "");
-      return {
-        id: d.id ?? "",
-        userId: d.userId ?? "",
-        userEmail: d.userEmail ?? "",
-        total: d.total ?? 0,
-        subtotal: d.subtotal ?? 0,
-        envio: d.envio ?? 0,
-        estado: d.estado ?? "",
-        metodoPago: d.metodoPago ?? "",
-        notas: d.notas ?? "",
-        creadoEn: fecha,
-      };
-    },
+    exportTransform: (d) => ({
+      id: cellString(d.id),
+      userId: cellString(d.userId),
+      userEmail: cellString(d.userEmail),
+      total: d.total ?? 0,
+      subtotal: d.subtotal ?? 0,
+      envio: d.envio ?? 0,
+      estado: cellString(d.estado),
+      metodoPago: cellString(d.metodoPago),
+      notas: cellString(d.notas),
+      creadoEn: cellString(d.creadoEn),
+    }),
     importTransform: () => ({}),
     importValidate: () => null,
   },
@@ -443,13 +456,13 @@ const COLLECTIONS: CollectionConfig[] = [
     templateHeaders: [],
     templateExample: {},
     exportTransform: (d) => ({
-      uid: d.uid ?? d.id ?? "",
-      dni: d.dni ?? "",
-      nombre: d.nombre ?? "",
-      email: d.email ?? "",
-      rol: d.rol ?? "",
-      telefono: d.telefono ?? "",
-      creadoEn: d.creadoEn ?? "",
+      uid: cellString(d.uid ?? d.id),
+      dni: cellString(d.dni),
+      nombre: cellString(d.nombre),
+      email: cellString(d.email),
+      rol: cellString(d.rol),
+      telefono: cellString(d.telefono),
+      creadoEn: cellString(d.creadoEn),
     }),
     importTransform: () => ({}),
     importValidate: () => null,
@@ -490,20 +503,18 @@ async function importRows(
   if (config.id === "ventasDiarias" || config.id === "productoFinanzas") {
     const { data, error } = await supabase.from("productos").select("id");
     if (error) throw error;
-    validProductIds = new Set((data ?? []).map((item) => String(item.id ?? "").trim()).filter(Boolean));
+    validProductIds = new Set((data ?? []).map((item) => cellString(item.id).trim()).filter(Boolean));
   }
 
   rows.forEach((row, i) => {
     const err = config.importValidate(row);
-    const productId = config.id === "ventasDiarias" ? String(row.productId ?? "").trim() : "";
-    const productExists =
-      config.id !== "ventasDiarias"
-      || !productId
-      || (validProductIds?.has(productId) ?? false);
+    const isVentas = config.id === "ventasDiarias";
+    const productId = isVentas ? String(row.productId ?? "").trim() : "";
+    const productMissingInCatalog = isVentas && productId.length > 0 && !(validProductIds?.has(productId) ?? false);
 
     if (err) {
       errors.push(`Fila ${i + 2}: ${err}`);
-    } else if (!productExists) {
+    } else if (productMissingInCatalog) {
       errors.push(`Fila ${i + 2}: El productId '${productId}' no existe en la tabla productos`);
     } else {
       const docId = config.importDocId ? config.importDocId(row) : null;
@@ -524,10 +535,10 @@ async function importRows(
 
     if (config.id === "productos") {
       const codes = chunk
-        .filter(({ source }) => String(source.codigo ?? "").trim())
+        .filter(({ source }) => cellString(source.codigo).trim())
         .map(({ data, docId, source }) => ({
           productoId: docId ?? (data as Record<string, unknown>).id,
-          codigo: String(source.codigo ?? "").trim(),
+          codigo: cellString(source.codigo).trim(),
           actualizadoEn: context.importadoEn,
         }));
       if (codes.length > 0) {
@@ -556,20 +567,20 @@ async function listTestBatches(): Promise<TestBatchSummary[]> {
   const grouped = new Map<string, TestBatchSummary>();
 
   docs.forEach(({ colId, data }) => {
-    const loteImportacion = String(data.loteImportacion ?? "").trim();
+    const loteImportacion = cellString(data.loteImportacion).trim();
     if (!loteImportacion) return;
 
     const current = grouped.get(loteImportacion) ?? {
       loteImportacion,
-      escenario: (String(data.escenario ?? "general").trim() || "general") as ScenarioKey,
-      importadoEn: String(data.importadoEn ?? data.creadoEn ?? ""),
+      escenario: ((cellString(data.escenario) || "general").trim() || "general") as ScenarioKey,
+      importadoEn: cellString(data.importadoEn ?? data.creadoEn),
       total: 0,
       counts: {},
     };
 
     current.total += 1;
     current.counts[colId] = (current.counts[colId] ?? 0) + 1;
-    if (!current.importadoEn) current.importadoEn = String(data.importadoEn ?? data.creadoEn ?? "");
+    if (!current.importadoEn) current.importadoEn = cellString(data.importadoEn ?? data.creadoEn);
     grouped.set(loteImportacion, current);
   });
 
@@ -578,12 +589,12 @@ async function listTestBatches(): Promise<TestBatchSummary[]> {
 
 async function countScenarioTestData(escenario: ScenarioKey): Promise<number> {
   const docs = await fetchTestDocs();
-  return docs.filter(({ data }) => String(data.escenario ?? "general").trim() === escenario).length;
+  return docs.filter(({ data }) => (cellString(data.escenario) || "general").trim() === escenario).length;
 }
 
 async function deleteScenarioTestData(escenario: ScenarioKey): Promise<number> {
   const docs = await fetchTestDocs();
-  const targets = docs.filter(({ data }) => String(data.escenario ?? "general").trim() === escenario);
+  const targets = docs.filter(({ data }) => (cellString(data.escenario) || "general").trim() === escenario);
   await Promise.all(
     IMPORTABLE_COLLECTIONS.map((colId) =>
       supabase.from(colId).delete().eq("esDePrueba", true).eq("escenario", escenario)
@@ -594,7 +605,7 @@ async function deleteScenarioTestData(escenario: ScenarioKey): Promise<number> {
 
 async function deleteTestBatch(loteImportacion: string): Promise<number> {
   const docs = await fetchTestDocs();
-  const targets = docs.filter(({ data }) => String(data.loteImportacion ?? "").trim() === loteImportacion);
+  const targets = docs.filter(({ data }) => cellString(data.loteImportacion).trim() === loteImportacion);
   await Promise.all(
     IMPORTABLE_COLLECTIONS.map((colId) =>
       supabase.from(colId).delete().eq("esDePrueba", true).eq("loteImportacion", loteImportacion)
@@ -623,14 +634,14 @@ async function deleteSalesUpToDate(dateStr: string): Promise<number> {
 // ── Escenarios de prueba (≈ 500 filas c/u) ───────────────────────────────────
 
 const BASE_PRODUCTS = [
-  { id: "PRUEBA_CV001", nombre: "Zapatilla Running Pro",  precio: 119.90, costo: 75.00,  cat: "Deportivo", marca: "Adidas",     color: "Azul",   talla: "40", baseProb: 0.65, minQ: 1, maxQ: 3 },
-  { id: "PRUEBA_CV002", nombre: "Bota de Cuero Casual",   precio: 159.90, costo: 95.00,  cat: "Casual",    marca: "Clarks",     color: "Marron", talla: "42", baseProb: 0.50, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV003", nombre: "Sandalia Verano",        precio:  49.90, costo: 28.00,  cat: "Casual",    marca: "Crocs",      color: "Beige",  talla: "38", baseProb: 0.45, minQ: 1, maxQ: 4 },
-  { id: "PRUEBA_CV004", nombre: "Mocasin Ejecutivo",      precio: 129.90, costo: 80.00,  cat: "Formal",    marca: "Bata",       color: "Negro",  talla: "41", baseProb: 0.55, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV005", nombre: "Zapatilla Escolar",      precio:  79.90, costo: 50.00,  cat: "Escolar",   marca: "Kolosh",     color: "Blanco", talla: "36", baseProb: 0.60, minQ: 1, maxQ: 3 },
-  { id: "PRUEBA_CV006", nombre: "Bota Urbana Negra",      precio: 189.90, costo: 120.00, cat: "Urbano",    marca: "Timberland", color: "Negro",  talla: "43", baseProb: 0.40, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV007", nombre: "Zapato Formal Clasico",  precio: 149.90, costo: 90.00,  cat: "Formal",    marca: "Bata",       color: "Cafe",   talla: "40", baseProb: 0.45, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV008", nombre: "Chancleta Playera",      precio:  29.90, costo: 15.00,  cat: "Playa",     marca: "Rider",      color: "Verde",  talla: "39", baseProb: 0.55, minQ: 1, maxQ: 5 },
+  { id: "PRUEBA_CV001", nombre: "Zapatilla Running Pro",  precio: 119.90, costo: 75,   cat: "Deportivo", marca: "Adidas",     color: "Azul",   talla: "40", baseProb: 0.65, minQ: 1, maxQ: 3 },
+  { id: "PRUEBA_CV002", nombre: "Bota de Cuero Casual",   precio: 159.90, costo: 95,   cat: "Casual",    marca: "Clarks",     color: "Marron", talla: "42", baseProb: 0.50, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV003", nombre: "Sandalia Verano",        precio:  49.90, costo: 28,   cat: "Casual",    marca: "Crocs",      color: "Beige",  talla: "38", baseProb: 0.45, minQ: 1, maxQ: 4 },
+  { id: "PRUEBA_CV004", nombre: "Mocasin Ejecutivo",      precio: 129.90, costo: 80,   cat: "Formal",    marca: "Bata",       color: "Negro",  talla: "41", baseProb: 0.55, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV005", nombre: "Zapatilla Escolar",      precio:  79.90, costo: 50,   cat: "Escolar",   marca: "Kolosh",     color: "Blanco", talla: "36", baseProb: 0.60, minQ: 1, maxQ: 3 },
+  { id: "PRUEBA_CV006", nombre: "Bota Urbana Negra",      precio: 189.90, costo: 120,  cat: "Urbano",    marca: "Timberland", color: "Negro",  talla: "43", baseProb: 0.40, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV007", nombre: "Zapato Formal Clasico",  precio: 149.90, costo: 90,   cat: "Formal",    marca: "Bata",       color: "Cafe",   talla: "40", baseProb: 0.45, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV008", nombre: "Chancleta Playera",      precio:  29.90, costo: 15,   cat: "Playa",     marca: "Rider",      color: "Verde",  talla: "39", baseProb: 0.55, minQ: 1, maxQ: 5 },
 ] as const;
 
 interface ScenarioCfg {
@@ -650,7 +661,7 @@ interface ScenarioCfg {
 }
 
 function uniqueSortedSizes(sizes: string[]) {
-  return Array.from(new Set(sizes.map((size) => String(size)))).sort((a, b) => Number(a) - Number(b));
+  return Array.from(new Set(sizes.map(String))).sort((a, b) => Number(a) - Number(b));
 }
 
 function buildScenarioColorStock(baseSize: string, stock: number) {
@@ -701,7 +712,7 @@ const SCENARIOS: ScenarioCfg[] = [
     detail: "90 dias · ventas regulares · precios normales · ~500 filas",
     days: 90,
     probMult: 1.1,
-    qtyMult: 1.0,
+    qtyMult: 1,
     priceDiscount: 0,
     trendStartMult: 0.98,
     trendEndMult: 1.05,
@@ -735,6 +746,9 @@ function downloadScenario(sc: ScenarioCfg): void {
       ? Math.round(p.precio * (1 - sc.priceDiscount) * 100) / 100
       : p.precio;
     const inventory = buildScenarioColorStock(p.talla, sc.stocks[i]);
+    let tipoCalzado = "Casual";
+    if (p.cat === "Formal") tipoCalzado = "Zapatos de Vestir";
+    else if (p.cat === "Deportivo") tipoCalzado = "Zapatillas";
     return {
       id: p.id,
       codigo: p.id.replace("PRUEBA_", ""),
@@ -742,7 +756,7 @@ function downloadScenario(sc: ScenarioCfg): void {
       precio,
       stock: sc.stocks[i],
       categoria: p.cat,
-      tipoCalzado: p.cat === "Formal" ? "Zapatos de Vestir" : p.cat === "Deportivo" ? "Zapatillas" : "Casual",
+      tipoCalzado,
       descripcion: `Producto de prueba — escenario ${sc.label}`,
       marca: p.marca,
       color: p.color,
@@ -885,7 +899,7 @@ export default function AdminData() {
 
   const handleDeleteByDate = async () => {
     if (!deleteDate) return;
-    if (!window.confirm(`¿Eliminar TODOS los registros de Ventas Diarias con fecha hasta el ${deleteDate}? Esta acción no se puede deshacer.`)) return;
+    if (!globalThis.confirm(`¿Eliminar TODOS los registros de Ventas Diarias con fecha hasta el ${deleteDate}? Esta acción no se puede deshacer.`)) return;
     setDeleteLoading(true);
     try {
       const deleted = await deleteSalesUpToDate(deleteDate);
@@ -984,7 +998,7 @@ export default function AdminData() {
   };
 
   const handleDeleteScenario = async () => {
-    if (!window.confirm(`¿Eliminar todos los datos de prueba del escenario ${scenarioLabel(scenarioKey)}?`)) return;
+    if (!globalThis.confirm(`¿Eliminar todos los datos de prueba del escenario ${scenarioLabel(scenarioKey)}?`)) return;
     setScenarioDeleteLoading(true);
     try {
       const deleted = await deleteScenarioTestData(scenarioKey);
@@ -1000,7 +1014,7 @@ export default function AdminData() {
   };
 
   const handleDeleteBatch = async (loteImportacion: string) => {
-    if (!window.confirm(`¿Eliminar el lote ${loteImportacion}? Solo se borrarán datos marcados como prueba.`)) return;
+    if (!globalThis.confirm(`¿Eliminar el lote ${loteImportacion}? Solo se borrarán datos marcados como prueba.`)) return;
     setDeletingBatch(loteImportacion);
     try {
       const deleted = await deleteTestBatch(loteImportacion);
@@ -1037,6 +1051,21 @@ export default function AdminData() {
           const errors = importErrors[config.id] ?? [];
           const result = importResult[config.id];
 
+          let exportStatusIcon: ReactNode = <Download size={15} />;
+          if (eStatus === "loading") exportStatusIcon = <Loader size={15} className="data-spin" />;
+          else if (eStatus === "success") exportStatusIcon = <CheckCircle size={15} />;
+
+          let exportStatusLabel = `Exportar ${config.label}`;
+          if (eStatus === "loading") exportStatusLabel = "Exportando...";
+          else if (eStatus === "success") exportStatusLabel = "Descargado";
+
+          let importStatusIcon: ReactNode = <Upload size={13} />;
+          if (iStatus === "loading") importStatusIcon = <Loader size={13} className="data-spin" />;
+          else if (iStatus === "success") importStatusIcon = <CheckCircle size={13} style={{ color: "#10b981" }} />;
+          else if (iStatus === "error") importStatusIcon = <AlertTriangle size={13} style={{ color: "#f59e0b" }} />;
+
+          const importButtonLabel = iStatus === "loading" ? "Importando..." : "Importar Excel";
+
           return (
             <div key={config.id} className="dash-card data-card">
               <div className="data-card-header">
@@ -1054,18 +1083,8 @@ export default function AdminData() {
                   disabled={eStatus === "loading"}
                   onClick={() => handleExport(config)}
                 >
-                  {eStatus === "loading" ? (
-                    <Loader size={15} className="data-spin" />
-                  ) : eStatus === "success" ? (
-                    <CheckCircle size={15} />
-                  ) : (
-                    <Download size={15} />
-                  )}
-                  {eStatus === "loading"
-                    ? "Exportando..."
-                    : eStatus === "success"
-                    ? "Descargado"
-                    : `Exportar ${config.label}`}
+                  {exportStatusIcon}
+                  {exportStatusLabel}
                 </button>
 
                 {config.canImport && (
@@ -1084,16 +1103,8 @@ export default function AdminData() {
                         disabled={iStatus === "loading"}
                         onClick={() => fileRefs.current[config.id]?.click()}
                       >
-                        {iStatus === "loading" ? (
-                          <Loader size={13} className="data-spin" />
-                        ) : iStatus === "success" ? (
-                          <CheckCircle size={13} style={{ color: "#10b981" }} />
-                        ) : iStatus === "error" ? (
-                          <AlertTriangle size={13} style={{ color: "#f59e0b" }} />
-                        ) : (
-                          <Upload size={13} />
-                        )}
-                        {iStatus === "loading" ? "Importando..." : "Importar Excel"}
+                        {importStatusIcon}
+                        {importButtonLabel}
                       </button>
                       <input
                         ref={(el) => { fileRefs.current[config.id] = el; }}
