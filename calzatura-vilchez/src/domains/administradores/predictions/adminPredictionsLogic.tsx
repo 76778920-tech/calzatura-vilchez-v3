@@ -584,16 +584,22 @@ export function productDetailTrendInterpretV2(t: Prediction["tendencia"]): strin
   return "Eso significa que, por ahora, su ritmo de venta se mantiene bastante estable.";
 }
 
+function predictionDisplayLabel(product: Pick<Prediction, "nombre" | "codigo">): string {
+  const codigoSuffix = product.codigo ? ` (${product.codigo})` : "";
+  return `${product.nombre}${codigoSuffix}`;
+}
+
 export function buildProductDetailResponseV2(product: Prediction) {
-  const label = `${product.nombre}${product.codigo ? ` (${product.codigo})` : ""}`;
+  const label = predictionDisplayLabel(product);
   const coverage = productDetailCoverageDescrV2(product);
 
   if (product.sin_historial) {
+    const categoriaStock = product.categoria ? ` dentro de la categoría ${product.categoria}` : "";
     return [
       `Sobre ${label}:`,
       "",
       `Todavía no tiene suficiente historial de ventas para hacer una proyección confiable.`,
-      `Por ahora solo veo ${product.stock_actual} unidades en stock${product.categoria ? ` dentro de la categoría ${product.categoria}` : ""}.`,
+      `Por ahora solo veo ${product.stock_actual} unidades en stock${categoriaStock}.`,
       "En términos simples: aún no hay suficiente movimiento real para saber si este producto rota rápido, lento o de forma estable.",
       "En cuanto acumule más ventas, el panel podrá estimar mejor su demanda, su riesgo de agotarse y la urgencia de reponerlo.",
     ].join("\n");
@@ -741,7 +747,7 @@ export function computeAssistantV2AsksRevenue(msg: string, intentScores: Assista
 }
 
 export function assistantV2LabelOf(product: Prediction): string {
-  return `${product.nombre}${product.codigo ? ` (${product.codigo})` : ""}`;
+  return predictionDisplayLabel(product);
 }
 
 export function assistantV2JoinNatural(items: string[]): string {
@@ -868,24 +874,35 @@ export function assistantV2TryRevenue(shared: AssistantV2Shared): string | null 
   const s = revenueForecast.summary;
   const horizonLabel = revenueForecast.horizon_days;
   const change = formatPercent(s.crecimiento_estimado_horizonte_pct);
-  const directionSentence =
-    s.crecimiento_estimado_horizonte_pct >= 5
-      ? `Eso apunta a un periodo de ${horizonLabel} días mejor que el anterior.`
-      : s.crecimiento_estimado_horizonte_pct <= -5
-        ? `Eso apunta a un periodo de ${horizonLabel} días más flojo que el anterior.`
-        : `Eso apunta a un periodo de ${horizonLabel} días muy parecido al anterior.`;
-  const decisionSentence =
-    s.crecimiento_estimado_horizonte_pct >= 5
-      ? "La lectura gerencial sería mantener el ritmo y cuidar que no falte stock en los productos que mejor rotan."
-      : s.crecimiento_estimado_horizonte_pct <= -5
-        ? "La lectura gerencial sería revisar promociones, stock y productos de mayor salida para no dejar caer las ventas."
-        : "La lectura gerencial sería mantener el control actual y monitorear si aparece algún cambio importante.";
-  const confidenceSentence =
-    s.confianza >= CONFIDENCE_ALTA_MIN
-      ? "La estimación se ve bastante confiable con los datos que ya tiene el sistema."
-      : s.confianza >= CONFIDENCE_MEDIA_MIN
-        ? "La estimación es útil como guía, aúnque conviene mirarla con algo de cautela."
-        : "La estimación aún es preliminar, así que conviene usarla solo como orientación.";
+
+  let directionSentence: string;
+  if (s.crecimiento_estimado_horizonte_pct >= 5) {
+    directionSentence = `Eso apunta a un periodo de ${horizonLabel} días mejor que el anterior.`;
+  } else if (s.crecimiento_estimado_horizonte_pct <= -5) {
+    directionSentence = `Eso apunta a un periodo de ${horizonLabel} días más flojo que el anterior.`;
+  } else {
+    directionSentence = `Eso apunta a un periodo de ${horizonLabel} días muy parecido al anterior.`;
+  }
+
+  let decisionSentence: string;
+  if (s.crecimiento_estimado_horizonte_pct >= 5) {
+    decisionSentence =
+      "La lectura gerencial sería mantener el ritmo y cuidar que no falte stock en los productos que mejor rotan.";
+  } else if (s.crecimiento_estimado_horizonte_pct <= -5) {
+    decisionSentence =
+      "La lectura gerencial sería revisar promociones, stock y productos de mayor salida para no dejar caer las ventas.";
+  } else {
+    decisionSentence = "La lectura gerencial sería mantener el control actual y monitorear si aparece algún cambio importante.";
+  }
+
+  let confidenceSentence: string;
+  if (s.confianza >= CONFIDENCE_ALTA_MIN) {
+    confidenceSentence = "La estimación se ve bastante confiable con los datos que ya tiene el sistema.";
+  } else if (s.confianza >= CONFIDENCE_MEDIA_MIN) {
+    confidenceSentence = "La estimación es útil como guía, aúnque conviene mirarla con algo de cautela.";
+  } else {
+    confidenceSentence = "La estimación aún es preliminar, así que conviene usarla solo como orientación.";
+  }
 
   return [
     "Resumen ejecutivo:",
@@ -1293,7 +1310,10 @@ export function DemandAccuracyChart({ predictions }: { predictions: Prediction[]
     return sum + Math.abs(est - p.ventas_30_dias) / p.ventas_30_dias;
   }, 0) / rows.length * 100;
 
-  const mapeColor = mape <= 15 ? "acc-mape-good" : mape <= 30 ? "acc-mape-warn" : "acc-mape-bad";
+  let mapeColor: string;
+  if (mape <= 15) mapeColor = "acc-mape-good";
+  else if (mape <= 30) mapeColor = "acc-mape-warn";
+  else mapeColor = "acc-mape-bad";
 
   return (
     <div className="acc-chart">
@@ -1413,7 +1433,14 @@ export function IreHistoryPanel({ data }: { data: IreHistorialPoint[] }) {
         </div>
         <div className="pred-model-meta-item">
           <span className="pred-sub">Cambio del período</span>
-          <strong>{delta === 0 ? "sin cambio" : `${delta > 0 ? "+" : ""}${delta} pts`}</strong>
+          <strong>
+            {delta === 0 ? "sin cambio" : (
+              <>
+                {delta > 0 ? "+" : ""}
+                {delta} pts
+              </>
+            )}
+          </strong>
         </div>
         <div className="pred-model-meta-item">
           <span className="pred-sub">Promedio histórico</span>
@@ -1660,7 +1687,7 @@ export function exportPredictionsCSV(predictions: Prediction[], horizon: Horizon
   a.download = `predicciones-${horizon}d-${new Date().toISOString().slice(0, 10)}.csv`;
   document.body.appendChild(a);
   a.click();
-  document.body.removeChild(a);
+  a.remove();
   URL.revokeObjectURL(url);
 }
 
@@ -1687,26 +1714,33 @@ export function normalizeRevenueForecastForHorizon(revenueForecast: RevenueForec
     summary.proximo_horizonte ?? (selectedHorizon <= 7 ? summary.proximo_7_dias : summary.proximo_30_dias);
 
   const historyWindowAvailable = revenueForecast.history.length >= selectedHorizon;
-  const ultimoHorizonte =
-    summary.ultimo_horizonte
-    ?? (selectedHorizon >= 30
-      ? summary.ultimo_30_dias
-      : historyWindowAvailable
-        ? Number(
-            revenueForecast.history
-              .slice(-selectedHorizon)
-              .reduce((total, point) => total + point.ingresos, 0)
-              .toFixed(2),
-          )
-        : Number(((summary.promedio_diario_historico ?? 0) * selectedHorizon).toFixed(2)));
 
-  const crecimientoHorizonte =
-    summary.crecimiento_estimado_horizonte_pct
-    ?? (selectedHorizon >= 30
-      ? summary.crecimiento_estimado_pct
-      : ultimoHorizonte > 0
-        ? Number((((proximoHorizonte - ultimoHorizonte) / ultimoHorizonte) * 100).toFixed(1))
-        : 0);
+  let ultimoHorizonte: number;
+  if (summary.ultimo_horizonte != null) {
+    ultimoHorizonte = summary.ultimo_horizonte;
+  } else if (selectedHorizon >= 30) {
+    ultimoHorizonte = summary.ultimo_30_dias;
+  } else if (historyWindowAvailable) {
+    ultimoHorizonte = Number(
+      revenueForecast.history
+        .slice(-selectedHorizon)
+        .reduce((total, point) => total + point.ingresos, 0)
+        .toFixed(2),
+    );
+  } else {
+    ultimoHorizonte = Number(((summary.promedio_diario_historico ?? 0) * selectedHorizon).toFixed(2));
+  }
+
+  let crecimientoHorizonte: number;
+  if (summary.crecimiento_estimado_horizonte_pct != null) {
+    crecimientoHorizonte = summary.crecimiento_estimado_horizonte_pct;
+  } else if (selectedHorizon >= 30) {
+    crecimientoHorizonte = summary.crecimiento_estimado_pct;
+  } else if (ultimoHorizonte > 0) {
+    crecimientoHorizonte = Number((((proximoHorizonte - ultimoHorizonte) / ultimoHorizonte) * 100).toFixed(1));
+  } else {
+    crecimientoHorizonte = 0;
+  }
 
   return {
     ...revenueForecast,
@@ -1901,7 +1935,10 @@ export function buildAbcInventoryItems(predictionsForView: Prediction[]): Predic
     ({ items, cum }, p) => {
       const newCum = cum + p.total_vendido_historico * p.precio;
       const pct = totalRev > 0 ? newCum / totalRev : 0;
-      const abc = (pct <= 0.80 ? "A" : pct <= 0.95 ? "B" : "C") as "A" | "B" | "C";
+      let abc: "A" | "B" | "C";
+      if (pct <= 0.80) abc = "A";
+      else if (pct <= 0.95) abc = "B";
+      else abc = "C";
       return { cum: newCum, items: [...items, { ...p, abc }] };
     },
     { items: [], cum: 0 },
@@ -2092,8 +2129,15 @@ export function CampanaActivaPanel({
           const isDone = i < currentIdx;
           const isCurrent = i === currentIdx;
           const isRiesgo = c.estado === "en_riesgo_stock" && step.key === "activa";
-          const color = isRiesgo ? "#f59e0b" : isCurrent ? "#6366f1" : isDone ? "#22c55e" : "rgba(255,255,255,0.18)";
-          const labelColor = isCurrent || isRiesgo ? "#fff" : isDone ? "#22c55e" : "rgba(255,255,255,0.45)";
+          let color: string;
+          if (isRiesgo) color = "#f59e0b";
+          else if (isCurrent) color = "#6366f1";
+          else if (isDone) color = "#22c55e";
+          else color = "rgba(255,255,255,0.18)";
+          let labelColor: string;
+          if (isCurrent || isRiesgo) labelColor = "#fff";
+          else if (isDone) labelColor = "#22c55e";
+          else labelColor = "rgba(255,255,255,0.45)";
           return (
             <div
               key={step.key}
@@ -2246,33 +2290,43 @@ export function CampanaActivaPanel({
                 </tr>
               </thead>
               <tbody>
-                {c.top_productos_detalle.map((p) => (
+                {c.top_productos_detalle.map((p) => {
+                  let upliftBadgeClass = "";
+                  if (p.uplift_ratio >= 2) upliftBadgeClass = "critico";
+                  else if (p.uplift_ratio >= 1.5) upliftBadgeClass = "alerta";
+                  const impactoSoles = p.impacto_soles ?? 0;
+                  const impactoText =
+                    impactoSoles > 0
+                      ? `S/ ${impactoSoles.toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                      : "—";
+                  let stockTdColor: string | undefined;
+                  if (p.stock_actual === 0) stockTdColor = "#ef4444";
+                  else if ((p.stock_actual ?? 999) < 5) stockTdColor = "#f59e0b";
+                  return (
                   <tr key={p.producto_id} className={p.stock_actual === 0 ? "pred-row-alert" : ""}>
                     <td style={{ fontWeight: 600 }}>{p.nombre}</td>
                     <td>{p.categoria}</td>
                     <td>
-                      <span className={`pred-estado-badge ${p.uplift_ratio >= 2 ? "critico" : p.uplift_ratio >= 1.5 ? "alerta" : ""}`}>
+                      <span className={`pred-estado-badge ${upliftBadgeClass}`}>
                         {p.uplift_ratio.toFixed(2)}×
                       </span>
                     </td>
                     <td>{p.ventas_recientes.toFixed(1)} uds</td>
                     <td>{p.ventas_baseline.toFixed(1)} uds</td>
-                    <td style={{ fontWeight: 600, color: (p.impacto_soles ?? 0) > 0 ? "#22c55e" : undefined }}>
-                      {(p.impacto_soles ?? 0) > 0
-                        ? `S/ ${(p.impacto_soles!).toLocaleString("es-PE", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                        : "—"}
+                    <td style={{ fontWeight: 600, color: impactoSoles > 0 ? "#22c55e" : undefined }}>
+                      {impactoText}
                     </td>
                     <td
                       style={{
                         fontWeight: 600,
-                        color:
-                          p.stock_actual === 0 ? "#ef4444" : (p.stock_actual ?? 999) < 5 ? "#f59e0b" : undefined,
+                        color: stockTdColor,
                       }}
                     >
                       {p.stock_actual ?? "—"}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -2310,6 +2364,10 @@ export function CampanasHistorialTable({ historial }: { historial: CampanaDetect
           <tbody>
             {historial.map((h) => {
               const impacto = campanaHistorialImpactoSoles(h);
+              let adminEstado: string;
+              if (h.confirmada_por_admin === true) adminEstado = "✓ Confirmada";
+              else if (h.confirmada_por_admin === false) adminEstado = "✗ Descartada";
+              else adminEstado = "Pendiente";
               return (
                 <tr key={h.id}>
                   <td>{h.fecha_deteccion}</td>
@@ -2322,11 +2380,7 @@ export function CampanasHistorialTable({ historial }: { historial: CampanaDetect
                   <td>{impacto > 0 ? `S/ ${impacto.toLocaleString("es-PE", { minimumFractionDigits: 2 })}` : "—"}</td>
                   <td>{CAMPANA_ESTADO_LABEL[h.estado] ?? h.estado}</td>
                   <td style={{ fontSize: "0.8rem", opacity: 0.85 }}>
-                    {h.confirmada_por_admin === true
-                      ? "✓ Confirmada"
-                      : h.confirmada_por_admin === false
-                        ? "✗ Descartada"
-                        : "Pendiente"}
+                    {adminEstado}
                   </td>
                 </tr>
               );
@@ -2480,8 +2534,8 @@ export function FinanzasRiesgoPanel({
             <TrendingUp size={14} /> Flujo de caja proyectado — próximas 4 semanas
           </div>
           <div className="fin-risk-flux-grid">
-            {semanas.map((s, i) => (
-              <div key={i} className="fin-risk-flux-card">
+            {semanas.map((s) => (
+              <div key={s.label} className="fin-risk-flux-card">
                 <span className="fin-risk-flux-label">{s.label}</span>
                 <span className="fin-risk-flux-val">{formatCurrency(s.valor)}</span>
                 <span className="fin-risk-flux-acum">Acum.: {formatCurrency(s.acumulado)}</span>
@@ -2495,6 +2549,18 @@ export function FinanzasRiesgoPanel({
       )}
     </div>
   );
+}
+
+function rankingTendenciaBadgeLabel(tendencia: Prediction["tendencia"]): string {
+  if (tendencia === "subiendo") return "↑ Subiendo";
+  if (tendencia === "bajando") return "↓ Bajando";
+  return "→ Estable";
+}
+
+function rankingRecomendacionNivelIcon(nivel: "critico" | "advertencia" | "sugerencia"): string {
+  if (nivel === "critico") return "🔴";
+  if (nivel === "advertencia") return "🟡";
+  return "🔵";
 }
 
 export function rankingSalesKey(period: RankingPeriod): keyof Prediction {
@@ -2623,7 +2689,10 @@ export function PredictionsRankingTabPanel({
   tabDirection: number;
 }) {
   const periodKey = rankingSalesKey(rankingPeriod);
-  const periodLabel = rankingPeriod === 7 ? "7 días" : rankingPeriod === 15 ? "15 días" : "30 días";
+  let periodLabel: string;
+  if (rankingPeriod === 7) periodLabel = "7 días";
+  else if (rankingPeriod === 15) periodLabel = "15 días";
+  else periodLabel = "30 días";
   const withHistory = predictions.filter((p) => !p.sin_historial && ((p[periodKey] as number) ?? 0) > 0);
   const top3 = [...withHistory]
     .sort((a, b) => ((b[periodKey] as number) ?? 0) - ((a[periodKey] as number) ?? 0))
@@ -2645,16 +2714,22 @@ export function PredictionsRankingTabPanel({
     >
       <div className="ranking-period-bar">
         <span className="ranking-period-label">Período:</span>
-        {([7, 15, 30] as RankingPeriod[]).map((p) => (
+        {([7, 15, 30] as RankingPeriod[]).map((p) => {
+          let periodBtnLabel: string;
+          if (p === 7) periodBtnLabel = "Semana";
+          else if (p === 15) periodBtnLabel = "15 días";
+          else periodBtnLabel = "Mes";
+          return (
           <button
             key={p}
             type="button"
             className={`ranking-period-btn${rankingPeriod === p ? " active" : ""}`}
             onClick={() => setRankingPeriod(p)}
           >
-            {p === 7 ? "Semana" : p === 15 ? "15 días" : "Mes"}
+            {periodBtnLabel}
           </button>
-        ))}
+          );
+        })}
       </div>
 
       <div className="ranking-section-title">
@@ -2685,7 +2760,7 @@ export function PredictionsRankingTabPanel({
                 {(((p[periodKey] as number) ?? 0) * p.precio).toLocaleString("es-PE", { maximumFractionDigits: 0 })}
               </div>
               <div className={`ranking-trend-badge ${p.tendencia}`}>
-                {p.tendencia === "subiendo" ? "↑ Subiendo" : p.tendencia === "bajando" ? "↓ Bajando" : "→ Estable"}
+                {rankingTendenciaBadgeLabel(p.tendencia)}
               </div>
             </div>
           ))}
@@ -2722,7 +2797,7 @@ export function PredictionsRankingTabPanel({
               </div>
               <div className={`ranking-rec ranking-rec-${rec.nivel}`}>
                 <span className="ranking-rec-icon">
-                  {rec.nivel === "critico" ? "🔴" : rec.nivel === "advertencia" ? "🟡" : "🔵"}
+                  {rankingRecomendacionNivelIcon(rec.nivel)}
                 </span>
                 <span>{rec.texto}</span>
               </div>
