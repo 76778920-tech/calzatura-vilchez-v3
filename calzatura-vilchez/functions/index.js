@@ -244,22 +244,16 @@ function aggregateColorStock(colorStock) {
   return aggregate;
 }
 
+function sizesFromStockMap(stockBySize) {
+  return Object.entries(stockBySize)
+    .filter(([, qty]) => Number(qty) > 0)
+    .map(([talla]) => talla)
+    .sort((a, b) => Number(a) - Number(b));
+}
+
 function getAvailableSizes(product) {
-  if (product.colorStock) {
-    const stockBySize = aggregateColorStock(product.colorStock);
-    return Object.entries(stockBySize)
-      .filter(([, qty]) => Number(qty) > 0)
-      .map(([talla]) => talla)
-      .sort((a, b) => Number(a) - Number(b));
-  }
-
-  if (product.tallaStock) {
-    return Object.entries(product.tallaStock)
-      .filter(([, qty]) => Number(qty) > 0)
-      .map(([talla]) => talla)
-      .sort((a, b) => Number(a) - Number(b));
-  }
-
+  if (product.colorStock) return sizesFromStockMap(aggregateColorStock(product.colorStock));
+  if (product.tallaStock) return sizesFromStockMap(product.tallaStock);
   return Array.isArray(product.tallas) ? product.tallas : [];
 }
 
@@ -546,6 +540,10 @@ async function discountOrderItemStock(supabase, item) {
   }
 }
 
+function hasValidOrderItems(order) {
+  return Array.isArray(order.items) && order.items.length > 0 && order.items.length <= ORDER_ITEM_LIMIT;
+}
+
 async function discountOrderStock(supabase, order) {
   for (const item of order.items || []) {
     await discountOrderItemStock(supabase, item);
@@ -642,7 +640,7 @@ exports.createCheckoutSession = onRequest(
         if (order.estado !== "pendiente" || order.metodoPago !== "stripe") {
           return res.status(409).json({ error: "El pedido no esta disponible para pago" });
         }
-        if (!Array.isArray(order.items) || order.items.length === 0 || order.items.length > ORDER_ITEM_LIMIT) {
+        if (!hasValidOrderItems(order)) {
           return res.status(400).json({ error: "Pedido sin productos validos" });
         }
 
@@ -792,7 +790,7 @@ exports.confirmCodOrder = onRequest(
         if (order.estado !== "pendiente" || order.metodoPago !== "contraentrega") {
           return res.status(409).json({ error: "El pedido no esta disponible para confirmar" });
         }
-        if (!Array.isArray(order.items) || order.items.length === 0 || order.items.length > ORDER_ITEM_LIMIT) {
+        if (!hasValidOrderItems(order)) {
           return res.status(400).json({ error: "Pedido sin productos validos" });
         }
 
@@ -916,18 +914,24 @@ exports.favorites = onRequest(
 const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
 
 /** @returns {{ ok: true, upstreamUrl: string, method: string } | { ok: false, status?: number, error: string }} */
+function parseQueryInt(req, name, defaultVal, min, max) {
+  const v = Number.parseInt(String(req.query[name] ?? defaultVal), 10);
+  if (!Number.isFinite(v) || v < min || v > max) return null;
+  return v;
+}
+
 function aiProxyCombined(base, req) {
-  const horizon = Number.parseInt(String(req.query.horizon ?? "30"), 10);
-  const history = Number.parseInt(String(req.query.history ?? "120"), 10);
-  if (!Number.isFinite(horizon) || horizon < 7 || horizon > 90) return { ok: false, error: "horizon invalido" };
-  if (!Number.isFinite(history) || history < 30 || history > 365) return { ok: false, error: "history invalido" };
+  const horizon = parseQueryInt(req, "horizon", "30", 7, 90);
+  const history = parseQueryInt(req, "history", "120", 30, 365);
+  if (horizon === null) return { ok: false, error: "horizon invalido" };
+  if (history === null) return { ok: false, error: "history invalido" };
   const upstreamUrl = `${base}/api/predict/combined?horizon=${encodeURIComponent(horizon)}&history=${encodeURIComponent(history)}`;
   return { ok: true, upstreamUrl, method: "GET" };
 }
 
 function aiProxyWeeklyChart(base, req) {
-  const weeks = Number.parseInt(String(req.query.weeks ?? "8"), 10);
-  if (!Number.isFinite(weeks) || weeks < 2 || weeks > 24) return { ok: false, error: "weeks invalido" };
+  const weeks = parseQueryInt(req, "weeks", "8", 2, 24);
+  if (weeks === null) return { ok: false, error: "weeks invalido" };
   const upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
   return { ok: true, upstreamUrl, method: "GET" };
 }
@@ -937,8 +941,8 @@ function aiProxyModelMetrics(base) {
 }
 
 function aiProxyIreHistorial(base, req) {
-  const days = Number.parseInt(String(req.query.days ?? "30"), 10);
-  if (!Number.isFinite(days) || days < 1 || days > 365) return { ok: false, error: "days invalido" };
+  const days = parseQueryInt(req, "days", "30", 1, 365);
+  if (days === null) return { ok: false, error: "days invalido" };
   const upstreamUrl = `${base}/api/ire/historial?days=${encodeURIComponent(days)}`;
   return { ok: true, upstreamUrl, method: "GET" };
 }
@@ -958,13 +962,11 @@ function aiProxyCampaignFeedback(base, req) {
 }
 
 function aiProxyCampaignDetection(base, req) {
-  const recentDays = Number.parseInt(String(req.query.recent_days ?? "7"), 10);
-  const baselineDays = Number.parseInt(String(req.query.baseline_days ?? "60"), 10);
-  if (!Number.isFinite(recentDays) || recentDays < 3 || recentDays > 14) return { ok: false, error: "recent_days invalido" };
-  if (!Number.isFinite(baselineDays) || baselineDays < 30 || baselineDays > 120) {
-    return { ok: false, error: "baseline_days invalido" };
-  }
-  const upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${recentDays}&baseline_days=${baselineDays}`;
+  const recentDays = parseQueryInt(req, "recent_days", "7", 3, 14);
+  const baselineDays = parseQueryInt(req, "baseline_days", "60", 30, 120);
+  if (recentDays === null) return { ok: false, error: "recent_days invalido" };
+  if (baselineDays === null) return { ok: false, error: "baseline_days invalido" };
+  const upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${encodeURIComponent(recentDays)}&baseline_days=${encodeURIComponent(baselineDays)}`;
   return { ok: true, upstreamUrl, method: "GET" };
 }
 
