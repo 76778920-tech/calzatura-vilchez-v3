@@ -934,22 +934,22 @@ const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
 /** @returns {{ ok: true, upstreamUrl: string, method: string } | { ok: false, status?: number, error: string }} */
 function parseQueryInt(req, name, defaultVal, min, max) {
   const v = Number.parseInt(String(req.query[name] ?? defaultVal), 10);
-  if (!Number.isFinite(v) || v < min || v > max) return null;
+  if (!Number.isFinite(v) || v < min || v > max) return Number.NaN;
   return v;
 }
 
 function aiProxyCombined(base, req) {
   const horizon = parseQueryInt(req, "horizon", "30", 7, 90);
   const history = parseQueryInt(req, "history", "120", 30, 365);
-  if (horizon === null) return { ok: false, error: "horizon invalido" };
-  if (history === null) return { ok: false, error: "history invalido" };
+  if (Number.isNaN(horizon)) return { ok: false, error: "horizon invalido" };
+  if (Number.isNaN(history)) return { ok: false, error: "history invalido" };
   const upstreamUrl = `${base}/api/predict/combined?horizon=${encodeURIComponent(horizon)}&history=${encodeURIComponent(history)}`;
   return { ok: true, upstreamUrl, method: "GET" };
 }
 
 function aiProxyWeeklyChart(base, req) {
   const weeks = parseQueryInt(req, "weeks", "8", 2, 24);
-  if (weeks === null) return { ok: false, error: "weeks invalido" };
+  if (Number.isNaN(weeks)) return { ok: false, error: "weeks invalido" };
   const upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
   return { ok: true, upstreamUrl, method: "GET" };
 }
@@ -960,7 +960,7 @@ function aiProxyModelMetrics(base) {
 
 function aiProxyIreHistorial(base, req) {
   const days = parseQueryInt(req, "days", "30", 1, 365);
-  if (days === null) return { ok: false, error: "days invalido" };
+  if (Number.isNaN(days)) return { ok: false, error: "days invalido" };
   const upstreamUrl = `${base}/api/ire/historial?days=${encodeURIComponent(days)}`;
   return { ok: true, upstreamUrl, method: "GET" };
 }
@@ -982,8 +982,8 @@ function aiProxyCampaignFeedback(base, req) {
 function aiProxyCampaignDetection(base, req) {
   const recentDays = parseQueryInt(req, "recent_days", "7", 3, 14);
   const baselineDays = parseQueryInt(req, "baseline_days", "60", 30, 120);
-  if (recentDays === null) return { ok: false, error: "recent_days invalido" };
-  if (baselineDays === null) return { ok: false, error: "baseline_days invalido" };
+  if (Number.isNaN(recentDays)) return { ok: false, error: "recent_days invalido" };
+  if (Number.isNaN(baselineDays)) return { ok: false, error: "baseline_days invalido" };
   const upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${encodeURIComponent(recentDays)}&baseline_days=${encodeURIComponent(baselineDays)}`;
   return { ok: true, upstreamUrl, method: "GET" };
 }
