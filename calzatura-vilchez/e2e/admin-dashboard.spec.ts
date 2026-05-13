@@ -238,9 +238,10 @@ test.describe("admin dashboard → KPIs, auditoría y errores", () => {
     await expect(page.locator("h1.dash-title", { hasText: /^Dashboard$/ })).toBeVisible({ timeout: 15_000 });
 
     const row = page.locator("tr.dash-order-row").first();
+    const rowButton = row.locator("button.dash-order-row-btn");
     await expect(row).toBeVisible();
-    await row.focus();
-    await expect(row).toBeFocused();
+    await rowButton.focus();
+    await expect(rowButton).toBeFocused();
     await page.keyboard.press("Enter");
 
     await expect(page.getByText(/Detalle del Pedido/i)).toBeVisible();
@@ -249,7 +250,8 @@ test.describe("admin dashboard → KPIs, auditoría y errores", () => {
     await page.keyboard.press("Escape");
     await expect(page.getByText(/Detalle del Pedido/i)).not.toBeVisible();
 
-    await row.focus();
+    await rowButton.focus();
+    await expect(rowButton).toBeFocused();
     await page.keyboard.press(" ");
     await expect(page.locator(".dash-order-modal").getByText(/Detalle del Pedido/i)).toBeVisible();
     await page.keyboard.press("Escape");
