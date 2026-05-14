@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { IdCard, User, Mail, Lock, Eye, EyeOff, Search } from "lucide-react";
+import { IdCard, User, Mail, Lock, Eye, EyeOff, Search, Smartphone } from "lucide-react";
 import { checkDisposableEmail, registerUser } from "@/domains/usuarios/services/auth";
 import { PUBLIC_ROUTES } from "@/routes/paths";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
@@ -18,6 +18,7 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
+  const [celular, setCelular] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [lookingUpDni, setLookingUpDni] = useState(false);
   const [validatedDni, setValidatedDni] = useState("");
@@ -68,6 +69,7 @@ export default function Register() {
       password,
       confirmPass,
       email,
+      celular,
     });
     if (blocking) {
       toast.error(blocking);
@@ -84,6 +86,7 @@ export default function Register() {
         apellidos,
         email: emailNorm,
         password,
+        celular,
       });
       savePendingVerificationEmail(emailNorm);
       navigate(PUBLIC_ROUTES.verifyEmail, { replace: true });
@@ -195,6 +198,25 @@ export default function Register() {
                 required
                 maxLength={MAX_AUTH_EMAIL_INPUT_LENGTH}
                 placeholder="tu@correo.com"
+                className="form-input with-icon"
+              />
+            </div>
+          </div>
+
+          <div className="input-group">
+            <label htmlFor="register-celular">Celular</label>
+            <div className="input-wrapper">
+              <Smartphone size={16} className="input-icon" />
+              <input
+                id="register-celular"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                value={celular}
+                onChange={(e) => setCelular(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                required
+                maxLength={9}
+                placeholder="9XXXXXXXX"
                 className="form-input with-icon"
               />
             </div>

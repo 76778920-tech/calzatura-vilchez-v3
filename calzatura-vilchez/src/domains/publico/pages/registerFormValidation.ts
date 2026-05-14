@@ -10,6 +10,7 @@ export type RegisterFormFields = {
   password: string;
   confirmPass: string;
   email: string;
+  celular: string;
 };
 
 /** Mensaje de error para mostrar con toast, o null si el formulario puede enviarse. */
@@ -20,6 +21,9 @@ export function getRegisterBlockingMessage(fields: RegisterFormFields): string |
   }
   if (!fields.validatedDni || !fields.nombres || !fields.apellidos) {
     return "Primero busca tu DNI con el boton de busqueda";
+  }
+  if (!/^9\d{8}$/.test(fields.celular)) {
+    return "Ingresa un celular válido de 9 dígitos (empieza con 9)";
   }
   if (fields.password !== fields.confirmPass) {
     return "Las contraseñas no coinciden";

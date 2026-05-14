@@ -37,12 +37,14 @@ function buildPendingProfileMarker(data: {
   dni: string;
   nombres: string;
   apellidos: string;
+  celular?: string;
 }): string {
   return [
     PENDING_PROFILE_PREFIX,
     encodePendingSegment(data.dni),
     encodePendingSegment(data.nombres),
     encodePendingSegment(data.apellidos),
+    encodePendingSegment(data.celular ?? ""),
   ].join("|");
 }
 
@@ -50,19 +52,21 @@ function parsePendingProfileMarker(displayName: string | null): {
   dni: string;
   nombres: string;
   apellidos: string;
+  celular?: string;
 } | null {
   if (!displayName?.startsWith(PENDING_PROFILE_PREFIX)) return null;
 
   const parts = displayName.split("|");
-  if (parts.length !== 4) return null;
+  if (parts.length < 4) return null;
 
-  const [, dni, nombres, apellidos] = parts;
+  const [, dni, nombres, apellidos, celular] = parts;
 
   try {
     return {
       dni: decodePendingSegment(dni),
       nombres: decodePendingSegment(nombres),
       apellidos: decodePendingSegment(apellidos),
+      celular: celular ? decodePendingSegment(celular) : undefined,
     };
   } catch {
     return null;
@@ -108,6 +112,7 @@ export async function registerUser(
     apellidos: string;
     email: string;
     password: string;
+    celular?: string;
   }
 ) {
   if (data.password.length < MIN_AUTH_PASSWORD_LENGTH) {
@@ -131,6 +136,7 @@ export async function registerUser(
         dni: data.dni,
         nombres,
         apellidos,
+        celular: data.celular,
       }),
     });
     await sendEmailVerification(user);
@@ -168,6 +174,7 @@ export async function ensureVerifiedUserProfile(user: User) {
     email: user.email ?? "",
     rol: role,
     creadoEn: new Date().toISOString(),
+    ...(pending?.celular ? { telefono: pending.celular } : {}),
   };
 
   await saveUserProfile(profile);
