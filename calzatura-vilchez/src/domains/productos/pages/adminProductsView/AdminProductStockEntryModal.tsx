@@ -15,8 +15,14 @@ type Props = Readonly<{
 }>;
 
 function toPositiveInt(value: string): number {
-  const n = parseInt(value.replace(/\D/g, ""), 10);
-  return isNaN(n) || n < 0 ? 0 : n;
+  const n = Number.parseInt(value.replace(/\D/g, ""), 10);
+  return Number.isNaN(n) || n < 0 ? 0 : n;
+}
+
+function stockSubmitButtonLabel(saving: boolean, totalNuevo: number): string {
+  if (saving) return "Registrando...";
+  if (totalNuevo > 0) return `Registrar +${totalNuevo}`;
+  return "Registrar";
 }
 
 export function AdminProductStockEntryModal({ product, onClose, onSubmit }: Props) {
@@ -41,7 +47,7 @@ export function AdminProductStockEntryModal({ product, onClose, onSubmit }: Prop
       const nonZero = Object.fromEntries(
         Object.entries(delta).filter(([, v]) => v > 0)
       );
-      const costoNum = costo ? parseFloat(costo) : undefined;
+      const costoNum = costo ? Number.parseFloat(costo) : undefined;
       await onSubmit(nonZero, costoNum, proveedor.trim(), observaciones.trim());
     } finally {
       setSaving(false);
@@ -79,7 +85,7 @@ export function AdminProductStockEntryModal({ product, onClose, onSubmit }: Prop
             </legend>
             <div className="admin-size-stock-grid">
               {sizes.map((size) => {
-                const stockActual = (product.tallaStock ?? {})[size] ?? 0;
+                const stockActual = product.tallaStock?.[size] ?? 0;
                 return (
                   <label key={size} className="admin-size-stock-item" title={`Stock actual: ${stockActual}`}>
                     <span>{size}</span>
@@ -157,7 +163,7 @@ export function AdminProductStockEntryModal({ product, onClose, onSubmit }: Prop
               className="btn-primary"
               disabled={saving || totalNuevo === 0}
             >
-              {saving ? "Registrando..." : `Registrar ${totalNuevo > 0 ? `+${totalNuevo}` : ""}`}
+              {stockSubmitButtonLabel(saving, totalNuevo)}
             </button>
           </div>
         </form>

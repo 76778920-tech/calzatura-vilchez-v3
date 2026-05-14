@@ -186,32 +186,28 @@ def log_startup_context():
         print(f"[startup] No se pudo restaurar training_meta: {exc}")
 
 
-def _load_data(force: bool = False, lookback_days: int = 180):
-    """Returns (daily_sales, orders, products, product_codes, stock_movements).
-    Each dataset has its own TTL and is refreshed independently."""
-    now = time.monotonic()
+def _dataset_needs_refresh(key: str, force: bool, now: float, lookback_days: int) -> bool:
+    slot = _cache[key]
+    if force or slot["data"] is None or now >= slot["expires_at"]:
+        return True
+    if key in ("daily_sales", "orders"):
+        return slot.get("lookback_days", 0) < lookback_days
+    return False
 
-    need = {
-        "daily_sales":     force or _cache["daily_sales"]["data"] is None or now >= _cache["daily_sales"]["expires_at"] or _cache["daily_sales"].get("lookback_days", 0) < lookback_days,
-        "orders":          force or _cache["orders"]["data"] is None or now >= _cache["orders"]["expires_at"] or _cache["orders"].get("lookback_days", 0) < lookback_days,
-        "products":        force or _cache["products"]["data"] is None or now >= _cache["products"]["expires_at"],
-        "product_codes":   force or _cache["product_codes"]["data"] is None or now >= _cache["product_codes"]["expires_at"],
-        "stock_movements": force or _cache["stock_movements"]["data"] is None or now >= _cache["stock_movements"]["expires_at"],
-    }
 
-    if any(need.values()):
-        futures: dict = {}
-        with ThreadPoolExecutor(max_workers=5) as pool:
-            if need["daily_sales"]:
-                futures["daily_sales"] = pool.submit(fetch_daily_sales, lookback_days)
-            if need["orders"]:
-                futures["orders"] = pool.submit(fetch_completed_orders, lookback_days)
-            if need["products"]:
-                futures["products"] = pool.submit(fetch_products)
-            if need["product_codes"]:
-                futures["product_codes"] = pool.submit(fetch_product_codes)
-            if need["stock_movements"]:
-                futures["stock_movements"] = pool.submit(fetch_stock_movements)
+def _refresh_cache_datasets(need: dict[str, bool], lookback_days: int, now: float) -> None:
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures: dict[str, Any] = {}
+        if need["daily_sales"]:
+            futures["daily_sales"] = pool.submit(fetch_daily_sales, lookback_days)
+        if need["orders"]:
+            futures["orders"] = pool.submit(fetch_completed_orders, lookback_days)
+        if need["products"]:
+            futures["products"] = pool.submit(fetch_products)
+        if need["product_codes"]:
+            futures["product_codes"] = pool.submit(fetch_product_codes)
+        if need["stock_movements"]:
+            futures["stock_movements"] = pool.submit(fetch_stock_movements)
 
         for key, future in futures.items():
             data = future.result()
@@ -219,6 +215,15 @@ def _load_data(force: bool = False, lookback_days: int = 180):
             _cache[key]["expires_at"] = now + _cache[key]["ttl"]
             if key in ("daily_sales", "orders"):
                 _cache[key]["lookback_days"] = lookback_days
+
+
+def _load_data(force: bool = False, lookback_days: int = 180):
+    """Returns (daily_sales, orders, products, product_codes, stock_movements).
+    Each dataset has its own TTL and is refreshed independently."""
+    now = time.monotonic()
+    need = {key: _dataset_needs_refresh(key, force, now, lookback_days) for key in _cache}
+    if any(need.values()):
+        _refresh_cache_datasets(need, lookback_days, now)
 
     return (
         _cache["daily_sales"]["data"],
