@@ -46,7 +46,13 @@ def _client(monkeypatch, save_ire=None) -> TestClient:
     monkeypatch.setattr(
         main,
         "_load_data",
-        lambda force=False, lookback_days=180: (_sales_rows(), [], _products(), {"p-contract-1": "CV-CONTRACT-1"}),
+        lambda force=False, lookback_days=180: (
+            _sales_rows(),
+            [],
+            _products(),
+            {"p-contract-1": "CV-CONTRACT-1"},
+            [],
+        ),
     )
     monkeypatch.setattr(main, "save_ire_historial", save_ire or (lambda ire: None))
     return TestClient(main.app)
