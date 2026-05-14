@@ -7,6 +7,19 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { defineSecret, defineString } = require("firebase-functions/params");
 const admin = require("firebase-admin");
 
+const {
+  ORDER_QTY_LIMIT,
+  strOr, arrOr, toN, orUndef, objOr, errorStatus, trimStr, isValidItemArray,
+  isNonEmptyString, isValidLoginEmail, isValidLoginPassword,
+  isInvalidOrderQty, hasValidOrderItems, toCents, validStripeImage, publicError,
+  normalizeOptionalText, normalizeAddress,
+  sumSizeStock, sumColorSizeStock, getAvailableSizes, deriveTotalStock, getSizeStock,
+  sanitizeOrderProduct, extractItemFields, assertStoredTotals,
+  assertStockAndPrice, resolveColorBucket,
+  resolveAiAdminUpstreamRequest, sendUpstreamToClient,
+  aiAdminProxyErrorStatus, aiAdminProxyErrorMessage,
+} = require("./fnUtils");
+
 /** Misma clave pública del cliente; solo la usa el servidor para REST Identity Toolkit (login vía BFF). */
 const FIREBASE_WEB_API_KEY = defineString("FIREBASE_WEB_API_KEY", { default: "" });
 
@@ -36,8 +49,6 @@ const SUPABASE_SERVICE_ROLE_KEY = defineSecret("SUPABASE_SERVICE_ROLE_KEY");
 const AI_SERVICE_URL = defineSecret("AI_SERVICE_URL");
 const AI_SERVICE_BEARER_TOKEN = defineSecret("AI_SERVICE_BEARER_TOKEN");
 
-const ORDER_ITEM_LIMIT = 30;
-const ORDER_QTY_LIMIT = 100;
 const SHIPPING_COST = 0;
 /** Tope de envío (S/) que acepta el servidor si el cliente envía `envio` (debe coincidir con tarifa ORS en frontend). */
 const DELIVERY_MAX_ENVIO_S = 35;
@@ -56,7 +67,7 @@ function getSupabaseAdmin() {
 }
 
 function getBearerToken(req) {
-  const header = req.headers.authorization || "";
+  const header = strOr(req.headers.authorization);
   const [scheme, token] = header.split(" ");
   return scheme === "Bearer" && token ? token : null;
 }
@@ -78,19 +89,6 @@ async function assertAdminRole(supabase, uid) {
     return;
   }
   throw Object.assign(new Error("Solo administradores pueden consultar el servicio de IA"), { status: 403 });
-}
-
-function toCents(amount) {
-  return Math.round(toN(amount) * 100);
-}
-
-function validStripeImage(image) {
-  try {
-    const url = new URL(image);
-    return url.protocol === "https:" ? [image] : [];
-  } catch {
-    return [];
-  }
 }
 
 // Inserta en la tabla auditoria desde el contexto de Cloud Functions.
@@ -121,17 +119,6 @@ async function logAuditFn({
   }
 }
 
-function publicError(error) {
-  if (error?.status && error.status < 500) {
-    return error.message;
-  }
-  return "No se pudo procesar la solicitud";
-}
-
-function isNonEmptyString(value, max) {
-  return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
-}
-
 const LOGIN_RATE_WINDOW_MS = 30 * 60 * 1000; // ventana: 30 minutos
 const LOGIN_RATE_MAX = 15; // máximo de POST /authLogin por IP en esa ventana (antes de cortar sin llamar a Google)
 const loginRateByIp = new Map();
@@ -141,7 +128,7 @@ function getClientIp(req) {
   if (typeof xf === "string" && xf.trim()) {
     return xf.split(",")[0].trim();
   }
-  return req.ip || "unknown";
+  return strOr(req.ip, "unknown");
 }
 
 function isLoginRateLimited(ip) {
@@ -164,198 +151,12 @@ function isLoginRateLimited(ip) {
   return false;
 }
 
-const LOGIN_EMAIL_RE =
-  /^[A-Za-z0-9_+~-]+(?:\.[A-Za-z0-9_+~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
-
-function isValidLoginEmail(email) {
-  if (typeof email !== "string") return false;
-  const t = email.trim().toLowerCase();
-  return t.length <= 100 && LOGIN_EMAIL_RE.test(t);
-}
-
-function isValidLoginPassword(password) {
-  return typeof password === "string" && password.length >= 1 && password.length <= 128;
-}
-
-function isValidPeruPhone(value) {
-  return typeof value === "string" && /^\+51 9\d{2} \d{3} \d{3}$/.test(value);
-}
-
-function normalizeTextField(value, fieldName, max) {
-  if (!isNonEmptyString(value, max)) {
-    throw Object.assign(new Error(`${fieldName} invalido`), { status: 400 });
-  }
-  return value.trim();
-}
-
-function normalizeOptionalText(value, max) {
-  if (value == null || value === "") return "";
-  if (typeof value !== "string" || value.trim().length > max) {
-    throw Object.assign(new Error("Campo opcional invalido"), { status: 400 });
-  }
-  return value.trim();
-}
-
-function normalizeAddress(address) {
-  if (!address || typeof address !== "object" || Array.isArray(address)) {
-    throw Object.assign(new Error("Direccion invalida"), { status: 400 });
-  }
-
-  const normalized = {
-    nombre: normalizeTextField(address.nombre, "Nombre", 80),
-    apellido: normalizeTextField(address.apellido, "Apellido", 80),
-    direccion: normalizeTextField(address.direccion, "Direccion", 180),
-    ciudad: normalizeTextField(address.ciudad, "Ciudad", 80),
-    distrito: normalizeTextField(address.distrito, "Distrito", 80),
-    telefono: normalizeTextField(address.telefono, "Telefono", 15),
-    referencia: normalizeOptionalText(address.referencia, 180),
-  };
-
-  if (!isValidPeruPhone(normalized.telefono)) {
-    throw Object.assign(new Error("Telefono invalido"), { status: 400 });
-  }
-
-  return normalized;
-}
-
-function sumSizeStock(tallaStock) {
-  return Object.values(objOr(tallaStock)).reduce(
-    (sum, qty) => sum + Math.max(0, toN(qty)),
-    0
-  );
-}
-
-function sumColorSizeStock(colorStock) {
-  return Object.values(objOr(colorStock)).reduce(
-    (sum, stockBySize) => sum + sumSizeStock(stockBySize),
-    0
-  );
-}
-
-function aggregateColorStock(colorStock) {
-  const aggregate = {};
-
-  Object.values(objOr(colorStock)).forEach((stockBySize) => {
-    Object.entries(objOr(stockBySize)).forEach(([talla, qty]) => {
-      aggregate[talla] = toN(aggregate[talla]) + Math.max(0, toN(qty));
-    });
-  });
-
-  return aggregate;
-}
-
-function sizesFromStockMap(stockBySize) {
-  return Object.entries(stockBySize)
-    .filter(([, qty]) => Number(qty) > 0)
-    .map(([talla]) => talla)
-    .sort((a, b) => Number(a) - Number(b));
-}
-
-function getAvailableSizes(product) {
-  if (product.colorStock) return sizesFromStockMap(aggregateColorStock(product.colorStock));
-  if (product.tallaStock) return sizesFromStockMap(product.tallaStock);
-  return Array.isArray(product.tallas) ? product.tallas : [];
-}
-
-function deriveTotalStock(product) {
-  if (product.colorStock) {
-    return sumColorSizeStock(product.colorStock);
-  }
-  if (product.tallaStock) {
-    return sumSizeStock(product.tallaStock);
-  }
-  return Math.max(0, toN(product.stock));
-}
-
-function getSizeStock(product, talla, color) {
-  if (product.colorStock && talla) {
-    if (color && typeof product.colorStock[color]?.[talla] === "number") {
-      return Math.max(0, toN(product.colorStock[color][talla]));
-    }
-
-    return Object.values(product.colorStock).reduce(
-      (sum, stockBySize) => sum + Math.max(0, toN(stockBySize?.[talla])),
-      0
-    );
-  }
-
-  if (talla && product.tallaStock && typeof product.tallaStock[talla] === "number") {
-    return Math.max(0, toN(product.tallaStock[talla]));
-  }
-
-  return deriveTotalStock(product);
-}
-
-function sanitizeOrderProduct(product) {
-  return {
-    id: product.id,
-    nombre: product.nombre,
-    precio: toN(product.precio),
-    descripcion: strOr(product.descripcion),
-    imagen: strOr(product.imagen),
-    imagenes: arrOr(product.imagenes),
-    stock: deriveTotalStock(product),
-    categoria: strOr(product.categoria),
-    tipoCalzado: strOr(product.tipoCalzado),
-    tallas: getAvailableSizes(product),
-    tallaStock: product.tallaStock || null,
-    colorStock: product.colorStock || null,
-    marca: strOr(product.marca),
-    color: strOr(product.color),
-    colores: arrOr(product.colores),
-    destacado: Boolean(product.destacado),
-  };
-}
-
-function extractProductId(item) {
-  if (item?.product?.id && typeof item.product.id === "string") {
-    return item.product.id.trim();
-  }
-  if (item?.productId && typeof item.productId === "string") {
-    return item.productId.trim();
-  }
-  return "";
-}
-
-function extractItemFields(item) {
-  return {
-    productId: extractProductId(item),
-    quantity: toN(item?.quantity),
-    talla: typeof item?.talla === "string" ? item.talla.trim() : "",
-    color: typeof item?.color === "string" ? item.color.trim() : "",
-  };
-}
-
-function isInvalidOrderQty(productId, quantity) {
-  return !productId || !Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT;
-}
-
-function strOr(v, d = "") {
-  return v || d;
-}
-
-function arrOr(v) {
-  return Array.isArray(v) ? v : [];
-}
-
-function toN(v) {
-  return Number(v) || 0;
-}
-
-function orUndef(v) {
-  return v || undefined;
-}
-
-function objOr(v) {
-  return v || {};
-}
-
 async function fetchProductsByIds(supabase, ids) {
   const { data, error } = await supabase.from("productos").select("*").in("id", ids);
   if (error) {
     throw Object.assign(new Error("No se pudo consultar productos"), { status: 500 });
   }
-  return data || [];
+  return arrOr(data);
 }
 
 async function fetchProductOrThrow(supabase, productId) {
@@ -369,27 +170,8 @@ async function fetchProductOrThrow(supabase, productId) {
   return data;
 }
 
-function calculateStoredSubtotal(items) {
-  return (items || []).reduce((sum, item) => {
-    return sum + toN(item?.quantity) * toN(item?.product?.precio);
-  }, 0);
-}
-
-function assertStoredTotals(order) {
-  const subtotal = calculateStoredSubtotal(order.items);
-  const envio = toN(order.envio);
-  const total = subtotal + envio;
-
-  if (
-    Math.abs(toN(order.subtotal) - subtotal) > 0.01 ||
-    Math.abs(toN(order.total) - total) > 0.01
-  ) {
-    throw Object.assign(new Error("Los totales del pedido no coinciden"), { status: 409 });
-  }
-}
-
 async function assertOrderStockAvailability(supabase, items) {
-  for (const item of items || []) {
+  for (const item of arrOr(items)) {
     const { productId, quantity, talla, color } = extractItemFields(item);
 
     if (isInvalidOrderQty(productId, quantity)) {
@@ -401,14 +183,12 @@ async function assertOrderStockAvailability(supabase, items) {
     const totalStock = deriveTotalStock(product);
     const sizeStock = getSizeStock(product, orUndef(talla), orUndef(color));
 
-    if (price <= 0 || totalStock < quantity || sizeStock < quantity) {
-      throw Object.assign(new Error("Stock o precio invalido"), { status: 409 });
-    }
+    assertStockAndPrice(price, totalStock, sizeStock, quantity);
   }
 }
 
 async function buildOrderDraft(supabase, rawItems) {
-  if (!Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > ORDER_ITEM_LIMIT) {
+  if (!isValidItemArray(rawItems)) {
     throw Object.assign(new Error("Pedido sin productos validos"), { status: 400 });
   }
 
@@ -444,9 +224,7 @@ async function buildOrderDraft(supabase, rawItems) {
     const totalStock = deriveTotalStock(product);
     const sizeStock = getSizeStock(product, orUndef(item.talla), orUndef(item.color));
 
-    if (price <= 0 || totalStock < item.quantity || sizeStock < item.quantity) {
-      throw Object.assign(new Error("Stock o precio invalido"), { status: 409 });
-    }
+    assertStockAndPrice(price, totalStock, sizeStock, item.quantity);
 
     subtotal += price * item.quantity;
     items.push({
@@ -457,7 +235,7 @@ async function buildOrderDraft(supabase, rawItems) {
     });
   }
 
-  const envio = items.length > 0 ? SHIPPING_COST : 0;
+  const envio = SHIPPING_COST;
 
   return {
     items,
@@ -485,20 +263,10 @@ async function updateOrder(supabase, orderId, patch) {
   }
 }
 
-function resolveColorBucket(colorStock, talla, quantity, preferredColor) {
-  if (preferredColor && typeof colorStock[preferredColor]?.[talla] === "number") {
-    return preferredColor;
-  }
-
-  return Object.keys(colorStock).find((colorKey) => {
-    return Math.max(0, toN(colorStock[colorKey]?.[talla])) >= quantity;
-  });
-}
-
 async function discountOrderItemStock(supabase, item) {
   const { productId, quantity, talla, color } = extractItemFields(item);
 
-  if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
+  if (isInvalidOrderQty(productId, quantity)) {
     throw new Error("Producto invalido al descontar stock");
   }
 
@@ -562,12 +330,8 @@ async function discountOrderItemStock(supabase, item) {
   }
 }
 
-function hasValidOrderItems(order) {
-  return Array.isArray(order.items) && order.items.length > 0 && order.items.length <= ORDER_ITEM_LIMIT;
-}
-
 async function discountOrderStock(supabase, order) {
-  for (const item of order.items || []) {
+  for (const item of arrOr(order.items)) {
     await discountOrderItemStock(supabase, item);
   }
 }
@@ -583,7 +347,7 @@ exports.createOrder = onRequest(
       try {
         const decodedToken = await verifyFirebaseUser(req);
         const supabase = getSupabaseAdmin();
-        const { items, direccion, metodoPago, notas, envio: rawEnvio } = req.body || {};
+        const { items, direccion, metodoPago, notas, envio: rawEnvio } = objOr(req.body);
 
         if (!["stripe", "contraentrega"].includes(metodoPago)) {
           return res.status(400).json({ error: "Metodo de pago invalido" });
@@ -603,7 +367,7 @@ exports.createOrder = onRequest(
           .from("pedidos")
           .insert({
             userId: decodedToken.uid,
-            userEmail: decodedToken.email || "",
+            userEmail: strOr(decodedToken.email),
             items: draft.items,
             subtotal: draft.subtotal,
             envio,
@@ -612,7 +376,7 @@ exports.createOrder = onRequest(
             direccion: normalizedAddress,
             creadoEn,
             metodoPago,
-            notas: normalizedNotes || "",
+            notas: normalizedNotes,
           })
           .select("id")
           .single();
@@ -630,7 +394,7 @@ exports.createOrder = onRequest(
         });
       } catch (error) {
         console.error("Create order error:", error);
-        return res.status(error.status || 500).json({ error: publicError(error) });
+        return res.status(errorStatus(error)).json({ error: publicError(error) });
       }
     });
   }
@@ -648,7 +412,7 @@ exports.createCheckoutSession = onRequest(
         const decodedToken = await verifyFirebaseUser(req);
         const stripe = require("stripe")(STRIPE_SECRET.value());
         const supabase = getSupabaseAdmin();
-        const { orderId } = req.body || {};
+        const { orderId } = objOr(req.body);
 
         if (!orderId || typeof orderId !== "string") {
           return res.status(400).json({ error: "Pedido invalido" });
@@ -674,7 +438,7 @@ exports.createCheckoutSession = onRequest(
         for (const item of order.items) {
           const quantity = toN(item?.quantity);
           const price = toN(item?.product?.precio);
-          const name = item?.product?.nombre || "Producto";
+          const name = strOr(item?.product?.nombre, "Producto");
           const image = strOr(item?.product?.imagen);
 
           if (!Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT || price <= 0) {
@@ -706,7 +470,7 @@ exports.createCheckoutSession = onRequest(
           });
         }
 
-        const appUrl = process.env.APP_URL || "https://calzaturavilchez-ab17f.web.app";
+        const appUrl = strOr(process.env.APP_URL, "https://calzaturavilchez-ab17f.web.app");
 
         const session = await stripe.checkout.sessions.create({
           payment_method_types: ["card"],
@@ -722,7 +486,7 @@ exports.createCheckoutSession = onRequest(
         return res.status(200).json({ sessionId: session.id });
       } catch (error) {
         console.error("Stripe error:", error);
-        return res.status(error.status || 500).json({ error: publicError(error) });
+        return res.status(errorStatus(error)).json({ error: publicError(error) });
       }
     });
   }
@@ -778,7 +542,7 @@ exports.stripeWebhook = onRequest(
           // No actualizamos ni auditamos de nuevo para evitar duplicados.
         } catch (error) {
           console.error("Stripe webhook order error:", error);
-          return res.status(error.status || 500).json({ error: publicError(error) });
+          return res.status(errorStatus(error)).json({ error: publicError(error) });
         }
       }
     }
@@ -798,7 +562,7 @@ exports.confirmCodOrder = onRequest(
       try {
         const decodedToken = await verifyFirebaseUser(req);
         const supabase = getSupabaseAdmin();
-        const { orderId } = req.body || {};
+        const { orderId } = objOr(req.body);
 
         if (!orderId || typeof orderId !== "string") {
           return res.status(400).json({ error: "Pedido invalido" });
@@ -822,7 +586,7 @@ exports.confirmCodOrder = onRequest(
         return res.status(200).json({ success: true });
       } catch (error) {
         console.error("COD confirm error:", error);
-        return res.status(error.status || 500).json({ error: publicError(error) });
+        return res.status(errorStatus(error)).json({ error: publicError(error) });
       }
     });
   }
@@ -850,7 +614,7 @@ async function favoritesGetAll(supabase, userId, res) {
   if (error) {
     throw Object.assign(new Error("No se pudieron consultar tus favoritos"), { status: 500 });
   }
-  return res.status(200).json({ productIds: (data || []).map((item) => item.productId) });
+  return res.status(200).json({ productIds: arrOr(data).map((item) => item.productId) });
 }
 
 async function favoritesHandleGet(supabase, userId, productId, res) {
@@ -916,125 +680,20 @@ exports.favorites = onRequest(
         const supabase = getSupabaseAdmin();
         const userId = decodedToken.uid;
         const rawProductId = req.method === "GET" ? req.query.productId : req.body?.productId;
-        const productId = typeof rawProductId === "string" ? rawProductId.trim() : "";
+        const productId = trimStr(rawProductId);
 
         const handler = FAVORITES_HANDLERS[req.method];
         if (!handler) return res.status(405).json({ error: "Metodo no permitido" });
         return handler(supabase, userId, productId, res);
       } catch (error) {
         console.error("Favorites error:", error);
-        return res.status(error.status || 500).json({ error: publicError(error) });
+        return res.status(errorStatus(error)).json({ error: publicError(error) });
       }
     });
   }
 );
 
 const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
-
-/** @returns {{ ok: true, upstreamUrl: string, method: string } | { ok: false, status?: number, error: string }} */
-function parseQueryInt(req, name, defaultVal, min, max) {
-  const v = Number.parseInt(String(req.query[name] ?? defaultVal), 10);
-  if (!Number.isFinite(v) || v < min || v > max) return Number.NaN;
-  return v;
-}
-
-function aiProxyCombined(base, req) {
-  const horizon = parseQueryInt(req, "horizon", "30", 7, 90);
-  const history = parseQueryInt(req, "history", "120", 30, 365);
-  if (Number.isNaN(horizon)) return { ok: false, error: "horizon invalido" };
-  if (Number.isNaN(history)) return { ok: false, error: "history invalido" };
-  const upstreamUrl = `${base}/api/predict/combined?horizon=${encodeURIComponent(horizon)}&history=${encodeURIComponent(history)}`;
-  return { ok: true, upstreamUrl, method: "GET" };
-}
-
-function aiProxyWeeklyChart(base, req) {
-  const weeks = parseQueryInt(req, "weeks", "8", 2, 24);
-  if (Number.isNaN(weeks)) return { ok: false, error: "weeks invalido" };
-  const upstreamUrl = `${base}/api/sales/weekly-chart?weeks=${encodeURIComponent(weeks)}`;
-  return { ok: true, upstreamUrl, method: "GET" };
-}
-
-function aiProxyModelMetrics(base) {
-  return { ok: true, upstreamUrl: `${base}/api/model/metrics`, method: "GET" };
-}
-
-function aiProxyIreHistorial(base, req) {
-  const days = parseQueryInt(req, "days", "30", 1, 365);
-  if (Number.isNaN(days)) return { ok: false, error: "days invalido" };
-  const upstreamUrl = `${base}/api/ire/historial?days=${encodeURIComponent(days)}`;
-  return { ok: true, upstreamUrl, method: "GET" };
-}
-
-function aiProxyCacheInvalidate(base, req) {
-  if (req.method !== "POST") return { ok: false, status: 405, error: "Metodo no permitido" };
-  return { ok: true, upstreamUrl: `${base}/api/cache/invalidate`, method: "POST" };
-}
-
-function aiProxyCampaignActive(base) {
-  return { ok: true, upstreamUrl: `${base}/api/campaign/active`, method: "GET" };
-}
-
-function aiProxyCampaignFeedback(base, req) {
-  if (req.method !== "POST") return { ok: false, status: 405, error: "Metodo no permitido" };
-  return { ok: true, upstreamUrl: `${base}/api/campaign/feedback`, method: "POST" };
-}
-
-function aiProxyCampaignDetection(base, req) {
-  const recentDays = parseQueryInt(req, "recent_days", "7", 3, 14);
-  const baselineDays = parseQueryInt(req, "baseline_days", "60", 30, 120);
-  if (Number.isNaN(recentDays)) return { ok: false, error: "recent_days invalido" };
-  if (Number.isNaN(baselineDays)) return { ok: false, error: "baseline_days invalido" };
-  const upstreamUrl = `${base}/api/predict/campaign-detection?recent_days=${encodeURIComponent(recentDays)}&baseline_days=${encodeURIComponent(baselineDays)}`;
-  return { ok: true, upstreamUrl, method: "GET" };
-}
-
-function aiProxyLearningStats(base) {
-  return { ok: true, upstreamUrl: `${base}/api/campaign/learning-stats`, method: "GET" };
-}
-
-const AI_ADMIN_UPSTREAM_RESOLVERS = {
-  combined: aiProxyCombined,
-  weeklyChart: aiProxyWeeklyChart,
-  modelMetrics: (base) => aiProxyModelMetrics(base),
-  ireHistorial: aiProxyIreHistorial,
-  cacheInvalidate: aiProxyCacheInvalidate,
-  campaignActive: (base) => aiProxyCampaignActive(base),
-  campaignFeedback: aiProxyCampaignFeedback,
-  campaignDetection: aiProxyCampaignDetection,
-  learningStats: (base) => aiProxyLearningStats(base),
-};
-
-function resolveAiAdminUpstreamRequest(base, op, req) {
-  const resolver = AI_ADMIN_UPSTREAM_RESOLVERS[op];
-  if (!resolver) return { ok: false, error: "op invalido" };
-  return resolver(base, req);
-}
-
-async function sendUpstreamToClient(res, upstream, text) {
-  const ct = upstream.headers.get("content-type") || "application/json; charset=utf-8";
-  if (ct.includes("application/json")) {
-    try {
-      return res.status(upstream.status).type("application/json").send(JSON.parse(text));
-    } catch {
-      return res.status(upstream.status).type("text/plain").send(text);
-    }
-  }
-  return res.status(upstream.status).type(ct).send(text);
-}
-
-function aiAdminProxyErrorStatus(error) {
-  let status = typeof error.status === "number" ? error.status : 500;
-  if (status === 500 && error.code && String(error.code).startsWith("auth/")) {
-    status = 401;
-  }
-  return status;
-}
-
-function aiAdminProxyErrorMessage(status, error) {
-  if (status === 401) return "Sesion invalida o expirada. Vuelve a iniciar sesion.";
-  if (status < 500 && error.message) return error.message;
-  return publicError(error);
-}
 
 async function runAiAdminProxyRequest(req, res) {
   const decodedToken = await verifyFirebaseUser(req);
