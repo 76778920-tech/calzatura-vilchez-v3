@@ -363,124 +363,75 @@ function tryContextualCyberLineaZapatillas(
   ]);
 }
 
-function tryContextualCyberHombre(
+function tryContextualCyberCategoria(
   input: ContextualFiltersInput,
   make: CatalogFilterMaker,
   cyberDesc: string
 ): CatalogFilterGroup | null {
-  if (input.campana !== "cyber" || input.categoria !== "hombre") return null;
-  return make("Cyber Hombre", [
-    { label: "Todos", params: { categoria: "hombre", campana: "cyber", descuento: cyberDesc } },
-    {
-      label: "Zapatillas Cyber",
-      params: { categoria: "hombre", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
-    },
-    {
-      label: "Zapatos Cyber",
-      params: { categoria: "hombre", campana: "cyber", tipo: "zapatos", descuento: cyberDesc },
-    },
-    {
-      label: "Botines Cyber",
-      params: { categoria: "hombre", campana: "cyber", tipo: "botines", descuento: cyberDesc },
-    },
-  ]);
-}
-
-function tryContextualCyberMujer(
-  input: ContextualFiltersInput,
-  make: CatalogFilterMaker,
-  cyberDesc: string
-): CatalogFilterGroup | null {
-  if (input.campana !== "cyber" || input.categoria !== "mujer") return null;
-  return make("Cyber Mujer", [
-    { label: "Todos", params: { categoria: "mujer", campana: "cyber", descuento: cyberDesc } },
-    {
-      label: "Zapatillas Cyber",
-      params: { categoria: "mujer", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
-    },
-    {
-      label: "Sandalias Cyber",
-      params: { categoria: "mujer", campana: "cyber", tipo: "sandalias", descuento: cyberDesc },
-    },
-    {
-      label: "Botines Cyber",
-      params: { categoria: "mujer", campana: "cyber", tipo: "botines", descuento: cyberDesc },
-    },
-  ]);
-}
-
-function tryContextualCyberNino(
-  input: ContextualFiltersInput,
-  make: CatalogFilterMaker,
-  cyberDesc: string
-): CatalogFilterGroup | null {
-  if (input.campana !== "cyber" || input.categoria !== "nino") return null;
-  return make("Cyber Infantil", [
-    { label: "Todos", params: { categoria: "nino", campana: "cyber", descuento: cyberDesc } },
-    {
-      label: "Escolar Cyber",
-      params: { categoria: "nino", campana: "cyber", tipo: "escolar", descuento: cyberDesc },
-    },
-    {
-      label: "Juvenil Activo",
-      params: { categoria: "nino", campana: "cyber", segmento: "juvenil", descuento: cyberDesc },
-    },
-    {
-      label: "Zapatillas Cyber",
-      params: { categoria: "nino", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc },
-    },
-  ]);
-}
-
-function tryContextualNuevasMujer(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
-  if (
-    input.categoria !== "mujer" ||
-    !(
-      input.campana === "nueva-temporada" ||
-      ["pasos-radiantes", "urban-glow", "sunset-chic"].includes(input.coleccion)
-    )
-  ) {
-    return null;
+  if (input.campana !== "cyber") return null;
+  const cat = input.categoria;
+  if (cat === "hombre") {
+    return make("Cyber Hombre", [
+      { label: "Todos", params: { categoria: "hombre", campana: "cyber", descuento: cyberDesc } },
+      { label: "Zapatillas Cyber", params: { categoria: "hombre", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc } },
+      { label: "Zapatos Cyber", params: { categoria: "hombre", campana: "cyber", tipo: "zapatos", descuento: cyberDesc } },
+      { label: "Botines Cyber", params: { categoria: "hombre", campana: "cyber", tipo: "botines", descuento: cyberDesc } },
+    ]);
   }
-  return make("Nuevas tendencias", [
-    { label: "Nueva temporada", params: { categoria: "mujer", campana: "nueva-temporada" } },
-    { label: "Pasos radiantes", params: { categoria: "mujer", coleccion: "pasos-radiantes" } },
-    { label: "Urban glow", params: { categoria: "mujer", coleccion: "urban-glow" } },
-    { label: "Sunset chic", params: { categoria: "mujer", coleccion: "sunset-chic" } },
-  ]);
+  if (cat === "mujer") {
+    return make("Cyber Mujer", [
+      { label: "Todos", params: { categoria: "mujer", campana: "cyber", descuento: cyberDesc } },
+      { label: "Zapatillas Cyber", params: { categoria: "mujer", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc } },
+      { label: "Sandalias Cyber", params: { categoria: "mujer", campana: "cyber", tipo: "sandalias", descuento: cyberDesc } },
+      { label: "Botines Cyber", params: { categoria: "mujer", campana: "cyber", tipo: "botines", descuento: cyberDesc } },
+    ]);
+  }
+  if (cat === "nino") {
+    return make("Cyber Infantil", [
+      { label: "Todos", params: { categoria: "nino", campana: "cyber", descuento: cyberDesc } },
+      { label: "Escolar Cyber", params: { categoria: "nino", campana: "cyber", tipo: "escolar", descuento: cyberDesc } },
+      { label: "Juvenil Activo", params: { categoria: "nino", campana: "cyber", segmento: "juvenil", descuento: cyberDesc } },
+      { label: "Zapatillas Cyber", params: { categoria: "nino", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc } },
+    ]);
+  }
+  return null;
 }
 
-function tryContextualNuevasHombre(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
-  if (
-    input.categoria !== "hombre" ||
-    !(
-      input.campana === "nueva-temporada" ||
-      ["ruta-urbana", "paso-ejecutivo", "weekend-flow"].includes(input.coleccion)
-    )
-  ) {
-    return null;
-  }
-  return make("Nuevas tendencias", [
-    { label: "Nueva temporada", params: { categoria: "hombre", campana: "nueva-temporada" } },
-    { label: "Ruta urbana", params: { categoria: "hombre", coleccion: "ruta-urbana" } },
-    { label: "Paso ejecutivo", params: { categoria: "hombre", coleccion: "paso-ejecutivo" } },
-    { label: "Weekend flow", params: { categoria: "hombre", coleccion: "weekend-flow" } },
-  ]);
-}
+const NUEVAS_CONFIG: Record<string, { colecciones: string[]; items: CatalogQuickFilter[] }> = {
+  mujer: {
+    colecciones: ["pasos-radiantes", "urban-glow", "sunset-chic"],
+    items: [
+      { label: "Nueva temporada", params: { categoria: "mujer", campana: "nueva-temporada" } },
+      { label: "Pasos radiantes", params: { categoria: "mujer", coleccion: "pasos-radiantes" } },
+      { label: "Urban glow", params: { categoria: "mujer", coleccion: "urban-glow" } },
+      { label: "Sunset chic", params: { categoria: "mujer", coleccion: "sunset-chic" } },
+    ],
+  },
+  hombre: {
+    colecciones: ["ruta-urbana", "paso-ejecutivo", "weekend-flow"],
+    items: [
+      { label: "Nueva temporada", params: { categoria: "hombre", campana: "nueva-temporada" } },
+      { label: "Ruta urbana", params: { categoria: "hombre", coleccion: "ruta-urbana" } },
+      { label: "Paso ejecutivo", params: { categoria: "hombre", coleccion: "paso-ejecutivo" } },
+      { label: "Weekend flow", params: { categoria: "hombre", coleccion: "weekend-flow" } },
+    ],
+  },
+  nino: {
+    colecciones: ["vuelta-al-cole", "mini-aventuras"],
+    items: [
+      { label: "Nueva temporada", params: { categoria: "nino", campana: "nueva-temporada" } },
+      { label: "Vuelta al cole", params: { categoria: "nino", coleccion: "vuelta-al-cole" } },
+      { label: "Paso activo", params: { categoria: "nino", tipo: "zapatillas" } },
+      { label: "Mini aventuras", params: { categoria: "nino", coleccion: "mini-aventuras" } },
+    ],
+  },
+};
 
-function tryContextualNuevasNino(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
-  if (
-    input.categoria !== "nino" ||
-    !(input.campana === "nueva-temporada" || ["vuelta-al-cole", "mini-aventuras"].includes(input.coleccion))
-  ) {
-    return null;
-  }
-  return make("Nuevas tendencias", [
-    { label: "Nueva temporada", params: { categoria: "nino", campana: "nueva-temporada" } },
-    { label: "Vuelta al cole", params: { categoria: "nino", coleccion: "vuelta-al-cole" } },
-    { label: "Paso activo", params: { categoria: "nino", tipo: "zapatillas" } },
-    { label: "Mini aventuras", params: { categoria: "nino", coleccion: "mini-aventuras" } },
-  ]);
+function tryContextualNuevas(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  const cfg = NUEVAS_CONFIG[input.categoria];
+  if (!cfg) return null;
+  if (input.campana !== "nueva-temporada" && !cfg.colecciones.includes(input.coleccion)) return null;
+  return make("Nuevas tendencias", cfg.items);
 }
 
 function tryContextualZapatillasCategoria(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
@@ -590,12 +541,8 @@ export function buildContextualCatalogFilters(input: ContextualFiltersInput): Ca
   return (
     tryContextualMarcas(input, make) ??
     tryContextualCyberLineaZapatillas(input, make, cyberDesc) ??
-    tryContextualCyberHombre(input, make, cyberDesc) ??
-    tryContextualCyberMujer(input, make, cyberDesc) ??
-    tryContextualCyberNino(input, make, cyberDesc) ??
-    tryContextualNuevasMujer(input, make) ??
-    tryContextualNuevasHombre(input, make) ??
-    tryContextualNuevasNino(input, make) ??
+    tryContextualCyberCategoria(input, make, cyberDesc) ??
+    tryContextualNuevas(input, make) ??
     tryContextualZapatillasCategoria(input, make) ??
     tryContextualZapatillasBlancas(input, make) ??
     tryContextualNinas(input, make) ??
