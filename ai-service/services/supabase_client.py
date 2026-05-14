@@ -80,8 +80,21 @@ def fetch_completed_orders(days: int | None = None) -> list[dict]:
 
 
 def fetch_products() -> list[dict]:
-    # Contrato de campos para demand.py: id, nombre, categoria, precio, stock, imagen, campana.
-    return _query("productos", {"select": "id,nombre,categoria,precio,stock,imagen,campana"})
+    # tallaStock y tallas añadidos para detección de talla residual en demand.py.
+    return _query("productos", {"select": "id,nombre,categoria,precio,stock,imagen,campana,tallaStock,tallas"})
+
+
+def fetch_stock_movements(days: int | None = None) -> list[dict]:
+    """Movimientos de ingreso de mercancía. Permite calcular sell-through
+    y detectar periodos de agotamiento real por producto."""
+    params = {
+        "select": "productId,tipo,fecha,tallaStock,cantidad,costoUnitario",
+        "tipo":   "eq.ingreso",
+        "order":  "fecha.asc",
+    }
+    if days and days > 0:
+        params["fecha"] = f"gte.{_cutoff_iso(days)}"
+    return _query("movimientosStock", params)
 
 
 def fetch_product_codes() -> dict[str, str]:

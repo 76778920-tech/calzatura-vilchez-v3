@@ -470,7 +470,7 @@ def _risk_level_for_stockout(stock: int, daily_demand: float, days_until_stockou
         return "critico"
     if days_until_stockout <= 14:
         return "atencion"
-    if days_until_stockout <= 21:
+    if days_until_stockout <= 30:
         return "vigilancia"
     return "estable"
 
@@ -542,7 +542,9 @@ def _prediction_row_no_sales_history(
     pid: str,
     product: dict,
     codes_map: dict[str, str],
+    movements_by_product: dict[str, list[dict]] | None = None,
 ) -> dict:
+    inventory = _inventory_enrichment(pid, product, movements_by_product or {}, total_sold=0.0)
     return {
         "productId": pid,
         "imagen": product.get("imagen") or "",
@@ -573,7 +575,95 @@ def _prediction_row_no_sales_history(
         "nivel_riesgo": "sin_historial",
         "alerta_stock": False,
         "sin_historial": True,
+        "talla_stock":            inventory["talla_stock"],
+        "talla_residual":         inventory["talla_residual"],
+        "stock_inicial_estimado": inventory["stock_inicial_estimado"],
+        "sell_through_pct":       inventory["sell_through_pct"],
+        "dias_en_catalogo":       inventory["dias_en_catalogo"],
     }
+
+
+# Tallas de mayor rotación por categoría para detectar stock residual.
+# Si solo quedan tallas fuera de este rango, el producto está estancado por surtido,
+# no por falta de demanda.
+_POPULAR_SIZES: dict[str, set[str]] = {
+    "hombre":  {"39", "40", "41", "42"},
+    "dama":    {"35", "36", "37", "38", "39"},
+    "juvenil": {"34", "35", "36", "37", "38"},
+    "nino":    {"27", "28", "29", "30", "31", "32"},
+    "bebe":    {"18", "19", "20", "21"},
+}
+
+
+def _build_movements_by_product(stock_movements: list[dict]) -> dict[str, list[dict]]:
+    result: dict[str, list[dict]] = {}
+    for m in stock_movements or []:
+        pid = m.get("productId") or m.get("product_id", "")
+        if not pid:
+            continue
+        result.setdefault(pid, []).append(m)
+    return result
+
+
+def _sell_through_metrics(
+    pid: str,
+    total_sold: float,
+    movements_by_product: dict[str, list[dict]],
+) -> dict:
+    movements = movements_by_product.get(pid, [])
+    if not movements:
+        return {}
+    stock_inicial = sum(int(m.get("cantidad") or 0) for m in movements)
+    if stock_inicial <= 0:
+        return {}
+    sell_through_pct = round(min(total_sold / stock_inicial * 100, 100), 1)
+    fechas = [m.get("fecha", "") for m in movements if m.get("fecha")]
+    if fechas:
+        first_date = min(fechas)
+        try:
+            dias_en_catalogo = (date.today() - date.fromisoformat(first_date)).days
+        except ValueError:
+            dias_en_catalogo = None
+    else:
+        dias_en_catalogo = None
+    return {
+        "stock_inicial_estimado": stock_inicial,
+        "sell_through_pct":       sell_through_pct,
+        "dias_en_catalogo":       dias_en_catalogo,
+    }
+
+
+def _inventory_enrichment(
+    pid: str,
+    product: dict,
+    movements_by_product: dict[str, list[dict]],
+    total_sold: float,
+) -> dict:
+    """Calcula métricas de inventario: sell-through, talla residual y stock por talla."""
+    talla_stock = {k: v for k, v in (product.get("tallaStock") or {}).items() if (v or 0) > 0}
+    sell_through = _sell_through_metrics(pid, total_sold, movements_by_product)
+    categoria = product.get("categoria", "")
+    talla_residual = _detect_talla_residual(categoria, talla_stock) if talla_stock else False
+    return {
+        "talla_stock":            talla_stock,
+        "talla_residual":         talla_residual,
+        "stock_inicial_estimado": sell_through.get("stock_inicial_estimado"),
+        "sell_through_pct":       sell_through.get("sell_through_pct"),
+        "dias_en_catalogo":       sell_through.get("dias_en_catalogo"),
+    }
+
+
+def _detect_talla_residual(categoria: str, talla_stock: dict) -> bool:
+    """True si solo quedan tallas de baja rotación (extremos del rango para esa categoría)."""
+    if not talla_stock:
+        return False
+    sizes_with_stock = {k for k, v in talla_stock.items() if (v or 0) > 0}
+    if not sizes_with_stock:
+        return False
+    popular = _POPULAR_SIZES.get(categoria.lower(), set())
+    if not popular:
+        return False
+    return sizes_with_stock.isdisjoint(popular)
 
 
 @dataclass(slots=True)
@@ -596,6 +686,7 @@ class _SalesHistoryPredictionInput:
     meta: dict
     codes_map: dict[str, str]
     feature_stats: dict
+    movements_by_product: dict[str, list[dict]]
 
 
 def _prediction_row_with_sales_history(inp: _SalesHistoryPredictionInput) -> dict | None:
@@ -615,6 +706,7 @@ def _prediction_row_with_sales_history(inp: _SalesHistoryPredictionInput) -> dic
     meta = inp.meta
     codes_map = inp.codes_map
     feature_stats = inp.feature_stats
+    movements_by_product = inp.movements_by_product
 
     series = [day_sales.get(d, 0.0) for d in date_range]
     total_sold = sum(series)
@@ -659,6 +751,8 @@ def _prediction_row_with_sales_history(inp: _SalesHistoryPredictionInput) -> dic
     trend = _demand_trend_from_averages(avg_7, avg_30)
     drift = _drift_score(avg_7, avg_30, feature_stats)
 
+    inventory = _inventory_enrichment(pid, product, movements_by_product, total_sold)
+
     return {
         "productId": pid,
         "imagen": imagen,
@@ -690,6 +784,11 @@ def _prediction_row_with_sales_history(inp: _SalesHistoryPredictionInput) -> dic
         "nivel_riesgo": "estable",
         "alerta_stock": False,
         "sin_historial": False,
+        "talla_stock":            inventory["talla_stock"],
+        "talla_residual":         inventory["talla_residual"],
+        "stock_inicial_estimado": inventory["stock_inicial_estimado"],
+        "sell_through_pct":       inventory["sell_through_pct"],
+        "dias_en_catalogo":       inventory["dias_en_catalogo"],
     }
 
 
@@ -700,6 +799,7 @@ def predict_demand(
     product_codes: dict[str, str] | None = None,
     horizon_days: int = 30,
     history_days: int = 90,
+    stock_movements: list[dict] | None = None,
 ) -> tuple[list[dict], dict]:
     """
     Predict demand for each product over the next horizon_days.
@@ -731,6 +831,7 @@ def predict_demand(
     sales_map = build_daily_sales_by_product(daily_sales, completed_orders)
     product_map = {p["id"]: p for p in products}
     codes_map: dict[str, str] = product_codes or {}
+    movements_by_product = _build_movements_by_product(stock_movements or [])
 
     sale_meta = _init_sale_meta_from_sources(daily_sales, completed_orders, product_map)
 
@@ -768,6 +869,7 @@ def predict_demand(
                 meta=meta,
                 codes_map=codes_map,
                 feature_stats=feature_stats,
+                movements_by_product=movements_by_product,
             )
         )
         if row is None:
@@ -784,7 +886,7 @@ def predict_demand(
     for pid, product in product_map.items():
         if pid in predicted_pids:
             continue
-        predictions.append(_prediction_row_no_sales_history(pid, product, codes_map))
+        predictions.append(_prediction_row_no_sales_history(pid, product, codes_map, movements_by_product))
 
     risk_order = {"critico": 0, "atencion": 1, "vigilancia": 2, "estable": 3, "sin_historial": 4}
     predictions.sort(

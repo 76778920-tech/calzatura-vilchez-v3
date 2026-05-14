@@ -308,6 +308,7 @@ export function useAdminPredictionsModel() {
     sinHistorial,
     sobreStock,
     rotacionDebil,
+    tallaResidual,
     promedioCobertura,
   } = useMemo(() => computePredictionCountKpis(predictionsForView), [predictionsForView]);
 
@@ -460,6 +461,7 @@ export function useAdminPredictionsModel() {
     sinHistorial,
     sobreStock,
     rotacionDebil,
+    tallaResidual,
     promedioCobertura,
     productoMotor,
     resumenEjecutivo,

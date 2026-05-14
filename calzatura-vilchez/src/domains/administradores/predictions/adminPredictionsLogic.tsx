@@ -41,6 +41,11 @@ export interface Prediction {
   nivel_riesgo: "critico" | "atencion" | "vigilancia" | "estable" | "sin_historial";
   alerta_stock: boolean;
   sin_historial: boolean;
+  talla_stock?: Record<string, number> | null;
+  talla_residual?: boolean | null;
+  stock_inicial_estimado?: number | null;
+  sell_through_pct?: number | null;
+  dias_en_catalogo?: number | null;
 }
 
 export interface WeekPoint {
@@ -114,6 +119,7 @@ export interface IreData {
   score: number;
   nivel: "bajo" | "moderado" | "alto" | "critico";
   descripcion: string;
+  sin_datos?: boolean;
   version?: string;
   definicion?: string;
   formula?: string;
@@ -434,6 +440,25 @@ export function generarRecomendaciónes(predictions: Prediction[]): Recomendaci�
         productId: p.productId,
       });
     }
+  }
+
+  const yaRecomendado = new Set(recs.map((r) => r.productId));
+  for (const p of predictions) {
+    if (p.talla_residual !== true || p.stock_actual <= 0) continue;
+    if (yaRecomendado.has(p.productId)) continue;
+    const st =
+      p.sell_through_pct != null && Number.isFinite(p.sell_through_pct)
+        ? ` Sell-through reciente ~${p.sell_through_pct.toFixed(0)}%.`
+        : "";
+    recs.push({
+      tipo: "atencion",
+      titulo: "Talla residual o surtido difícil",
+      detalle: `"${p.nombre}" concentra stock en tallas poco giradas o pares sueltos.${st}`,
+      accion:
+        "Promoción en vitrina o liquidación focalizada; no repitas el mismo mix de tallas en el próximo pedido.",
+      producto: p.nombre,
+      productId: p.productId,
+    });
   }
 
   const order = { urgente: 0, atencion: 1, oportunidad: 2, tranquilo: 3 };
@@ -2868,6 +2893,7 @@ export function computePredictionCountKpis(predictionsForView: Prediction[]) {
   const sinHistorial = predictionsForView.filter((item) => item.sin_historial).length;
   const sobreStock = predictionsForView.filter((item) => !item.sin_historial && isOverstocked(item)).length;
   const rotacionDebil = predictionsForView.filter((item) => !item.sin_historial && isSlowMoving(item)).length;
+  const tallaResidual = predictionsForView.filter((item) => item.talla_residual === true).length;
   const conCobertura = predictionsForView.filter((item) => !item.sin_historial && item.dias_hasta_agotarse < 999);
   const promedioCobertura = conCobertura.reduce(
     (acc, item, _, arr) => acc + (item.dias_hasta_agotarse / Math.max(arr.length, 1)),
@@ -2881,6 +2907,7 @@ export function computePredictionCountKpis(predictionsForView: Prediction[]) {
     sinHistorial,
     sobreStock,
     rotacionDebil,
+    tallaResidual,
     promedioCobertura,
   };
 }

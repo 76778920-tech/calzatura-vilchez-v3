@@ -67,6 +67,7 @@ export function PredictionsResumenTabPanel(props: AdminPredictionsModelState) {
     riskAlerts,
     changeTab,
     recomendaciones,
+    tallaResidual,
   } = props;
   return (
         <motion.div
@@ -79,42 +80,63 @@ export function PredictionsResumenTabPanel(props: AdminPredictionsModelState) {
           {/* IRE hero */}
           {ireData && (
             <motion.div
-              className={`ire-hero ire-hero-${ireData.nivel}`}
+              className={`ire-hero ire-hero-${ireData.sin_datos ? "bajo" : ireData.nivel}`}
               initial={{ opacity: 0, y: -16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: "easeOut" }}
             >
               <div className="ire-left">
                 <div className="ire-label">Índice de Riesgo Empresarial</div>
-                <div className="ire-score-row">
-                  <span className="ire-score">{ireData.score}</span>
-                  <span className="ire-score-max">/100</span>
-                  <span className={`ire-nivel ire-nivel-${ireData.nivel}`}>
-                    {IRE_NIVEL_LABELS[ireData.nivel] ?? ireData.nivel}
-                  </span>
-                </div>
-                <p className="ire-desc">{ireData.descripcion}</p>
-              </div>
-              <div className="ire-dims">
-                {IRE_DIM_CONFIG.map(({ key, label }) => {
-                  const val = ireData.dimensiones[key];
-                  const peso = ireData.pesos[key];
-                  const pesoLabel = `${label} ${Math.round(peso * 100)}%`;
-                  return (
-                  <div key={key} className="ire-dim">
-                    <div className="ire-dim-label">{pesoLabel}</div>
-                    <div className="ire-dim-bar-bg">
-                      <div
-                        className={`ire-dim-bar ire-dim-bar-${val >= 75 ? "critico" : val >= 50 ? "alto" : val >= 25 ? "moderado" : "bajo"}`}
-                        style={{ width: `${val}%` }}
-                      />
+                {ireData.sin_datos ? (
+                  <>
+                    <div className="ire-score-row">
+                      <span className="ire-score" style={{ opacity: 0.35 }}>—</span>
+                      <span className="ire-nivel ire-nivel-bajo" style={{ marginLeft: "0.5rem" }}>Sin datos</span>
                     </div>
-                    <div className="ire-dim-val">{val}</div>
-                  </div>
-                  );
-                })}
+                    <p className="ire-desc">
+                      No hay productos con historial de ventas suficiente para calcular el IRE.
+                      El índice se activará automáticamente cuando existan registros de demanda.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="ire-score-row">
+                      <span className="ire-score">{ireData.score}</span>
+                      <span className="ire-score-max">/100</span>
+                      <span className={`ire-nivel ire-nivel-${ireData.nivel}`}>
+                        {IRE_NIVEL_LABELS[ireData.nivel] ?? ireData.nivel}
+                      </span>
+                    </div>
+                    <p className="ire-desc">{ireData.descripcion}</p>
+                  </>
+                )}
               </div>
-              {ireHistorial.length >= 2 && (
+              {!ireData.sin_datos && (
+                <div className="ire-dims">
+                  {IRE_DIM_CONFIG.map(({ key, label }) => {
+                    const val = ireData.dimensiones[key];
+                    const peso = ireData.pesos[key];
+                    const pesoLabel = `${label} ${Math.round(peso * 100)}%`;
+                    let dimLevel = "bajo";
+                    if (val >= 75) dimLevel = "critico";
+                    else if (val >= 50) dimLevel = "alto";
+                    else if (val >= 25) dimLevel = "moderado";
+                    return (
+                    <div key={key} className="ire-dim">
+                      <div className="ire-dim-label">{pesoLabel}</div>
+                      <div className="ire-dim-bar-bg">
+                        <div
+                          className={`ire-dim-bar ire-dim-bar-${dimLevel}`}
+                          style={{ width: `${val}%` }}
+                        />
+                      </div>
+                      <div className="ire-dim-val">{val}</div>
+                    </div>
+                    );
+                  })}
+                </div>
+              )}
+              {!ireData.sin_datos && ireHistorial.length >= 2 && (
                 <IreSparkline data={ireHistorial} />
               )}
             </motion.div>
@@ -210,6 +232,16 @@ export function PredictionsResumenTabPanel(props: AdminPredictionsModelState) {
             <p className="pred-kpi-sub">analizados en catálogo</p>
           </div>
         </motion.div>
+        {tallaResidual > 0 && (
+          <motion.div className="pred-kpi-card pred-kpi-alert" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.36, ease: "easeOut" } }} whileHover={{ y: -8, scale: 1.015 }}>
+            <AlertTriangle size={20} />
+            <div>
+              <p className="pred-kpi-label">Talla residual</p>
+              <p className="pred-kpi-value">{tallaResidual}</p>
+              <p className="pred-kpi-sub">solo tallas extremas en stock</p>
+            </div>
+          </motion.div>
+        )}
       </div>
 
       <div className="pred-section-grid">
@@ -514,6 +546,9 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
                           {prediction.codigo && <p className="pred-product-code">{prediction.codigo}</p>}
                           <p className="pred-product-name">{prediction.nombre}</p>
                           <p className="pred-product-cat">{prediction.categoria}</p>
+                          {prediction.talla_residual && (
+                            <span className="pred-talla-residual-badge">talla residual</span>
+                          )}
                           <DriftBadge score={prediction.drift_score} />
                         </td>
                         <td>
@@ -540,6 +575,9 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
                           <span className={`pred-stock-badge ${stockBadgeClass}`}>
                             {prediction.stock_actual} uds.
                           </span>
+                          {prediction.sell_through_pct != null && (
+                            <p className="pred-sub">{prediction.sell_through_pct.toFixed(0)}% vendido</p>
+                          )}
                         </td>
                         <td>
                           <DuracionTexto p={prediction} />

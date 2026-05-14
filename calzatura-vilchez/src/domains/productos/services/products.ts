@@ -166,6 +166,33 @@ export async function deleteProduct(id: string): Promise<void> {
   void logAudit("eliminar", "producto", id, id);
 }
 
+export async function registrarIngresoStock(
+  productId: string,
+  productNombre: string,
+  tallaStock: Record<string, number>,
+  costoUnitario?: number,
+  proveedor?: string,
+  observaciones?: string,
+  registradoPor?: string,
+): Promise<{ cantidad: number; tallaStock: Record<string, number> }> {
+  const { data, error } = await supabase.rpc("registrar_ingreso_stock", {
+    p_product_id:     productId,
+    p_talla_stock:    tallaStock,
+    p_costo_unitario: costoUnitario ?? null,
+    p_proveedor:      proveedor     || null,
+    p_observaciones:  observaciones || null,
+    p_registrado_por: registradoPor || null,
+  });
+  if (error) throw error;
+  const result = data as { ok: boolean; cantidad: number; tallaStock: Record<string, number> };
+  void logAudit("editar", "producto", productId, productNombre, {
+    accion: "ingreso_stock",
+    cantidad: result.cantidad,
+    proveedor: proveedor || null,
+  });
+  return result;
+}
+
 export async function fetchProductCodes(): Promise<Record<string, string>> {
   const { data, error } = await supabase.from(CODE_COL).select("*");
   if (error) throw error;

@@ -10,6 +10,7 @@ import {
   deleteProductCode,
   fetchProductCodes,
   fetchProducts,
+  registrarIngresoStock,
 } from "@/domains/productos/services/products";
 import {
   compressImageFile,
@@ -30,6 +31,7 @@ import { capitalizeWords } from "@/utils/colors";
 import { sumSizeStock } from "@/utils/stock";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import toast from "react-hot-toast";
+import { invalidateAICache } from "@/domains/administradores/predictions/adminPredictionsApi";
 import {
   computeAdminProductStats,
   filterAdminProducts,
@@ -110,6 +112,8 @@ export function useAdminProductsPage() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [stockModalProduct, setStockModalProduct] = useState<AdminProduct | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>({ ...EMPTY_FORM });
   const [variantSlots, setVariantSlots] = useState<VariantSlot[]>(() => createVariantSlots(EMPTY_FORM.categoria));
@@ -553,6 +557,7 @@ export function useAdminProductsPage() {
   const handleSave = async (event: { preventDefault(): void }) => {
     event.preventDefault();
     const codigo = normalizeVariantCode(form.codigo ?? "");
+    const saveEvent = editingId ? "product_updated" : "product_created";
     await runAdminProductSaveFlow({
       codigo,
       form,
@@ -563,6 +568,42 @@ export function useAdminProductsPage() {
       closeModal,
       load,
     });
+    void invalidateAICache(saveEvent);
+  };
+
+  const openStockEntry = (product: AdminProduct) => {
+    setStockModalProduct(product);
+    setShowStockModal(true);
+  };
+
+  const closeStockModal = () => {
+    setShowStockModal(false);
+    setStockModalProduct(null);
+  };
+
+  const handleStockEntry = async (
+    tallaStock: Record<string, number>,
+    costoUnitario: number | undefined,
+    proveedor: string,
+    observaciones: string,
+  ) => {
+    if (!stockModalProduct) return;
+    try {
+      await registrarIngresoStock(
+        stockModalProduct.id,
+        stockModalProduct.nombre,
+        tallaStock,
+        costoUnitario,
+        proveedor || undefined,
+        observaciones || undefined,
+      );
+      toast.success("Ingreso registrado");
+      void invalidateAICache("stock_entry");
+      closeStockModal();
+      load();
+    } catch {
+      toast.error("Error al registrar el ingreso de stock");
+    }
   };
 
   const handleDelete = async (product: AdminProduct) => {
@@ -574,6 +615,7 @@ export function useAdminProductsPage() {
         deleteProductFinancial(product.id),
       ]);
       toast.success("Producto eliminado");
+      void invalidateAICache("product_deleted");
       load();
     } catch {
       toast.error("Error al eliminar");
@@ -584,6 +626,11 @@ export function useAdminProductsPage() {
     activeColorSlotRef,
     categoryFilter,
     clearFilters,
+    closeStockModal,
+    handleStockEntry,
+    openStockEntry,
+    showStockModal,
+    stockModalProduct,
     clearImage,
     closeModal,
     colorPaletteOpen,

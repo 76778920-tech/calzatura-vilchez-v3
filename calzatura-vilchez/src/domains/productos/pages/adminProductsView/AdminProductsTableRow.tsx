@@ -1,4 +1,4 @@
-import { Copy, Pencil, Trash2 } from "lucide-react";
+import { Copy, PackagePlus, Pencil, Trash2 } from "lucide-react";
 import { categoryLabel } from "@/utils/labels";
 import { FALLBACK_PRODUCT_IMAGE, LOW_STOCK_LIMIT, type AdminProduct } from "../adminProductsInternals";
 
@@ -7,6 +7,7 @@ type Props = Readonly<{
   setPreviewImage: (v: { src: string; title: string; subtitle?: string }) => void;
   openVariant: (product: AdminProduct) => void;
   openEdit: (product: AdminProduct) => void;
+  openStockEntry: (product: AdminProduct) => void;
   handleDelete: (product: AdminProduct) => void;
 }>;
 
@@ -15,6 +16,7 @@ export function AdminProductsTableRow({
   setPreviewImage,
   openVariant,
   openEdit,
+  openStockEntry,
   handleDelete,
 }: Props) {
   const thumb = product.imagen || FALLBACK_PRODUCT_IMAGE;
@@ -85,6 +87,9 @@ export function AdminProductsTableRow({
         <div className="admin-actions">
           <button onClick={() => openVariant(product)} className="action-btn" title="Crear variante de color" aria-label={`Crear variante de ${product.nombre}`}>
             <Copy size={14} />
+          </button>
+          <button onClick={() => openStockEntry(product)} className="action-btn" title="Ingresar mercancía" aria-label={`Ingresar stock de ${product.nombre}`}>
+            <PackagePlus size={14} />
           </button>
           <button onClick={() => openEdit(product)} className="action-btn edit-btn" aria-label={`Editar ${product.nombre}`}>
             <Pencil size={14} />

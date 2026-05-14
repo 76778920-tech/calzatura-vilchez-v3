@@ -27,6 +27,7 @@ from services.supabase_client import (
     fetch_ire_historial,
     fetch_product_codes,
     fetch_products,
+    fetch_stock_movements,
     get_client,
     get_last_campana_activa,
     load_modelo_estado,
@@ -87,12 +88,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-_CACHE_TTL = 7200  # 2 hours — conserves Firestore free-tier quota
+# Per-dataset TTLs (seconds) — configurable via env vars for easy tuning
+_TTL_PRODUCTS        = int(os.getenv("CACHE_TTL_PRODUCTS",        "1800"))  # 30 min
+_TTL_PRODUCT_CODES   = int(os.getenv("CACHE_TTL_PRODUCT_CODES",   "7200"))  # 2 h
+_TTL_DAILY_SALES     = int(os.getenv("CACHE_TTL_DAILY_SALES",     "3600"))  # 1 h
+_TTL_ORDERS          = int(os.getenv("CACHE_TTL_ORDERS",          "3600"))  # 1 h
+_TTL_STOCK_MOVEMENTS = int(os.getenv("CACHE_TTL_STOCK_MOVEMENTS", "1800"))  # 30 min
 
-_cache: dict = {
-    "data": None,       # (daily_sales, orders, products, product_codes)
-    "expires_at": 0.0,
-    "lookback_days": 0,
+# Which datasets each event type invalidates
+_EVENT_INVALIDATION: dict[str, set[str]] = {
+    "stock_entry":     {"products", "stock_movements"},
+    "product_created": {"products", "product_codes"},
+    "product_updated": {"products", "product_codes"},
+    "product_deleted": {"products", "product_codes"},
+    "sale_recorded":   {"daily_sales", "orders"},
+    "full":            {"products", "product_codes", "daily_sales", "orders", "stock_movements"},
+}
+
+_cache: dict[str, dict] = {
+    "products":        {"data": None, "expires_at": 0.0, "ttl": _TTL_PRODUCTS},
+    "product_codes":   {"data": None, "expires_at": 0.0, "ttl": _TTL_PRODUCT_CODES},
+    "daily_sales":     {"data": None, "expires_at": 0.0, "ttl": _TTL_DAILY_SALES,     "lookback_days": 0},
+    "orders":          {"data": None, "expires_at": 0.0, "ttl": _TTL_ORDERS,          "lookback_days": 0},
+    "stock_movements": {"data": None, "expires_at": 0.0, "ttl": _TTL_STOCK_MOVEMENTS},
 }
 
 _AI_SERVICE_BEARER_TOKEN = os.getenv("AI_SERVICE_BEARER_TOKEN", "").strip()
@@ -169,31 +187,46 @@ def log_startup_context():
 
 
 def _load_data(force: bool = False, lookback_days: int = 180):
-    """Returns cached Supabase data or refreshes it when expired."""
+    """Returns (daily_sales, orders, products, product_codes, stock_movements).
+    Each dataset has its own TTL and is refreshed independently."""
     now = time.monotonic()
-    if (
-        not force
-        and _cache["data"] is not None
-        and now < _cache["expires_at"]
-        and _cache["lookback_days"] >= lookback_days
-    ):
-        return _cache["data"]
 
-    with ThreadPoolExecutor(max_workers=4) as pool:
-        f_daily = pool.submit(fetch_daily_sales, lookback_days)
-        f_orders = pool.submit(fetch_completed_orders, lookback_days)
-        f_products = pool.submit(fetch_products)
-        f_codes = pool.submit(fetch_product_codes)
-        data = (
-            f_daily.result(),
-            f_orders.result(),
-            f_products.result(),
-            f_codes.result(),
-        )
-    _cache["data"] = data
-    _cache["expires_at"] = now + _CACHE_TTL
-    _cache["lookback_days"] = lookback_days
-    return data
+    need = {
+        "daily_sales":     force or _cache["daily_sales"]["data"] is None or now >= _cache["daily_sales"]["expires_at"] or _cache["daily_sales"].get("lookback_days", 0) < lookback_days,
+        "orders":          force or _cache["orders"]["data"] is None or now >= _cache["orders"]["expires_at"] or _cache["orders"].get("lookback_days", 0) < lookback_days,
+        "products":        force or _cache["products"]["data"] is None or now >= _cache["products"]["expires_at"],
+        "product_codes":   force or _cache["product_codes"]["data"] is None or now >= _cache["product_codes"]["expires_at"],
+        "stock_movements": force or _cache["stock_movements"]["data"] is None or now >= _cache["stock_movements"]["expires_at"],
+    }
+
+    if any(need.values()):
+        futures: dict = {}
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            if need["daily_sales"]:
+                futures["daily_sales"] = pool.submit(fetch_daily_sales, lookback_days)
+            if need["orders"]:
+                futures["orders"] = pool.submit(fetch_completed_orders, lookback_days)
+            if need["products"]:
+                futures["products"] = pool.submit(fetch_products)
+            if need["product_codes"]:
+                futures["product_codes"] = pool.submit(fetch_product_codes)
+            if need["stock_movements"]:
+                futures["stock_movements"] = pool.submit(fetch_stock_movements)
+
+        for key, future in futures.items():
+            data = future.result()
+            _cache[key]["data"] = data
+            _cache[key]["expires_at"] = now + _cache[key]["ttl"]
+            if key in ("daily_sales", "orders"):
+                _cache[key]["lookback_days"] = lookback_days
+
+    return (
+        _cache["daily_sales"]["data"],
+        _cache["orders"]["data"],
+        _cache["products"]["data"],
+        _cache["product_codes"]["data"],
+        _cache["stock_movements"]["data"],
+    )
 
 
 def _raise_http_error(error: Exception) -> None:
@@ -210,11 +243,12 @@ def _raise_http_error(error: Exception) -> None:
 
 @app.get("/")
 def root():
-    cached = _cache["data"] is not None and time.monotonic() < _cache["expires_at"]
+    now = time.monotonic()
+    cache_status = {k: v["data"] is not None and now < v["expires_at"] for k, v in _cache.items()}
     return {
         "status": "ok",
         "service": "Calzatura Vilchez AI",
-        "cache_active": cached,
+        "cache": cache_status,
     }
 
 
@@ -284,7 +318,7 @@ def demand_prediction(
     try:
         _require_service_auth(request)
         lookback_days = max(history, 120)
-        daily_sales, orders, products, product_codes = _load_data(lookback_days=lookback_days)
+        daily_sales, orders, products, product_codes, movements = _load_data(lookback_days=lookback_days)
         predictions, training_meta = predict_demand(
             daily_sales=daily_sales,
             completed_orders=orders,
@@ -292,6 +326,7 @@ def demand_prediction(
             product_codes=product_codes,
             horizon_days=horizon,
             history_days=history,
+            stock_movements=movements,
         )
 
         # Cache training metadata for /api/model/info
@@ -363,7 +398,7 @@ def combined_prediction(
     try:
         _require_service_auth(request)
         lookback_days = max(history, 120)
-        daily_sales, orders, products, product_codes = _load_data(lookback_days=lookback_days)
+        daily_sales, orders, products, product_codes, movements = _load_data(lookback_days=lookback_days)
 
         predictions, training_meta = predict_demand(
             daily_sales=daily_sales,
@@ -372,6 +407,7 @@ def combined_prediction(
             product_codes=product_codes,
             horizon_days=horizon,
             history_days=history,
+            stock_movements=movements,
         )
 
         # Update model registry and prediction log (same as /api/predict/demand)
@@ -491,7 +527,7 @@ def stock_alerts(
     try:
         _require_service_auth(request)
         lookback_days = max(days_threshold, 90)
-        daily_sales, orders, products, product_codes = _load_data(lookback_days=lookback_days)
+        daily_sales, orders, products, product_codes, movements = _load_data(lookback_days=lookback_days)
         predictions, _ = predict_demand(
             daily_sales=daily_sales,
             completed_orders=orders,
@@ -499,6 +535,7 @@ def stock_alerts(
             product_codes=product_codes,
             horizon_days=days_threshold,
             history_days=90,
+            stock_movements=movements,
         )
         alerts = get_stock_alerts(predictions, days_threshold=days_threshold)
         return {
@@ -577,6 +614,17 @@ def weekly_chart(
         _raise_http_error(error)
 
 
+class InvalidateCacheRequest(BaseModel):
+    event: str = Field(
+        default="full",
+        description=(
+            "Tipo de evento que dispara la invalidación. "
+            "Valores: full | stock_entry | product_created | product_updated | product_deleted | sale_recorded. "
+            "Cualquier valor desconocido se trata como 'full'."
+        ),
+    )
+
+
 @app.post("/api/cache/invalidate", responses={
         401: {
             "description": (
@@ -592,13 +640,22 @@ def weekly_chart(
             ),
         },
     })
-@limiter.limit("5/minute")
-def invalidate_cache(request: Annotated[Request, None]):
-    """Force a cache refresh on the next request."""
+@limiter.limit("20/minute")
+def invalidate_cache(
+    request: Annotated[Request, None],
+    body: Annotated[InvalidateCacheRequest, Body()] = InvalidateCacheRequest(),
+):
+    """Invalida selectivamente los datasets afectados por el evento indicado."""
     _require_service_auth(request)
-    _cache["expires_at"] = 0.0
-    _cache["lookback_days"] = 0
-    return {"status": "cache invalidated"}
+    event = (body.event or "full").strip()
+    targets = _EVENT_INVALIDATION.get(event, _EVENT_INVALIDATION["full"])
+    invalidated = []
+    for key in targets:
+        if key in _cache:
+            _cache[key]["expires_at"] = 0.0
+            invalidated.append(key)
+    logger.info("[cache] invalidated event=%s datasets=%s", event, invalidated)
+    return {"status": "ok", "event": event, "invalidated": invalidated}
 
 
 @app.get("/api/model/info", responses={
@@ -666,7 +723,7 @@ def model_metrics(request: Annotated[Request, None]):
         }
 
     today = date.today()
-    daily_sales, orders, _, _ = _load_data()
+    daily_sales, orders, *_ = _load_data()
     sales_map = build_daily_sales_by_product(daily_sales, orders)
 
     evaluated = []
@@ -935,7 +992,7 @@ def campaign_detection(
     _require_service_auth(request)
 
     lookback = baseline_days + recent_days + 7
-    daily_sales, _, products, _ = _load_data(lookback_days=lookback)
+    daily_sales, _, products, *__ = _load_data(lookback_days=lookback)
 
     # Load feedback-learned thresholds (fire-and-forget; defaults to constants on error)
     threshold_overrides: dict | None = None

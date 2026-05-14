@@ -24,11 +24,23 @@ export function describeAIError(cause: unknown): string {
   return cause instanceof Error ? cause.message : "Error desconocido al conectar con el servicio de IA.";
 }
 
-export async function invalidateAICache() {
+export type CacheEvent =
+  | "full"
+  | "stock_entry"
+  | "product_created"
+  | "product_updated"
+  | "product_deleted"
+  | "sale_recorded";
+
+export async function invalidateAICache(event: CacheEvent = "full"): Promise<void> {
   try {
-    await fetchAI("/api/cache/invalidate", { method: "POST" });
+    await fetchAI("/api/cache/invalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event }),
+    });
   } catch {
-    // El panel puede seguir consultando aúnque el cache no se invalide.
+    // El panel puede seguir consultando aunque el cache no se invalide.
   }
 }
 

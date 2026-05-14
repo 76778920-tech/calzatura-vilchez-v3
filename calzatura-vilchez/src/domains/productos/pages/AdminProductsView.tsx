@@ -2,6 +2,7 @@ import ImagePreviewModal from "@/domains/administradores/components/ImagePreview
 import type { AdminProductsViewModel } from "./useAdminProductsPage";
 import { AdminProductModal } from "./adminProductsView/AdminProductModal";
 import { AdminProductsCatalogBody } from "./adminProductsView/AdminProductsCatalogBody";
+import { AdminProductStockEntryModal } from "./adminProductsView/AdminProductStockEntryModal";
 import { AdminProductsStatsBar } from "./adminProductsView/AdminProductsStatsBar";
 import { AdminProductsToolbar } from "./adminProductsView/AdminProductsToolbar";
 
@@ -37,10 +38,19 @@ export function AdminProductsView(p: Readonly<AdminProductsViewModel>) {
         setPreviewImage={p.setPreviewImage}
         openVariant={p.openVariant}
         openEdit={p.openEdit}
+        openStockEntry={p.openStockEntry}
         handleDelete={p.handleDelete}
       />
 
       {p.showModal && <AdminProductModal {...p} />}
+
+      {p.showStockModal && p.stockModalProduct && (
+        <AdminProductStockEntryModal
+          product={p.stockModalProduct}
+          onClose={p.closeStockModal}
+          onSubmit={p.handleStockEntry}
+        />
+      )}
 
       {p.previewImage && (
         <ImagePreviewModal

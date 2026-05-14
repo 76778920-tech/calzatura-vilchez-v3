@@ -6453,6 +6453,7 @@ button.dash-order-row-btn:hover { background: var(--bg-alt); }
 .pred-stock-badge.ok { background: #d1fae5; color: #065f46; }
 .pred-stock-badge.low { background: #fef3c7; color: #92400e; }
 .pred-stock-badge.out { background: #fee2e2; color: #991b1b; }
+.pred-talla-residual-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 0.1rem 0.45rem; border-radius: 100px; background: #fef9c3; color: #854d0e; margin-top: 0.2rem; letter-spacing: 0.02em; }
 .pred-days-critical { color: #dc2626; font-weight: 700; }
 .pred-days-warn { color: #d97706; font-weight: 600; }
 .pred-trend-cell { display: flex; align-items: center; gap: 0.35rem; font-size: 13px; }

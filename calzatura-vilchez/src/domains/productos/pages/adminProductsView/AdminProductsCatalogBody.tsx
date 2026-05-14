@@ -8,6 +8,7 @@ type Props = Readonly<{
   setPreviewImage: (v: { src: string; title: string; subtitle?: string }) => void;
   openVariant: (product: AdminProduct) => void;
   openEdit: (product: AdminProduct) => void;
+  openStockEntry: (product: AdminProduct) => void;
   handleDelete: (product: AdminProduct) => void;
 }>;
 
@@ -18,6 +19,7 @@ export function AdminProductsCatalogBody({
   setPreviewImage,
   openVariant,
   openEdit,
+  openStockEntry,
   handleDelete,
 }: Props) {
   if (loading) {
@@ -62,6 +64,7 @@ export function AdminProductsCatalogBody({
               setPreviewImage={setPreviewImage}
               openVariant={openVariant}
               openEdit={openEdit}
+              openStockEntry={openStockEntry}
               handleDelete={handleDelete}
             />
           ))}

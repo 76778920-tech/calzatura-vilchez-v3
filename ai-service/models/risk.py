@@ -241,10 +241,13 @@ def compute_ire(predictions: list[dict], revenue: dict | None) -> dict:
     }
     contribution_values = _score_contributions(raw_dimension_values, ire)
 
+    sin_datos = total == 0
+
     return {
         "score":          ire,
         "nivel":          nivel,
         "descripcion":    descripcion,
+        "sin_datos":      sin_datos,
         "version":        IRE_VERSION,
         "definicion":     IRE_DEFINITION,
         "formula":        _ire_formula(),
