@@ -1,7 +1,7 @@
-import { X, ShoppingBag, Trash2, Plus, Minus } from "lucide-react";
+import { X, ShoppingBag, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCart } from "@/domains/carrito/context/CartContext";
-import { CartSummaryRows } from "@/domains/carrito/components/cartShared";
+import { CartSummaryRows, CartItemQtyControls } from "@/domains/carrito/components/cartShared";
 import { handleProductImageError } from "@/utils/imgUtils";
 
 export default function CartSidebar() {
@@ -56,19 +56,13 @@ export default function CartSidebar() {
                     S/ {(item.product.precio * item.quantity).toFixed(2)}
                   </p>
                   <div className="cart-item-controls">
-                    <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity - 1, item.talla, item.color)}
-                      className="qty-btn"
-                    >
-                      <Minus size={12} />
-                    </button>
-                    <span className="qty-value">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.product.id, item.quantity + 1, item.talla, item.color)}
-                      className="qty-btn"
-                    >
-                      <Plus size={12} />
-                    </button>
+                    <CartItemQtyControls
+                      productId={item.product.id}
+                      quantity={item.quantity}
+                      talla={item.talla}
+                      color={item.color}
+                      onUpdate={updateQuantity}
+                    />
                     <button
                       onClick={() => removeItem(item.product.id, item.talla, item.color)}
                       className="remove-btn"

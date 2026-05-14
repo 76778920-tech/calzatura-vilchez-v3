@@ -3,10 +3,9 @@ import type { User as AuthUser } from "firebase/auth";
 import type { Dispatch, SetStateAction } from "react";
 import { Box, Heart, MapPin, Phone, User as UserIcon, ChevronDown } from "lucide-react";
 import type { MegaMenu } from "@/components/layout/headerMegaMenuTypes";
+import { WHATSAPP_CONTACT_URL } from "@/components/layout/headerMenuData";
 import { CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 
-const WHATSAPP_CONTACT_URL =
-  "https://wa.me/51964052530?text=Hola%20Calzatura%20Vilchez%2C%20quiero%20hacer%20una%20consulta%20sobre%20sus%20calzados.";
 
 type AccountNavHref =
   | (typeof PUBLIC_ROUTES)["login"]

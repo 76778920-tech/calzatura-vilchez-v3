@@ -1,4 +1,25 @@
+import { Minus, Plus } from "lucide-react";
 import { COSTO_ENVIO } from "@/domains/carrito/context/CartContext";
+
+export function CartItemQtyControls({ productId, quantity, talla, color, onUpdate }: Readonly<{
+  productId: string;
+  quantity: number;
+  talla: string | undefined;
+  color: string | undefined;
+  onUpdate: (id: string, qty: number, talla: string | undefined, color: string | undefined) => void;
+}>) {
+  return (
+    <>
+      <button onClick={() => onUpdate(productId, quantity - 1, talla, color)} className="qty-btn">
+        <Minus size={12} />
+      </button>
+      <span className="qty-value">{quantity}</span>
+      <button onClick={() => onUpdate(productId, quantity + 1, talla, color)} className="qty-btn">
+        <Plus size={12} />
+      </button>
+    </>
+  );
+}
 
 export function CartSummaryRows({ subtotal, total, rowClass, totalClass }: Readonly<{
   subtotal: number;
