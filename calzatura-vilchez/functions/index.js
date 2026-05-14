@@ -159,15 +159,15 @@ async function fetchProductsByIds(supabase, ids) {
   return arrOr(data);
 }
 
-async function fetchProductOrThrow(supabase, productId) {
-  const { data, error } = await supabase.from("productos").select("*").eq("id", productId).maybeSingle();
-  if (error) {
-    throw Object.assign(new Error("No se pudo consultar el producto"), { status: 500 });
-  }
-  if (!data) {
-    throw Object.assign(new Error("Producto no encontrado"), { status: 400 });
-  }
+async function fetchRowOrThrow(supabase, table, id, notFoundStatus, fetchMsg, notFoundMsg) {
+  const { data, error } = await supabase.from(table).select("*").eq("id", id).maybeSingle();
+  if (error) throw Object.assign(new Error(fetchMsg), { status: 500 });
+  if (!data) throw Object.assign(new Error(notFoundMsg), { status: notFoundStatus });
   return data;
+}
+
+async function fetchProductOrThrow(supabase, productId) {
+  return fetchRowOrThrow(supabase, "productos", productId, 400, "No se pudo consultar el producto", "Producto no encontrado");
 }
 
 async function assertOrderStockAvailability(supabase, items) {
@@ -246,14 +246,7 @@ async function buildOrderDraft(supabase, rawItems) {
 }
 
 async function fetchOrderOrThrow(supabase, orderId) {
-  const { data, error } = await supabase.from("pedidos").select("*").eq("id", orderId).maybeSingle();
-  if (error) {
-    throw Object.assign(new Error("No se pudo consultar el pedido"), { status: 500 });
-  }
-  if (!data) {
-    throw Object.assign(new Error("Pedido no encontrado"), { status: 404 });
-  }
-  return data;
+  return fetchRowOrThrow(supabase, "pedidos", orderId, 404, "No se pudo consultar el pedido", "Pedido no encontrado");
 }
 
 async function updateOrder(supabase, orderId, patch) {

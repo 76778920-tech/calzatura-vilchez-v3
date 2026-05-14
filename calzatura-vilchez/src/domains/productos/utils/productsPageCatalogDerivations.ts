@@ -363,6 +363,25 @@ function tryContextualCyberLineaZapatillas(
   ]);
 }
 
+const CYBER_CAT_CONFIG: Record<string, { title: string; tipoItems: Array<{ label: string; tipo: string }> }> = {
+  hombre: {
+    title: "Cyber Hombre",
+    tipoItems: [
+      { label: "Zapatillas Cyber", tipo: "zapatillas" },
+      { label: "Zapatos Cyber", tipo: "zapatos" },
+      { label: "Botines Cyber", tipo: "botines" },
+    ],
+  },
+  mujer: {
+    title: "Cyber Mujer",
+    tipoItems: [
+      { label: "Zapatillas Cyber", tipo: "zapatillas" },
+      { label: "Sandalias Cyber", tipo: "sandalias" },
+      { label: "Botines Cyber", tipo: "botines" },
+    ],
+  },
+};
+
 function tryContextualCyberCategoria(
   input: ContextualFiltersInput,
   make: CatalogFilterMaker,
@@ -370,20 +389,14 @@ function tryContextualCyberCategoria(
 ): CatalogFilterGroup | null {
   if (input.campana !== "cyber") return null;
   const cat = input.categoria;
-  if (cat === "hombre") {
-    return make("Cyber Hombre", [
-      { label: "Todos", params: { categoria: "hombre", campana: "cyber", descuento: cyberDesc } },
-      { label: "Zapatillas Cyber", params: { categoria: "hombre", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc } },
-      { label: "Zapatos Cyber", params: { categoria: "hombre", campana: "cyber", tipo: "zapatos", descuento: cyberDesc } },
-      { label: "Botines Cyber", params: { categoria: "hombre", campana: "cyber", tipo: "botines", descuento: cyberDesc } },
-    ]);
-  }
-  if (cat === "mujer") {
-    return make("Cyber Mujer", [
-      { label: "Todos", params: { categoria: "mujer", campana: "cyber", descuento: cyberDesc } },
-      { label: "Zapatillas Cyber", params: { categoria: "mujer", campana: "cyber", tipo: "zapatillas", descuento: cyberDesc } },
-      { label: "Sandalias Cyber", params: { categoria: "mujer", campana: "cyber", tipo: "sandalias", descuento: cyberDesc } },
-      { label: "Botines Cyber", params: { categoria: "mujer", campana: "cyber", tipo: "botines", descuento: cyberDesc } },
+  const cfg = CYBER_CAT_CONFIG[cat];
+  if (cfg) {
+    return make(cfg.title, [
+      { label: "Todos", params: { categoria: cat, campana: "cyber", descuento: cyberDesc } },
+      ...cfg.tipoItems.map((item) => ({
+        label: item.label,
+        params: { categoria: cat, campana: "cyber", tipo: item.tipo, descuento: cyberDesc },
+      })),
     ]);
   }
   if (cat === "nino") {
@@ -653,10 +666,10 @@ export function buildCatalogBreadcrumbs(input: CatalogBreadcrumbsInput): Catalog
     pushCrumb(humanizeSlug(estilo), { ...ctx });
   }
   if (segmento) {
-    ctx.campana = opt(campana);
-    ctx.coleccion = opt(coleccion);
     ctx.linea = opt(linea);
     ctx.tipo = opt(tipo);
+    ctx.campana = opt(campana);
+    ctx.coleccion = opt(coleccion);
     ctx.segmento = segmento;
     pushCrumb(categoryLabel(segmento), { ...ctx });
   }
