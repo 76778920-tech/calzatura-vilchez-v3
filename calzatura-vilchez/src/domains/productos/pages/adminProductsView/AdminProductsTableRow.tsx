@@ -1,5 +1,6 @@
 import { Copy, PackagePlus, Pencil, Trash2 } from "lucide-react";
 import { categoryLabel } from "@/utils/labels";
+import { isStockTallaIncoherent, sumTallaStockUnits } from "../adminProductStockCoherence";
 import { FALLBACK_PRODUCT_IMAGE, LOW_STOCK_LIMIT, type AdminProduct } from "../adminProductsInternals";
 
 type Props = Readonly<{
@@ -24,8 +25,12 @@ export function AdminProductsTableRow({
   if (product.stock === 0) stockClass = "stock-badge out";
   else if (product.stock <= LOW_STOCK_LIMIT) stockClass = "stock-badge low";
 
+  const stockTallaMismatch = isStockTallaIncoherent(product);
+  const sumTallas = sumTallaStockUnits(product.tallaStock);
+  const rowClass = stockTallaMismatch ? "admin-row-stock-incoherent" : undefined;
+
   return (
-    <tr>
+    <tr className={rowClass}>
       <td>
         <button
           type="button"
@@ -76,7 +81,17 @@ export function AdminProductsTableRow({
         )}
       </td>
       <td>
-        <span className={stockClass}>{product.stock}</span>
+        <div className="admin-stock-cell">
+          <span className={stockClass}>{product.stock}</span>
+          {stockTallaMismatch && (
+            <span
+              className="admin-stock-incoherent-badge"
+              title={`Suma tallas: ${sumTallas} — total en producto: ${product.stock}. Abre Editar y alinea la rejilla.`}
+            >
+              !
+            </span>
+          )}
+        </div>
       </td>
       <td>
         <span className={product.destacado ? "admin-status-badge featured" : "admin-status-badge muted"}>

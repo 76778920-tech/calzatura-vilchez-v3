@@ -1,7 +1,8 @@
 import type { ProductFinancial } from "@/types";
 import { categoryLabel } from "@/utils/labels";
+import { isStockTallaIncoherent } from "./adminProductStockCoherence";
 
-export type StockFilter = "todos" | "con-stock" | "bajo-stock" | "sin-stock";
+export type StockFilter = "todos" | "con-stock" | "bajo-stock" | "sin-stock" | "stock-talla-mismatch";
 export type FeaturedFilter = "todos" | "destacados" | "normales";
 
 type AdminProductRow = {
@@ -17,6 +18,7 @@ type AdminProductRow = {
   tipoCalzado?: string;
   descripcion?: string;
   stock: number;
+  tallaStock?: Record<string, number> | null;
   destacado?: boolean;
   finanzas?: ProductFinancial;
 };
@@ -25,7 +27,8 @@ export function computeAdminProductStats(products: AdminProductRow[], lowStockLi
   const bajoStock = products.filter((p) => p.stock > 0 && p.stock <= lowStockLimit).length;
   const destacados = products.filter((p) => p.destacado).length;
   const stockTotal = products.reduce((sum, p) => sum + p.stock, 0);
-  return { bajoStock, destacados, stockTotal };
+  const stockTallaIncoherentes = products.filter((p) => isStockTallaIncoherent(p)).length;
+  return { bajoStock, destacados, stockTotal, stockTallaIncoherentes };
 }
 
 export function filterAdminProducts<T extends AdminProductRow>(
@@ -61,7 +64,8 @@ export function filterAdminProducts<T extends AdminProductRow>(
       params.stockFilter === "todos" ||
       (params.stockFilter === "con-stock" && product.stock > params.lowStockLimit) ||
       (params.stockFilter === "bajo-stock" && product.stock > 0 && product.stock <= params.lowStockLimit) ||
-      (params.stockFilter === "sin-stock" && product.stock === 0);
+      (params.stockFilter === "sin-stock" && product.stock === 0) ||
+      (params.stockFilter === "stock-talla-mismatch" && isStockTallaIncoherent(product));
     const matchesFeatured =
       params.featuredFilter === "todos" ||
       (params.featuredFilter === "destacados" && Boolean(product.destacado)) ||

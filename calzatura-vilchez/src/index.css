@@ -6604,6 +6604,25 @@ button.dash-order-row-btn:hover { background: var(--bg-alt); }
 .tallas-selector { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 
 .admin-products-page { display: flex; flex-direction: column; gap: 1.15rem; }
+.admin-stock-coherence-banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1rem;
+  padding: 0.9rem 1rem; border-radius: var(--radius-md);
+  border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.09); color: var(--text);
+  font-size: 14px; line-height: 1.45;
+}
+.admin-stock-coherence-banner p { margin: 0; max-width: min(720px, 100%); }
+.admin-stock-coherence-banner__action { flex-shrink: 0; }
+.admin-metric-card--alert { border-color: rgba(245, 158, 11, 0.42) !important; background: rgba(245, 158, 11, 0.07) !important; }
+.admin-metric-card--alert svg { color: #d97706 !important; }
+.admin-stats-grid.product-stats-grid { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); }
+.admin-stock-cell { display: inline-flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.admin-stock-incoherent-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; border-radius: 999px;
+  background: rgba(245, 158, 11, 0.28); color: #92400e; font-weight: 900; font-size: 12px; line-height: 1;
+  cursor: help;
+}
+.admin-row-stock-incoherent td { background: rgba(245, 158, 11, 0.055); }
 .admin-page-header { align-items: flex-start; gap: 1rem; margin-bottom: 0; }
 .admin-page-kicker {
   display: inline-block; margin-bottom: 0.25rem; color: var(--gold-dark);
@@ -6635,7 +6654,7 @@ button.dash-order-row-btn:hover { background: var(--bg-alt); }
   width: 100%; border: 0; outline: none; background: transparent;
   font-family: var(--font-sans); font-size: 14px; color: var(--text);
 }
-.admin-filter-grid { display: grid; grid-template-columns: 170px 160px 135px auto auto; gap: 0.6rem; align-items: center; }
+.admin-filter-grid { display: grid; grid-template-columns: 170px 200px 135px auto auto; gap: 0.6rem; align-items: center; }
 .admin-manufacturer-filter-grid { grid-template-columns: minmax(130px, 150px) auto; }
 .admin-clear-filters { min-height: 42px; justify-content: center; color: var(--black); border-color: var(--border); }
 .admin-toolbar-create { min-height: 42px; justify-content: center; white-space: nowrap; padding-inline: 1rem; }

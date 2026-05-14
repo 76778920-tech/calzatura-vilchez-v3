@@ -17,6 +17,24 @@ export function AdminProductsView(p: Readonly<AdminProductsViewModel>) {
 
       <AdminProductsStatsBar productCount={p.products.length} stats={p.stats} />
 
+      {p.stats.stockTallaIncoherentes > 0 && (
+        <div className="admin-stock-coherence-banner" role="status">
+          <p>
+            <strong>{p.stats.stockTallaIncoherentes}</strong>{" "}
+            {p.stats.stockTallaIncoherentes === 1 ? "producto tiene" : "productos tienen"}{" "}
+            el total de pares distinto a la suma de la rejilla de tallas (datos legacy o edición incompleta).
+            Corrige desde <strong>Editar</strong> para alinear stock y tallas antes de confiar en ingresos o en el modelo.
+          </p>
+          <button
+            type="button"
+            className="btn-outline admin-stock-coherence-banner__action"
+            onClick={() => p.setStockFilter("stock-talla-mismatch")}
+          >
+            Ver solo desalineados
+          </button>
+        </div>
+      )}
+
       <AdminProductsToolbar
         searchTerm={p.searchTerm}
         setSearchTerm={p.setSearchTerm}

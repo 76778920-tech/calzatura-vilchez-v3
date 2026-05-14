@@ -52,6 +52,7 @@ export function AdminProductsToolbar({
           <option value="con-stock">Con stock saludable</option>
           <option value="bajo-stock">Stock bajo</option>
           <option value="sin-stock">Sin stock</option>
+          <option value="stock-talla-mismatch">Stock ≠ suma tallas</option>
         </select>
         <select value={featuredFilter} onChange={(event) => setFeaturedFilter(event.target.value as FeaturedFilter)} className="form-input">
           <option value="todos">Todos</option>

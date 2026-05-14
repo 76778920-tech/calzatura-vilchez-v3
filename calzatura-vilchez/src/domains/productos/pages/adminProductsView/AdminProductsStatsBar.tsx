@@ -1,9 +1,10 @@
-import { AlertTriangle, Boxes, PackageCheck, Star } from "lucide-react";
+import { AlertTriangle, Boxes, GitCompareArrows, PackageCheck, Star } from "lucide-react";
 
 type Stats = {
   bajoStock: number;
   stockTotal: number;
   destacados: number;
+  stockTallaIncoherentes: number;
 };
 
 type Props = Readonly<{
@@ -12,6 +13,10 @@ type Props = Readonly<{
 }>;
 
 export function AdminProductsStatsBar({ productCount, stats }: Props) {
+  const incClass =
+    stats.stockTallaIncoherentes > 0
+      ? "stat-card admin-metric-card admin-metric-card--alert"
+      : "stat-card admin-metric-card";
   return (
     <div className="admin-stats-grid product-stats-grid">
       <div className="stat-card admin-metric-card">
@@ -19,6 +24,13 @@ export function AdminProductsStatsBar({ productCount, stats }: Props) {
         <div>
           <span>Total productos</span>
           <strong>{productCount}</strong>
+        </div>
+      </div>
+      <div className={incClass}>
+        <GitCompareArrows size={22} />
+        <div>
+          <span>Stock ≠ suma tallas</span>
+          <strong>{stats.stockTallaIncoherentes}</strong>
         </div>
       </div>
       <div className="stat-card admin-metric-card">
