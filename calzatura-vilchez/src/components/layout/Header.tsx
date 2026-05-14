@@ -331,6 +331,7 @@ export default function Header() {
   const [headerSearch, setHeaderSearch] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [searchFocused, setSearchFocused] = useState(false);
+  const productsFetchedRef = useRef(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [activeMobileMenuId, setActiveMobileMenuId] = useState<string | null>(null);
   const [mobileMenuMode, setMobileMenuMode] = useState<MobileMenuMode>(null);
@@ -388,10 +389,12 @@ export default function Header() {
   );
 
   useEffect(() => {
+    if (!searchFocused || productsFetchedRef.current) return;
+    productsFetchedRef.current = true;
     fetchPublicProducts()
       .then(setProducts)
       .catch(() => setProducts([]));
-  }, []);
+  }, [searchFocused]);
 
   useEffect(() => {
     const timer = globalThis.setTimeout(() => {
