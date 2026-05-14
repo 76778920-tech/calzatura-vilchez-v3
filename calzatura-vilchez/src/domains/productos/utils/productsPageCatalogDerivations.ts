@@ -488,9 +488,8 @@ function tryContextualNinos(input: ContextualFiltersInput, make: CatalogFilterMa
   ]);
 }
 
-function tryContextualCalzadoMujer(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
-  if (input.categoria !== "mujer") return null;
-  return make("Calzado mujer", [
+const CALZADO_ITEMS: Record<string, CatalogQuickFilter[]> = {
+  mujer: [
     { label: "Todos", params: { categoria: "mujer" } },
     { label: "Zapatillas", params: { categoria: "mujer", tipo: "zapatillas" } },
     { label: "Sandalias", params: { categoria: "mujer", tipo: "sandalias" } },
@@ -498,12 +497,8 @@ function tryContextualCalzadoMujer(input: ContextualFiltersInput, make: CatalogF
     { label: "Vestir", params: { categoria: "mujer", tipo: "formal" } },
     { label: "Mocasines", params: { categoria: "mujer", tipo: "mocasines" } },
     { label: "Botas", params: { categoria: "mujer", tipo: "botas" } },
-  ]);
-}
-
-function tryContextualCalzadoHombre(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
-  if (input.categoria !== "hombre") return null;
-  return make("Calzado hombre", [
+  ],
+  hombre: [
     { label: "Todos", params: { categoria: "hombre" } },
     { label: "Zapatillas", params: { categoria: "hombre", tipo: "zapatillas" } },
     { label: "Vestir", params: { categoria: "hombre", tipo: "formal" } },
@@ -511,7 +506,15 @@ function tryContextualCalzadoHombre(input: ContextualFiltersInput, make: Catalog
     { label: "Sandalias", params: { categoria: "hombre", tipo: "sandalias" } },
     { label: "Botines", params: { categoria: "hombre", tipo: "botines" } },
     { label: "Seguridad", params: { categoria: "hombre", tipo: "seguridad" } },
-  ]);
+  ],
+};
+
+function tryContextualCalzadoCategoria(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  const cat = input.categoria;
+  const items = CALZADO_ITEMS[cat];
+  if (!items) return null;
+  const title = cat === "mujer" ? "Calzado mujer" : "Calzado hombre";
+  return make(title, items);
 }
 
 function tryContextualInfantil(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
@@ -547,8 +550,7 @@ export function buildContextualCatalogFilters(input: ContextualFiltersInput): Ca
     tryContextualZapatillasBlancas(input, make) ??
     tryContextualNinas(input, make) ??
     tryContextualNinos(input, make) ??
-    tryContextualCalzadoMujer(input, make) ??
-    tryContextualCalzadoHombre(input, make) ??
+    tryContextualCalzadoCategoria(input, make) ??
     tryContextualInfantil(input, make) ??
     contextualDefaultCategoria(make)
   );
@@ -693,17 +695,17 @@ export function filterParsedSizesForCatalogDraft(parsed: string[], catalogSizes:
   return parsed.filter((size) => allowed.has(size));
 }
 
-export function filterParsedColorsForCatalogDraft(parsed: string[], catalogColors: { value: string }[]): string[] {
-  const allowed = new Set(catalogColors.map((c) => c.value));
+function filterParsedByValue(parsed: string[], catalog: { value: string }[]): string[] {
+  const allowed = new Set(catalog.map((c) => c.value));
   return parsed.filter((value) => allowed.has(value));
 }
 
-export function filterParsedMaterialsForCatalogDraft(
-  parsed: string[],
-  catalogMaterials: { value: string }[]
-): string[] {
-  const allowed = new Set(catalogMaterials.map((m) => m.value));
-  return parsed.filter((value) => allowed.has(value));
+export function filterParsedColorsForCatalogDraft(parsed: string[], catalogColors: { value: string }[]): string[] {
+  return filterParsedByValue(parsed, catalogColors);
+}
+
+export function filterParsedMaterialsForCatalogDraft(parsed: string[], catalogMaterials: { value: string }[]): string[] {
+  return filterParsedByValue(parsed, catalogMaterials);
 }
 
 export type ActiveCatalogFacetChip = {
