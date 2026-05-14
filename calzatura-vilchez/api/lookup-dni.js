@@ -19,7 +19,7 @@ const allowedOrigins = new Set([
 ]);
 
 const RATE_LIMIT_WINDOW_MS = 30 * 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 15;
+const RATE_LIMIT_MAX_REQUESTS = 4;
 const ipBuckets = new Map();
 const REQUEST_TIMEOUT_MS = 10_000;
 
