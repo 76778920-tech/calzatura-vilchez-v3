@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterAdminProducts } from "@/domains/productos/pages/adminProductsListFilters";
+import { filterAdminProducts, type AdminProductRow } from "@/domains/productos/pages/adminProductsListFilters";
 import { isStockTallaIncoherent, sumTallaStockUnits } from "@/domains/productos/pages/adminProductStockCoherence";
 
 describe("sumTallaStockUnits", () => {
@@ -31,7 +31,7 @@ describe("isStockTallaIncoherent", () => {
 });
 
 describe("filterAdminProducts stock-talla-mismatch", () => {
-  const rows = [
+  const rows: AdminProductRow[] = [
     { id: "a", nombre: "Ok", imagen: "", precio: 1, categoria: "hombre", stock: 5, tallaStock: { "38": 2, "39": 3 } },
     { id: "b", nombre: "Bad", imagen: "", precio: 1, categoria: "hombre", stock: 5, tallaStock: { "38": 1 } },
   ];

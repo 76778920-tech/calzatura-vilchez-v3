@@ -5,7 +5,7 @@ import { isStockTallaIncoherent } from "./adminProductStockCoherence";
 export type StockFilter = "todos" | "con-stock" | "bajo-stock" | "sin-stock" | "stock-talla-mismatch";
 export type FeaturedFilter = "todos" | "destacados" | "normales";
 
-type AdminProductRow = {
+export type AdminProductRow = {
   id: string;
   codigo?: string;
   nombre: string;
