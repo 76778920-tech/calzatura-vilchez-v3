@@ -70,7 +70,7 @@ function createImportContext(fileName: string): ImportContext {
     .replace(/^-+|-+$/g, "")
     .slice(0, 48) || "archivo";
   const stamp = importadoEn.replace(/\D/g, "").slice(0, 14);
-  const rand = Math.random().toString(36).slice(2, 6);
+  const rand = crypto.randomUUID().slice(0, 4);
   return {
     fileName,
     importadoEn,

@@ -628,7 +628,7 @@ function MegaMenuPanel({
           <div className="mega-service-links">
             <Link to={PUBLIC_ROUTES.stores} onClick={onClose}><MapPin size={18} /> Tiendas</Link>
             <Link to={INFO_ROUTES.ayudaRastreoPedido} onClick={onClose}><Box size={18} /> Localiza tu pedido</Link>
-            <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noreferrer" onClick={onClose}><Phone size={18} /> Contáctanos</a>
+            <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noopener noreferrer" onClick={onClose}><Phone size={18} /> Contáctanos</a>
             <hr />
             <Link to={CLIENT_ROUTES.profile} onClick={onClose}><User size={18} /> Mi cuenta</Link>
             <Link to={CLIENT_ROUTES.favorites} onClick={onClose}><Heart size={18} /> Favoritos</Link>

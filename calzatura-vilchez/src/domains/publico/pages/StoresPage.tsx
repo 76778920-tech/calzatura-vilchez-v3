@@ -21,7 +21,7 @@ export default function StoresPage() {
           <div>
             <h2>Calzatura Vilchez</h2>
             <p>Mercado Modelo, int. N.° 732</p>
-            <a href={MAPS_URL} target="_blank" rel="noreferrer">Abrir ubicación en Google Maps</a>
+            <a href={MAPS_URL} target="_blank" rel="noopener noreferrer">Abrir ubicación en Google Maps</a>
           </div>
         </div>
 
@@ -41,7 +41,7 @@ export default function StoresPage() {
         </div>
       </section>
 
-      <a className="btn-primary stores-whatsapp" href={WHATSAPP_CONTACT_URL} target="_blank" rel="noreferrer">
+      <a className="btn-primary stores-whatsapp" href={WHATSAPP_CONTACT_URL} target="_blank" rel="noopener noreferrer">
         <Phone size={18} />
         Consultar ubicación por WhatsApp
       </a>

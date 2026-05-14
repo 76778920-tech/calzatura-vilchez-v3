@@ -153,7 +153,7 @@ export default function HeaderMobileNav({
         <Link to={INFO_ROUTES.ayudaRastreoPedido} className="nav-mobile-link" onClick={onClose}>
           <Box size={18} /> Localiza tu pedido
         </Link>
-        <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noreferrer" className="nav-mobile-link" onClick={onClose}>
+        <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noopener noreferrer" className="nav-mobile-link" onClick={onClose}>
           <Phone size={18} /> Contáctanos
         </a>
         <span className="nav-mobile-divider" aria-hidden="true" />
