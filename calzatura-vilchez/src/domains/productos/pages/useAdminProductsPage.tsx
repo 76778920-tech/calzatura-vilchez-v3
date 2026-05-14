@@ -54,6 +54,58 @@ import {
   type VariantSlot,
 } from "./adminProductsInternals";
 
+async function compressAndUploadImage(
+  event: ChangeEvent<HTMLInputElement>,
+  setCompressing: (v: boolean) => void,
+  onSuccess: (imageUrl: string) => void
+): Promise<void> {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  setCompressing(true);
+  try {
+    const dimError = await validateImageFile(file);
+    if (dimError) {
+      toast.error(imageValidationMessage(dimError));
+      return;
+    }
+    const compressed = await compressImageFile(file, 1100, 0.78);
+    if (compressed.size > IMAGE_RULES.maxCompressedBytes) {
+      toast.error(imageValidationMessage("IMAGE_COMPRESSED_TOO_LARGE"));
+      return;
+    }
+    const imageUrl = await uploadImageToCloudinary(compressed, file.name);
+    onSuccess(imageUrl);
+  } catch {
+    toast.error("No se pudo subir la imagen a Cloudinary");
+  } finally {
+    setCompressing(false);
+    event.target.value = "";
+  }
+}
+
+async function validateAndApplyImageUrl(
+  value: string,
+  apply: (normalized: string) => void,
+  clear: () => void
+): Promise<void> {
+  const normalized = normalizeCloudinaryImageUrl(value);
+  if (!normalized) { clear(); return; }
+  try {
+    new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(normalized) ? normalized : `https://${normalized}`);
+  } catch {
+    toast.error("Ingresa una URL válida de imagen");
+    return;
+  }
+  apply(normalized);
+  if (isCloudinaryImageUrl(normalized)) {
+    const dimError = await validateImageUrlDimensions(normalized);
+    if (dimError) {
+      clear();
+      toast.error(imageValidationMessage(dimError));
+    }
+  }
+}
+
 export function useAdminProductsPage() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -404,35 +456,15 @@ export function useAdminProductsPage() {
     setFeaturedFilter("todos");
   };
 
-  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>, index: number) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setCompressing(true);
-    try {
-      const dimError = await validateImageFile(file);
-      if (dimError) {
-        toast.error(imageValidationMessage(dimError));
-        return;
-      }
-      const compressed = await compressImageFile(file, 1100, 0.78);
-      if (compressed.size > IMAGE_RULES.maxCompressedBytes) {
-        toast.error(imageValidationMessage("IMAGE_COMPRESSED_TOO_LARGE"));
-        return;
-      }
-      const imageUrl = await uploadImageToCloudinary(compressed, file.name);
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>, index: number) =>
+    compressAndUploadImage(event, setCompressing, (imageUrl) => {
       setForm((current) => {
         const imagenes = editableImageSlots(current.imagenes, current.imagen);
         imagenes[index] = imageUrl;
         const primaryImage = imagenes.find(Boolean) ?? "";
         return { ...current, imagenes, imagen: primaryImage };
       });
-    } catch {
-      toast.error("No se pudo subir la imagen a Cloudinary");
-    } finally {
-      setCompressing(false);
-      event.target.value = "";
-    }
-  };
+    });
 
   const updateImageUrl = (index: number, value: string) => {
     const imagenes = editableImageSlots(form.imagenes, form.imagen);
@@ -441,24 +473,12 @@ export function useAdminProductsPage() {
     setForm({ ...form, imagenes, imagen: primaryImage });
   };
 
-  const validateImageUrl = async (index: number, value: string) => {
-    const normalized = normalizeCloudinaryImageUrl(value);
-    if (!normalized) { updateImageUrl(index, ""); return; }
-    try {
-      new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(normalized) ? normalized : `https://${normalized}`);
-    } catch {
-      toast.error("Ingresa una URL válida de imagen");
-      return;
-    }
-    updateImageUrl(index, normalized);
-    if (isCloudinaryImageUrl(normalized)) {
-      const dimError = await validateImageUrlDimensions(normalized);
-      if (dimError) {
-        updateImageUrl(index, "");
-        toast.error(imageValidationMessage(dimError));
-      }
-    }
-  };
+  const validateImageUrl = (index: number, value: string) =>
+    validateAndApplyImageUrl(
+      value,
+      (normalized) => updateImageUrl(index, normalized),
+      () => updateImageUrl(index, "")
+    );
 
   const clearImage = (index: number) => {
     const imagenes = editableImageSlots(form.imagenes, form.imagen);
@@ -481,56 +501,21 @@ export function useAdminProductsPage() {
     });
   };
 
-  const validateVariantSlotImageUrl = async (slotIndex: number, imageIndex: number, value: string) => {
-    const normalized = normalizeCloudinaryImageUrl(value);
-    if (!normalized) {
-      updateVariantSlotImageUrl(slotIndex, imageIndex, "");
-      return;
-    }
-    try {
-      new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(normalized) ? normalized : `https://${normalized}`);
-    } catch {
-      toast.error("Ingresa una URL válida de imagen");
-      return;
-    }
-    updateVariantSlotImageUrl(slotIndex, imageIndex, normalized);
-    if (isCloudinaryImageUrl(normalized)) {
-      const dimError = await validateImageUrlDimensions(normalized);
-      if (dimError) {
-        updateVariantSlotImageUrl(slotIndex, imageIndex, "");
-        toast.error(imageValidationMessage(dimError));
-      }
-    }
-  };
+  const validateVariantSlotImageUrl = (slotIndex: number, imageIndex: number, value: string) =>
+    validateAndApplyImageUrl(
+      value,
+      (normalized) => updateVariantSlotImageUrl(slotIndex, imageIndex, normalized),
+      () => updateVariantSlotImageUrl(slotIndex, imageIndex, "")
+    );
 
-  const handleVariantFileChange = async (event: ChangeEvent<HTMLInputElement>, slotIndex: number, imageIndex: number) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setCompressing(true);
-    try {
-      const dimError = await validateImageFile(file);
-      if (dimError) {
-        toast.error(imageValidationMessage(dimError));
-        return;
-      }
-      const compressed = await compressImageFile(file, 1100, 0.78);
-      if (compressed.size > IMAGE_RULES.maxCompressedBytes) {
-        toast.error(imageValidationMessage("IMAGE_COMPRESSED_TOO_LARGE"));
-        return;
-      }
-      const imageUrl = await uploadImageToCloudinary(compressed, file.name);
+  const handleVariantFileChange = (event: ChangeEvent<HTMLInputElement>, slotIndex: number, imageIndex: number) =>
+    compressAndUploadImage(event, setCompressing, (imageUrl) => {
       updateVariantSlot(slotIndex, (slot) => {
         const imagenes = [...normalizeImageSlots(slot.imagenes)];
         imagenes[imageIndex] = imageUrl;
         return { ...slot, imagenes };
       });
-    } catch {
-      toast.error("No se pudo subir la imagen a Cloudinary");
-    } finally {
-      setCompressing(false);
-      event.target.value = "";
-    }
-  };
+    });
 
   const updateVariantSlotStock = (slotIndex: number, talla: string, quantity: number) => {
     updateVariantSlot(slotIndex, (slot) => ({

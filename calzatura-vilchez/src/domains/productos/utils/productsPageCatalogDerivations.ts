@@ -82,12 +82,14 @@ export function getProductSizes(product: Product) {
   return Array.from(new Set([...fromTallas, ...fromStock].map((value) => value.trim()).filter(Boolean)));
 }
 
+function parsePriceParts(value: string) {
+  const [mode, rawFirst, rawSecond] = value.split(":");
+  return { mode, first: Number(rawFirst), second: Number(rawSecond) };
+}
+
 export function getPriceLabel(value: string, min: number, max: number) {
   if (!value) return "";
-  const [mode, rawFirst, rawSecond] = value.split(":");
-  const first = Number(rawFirst);
-  const second = Number(rawSecond);
-
+  const { mode, first, second } = parsePriceParts(value);
   if (mode === "under" && Number.isFinite(first)) return `Hasta S/ ${first}`;
   if (mode === "between" && Number.isFinite(first) && Number.isFinite(second)) return `S/ ${first} - ${second}`;
   if (mode === "over" && Number.isFinite(first)) return `Desde S/ ${first}`;
@@ -97,10 +99,7 @@ export function getPriceLabel(value: string, min: number, max: number) {
 
 function matchesPriceBucket(price: number, bucket: string) {
   if (!bucket) return true;
-  const [mode, rawFirst, rawSecond] = bucket.split(":");
-  const first = Number(rawFirst);
-  const second = Number(rawSecond);
-
+  const { mode, first, second } = parsePriceParts(bucket);
   if (mode === "under" && Number.isFinite(first)) return price <= first;
   if (mode === "between" && Number.isFinite(first) && Number.isFinite(second)) {
     return price >= first && price <= second;
@@ -113,23 +112,11 @@ function matchesPriceBucket(price: number, bucket: string) {
 }
 
 export function parsePriceRange(value: string, fallbackMin: number, fallbackMax: number) {
-  const [mode, rawFirst, rawSecond] = value.split(":");
-
-  if (mode === "range") {
-    const first = Number(rawFirst);
-    const second = Number(rawSecond);
-    if (Number.isFinite(first) && Number.isFinite(second)) {
-      return {
-        min: Math.min(first, second),
-        max: Math.max(first, second),
-      };
-    }
+  const { mode, first, second } = parsePriceParts(value);
+  if (mode === "range" && Number.isFinite(first) && Number.isFinite(second)) {
+    return { min: Math.min(first, second), max: Math.max(first, second) };
   }
-
-  return {
-    min: fallbackMin,
-    max: fallbackMax,
-  };
+  return { min: fallbackMin, max: fallbackMax };
 }
 
 export function parseCommaSeparatedTokens(value: string): string[] {
@@ -496,25 +483,16 @@ function tryContextualNuevasNino(input: ContextualFiltersInput, make: CatalogFil
   ]);
 }
 
-function tryContextualZapatillasMujer(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
-  if (input.categoria !== "mujer" || input.tipo !== "zapatillas") return null;
-  return make("Zapatillas mujer", [
-    { label: "Todos", params: { categoria: "mujer", tipo: "zapatillas" } },
-    { label: "Urbanas", params: { categoria: "mujer", tipo: "zapatillas", estilo: "urbanas" } },
-    { label: "Deportivas", params: { categoria: "mujer", tipo: "zapatillas", estilo: "deportivas" } },
-    { label: "Casuales", params: { categoria: "mujer", tipo: "zapatillas", estilo: "casuales" } },
-    { label: "Outdoor", params: { categoria: "mujer", tipo: "zapatillas", estilo: "outdoor" } },
-  ]);
-}
-
-function tryContextualZapatillasHombre(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
-  if (input.categoria !== "hombre" || input.tipo !== "zapatillas") return null;
-  return make("Zapatillas hombre", [
-    { label: "Todos", params: { categoria: "hombre", tipo: "zapatillas" } },
-    { label: "Urbanas", params: { categoria: "hombre", tipo: "zapatillas", estilo: "urbanas" } },
-    { label: "Deportivas", params: { categoria: "hombre", tipo: "zapatillas", estilo: "deportivas" } },
-    { label: "Casuales", params: { categoria: "hombre", tipo: "zapatillas", estilo: "casuales" } },
-    { label: "Outdoor", params: { categoria: "hombre", tipo: "zapatillas", estilo: "outdoor" } },
+function tryContextualZapatillasCategoria(input: ContextualFiltersInput, make: CatalogFilterMaker): CatalogFilterGroup | null {
+  const cat = input.categoria;
+  if ((cat !== "mujer" && cat !== "hombre") || input.tipo !== "zapatillas") return null;
+  const title = cat === "mujer" ? "Zapatillas mujer" : "Zapatillas hombre";
+  return make(title, [
+    { label: "Todos", params: { categoria: cat, tipo: "zapatillas" } },
+    { label: "Urbanas", params: { categoria: cat, tipo: "zapatillas", estilo: "urbanas" } },
+    { label: "Deportivas", params: { categoria: cat, tipo: "zapatillas", estilo: "deportivas" } },
+    { label: "Casuales", params: { categoria: cat, tipo: "zapatillas", estilo: "casuales" } },
+    { label: "Outdoor", params: { categoria: cat, tipo: "zapatillas", estilo: "outdoor" } },
   ]);
 }
 
@@ -618,8 +596,7 @@ export function buildContextualCatalogFilters(input: ContextualFiltersInput): Ca
     tryContextualNuevasMujer(input, make) ??
     tryContextualNuevasHombre(input, make) ??
     tryContextualNuevasNino(input, make) ??
-    tryContextualZapatillasMujer(input, make) ??
-    tryContextualZapatillasHombre(input, make) ??
+    tryContextualZapatillasCategoria(input, make) ??
     tryContextualZapatillasBlancas(input, make) ??
     tryContextualNinas(input, make) ??
     tryContextualNinos(input, make) ??
