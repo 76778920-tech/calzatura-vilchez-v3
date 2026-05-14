@@ -31,12 +31,26 @@ describe("isStockTallaIncoherent", () => {
 });
 
 describe("filterAdminProducts stock-talla-mismatch", () => {
-  const rows: AdminProductRow[] = [
-    { id: "a", nombre: "Ok", imagen: "", precio: 1, categoria: "hombre", stock: 5, tallaStock: { "38": 2, "39": 3 } },
-    { id: "b", nombre: "Bad", imagen: "", precio: 1, categoria: "hombre", stock: 5, tallaStock: { "38": 1 } },
-  ];
   it("solo deja productos incoherentes", () => {
-    const out = filterAdminProducts(rows, {
+    const rowOk: AdminProductRow = {
+      id: "a",
+      nombre: "Ok",
+      imagen: "",
+      precio: 1,
+      categoria: "hombre",
+      stock: 5,
+      tallaStock: { "38": 2, "39": 3 },
+    };
+    const rowBad: AdminProductRow = {
+      id: "b",
+      nombre: "Bad",
+      imagen: "",
+      precio: 1,
+      categoria: "hombre",
+      stock: 5,
+      tallaStock: { "38": 1 },
+    };
+    const out = filterAdminProducts([rowOk, rowBad], {
       searchTerm: "",
       categoryFilter: "todos",
       stockFilter: "stock-talla-mismatch",
