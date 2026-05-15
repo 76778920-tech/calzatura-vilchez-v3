@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   MapContainer,
   TileLayer,
@@ -24,40 +24,43 @@ type Props = Readonly<{
   onCustomerPositionChange?: (lat: number, lng: number) => void;
 }>;
 
+/** Encuadra tienda + entrega solo al elegir ubicación (no al cargar la ruta; evita tiles cancelados). */
 function FitBoundsToSignal({
   storeLat,
   storeLng,
   fitBoundsNonce,
   customerLat,
   customerLng,
-  routePositions,
 }: {
   storeLat: number;
   storeLng: number;
   fitBoundsNonce: number;
   customerLat: number;
   customerLng: number;
-  routePositions?: MapRoutePosition[] | null;
 }) {
   const map = useMap();
+  const didInvalidateRef = useRef(false);
 
   useEffect(() => {
     const timer = globalThis.setTimeout(() => {
-      map.invalidateSize();
-      const boundsPoints: L.LatLngExpression[] = isDrivingRouteGeometry(routePositions)
-        ? routePositions!
-        : [
-            [storeLat, storeLng],
-            [customerLat, customerLng],
-          ];
-      map.fitBounds(L.latLngBounds(boundsPoints), {
-        padding: [52, 52],
-        maxZoom: 17,
-        animate: false,
-      });
-    }, 120);
+      if (!didInvalidateRef.current) {
+        map.invalidateSize();
+        didInvalidateRef.current = true;
+      }
+      map.fitBounds(
+        L.latLngBounds([
+          [storeLat, storeLng],
+          [customerLat, customerLng],
+        ]),
+        {
+          padding: [52, 52],
+          maxZoom: 17,
+          animate: false,
+        },
+      );
+    }, 200);
     return () => globalThis.clearTimeout(timer);
-  }, [map, storeLat, storeLng, customerLat, customerLng, fitBoundsNonce, routePositions]);
+  }, [map, storeLat, storeLng, customerLat, customerLng, fitBoundsNonce]);
   return null;
 }
 
@@ -117,10 +120,12 @@ export default function CheckoutDeliveryMap({
     >
       {routeLoading ? <div className="checkout-delivery-map-loading" aria-hidden="true" /> : null}
       <MapContainer
+        key="checkout-delivery-map"
         center={store}
         zoom={14}
         className="checkout-delivery-map-inner"
         scrollWheelZoom={interactive}
+        preferCanvas
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
@@ -137,7 +142,6 @@ export default function CheckoutDeliveryMap({
           fitBoundsNonce={fitBoundsNonce}
           customerLat={customerLat}
           customerLng={customerLng}
-          routePositions={routePositions}
         />
         {interactive && onCustomerPositionChange ? (
           <MapPickHandler enabled={interactive} onPick={onCustomerPositionChange} />
