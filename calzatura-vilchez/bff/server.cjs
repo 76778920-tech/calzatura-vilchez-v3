@@ -602,6 +602,10 @@ app.use(
   })
 );
 
+app.get("/", (_req, res) =>
+  res.status(200).type("text/plain").send("Calzatura Vilchez BFF. Use GET /health para estado."),
+);
+
 app.get("/health", (_req, res) => res.status(200).type("text/plain").send("ok"));
 
 app.post("/createOrder", (req, res) => {
