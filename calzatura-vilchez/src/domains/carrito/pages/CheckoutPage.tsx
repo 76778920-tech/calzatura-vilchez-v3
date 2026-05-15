@@ -42,7 +42,7 @@ function findLiveProductForCartItem(products: Product[], item: CartItem) {
   if (
     byId &&
     (!requestedColor || sameText(byId.color, requestedColor)) &&
-    getSizeStock(byId, requestedSize || undefined) >= requestedQty
+    getSizeStock(byId, requestedSize || undefined, requestedColor || byId.color || undefined) >= requestedQty
   ) {
     return byId;
   }
@@ -50,7 +50,7 @@ function findLiveProductForCartItem(products: Product[], item: CartItem) {
   return products.find((product) => {
     if (!sameText(product.nombre, requestedName)) return false;
     if (requestedColor && !sameText(product.color, requestedColor)) return false;
-    return getSizeStock(product, requestedSize || undefined) >= requestedQty;
+    return getSizeStock(product, requestedSize || undefined, requestedColor || product.color || undefined) >= requestedQty;
   });
 }
 
