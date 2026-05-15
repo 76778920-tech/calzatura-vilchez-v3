@@ -5,6 +5,10 @@ const ORS_GEOCODE_STRUCTURED = "https://api.openrouteservice.org/geocode/search/
 const ORS_GEOCODE_AUTOCOMPLETE = "https://api.openrouteservice.org/geocode/autocomplete";
 const ORS_GEOCODE_REVERSE = "https://api.openrouteservice.org/geocode/reverse";
 const ORS_MATRIX = "https://api.openrouteservice.org/v2/matrix/driving-car";
+const ORS_DIRECTIONS = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+
+/** Coordenadas Leaflet `[lat, lng]`. */
+export type MapRoutePosition = [number, number];
 
 const DEFAULT_GEOCODE_SIZE = 15;
 const ORS_UNAVAILABLE_MESSAGE =
@@ -281,6 +285,10 @@ export function parseStreetHousenumber(input: string): { street: string; housenu
   return { street: q };
 }
 
+export function addressLabelContainsHousenumber(label: string, housenumber: string): boolean {
+  return labelContainsHousenumber(label, housenumber);
+}
+
 function labelContainsHousenumber(label: string, housenumber: string): boolean {
   const re = new RegExp(String.raw`(?:^|[\s,.-])${escapeRegExp(housenumber)}(?:$|[\s,.-])`);
   return re.test(label);
@@ -329,6 +337,17 @@ function dedupeCandidates(list: GeocodeCandidate[]): GeocodeCandidate[] {
     out.push(c);
   }
   return out;
+}
+
+/** Si hay número de puerta, prioriza resultados que lo incluyan en la etiqueta. */
+export function preferHousenumberMatches(
+  list: GeocodeCandidate[],
+  housenumber?: string,
+): GeocodeCandidate[] {
+  const hn = housenumber?.trim();
+  if (!hn) return list;
+  const matches = list.filter((c) => labelContainsHousenumber(c.label, hn));
+  return matches.length > 0 ? matches : list;
 }
 
 function sortCandidatesForCheckout(
@@ -463,8 +482,22 @@ export async function geocodeSearchBarSuggestions(
   const parsed = parseStreetHousenumber(norm);
   const enriched = enrichGeocodeTextWithLocality(norm, context?.ciudad, context?.distrito);
 
-  const structured =
-    context?.ciudad?.trim() && structuredAddressLine(norm, parsed).length >= 3
+  const structuredParts =
+    context?.ciudad?.trim() && (parsed.street.length >= 2 || structuredAddressLine(norm, parsed).length >= 3)
+      ? await geocodeStructuredCandidates(
+          {
+            street: parsed.housenumber ? parsed.street : undefined,
+            housenumber: parsed.housenumber,
+            address: parsed.housenumber ? undefined : structuredAddressLine(norm, parsed),
+            neighbourhood: context?.distrito?.trim() ?? "",
+            locality: context.ciudad.trim(),
+          },
+          size,
+        ).catch(optionalStructuredFallback)
+      : [];
+
+  const structuredCombined =
+    parsed.housenumber && context?.ciudad?.trim()
       ? await geocodeStructuredCandidates(
           {
             address: structuredAddressLine(norm, parsed),
@@ -475,6 +508,8 @@ export async function geocodeSearchBarSuggestions(
         ).catch(optionalStructuredFallback)
       : [];
 
+  const structured = dedupeCandidates([...structuredParts, ...structuredCombined]);
+
   const spatial = { useServiceBBox: true, restrictCircle: false };
   const auto = await fetchGeocodeAutocomplete(enriched, size, spatial);
   const forward = await geocodeForwardCandidates(enriched, size, {
@@ -482,9 +517,12 @@ export async function geocodeSearchBarSuggestions(
     boostHousenumber: parsed.housenumber,
   });
 
-  return sortCandidatesForCheckout(dedupeCandidates([...structured, ...auto, ...forward]), {
-    housenumber: parsed.housenumber,
-  });
+  return preferHousenumberMatches(
+    sortCandidatesForCheckout(dedupeCandidates([...structured, ...auto, ...forward]), {
+      housenumber: parsed.housenumber,
+    }),
+    parsed.housenumber,
+  );
 }
 
 /** Sugerencias según formulario: dirección normalizada + estructurada + búsqueda acotada al área de servicio. */
@@ -498,14 +536,32 @@ export async function geocodeCheckoutFormSuggestions(args: {
   const parsed = parseStreetHousenumber(addrNorm);
   const addressStructured = structuredAddressLine(addrNorm, parsed);
 
-  const structured = await geocodeStructuredCandidates(
+  const structuredStreet = parsed.housenumber ? parsed.street : undefined;
+  const structuredNumber = parsed.housenumber;
+  const structuredByParts = await geocodeStructuredCandidates(
     {
-      address: addressStructured,
+      street: structuredStreet,
+      housenumber: structuredNumber,
+      address: structuredNumber ? undefined : addressStructured,
       neighbourhood: args.distrito.trim(),
       locality: args.ciudad.trim(),
     },
     size,
   ).catch(optionalStructuredFallback);
+
+  const structuredCombined =
+    structuredNumber && structuredStreet
+      ? await geocodeStructuredCandidates(
+          {
+            address: addressStructured,
+            neighbourhood: args.distrito.trim(),
+            locality: args.ciudad.trim(),
+          },
+          size,
+        ).catch(optionalStructuredFallback)
+      : [];
+
+  const structured = dedupeCandidates([...structuredByParts, ...structuredCombined]);
 
   const line = [args.direccion, args.distrito, args.ciudad].map((s) => s.trim()).filter(Boolean).join(", ");
   const lineNorm = normalizeGeocodeQuery(line);
@@ -524,26 +580,43 @@ export async function geocodeCheckoutFormSuggestions(args: {
         })
       : [];
 
-  return sortCandidatesForCheckout(dedupeCandidates([...structured, ...forward]), {
-    housenumber: lineParsed.housenumber,
-  });
+  const merged = preferHousenumberMatches(
+    sortCandidatesForCheckout(dedupeCandidates([...structured, ...forward]), {
+      housenumber: lineParsed.housenumber,
+    }),
+    lineParsed.housenumber,
+  );
+  return merged;
 }
 
+type StructuredGeocodeParts = {
+  street?: string;
+  housenumber?: string;
+  address?: string;
+  neighbourhood: string;
+  locality: string;
+};
+
 async function geocodeStructuredCandidates(
-  parts: { address: string; neighbourhood: string; locality: string },
+  parts: StructuredGeocodeParts,
   size: number,
 ): Promise<GeocodeCandidate[]> {
   const apiKey = getApiKey();
   if (!apiKey) {
     throw new Error("Falta VITE_ORS_API_KEY");
   }
-  if (!parts.address && !parts.neighbourhood && !parts.locality) {
+  const street = parts.street?.trim() ?? "";
+  const housenumber = parts.housenumber?.trim() ?? "";
+  const address = parts.address?.trim() ?? "";
+  if (!street && !housenumber && !address && !parts.neighbourhood && !parts.locality) {
     return [];
   }
   const qs = new URLSearchParams();
   qs.set("api_key", apiKey);
   qs.set("size", String(size));
-  if (parts.address) qs.set("address", parts.address);
+  if (street) qs.set("street", street);
+  if (housenumber) qs.set("housenumber", housenumber);
+  if (address) qs.set("address", address);
   if (parts.neighbourhood) qs.set("neighbourhood", parts.neighbourhood);
   if (parts.locality) qs.set("locality", parts.locality);
   qs.set("country", "PER");
@@ -561,8 +634,9 @@ async function geocodeStructuredCandidates(
   );
   if (!response.ok) return [];
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
-  const raw = parseGeocodeFeatures(data, parts.address || parts.locality);
-  return sortCandidatesForCheckout(raw);
+  const fallbackLabel = address || [street, housenumber].filter(Boolean).join(" ") || parts.locality;
+  const raw = parseGeocodeFeatures(data, fallbackLabel);
+  return sortCandidatesForCheckout(raw, { housenumber: housenumber || undefined });
 }
 
 /** @deprecated Preferir `geocodeCheckoutFormSuggestions` o `geocodeSearchBarSuggestions`. */
@@ -600,6 +674,50 @@ export async function reverseGeocodeLabel(lng: number, lat: number): Promise<str
   return data.features?.[0]?.properties?.label ?? null;
 }
 
+/** Geometría de la ruta en auto (tienda → entrega) para dibujar en el mapa. */
+export async function fetchDrivingRoutePositions(
+  storeLat: number,
+  storeLng: number,
+  destLat: number,
+  destLng: number,
+): Promise<MapRoutePosition[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error("Falta VITE_ORS_API_KEY");
+  }
+  const response = await fetchOpenRoute(
+    ORS_DIRECTIONS,
+    {
+      method: "POST",
+      headers: {
+        Authorization: apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        coordinates: [
+          [storeLng, storeLat],
+          [destLng, destLat],
+        ],
+      }),
+    },
+    "Directions (ruta)",
+  );
+  const data = (await response.json()) as {
+    features?: Array<{ geometry?: { coordinates?: [number, number][] } }>;
+  };
+  const coords = data.features?.[0]?.geometry?.coordinates;
+  /** Menos de 3 vértices ≈ línea recta; no dibujar como “ruta por calles”. */
+  if (!coords || coords.length < 3) {
+    return [];
+  }
+  return coords.map(([lng, lat]) => [lat, lng] as MapRoutePosition);
+}
+
+/** ¿La geometría representa una ruta real (no solo origen–destino)? */
+export function isDrivingRouteGeometry(positions: MapRoutePosition[] | null | undefined): boolean {
+  return Boolean(positions && positions.length >= 3);
+}
+
 async function drivingDistanceKm(storeLng: number, storeLat: number, destLng: number, destLat: number): Promise<number> {
   const apiKey = getApiKey();
   if (!apiKey) {
@@ -635,6 +753,23 @@ async function drivingDistanceKm(storeLng: number, storeLat: number, destLng: nu
     throw new TypeError("No se pudo calcular la distancia");
   }
   return d;
+}
+
+/** Cotización aproximada (línea recta) cuando ORS Matrix no está disponible; el mapa sigue usable. */
+export function estimateDeliveryQuoteHaversine(
+  destLat: number,
+  destLng: number,
+  label?: string,
+): DeliveryQuote {
+  const { storeLat, storeLng } = DELIVERY_CONFIG;
+  const distanceKm = haversineKm(storeLat, storeLng, destLat, destLng);
+  const quote = quoteFromDistanceKm(distanceKm, label);
+  return {
+    ...quote,
+    distanceFormatted: `${distanceKm.toFixed(1)} km (aprox.)`,
+    customerLat: destLat,
+    customerLng: destLng,
+  };
 }
 
 export function quoteFromDistanceKm(distanceKm: number, label?: string): DeliveryQuote {

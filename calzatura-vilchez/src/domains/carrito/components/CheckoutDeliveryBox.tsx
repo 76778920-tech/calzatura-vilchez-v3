@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
 import { DELIVERY_CONFIG } from "@/config/delivery";
-import type { DeliveryQuote, GeocodeCandidate } from "@/services/deliveryOpenRoute";
+import type { DeliveryQuote, GeocodeCandidate, MapRoutePosition } from "@/services/deliveryOpenRoute";
 import CheckoutDeliveryMap from "@/domains/carrito/components/CheckoutDeliveryMap";
 import { checkoutGeoLayerHint } from "@/domains/carrito/utils/checkoutGeoHints";
+import { isCheckoutDefaultMapPick } from "@/domains/carrito/utils/checkoutMapDefaults";
 
 function SuggestionList({ candidates, keyPrefix, ariaLabel, onPick }: Readonly<{
   candidates: GeocodeCandidate[];
@@ -32,6 +33,8 @@ function SuggestionList({ candidates, keyPrefix, ariaLabel, onPick }: Readonly<{
 }
 
 type Props = Readonly<{
+  mapDegraded?: boolean;
+  degradedNotice?: string;
   addressLineLength: number;
   mapSearchInput: string;
   onMapSearchChange: (value: string) => void;
@@ -43,7 +46,11 @@ type Props = Readonly<{
   addressSuggestError: string;
   addressSuggestions: GeocodeCandidate[];
   selectedDelivery: GeocodeCandidate | null;
+  mapDisplayDelivery: GeocodeCandidate | null;
+  locationConfirmed: boolean;
   mapFitNonce: number;
+  routePositions?: MapRoutePosition[] | null;
+  routeLoading?: boolean;
   onMapCustomerMove: (lat: number, lng: number) => void;
   deliveryQuoteLoading: boolean;
   deliveryQuoteError: string;
@@ -51,6 +58,8 @@ type Props = Readonly<{
 }>;
 
 export default function CheckoutDeliveryBox({
+  mapDegraded = false,
+  degradedNotice = "",
   addressLineLength,
   mapSearchInput,
   onMapSearchChange,
@@ -62,7 +71,11 @@ export default function CheckoutDeliveryBox({
   addressSuggestError,
   addressSuggestions,
   selectedDelivery,
+  mapDisplayDelivery,
+  locationConfirmed,
   mapFitNonce,
+  routePositions = null,
+  routeLoading = false,
   onMapCustomerMove,
   deliveryQuoteLoading,
   deliveryQuoteError,
@@ -90,12 +103,21 @@ export default function CheckoutDeliveryBox({
 
   return (
     <div className="checkout-delivery-box">
-      <p className="checkout-delivery-title">Envío (OpenRouteService)</p>
+      <p className="checkout-delivery-title">
+        {mapDegraded ? "Ubicación de entrega" : "Envío y ruta de entrega"}
+      </p>
+      {mapDegraded && degradedNotice ? (
+        <p className="checkout-delivery-warn" role="status">
+          {degradedNotice} Podés marcar el punto en el mapa; el costo usa distancia aproximada (línea recta).
+        </p>
+      ) : null}
       <p className="checkout-delivery-muted checkout-delivery-intro">
-        La lista prioriza direcciones y calles sobre solo «ciudad». Incluí en <strong>Dirección</strong> el nombre de la vía y el
-        número (ej. Jr. Puno 245). Si no aparece tu puerta exacta, tocá el mapa o arrastrá el pin azul.
+        {mapDegraded
+          ? "Tocá el mapa o arrastrá el pin azul hasta tu puerta. Las búsquedas automáticas vuelven cuando el servicio de mapas esté disponible."
+          : "La lista prioriza direcciones y calles sobre solo «ciudad». Incluí en Dirección el nombre de la vía y el número (ej. Jr. Puno 245). Si no aparece tu puerta exacta, tocá el mapa o arrastrá el pin azul."}
       </p>
 
+      {!mapDegraded && (
       <div className="form-group checkout-delivery-search-group">
         <label htmlFor="checkout-delivery-map-search">Buscar ubicación en el mapa</label>
         <input
@@ -120,8 +142,9 @@ export default function CheckoutDeliveryBox({
           />
         )}
       </div>
+      )}
 
-      {addressLineLength >= 10 && (
+      {!mapDegraded && addressLineLength >= 10 && (
         <div className="checkout-delivery-suggest-block">
           <p className="checkout-delivery-subtitle">Sugerencias según tu dirección</p>
           {addressSuggestLoading && <p className="checkout-delivery-muted">Cargando sugerencias…</p>}
@@ -142,17 +165,26 @@ export default function CheckoutDeliveryBox({
         </div>
       )}
 
-      {selectedDelivery && (
+      {mapDisplayDelivery ? (
         <CheckoutDeliveryMap
           storeLat={DELIVERY_CONFIG.storeLat}
           storeLng={DELIVERY_CONFIG.storeLng}
-          customerLat={selectedDelivery.lat}
-          customerLng={selectedDelivery.lng}
+          customerLat={mapDisplayDelivery.lat}
+          customerLng={mapDisplayDelivery.lng}
           fitBoundsNonce={mapFitNonce}
+          routePositions={routePositions}
+          routeLoading={routeLoading}
+          locationPending={!locationConfirmed && isCheckoutDefaultMapPick(mapDisplayDelivery)}
           interactive
           onCustomerPositionChange={onMapCustomerMove}
         />
-      )}
+      ) : null}
+
+      {selectedDelivery?.label && locationConfirmed ? (
+        <p className="checkout-delivery-selected" role="status">
+          Punto de entrega: <strong>{selectedDelivery.label}</strong>
+        </p>
+      ) : null}
 
       {deliveryQuoteLoading && <p className="checkout-delivery-muted">Calculando distancia y costo…</p>}
       {!deliveryQuoteLoading && deliveryQuoteError && (
@@ -168,8 +200,8 @@ export default function CheckoutDeliveryBox({
         </>
       )}
 
-      {addressLineLength < 10 && (
-        <p className="checkout-delivery-muted">Completa dirección, distrito y ciudad para ver sugerencias de envío.</p>
+      {!mapDegraded && addressLineLength < 8 && (
+        <p className="checkout-delivery-muted">Completa dirección, distrito y ciudad para ver el mapa y las sugerencias.</p>
       )}
     </div>
   );

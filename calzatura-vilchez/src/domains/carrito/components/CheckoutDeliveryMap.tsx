@@ -2,7 +2,6 @@ import { useEffect, useMemo } from "react";
 import {
   MapContainer,
   TileLayer,
-  CircleMarker,
   Polyline,
   useMap,
   Marker,
@@ -10,14 +9,17 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { isDrivingRouteGeometry, type MapRoutePosition } from "@/services/deliveryOpenRoute";
 
 type Props = Readonly<{
   storeLat: number;
   storeLng: number;
   customerLat: number;
   customerLng: number;
-  /** Incrementar al elegir una sugerencia para volver a encuadrar tienda + entrega. */
   fitBoundsNonce: number;
+  routePositions?: MapRoutePosition[] | null;
+  routeLoading?: boolean;
+  locationPending?: boolean;
   interactive?: boolean;
   onCustomerPositionChange?: (lat: number, lng: number) => void;
 }>;
@@ -28,25 +30,33 @@ function FitBoundsToSignal({
   fitBoundsNonce,
   customerLat,
   customerLng,
+  routePositions,
 }: {
   storeLat: number;
   storeLng: number;
   fitBoundsNonce: number;
   customerLat: number;
   customerLng: number;
+  routePositions?: MapRoutePosition[] | null;
 }) {
   const map = useMap();
 
   useEffect(() => {
     const id = globalThis.requestAnimationFrame(() => {
       map.invalidateSize();
-      map.fitBounds(L.latLngBounds([storeLat, storeLng], [customerLat, customerLng]), {
-        padding: [48, 48],
+      const boundsPoints: L.LatLngExpression[] = isDrivingRouteGeometry(routePositions)
+        ? routePositions!
+        : [
+            [storeLat, storeLng],
+            [customerLat, customerLng],
+          ];
+      map.fitBounds(L.latLngBounds(boundsPoints), {
+        padding: [52, 52],
         maxZoom: 17,
       });
     });
     return () => globalThis.cancelAnimationFrame(id);
-  }, [map, storeLat, storeLng, customerLat, customerLng, fitBoundsNonce]);
+  }, [map, storeLat, storeLng, customerLat, customerLng, fitBoundsNonce, routePositions]);
   return null;
 }
 
@@ -66,40 +76,50 @@ function MapPickHandler({
   return null;
 }
 
+function makePinIcon(fill: string, stroke: string) {
+  const svg = encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">` +
+      `<path fill="${fill}" stroke="${stroke}" stroke-width="1.2" d="M16 1C9.4 1 4 6.2 4 12.5c0 6.8 12 25.5 12 25.5S28 19.3 28 12.5C28 6.2 22.6 1 16 1z"/>` +
+      `<circle cx="16" cy="12.5" r="3.5" fill="#fff"/>` +
+      `</svg>`,
+  );
+  return L.icon({
+    iconUrl: `data:image/svg+xml;charset=utf-8,${svg}`,
+    iconSize: [32, 40],
+    iconAnchor: [16, 40],
+  });
+}
+
 export default function CheckoutDeliveryMap({
   storeLat,
   storeLng,
   customerLat,
   customerLng,
   fitBoundsNonce,
+  routePositions = null,
+  routeLoading = false,
+  locationPending = false,
   interactive = false,
   onCustomerPositionChange,
 }: Props) {
   const store: L.LatLngTuple = [storeLat, storeLng];
   const customer: L.LatLngTuple = [customerLat, customerLng];
+  const hasDrivingRoute = isDrivingRouteGeometry(routePositions);
 
-  /** Icono explícito (evita el pin por defecto de Leaflet si falla el divIcon). */
-  const customerIcon = useMemo(() => {
-    const svg = encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">` +
-        `<path fill="#3b82f6" stroke="#1e3a8a" stroke-width="1.25" d="M18 2C10.3 2 4 8.1 4 15.4c0 7.4 14 25.6 14 25.6S32 22.8 32 15.4C32 8.1 25.7 2 18 2z"/>` +
-        `<circle cx="18" cy="15" r="4.2" fill="#fff"/>` +
-        `</svg>`,
-    );
-    return L.icon({
-      iconUrl: `data:image/svg+xml;charset=utf-8,${svg}`,
-      iconSize: [36, 44],
-      iconAnchor: [18, 44],
-    });
-  }, []);
+  const storeIcon = useMemo(() => makePinIcon("#d97706", "#92400e"), []);
+  const customerIcon = useMemo(() => makePinIcon("#3b82f6", "#1e40af"), []);
 
   return (
-    <div className={`checkout-delivery-map ${interactive ? "checkout-delivery-map--interactive" : ""}`}>
+    <div
+      className={`checkout-delivery-map ${interactive ? "checkout-delivery-map--interactive" : ""}${locationPending ? " checkout-delivery-map--pending" : ""}`}
+      aria-busy={routeLoading}
+    >
+      {routeLoading ? <div className="checkout-delivery-map-loading" aria-hidden="true" /> : null}
       <MapContainer
         center={store}
-        zoom={13}
+        zoom={14}
         className="checkout-delivery-map-inner"
-        scrollWheelZoom={false}
+        scrollWheelZoom={interactive}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -111,30 +131,49 @@ export default function CheckoutDeliveryMap({
           fitBoundsNonce={fitBoundsNonce}
           customerLat={customerLat}
           customerLng={customerLng}
+          routePositions={routePositions}
         />
         {interactive && onCustomerPositionChange ? (
           <MapPickHandler enabled={interactive} onPick={onCustomerPositionChange} />
         ) : null}
-        <Polyline
-          interactive={false}
-          positions={[store, customer]}
-          pathOptions={{
-            color: "#64748b",
-            weight: 2,
-            dashArray: "6 6",
-            opacity: 0.9,
-          }}
-        />
-        <CircleMarker
-          center={store}
-          radius={9}
-          pathOptions={{
-            color: "#92400e",
-            fillColor: "#d97706",
-            fillOpacity: 0.95,
-            weight: 2,
-          }}
-        />
+        {hasDrivingRoute ? (
+          <>
+            <Polyline
+              interactive={false}
+              positions={routePositions!}
+              pathOptions={{
+                color: "#ffffff",
+                weight: 7,
+                opacity: 0.85,
+                lineJoin: "round",
+                lineCap: "round",
+              }}
+            />
+            <Polyline
+              interactive={false}
+              positions={routePositions!}
+              pathOptions={{
+                color: "#2563eb",
+                weight: 4,
+                opacity: 0.92,
+                lineJoin: "round",
+                lineCap: "round",
+              }}
+            />
+          </>
+        ) : (
+          <Polyline
+            interactive={false}
+            positions={[store, customer]}
+            pathOptions={{
+              color: "#94a3b8",
+              weight: 2,
+              dashArray: "7 7",
+              opacity: routeLoading ? 0.35 : 0.7,
+            }}
+          />
+        )}
+        <Marker position={store} icon={storeIcon} interactive={false} />
         {interactive && onCustomerPositionChange ? (
           <Marker
             position={customer}
@@ -148,16 +187,7 @@ export default function CheckoutDeliveryMap({
             }}
           />
         ) : (
-          <CircleMarker
-            center={customer}
-            radius={9}
-            pathOptions={{
-              color: "#1e40af",
-              fillColor: "#3b82f6",
-              fillOpacity: 0.95,
-              weight: 2,
-            }}
-          />
+          <Marker position={customer} icon={customerIcon} interactive={false} />
         )}
       </MapContainer>
       <div className="checkout-delivery-map-legend">
@@ -167,10 +197,23 @@ export default function CheckoutDeliveryMap({
         <span className="checkout-delivery-map-legend-item">
           <span className="checkout-delivery-map-dot checkout-delivery-map-dot--delivery" /> Entrega
         </span>
+        {hasDrivingRoute ? (
+          <span className="checkout-delivery-map-legend-item">
+            <span className="checkout-delivery-map-route-line" /> Ruta en auto
+          </span>
+        ) : null}
       </div>
-      {interactive ? (
+      {locationPending ? (
+        <p className="checkout-delivery-map-hint checkout-delivery-map-hint--warn">
+          Elegí una sugerencia o mové el pin azul para confirmar la entrega.
+        </p>
+      ) : routeLoading ? (
+        <p className="checkout-delivery-map-hint">Calculando ruta por calles…</p>
+      ) : interactive ? (
         <p className="checkout-delivery-map-hint">
-          Tocá el mapa o arrastrá el pin azul para ubicar la entrega.
+          {hasDrivingRoute
+            ? "La línea azul es la ruta estimada. Podés afinar la ubicación arrastrando el pin."
+            : "Tocá el mapa o arrastrá el pin azul hasta tu puerta."}
         </p>
       ) : null}
     </div>

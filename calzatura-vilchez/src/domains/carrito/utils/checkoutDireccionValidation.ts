@@ -6,7 +6,8 @@ import { buildCheckoutAddressLine } from "@/domains/carrito/utils/checkoutAddres
 
 type ValidateArgs = {
   direccion: Address;
-  orsEnabled: boolean;
+  deliveryPricingActive: boolean;
+  locationConfirmed: boolean;
   selectedDelivery: GeocodeCandidate | null;
   deliveryQuoteLoading: boolean;
   deliveryQuoteError: string;
@@ -16,7 +17,8 @@ type ValidateArgs = {
 /** Devuelve mensaje de error para `toast.error`, o `null` si puede pasar al paso pago. */
 export function validateCheckoutDireccionStep({
   direccion,
-  orsEnabled,
+  deliveryPricingActive,
+  locationConfirmed,
   selectedDelivery,
   deliveryQuoteLoading,
   deliveryQuoteError,
@@ -29,10 +31,13 @@ export function validateCheckoutDireccionStep({
   if (phoneError || !isValidPeruPhone(direccion.telefono)) {
     return phoneError ?? "Ingresa un teléfono válido";
   }
-  if (!orsEnabled) return null;
+  if (!deliveryPricingActive) return null;
 
   const line = buildCheckoutAddressLine(direccion);
-  if (line.length >= 10 && !selectedDelivery) {
+  if (line.length >= 8 && !locationConfirmed) {
+    return "Confirmá la entrega: elegí una sugerencia, buscá en el mapa o arrastrá el pin azul.";
+  }
+  if (line.length >= 8 && !selectedDelivery) {
     return "Elegí un punto de entrega: una sugerencia de la lista, una búsqueda o el mapa.";
   }
   if (deliveryQuoteLoading) {

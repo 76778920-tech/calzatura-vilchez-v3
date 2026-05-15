@@ -45,17 +45,35 @@ export default function CheckoutPage() {
   const envioSummaryText = useMemo(
     () =>
       checkoutEnvioSummaryLabel({
-        orsEnabled: geo.orsEnabled,
+        deliveryPricingActive: geo.deliveryPricingActive,
+        locationConfirmed: geo.locationConfirmed,
         deliveryQuoteLoading: geo.deliveryQuoteLoading,
         deliveryQuoteError: geo.deliveryQuoteError,
         deliveryQuote: geo.deliveryQuote,
       }),
-    [geo.deliveryQuote, geo.deliveryQuoteError, geo.deliveryQuoteLoading, geo.orsEnabled],
+    [
+      geo.deliveryQuote,
+      geo.deliveryQuoteError,
+      geo.deliveryQuoteLoading,
+      geo.deliveryPricingActive,
+      geo.locationConfirmed,
+    ],
   );
 
   const pagoDisabledByDelivery =
-    geo.orsEnabled &&
-    (geo.deliveryQuoteLoading || !!geo.deliveryQuoteError || !geo.deliveryQuote || geo.deliveryQuote.isOutOfRange);
+    geo.deliveryPricingActive &&
+    (!geo.locationConfirmed ||
+      geo.deliveryQuoteLoading ||
+      !!geo.deliveryQuoteError ||
+      !geo.deliveryQuote ||
+      geo.deliveryQuote.isOutOfRange);
+
+  const deliveryDegradedNotice = geo.mapDegraded
+    ? geo.orsRuntimeError ||
+      (!geo.orsConfigured
+        ? "Falta configurar VITE_ORS_API_KEY en el build de producción."
+        : "")
+    : "";
 
   if (items.length === 0) {
     return (
@@ -84,7 +102,8 @@ export default function CheckoutPage() {
     e.preventDefault();
     const err = validateCheckoutDireccionStep({
       direccion,
-      orsEnabled: geo.orsEnabled,
+      deliveryPricingActive: geo.deliveryPricingActive,
+      locationConfirmed: geo.locationConfirmed,
       selectedDelivery: geo.selectedDelivery,
       deliveryQuoteLoading: geo.deliveryQuoteLoading,
       deliveryQuoteError: geo.deliveryQuoteError,
@@ -244,41 +263,30 @@ export default function CheckoutPage() {
                 />
               </div>
 
-              {geo.orsEnabled && (
-                <CheckoutDeliveryBox
-                  addressLineLength={addressLineLen}
-                  mapSearchInput={geo.mapSearchInput}
-                  onMapSearchChange={geo.setMapSearchInput}
-                  searchSuggestLoading={geo.searchSuggestLoading}
-                  searchSuggestError={geo.searchSuggestError}
-                  searchSuggestions={geo.searchSuggestions}
-                  onPickCandidate={geo.pickCandidate}
-                  addressSuggestLoading={geo.addressSuggestLoading}
-                  addressSuggestError={geo.addressSuggestError}
-                  addressSuggestions={geo.addressSuggestions}
-                  selectedDelivery={geo.selectedDelivery}
-                  mapFitNonce={geo.mapFitNonce}
-                  onMapCustomerMove={geo.onMapCustomerMove}
-                  deliveryQuoteLoading={geo.deliveryQuoteLoading}
-                  deliveryQuoteError={geo.deliveryQuoteError}
-                  deliveryQuote={geo.deliveryQuote}
-                />
-              )}
-
-              {!geo.orsEnabled && (
-                <p className="checkout-delivery-muted">
-                  {geo.orsRuntimeError ? (
-                    <>
-                      {geo.orsRuntimeError} El envío se registra como S/ 0.00 hasta que el servicio vuelva a estar disponible.
-                    </>
-                  ) : (
-                    <>
-                      Sin <code className="checkout-delivery-code">VITE_ORS_API_KEY</code>, el envío se registra como S/ 0.00
-                      (configura la clave en <code className="checkout-delivery-code">.env.local</code> para cálculo automático).
-                    </>
-                  )}
-                </p>
-              )}
+              <CheckoutDeliveryBox
+                mapDegraded={geo.mapDegraded}
+                degradedNotice={deliveryDegradedNotice}
+                addressLineLength={addressLineLen}
+                mapSearchInput={geo.mapSearchInput}
+                onMapSearchChange={geo.setMapSearchInput}
+                searchSuggestLoading={geo.searchSuggestLoading}
+                searchSuggestError={geo.searchSuggestError}
+                searchSuggestions={geo.searchSuggestions}
+                onPickCandidate={geo.pickCandidate}
+                addressSuggestLoading={geo.addressSuggestLoading}
+                addressSuggestError={geo.addressSuggestError}
+                addressSuggestions={geo.addressSuggestions}
+                selectedDelivery={geo.selectedDelivery}
+                mapDisplayDelivery={geo.mapDisplayDelivery}
+                locationConfirmed={geo.locationConfirmed}
+                mapFitNonce={geo.mapFitNonce}
+                routePositions={geo.routePositions}
+                routeLoading={geo.routeLoading}
+                onMapCustomerMove={geo.onMapCustomerMove}
+                deliveryQuoteLoading={geo.deliveryQuoteLoading}
+                deliveryQuoteError={geo.deliveryQuoteError}
+                deliveryQuote={geo.deliveryQuote}
+              />
 
               <button type="submit" className="btn-primary btn-full">
                 Continuar al Pago
