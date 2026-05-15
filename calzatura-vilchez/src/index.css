@@ -5114,6 +5114,7 @@ button.cart-overlay {
 .success-icon { color: #10b981; margin: 0 auto 1rem; }
 .success-card h1 { font-family: var(--font-display); font-size: 1.75rem; margin-bottom: 0.5rem; }
 .success-message { color: var(--text-muted); margin-bottom: 1.5rem; }
+.success-inline-link { color: var(--gold); text-decoration: underline; font-weight: 600; }
 .success-details { background: var(--bg-alt); border-radius: var(--radius-md); padding: 1.2rem; margin-bottom: 2rem; display: flex; flex-direction: column; gap: 0.6rem; text-align: left; }
 .success-detail-row { display: flex; justify-content: space-between; font-size: 14px; }
 .success-order-id { font-weight: 700; font-family: monospace; }
@@ -6610,7 +6611,13 @@ button.dash-order-row-btn:hover { background: var(--bg-alt); }
   border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.09); color: var(--text);
   font-size: 14px; line-height: 1.45;
 }
-.admin-stock-coherence-banner p { margin: 0; max-width: min(720px, 100%); }
+.admin-stock-coherence-banner__live {
+  display: block;
+  margin: 0;
+  max-width: min(720px, 100%);
+  font: inherit;
+  color: inherit;
+}
 .admin-stock-coherence-banner__action { flex-shrink: 0; }
 .admin-metric-card--alert { border-color: rgba(245, 158, 11, 0.42) !important; background: rgba(245, 158, 11, 0.07) !important; }
 .admin-metric-card--alert svg { color: #d97706 !important; }
