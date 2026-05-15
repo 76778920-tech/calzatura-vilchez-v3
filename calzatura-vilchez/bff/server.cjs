@@ -392,6 +392,16 @@ function extractProductId(item) {
   return "";
 }
 
+function extractProductName(item) {
+  if (item?.product?.nombre && typeof item.product.nombre === "string") {
+    return item.product.nombre.trim();
+  }
+  if (item?.nombre && typeof item.nombre === "string") {
+    return item.nombre.trim();
+  }
+  return "";
+}
+
 async function fetchProductsByIds(supabase, ids) {
   const { data, error } = await supabase.from("productos").select("*").in("id", ids);
   if (error) {
@@ -418,6 +428,62 @@ async function findProductVariantByColor(supabase, product, requestedColor) {
   }
 
   return (data || []).find((candidate) => sameComparable(candidate.color, requestedColor)) || product;
+}
+
+async function findOrderableProductVariant(supabase, product, item) {
+  const requestedColor = item.color || "";
+  const productName = item.productName || product?.nombre || "";
+  const needsVariantLookup =
+    !product ||
+    (requestedColor && !sameComparable(product.color, requestedColor)) ||
+    Number(product.precio || 0) <= 0 ||
+    getSizeStock(product, item.talla || undefined, requestedColor || undefined) < item.quantity;
+
+  if (!needsVariantLookup) {
+    return product;
+  }
+
+  const candidates = [];
+  if (product?.familiaId) {
+    const { data, error } = await supabase
+      .from("productos")
+      .select("*")
+      .eq("familiaId", product.familiaId)
+      .limit(50);
+    if (error) {
+      throw Object.assign(new Error("No se pudo consultar variantes del producto"), { status: 500 });
+    }
+    candidates.push(...(data || []));
+  }
+
+  if (productName) {
+    const { data, error } = await supabase
+      .from("productos")
+      .select("*")
+      .eq("nombre", productName)
+      .limit(50);
+    if (error) {
+      throw Object.assign(new Error("No se pudo consultar variantes del producto"), { status: 500 });
+    }
+    candidates.push(...(data || []));
+  }
+
+  const seen = new Set();
+  const uniqueCandidates = candidates.filter((candidate) => {
+    const id = String(candidate.id || "");
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+
+  return (
+    uniqueCandidates.find((candidate) => {
+      if (requestedColor && !sameComparable(candidate.color, requestedColor)) return false;
+      if (Number(candidate.precio || 0) <= 0) return false;
+      return getSizeStock(candidate, item.talla || undefined, requestedColor || undefined) >= item.quantity;
+    }) ||
+    product
+  );
 }
 
 async function fetchProductOrThrow(supabase, productId) {
@@ -481,6 +547,7 @@ async function buildOrderDraft(supabase, rawItems) {
 
   const normalizedItems = rawItems.map((item) => {
     const productId = extractProductId(item);
+    const productName = extractProductName(item);
     const quantity = Number(item?.quantity || 0);
     const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
     const color = typeof item?.color === "string" ? item.color.trim() : "";
@@ -491,6 +558,7 @@ async function buildOrderDraft(supabase, rawItems) {
 
     return {
       productId,
+      productName,
       quantity,
       talla,
       color,
@@ -510,6 +578,7 @@ async function buildOrderDraft(supabase, rawItems) {
       throw Object.assign(new Error("Producto no encontrado"), { status: 400 });
     }
     product = await findProductVariantByColor(supabase, product, item.color);
+    product = await findOrderableProductVariant(supabase, product, item);
 
     const price = Number(product.precio || 0);
     const totalStock = deriveTotalStock(product);
