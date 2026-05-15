@@ -127,6 +127,8 @@ export interface Order {
   direccion: Address;
   creadoEn: string;
   pagadoEn?: string;
+  /** Contra entrega: marca server-side tras descontar stock en createOrder (o confirmCodOrder legacy). */
+  stockDescontadoEn?: string;
   stripeSessionId?: string;
   metodoPago: string;
   notas?: string;

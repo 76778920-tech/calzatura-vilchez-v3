@@ -8,11 +8,15 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { downloadReceipt, openReceiptPreview } from "@/utils/receipt";
 import toast from "react-hot-toast";
 
-function successPageEstadoLabel(estado: Order["estado"]): string {
+function successPageEstadoLabel(estado: Order["estado"], metodoPago?: string): string {
   if (estado === "pagado") return "Pagado";
+  if (estado === "pendiente" && metodoPago === "contraentrega") return "Confirmado — pago al recibir";
   if (estado === "pendiente") return "Pendiente de pago";
   return estado;
 }
+
+const PAYMENT_POLL_MAX = 45;
+const PAYMENT_POLL_MS = 2000;
 
 export default function OrderSuccessPage() {
   const { id } = useParams<{ id: string }>();
@@ -22,7 +26,9 @@ export default function OrderSuccessPage() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [paymentSyncTimeout, setPaymentSyncTimeout] = useState(false);
   const downloadedRef = useRef(false);
+  const pollCountRef = useRef(0);
 
   useEffect(() => {
     if (!id) return;
@@ -43,10 +49,15 @@ export default function OrderSuccessPage() {
           localStorage.setItem(`receipt_downloaded_${o.id}`, "true");
         }
 
-        if (sessionId && o?.estado === "pendiente") {
-          pollTimer = globalThis.setTimeout(() => {
-            void load();
-          }, 2000);
+        if (sessionId && o?.estado === "pendiente" && o.metodoPago === "stripe") {
+          pollCountRef.current += 1;
+          if (pollCountRef.current >= PAYMENT_POLL_MAX) {
+            setPaymentSyncTimeout(true);
+          } else {
+            pollTimer = globalThis.setTimeout(() => {
+              void load();
+            }, PAYMENT_POLL_MS);
+          }
         }
       } finally {
         if (active) setLoading(false);
@@ -87,8 +98,21 @@ export default function OrderSuccessPage() {
         <CheckCircle size={64} className="success-icon" />
         <h1>¡Pedido Confirmado!</h1>
         <p className="success-message">
-          Gracias por tu compra. Recibirás una confirmación pronto.
+          Gracias por tu compra.
+          {order?.metodoPago === "stripe" && order.estado === "pagado"
+            ? " Stripe envía el recibo de pago a tu correo."
+            : " Conserva el número de pedido para cualquier consulta."}
         </p>
+
+        {paymentSyncTimeout && order?.estado === "pendiente" && (
+          <p className="success-message" role="status">
+            El pago puede tardar unos segundos en reflejarse. Revisa{" "}
+            <Link to="/mis-pedidos" className="success-inline-link">
+              Mis pedidos
+            </Link>{" "}
+            en un momento o actualiza esta página.
+          </p>
+        )}
 
         {order && (
           <div className="success-details">
@@ -103,7 +127,7 @@ export default function OrderSuccessPage() {
             <div className="success-detail-row">
               <span>Estado:</span>
               <span className={`order-status-badge status-${order.estado}`}>
-                {successPageEstadoLabel(order.estado)}
+                {successPageEstadoLabel(order.estado, order.metodoPago)}
               </span>
             </div>
             <div className="success-detail-row">

@@ -30,6 +30,17 @@ export function hasOpenRouteServiceKey(): boolean {
   return Boolean(getApiKey());
 }
 
+/** Mensaje claro cuando ORS rechaza la clave (401/403) — suele ser clave errónea, cuota o dominio no permitido. */
+function openRouteGeocodeError(operation: string, status: number): Error {
+  if (status === 401 || status === 403) {
+    return new Error(
+      `${operation}: OpenRouteService respondió ${status}. Revisa que VITE_ORS_API_KEY en el build (p. ej. secret de GitHub Actions) sea la clave activa, ` +
+        "que no hayas superado la cuota y, en openrouteservice.org → tu clave, que el dominio del sitio (p. ej. *.web.app) esté permitido si aplica restricción por referrer.",
+    );
+  }
+  return new Error(`${operation}: HTTP ${status}`);
+}
+
 export type GeocodeCandidate = {
   lat: number;
   lng: number;
@@ -337,7 +348,7 @@ async function fetchGeocodeSearch(
   const url = `${ORS_GEOCODE_SEARCH}?${qs.toString()}`;
   const response = await fetch(url, { method: "GET" });
   if (!response.ok) {
-    throw new Error(`Geocodificación: HTTP ${response.status}`);
+    throw openRouteGeocodeError("Geocodificación", response.status);
   }
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
   return parseGeocodeFeatures(data, text);
@@ -387,7 +398,7 @@ async function fetchGeocodeAutocomplete(
   const url = `${ORS_GEOCODE_AUTOCOMPLETE}?${qs.toString()}`;
   const response = await fetch(url, { method: "GET" });
   if (!response.ok) {
-    throw new Error(`Autocompletado: HTTP ${response.status}`);
+    throw openRouteGeocodeError("Autocompletado", response.status);
   }
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
   return parseGeocodeFeatures(data, text);
@@ -499,7 +510,7 @@ async function geocodeStructuredCandidates(
     if (response.status === 404 || response.status === 400 || response.status === 405) {
       return [];
     }
-    throw new Error(`Geocodificación estructurada: HTTP ${response.status}`);
+    throw openRouteGeocodeError("Geocodificación estructurada", response.status);
   }
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
   const raw = parseGeocodeFeatures(data, parts.address || parts.locality);
@@ -564,6 +575,9 @@ async function drivingDistanceKm(storeLng: number, storeLat: number, destLng: nu
     }),
   });
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw openRouteGeocodeError("Matrix (distancia)", response.status);
+    }
     const errText = await response.text().catch(() => "");
     const errSnippet = errText ? ` — ${errText.slice(0, 120)}` : "";
     throw new Error(`Matrix: HTTP ${response.status}${errSnippet}`);

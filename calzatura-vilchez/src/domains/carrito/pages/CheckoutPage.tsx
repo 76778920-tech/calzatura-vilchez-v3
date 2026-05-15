@@ -99,6 +99,10 @@ export default function CheckoutPage() {
   };
 
   const handlePlaceOrder = async () => {
+    if (metodoPago === "stripe" && !STRIPE_PK.trim()) {
+      toast.error("El pago con tarjeta no está configurado (falta VITE_STRIPE_PUBLIC_KEY). Usa contra entrega o contacta a la tienda.");
+      return;
+    }
     setLoading(true);
     try {
       const orderId = await createOrder({

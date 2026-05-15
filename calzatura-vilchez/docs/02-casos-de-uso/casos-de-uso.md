@@ -15,7 +15,7 @@
 |---|---|---|
 | Visitante | Primario | Usuario no autenticado que navega el catálogo público |
 | Cliente | Primario | Usuario registrado que realiza compras y gestiona su perfil |
-| Administrador | Primario | Empleado interno que gestiona el back-office del negocio |
+| Trabajador | Primario | Empleado interno que gestiona el back-office del negocio |
 | Superadministrador | Primario | Usuario con acceso completo, incluyendo gestión de roles |
 | Firebase Auth | Secundario | Sistema de autenticación externo |
 | Stripe | Secundario | Pasarela de pago externa |

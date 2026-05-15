@@ -378,8 +378,32 @@ exports.createOrder = onRequest(
           throw Object.assign(new Error("No se pudo crear el pedido"), { status: 500 });
         }
 
+        const orderId = data.id;
+
+        if (metodoPago === "contraentrega") {
+          try {
+            const inserted = await fetchOrderOrThrow(supabase, orderId);
+            await discountOrderStock(supabase, inserted);
+            const stockMark = new Date().toISOString();
+            await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
+            await logAuditFn({
+              supabase,
+              accion: "descontar_stock_pedido",
+              entidad: "pedido",
+              entidadId: orderId,
+              entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
+              usuarioUid: decodedToken.uid,
+              usuarioEmail: strOr(decodedToken.email),
+              detalle: { source: "createOrder_cod", metodoPago: "contraentrega" },
+            });
+          } catch (discountErr) {
+            await supabase.from("pedidos").delete().eq("id", orderId);
+            throw discountErr;
+          }
+        }
+
         return res.status(200).json({
-          orderId: data.id,
+          orderId,
           subtotal: draft.subtotal,
           envio,
           total,
@@ -465,14 +489,20 @@ exports.createCheckoutSession = onRequest(
 
         const appUrl = strOr(process.env.APP_URL, "https://calzaturavilchez-ab17f.web.app");
 
-        const session = await stripe.checkout.sessions.create({
+        const payerEmail = strOr(order.userEmail).trim();
+        const sessionPayload = {
           payment_method_types: ["card"],
           line_items: lineItems,
           mode: "payment",
           success_url: `${appUrl}/pedido-exitoso/${orderId}?session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${appUrl}/checkout`,
           metadata: { orderId, userId: decodedToken.uid },
-        });
+        };
+        if (payerEmail.includes("@")) {
+          sessionPayload.customer_email = payerEmail;
+        }
+
+        const session = await stripe.checkout.sessions.create(sessionPayload);
 
         await updateOrder(supabase, orderId, { stripeSessionId: session.id });
 
@@ -573,8 +603,25 @@ exports.confirmCodOrder = onRequest(
           return res.status(400).json({ error: "Pedido sin productos validos" });
         }
 
+        if (order.stockDescontadoEn) {
+          return res.status(200).json({ success: true, alreadyProcessed: true });
+        }
+
         assertStoredTotals(order);
         await assertOrderStockAvailability(supabase, order.items);
+        await discountOrderStock(supabase, order);
+        const stockMark = new Date().toISOString();
+        await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
+        await logAuditFn({
+          supabase,
+          accion: "descontar_stock_pedido",
+          entidad: "pedido",
+          entidadId: orderId,
+          entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
+          usuarioUid: decodedToken.uid,
+          usuarioEmail: order.userEmail ?? null,
+          detalle: { source: "confirmCodOrder", metodoPago: "contraentrega" },
+        });
 
         return res.status(200).json({ success: true });
       } catch (error) {
