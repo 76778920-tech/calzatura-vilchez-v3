@@ -83,6 +83,16 @@ export async function addDailySale(data: Omit<DailySale, "id" | "creadoEn">): Pr
   return row.id;
 }
 
+export type DailySaleAtomicInput = Omit<DailySale, "id" | "creadoEn" | "devuelto" | "motivoDevolucion" | "devueltoEn" | "canal">;
+
+export async function registerDailySalesAtomic(sales: DailySaleAtomicInput[]): Promise<string[]> {
+  const { data, error } = await supabase.rpc("register_daily_sales_atomic", {
+    p_sales: sales,
+  });
+  if (error) throw error;
+  return ((data as { ids?: string[] })?.ids ?? []) as string[];
+}
+
 export async function markSaleReturned(saleId: string, motivo: string): Promise<void> {
   const { error } = await supabase.from(SALES_COL).update({
     devuelto: true,
@@ -90,6 +100,18 @@ export async function markSaleReturned(saleId: string, motivo: string): Promise<
     devueltoEn: new Date().toISOString(),
   }).eq("id", saleId);
   if (error) throw error;
+}
+
+export async function returnDailySaleAtomic(
+  saleId: string,
+  motivo: string
+): Promise<Pick<DailySale, "id" | "productId" | "devuelto" | "motivoDevolucion" | "devueltoEn">> {
+  const { data, error } = await supabase.rpc("return_daily_sale_atomic", {
+    p_sale_id: saleId,
+    p_motivo: motivo,
+  });
+  if (error) throw error;
+  return data as Pick<DailySale, "id" | "productId" | "devuelto" | "motivoDevolucion" | "devueltoEn">;
 }
 
 export async function decrementProductStock(

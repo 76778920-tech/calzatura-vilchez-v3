@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import toast from "react-hot-toast";
-import { addDailySale, decrementProductStock } from "@/domains/ventas/services/finance";
+import { registerDailySalesAtomic, type DailySaleAtomicInput } from "@/domains/ventas/services/finance";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import type { SaleCustomer, SaleDocumentType } from "@/types";
 import { closeSaleDocumentWindow, openSaleDocumentWindow, renderSaleDocument, type SaleDocumentLine } from "@/utils/saleDocument";
@@ -59,6 +59,53 @@ export function isDniLookupError(err: unknown) {
   return ["DNI_INVALID", "DNI_LOOKUP_NOT_CONFIGURED", "DNI_NOT_FOUND", "DNI_LOOKUP_FAILED"].includes(msg);
 }
 
+function errorText(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (!err || typeof err !== "object") return "";
+  const fields = ["message", "details", "hint", "error", "description"] as const;
+  return fields
+    .map((field) => (err as Record<string, unknown>)[field])
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+}
+
+function errorStatus(err: unknown): number {
+  if (!err || typeof err !== "object") return 0;
+  const record = err as Record<string, unknown>;
+  const direct = Number(record.status ?? record.statusCode);
+  if (Number.isFinite(direct)) return direct;
+  const cause = record.cause;
+  if (cause && typeof cause === "object") {
+    const nested = Number((cause as Record<string, unknown>).status ?? (cause as Record<string, unknown>).statusCode);
+    if (Number.isFinite(nested)) return nested;
+  }
+  return 0;
+}
+
+export function toastFromSalesError(err: unknown): string {
+  const msg = errorText(err);
+  const code = typeof err === "object" && err && "code" in err ? String((err as { code?: unknown }).code) : "";
+  const status = errorStatus(err);
+  const lower = `${msg} ${code}`.toLowerCase();
+  if (
+    lower.includes("insufficient_stock") ||
+    lower.includes("insufficient_size_stock") ||
+    lower.includes("stock insuficiente")
+  ) {
+    return "Stock insuficiente. Actualiza la lista y vuelve a intentarlo.";
+  }
+  if (code === "42501" || lower.includes("row-level security")) {
+    return "Sin permisos para realizar esta operación.";
+  }
+  if (status === 401 || code === "401" || lower.includes("401") || lower.includes("unauthorized") || lower.includes("jwt")) {
+    return "Sesión sin autorización para realizar esta operación.";
+  }
+  if (code === "PGRST202" || lower.includes("could not find the function")) {
+    return "Operación no disponible en la base de datos. Aplica las migraciones pendientes.";
+  }
+  return `Error: ${msg || "no se pudo completar la operación"}`;
+}
+
 type AddSaleLineValidation = {
   selectedProduct: SaleProduct | undefined;
   availableColors: string[];
@@ -95,55 +142,37 @@ export function messageForInvalidAddSaleLine({
   return null;
 }
 
-async function insertPendingLinesAsDailySales(
+function buildDailySalePayload(
   pendingLines: PendingSaleLine[],
   products: SaleProduct[],
   date: string,
   documentType: SaleDocumentType,
   docNumber: string | undefined,
   saleCustomer: SaleCustomer | undefined
-): Promise<void> {
-  await Promise.all(
-    pendingLines.map((line) => {
-      const product = products.find((p) => p.id === line.productId);
-      if (!product?.finanzas) throw new Error("Producto sin finanzas");
-      const total = saleLineTotal(line);
-      const costoTotal = product.finanzas.costoCompra * line.quantity;
-      return addDailySale({
-        productId: product.id,
-        codigo: product.codigo || "SIN-CODIGO",
-        nombre: product.nombre,
-        color: line.color || product.color || "",
-        talla: line.talla || undefined,
-        fecha: date,
-        cantidad: line.quantity,
-        precioVenta: line.salePrice,
-        total,
-        costoUnitario: product.finanzas.costoCompra,
-        costoTotal,
-        ganancia: total - costoTotal,
-        documentoTipo: documentType,
-        ...(docNumber ? { documentoNumero: docNumber } : {}),
-        ...(saleCustomer ? { cliente: saleCustomer } : {}),
-      });
-    })
-  );
-}
-
-async function decrementStockForPendingLines(pendingLines: PendingSaleLine[]): Promise<void> {
-  const linesByProduct = pendingLines.reduce<Record<string, PendingSaleLine[]>>((acc, line) => {
-    acc[line.productId] = [...(acc[line.productId] ?? []), line];
-    return acc;
-  }, {});
-
-  await Promise.all(
-    Object.entries(linesByProduct).map(([id, lines]) =>
-      decrementProductStock(
-        id,
-        lines.map((l) => ({ talla: l.talla || null, cantidad: l.quantity }))
-      )
-    )
-  );
+): DailySaleAtomicInput[] {
+  return pendingLines.map((line) => {
+    const product = products.find((p) => p.id === line.productId);
+    if (!product?.finanzas) throw new Error("Producto sin finanzas");
+    const total = saleLineTotal(line);
+    const costoTotal = product.finanzas.costoCompra * line.quantity;
+    return {
+      productId: product.id,
+      codigo: product.codigo || "SIN-CODIGO",
+      nombre: product.nombre,
+      color: line.color || product.color || "",
+      talla: line.talla || undefined,
+      fecha: date,
+      cantidad: line.quantity,
+      precioVenta: line.salePrice,
+      total,
+      costoUnitario: product.finanzas.costoCompra,
+      costoTotal,
+      ganancia: total - costoTotal,
+      documentoTipo: documentType,
+      ...(docNumber ? { documentoNumero: docNumber } : {}),
+      ...(saleCustomer ? { cliente: saleCustomer } : {}),
+    };
+  });
 }
 
 async function resolveRegisterSaleCustomerForDocument(
@@ -173,7 +202,8 @@ function renderRegisterSaleDocumentIfNeeded(
   saleCustomer: SaleCustomer | undefined,
   documentPreview: Window | null,
   pendingLines: PendingSaleLine[],
-  products: SaleProduct[]
+  products: SaleProduct[],
+  date: string
 ) {
   if (!documentToIssue || !docNumber || !saleCustomer || !documentPreview) return;
   const documentLines: SaleDocumentLine[] = pendingLines.map((line) => {
@@ -192,7 +222,7 @@ function renderRegisterSaleDocumentIfNeeded(
     id: docNumber,
     type: documentToIssue,
     customer: saleCustomer,
-    date: new Date(),
+    date: new Date(`${date}T12:00:00`),
     lines: documentLines,
   });
   if (rendered) {
@@ -257,8 +287,8 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     );
     if (requiresCustomer && !saleCustomer) return;
 
-    await insertPendingLinesAsDailySales(pendingLines, products, date, documentType, docNumber, saleCustomer);
-    await decrementStockForPendingLines(pendingLines);
+    const salesPayload = buildDailySalePayload(pendingLines, products, date, documentType, docNumber, saleCustomer);
+    await registerDailySalesAtomic(salesPayload);
 
     toast.success("Ventas registradas");
     renderRegisterSaleDocumentIfNeeded(
@@ -267,7 +297,8 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
       saleCustomer,
       documentPreview,
       pendingLines,
-      products
+      products,
+      date
     );
 
     setPendingLines([]);
@@ -279,7 +310,7 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     if (isDniLookupError(err)) {
       showDniLookupError(err);
     } else {
-      toast.error("No se pudo registrar la venta");
+      toast.error(toastFromSalesError(err));
     }
     closeSaleDocumentWindow(documentPreview);
   } finally {

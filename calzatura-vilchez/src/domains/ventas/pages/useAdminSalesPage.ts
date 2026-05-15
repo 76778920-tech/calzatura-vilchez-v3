@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { fetchProductCodes, fetchProducts } from "@/domains/productos/services/products";
-import { fetchDailySales, fetchProductFinancials, markSaleReturned, restoreProductStock } from "@/domains/ventas/services/finance";
+import { fetchDailySales, fetchProductFinancials, returnDailySaleAtomic } from "@/domains/ventas/services/finance";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import type { DailySale, SaleCustomer, SaleDocumentType } from "@/types";
 import { getProductColors } from "@/utils/colors";
@@ -16,6 +16,7 @@ import {
   saleLineProfit,
   saleLineTotal,
   showDniLookupError,
+  toastFromSalesError,
   todayISO,
 } from "./adminSalesRegisterLogic";
 import { computeAdminSalesTotals } from "./adminSalesTotals";
@@ -111,14 +112,26 @@ export function useAdminSalesPage(): AdminSalesPageModel {
   const [returning, setReturning] = useState(false);
   const [historialSearch, setHistorialSearch] = useState("");
 
-  const loadSales = useCallback((targetDate: string) => {
-    fetchDailySales(targetDate).then(setSales).catch(() => {});
-  }, []);
-
-  const load = useCallback(() => {
+  const load = useCallback((targetDate = date) => {
     setLoading(true);
-    Promise.all([fetchProducts(), fetchProductCodes(), fetchProductFinancials(), fetchDailySales(todayISO())])
-      .then(([items, codes, financials, daySales]) => {
+    return Promise.allSettled([fetchProducts(), fetchProductCodes(), fetchProductFinancials(), fetchDailySales(targetDate)])
+      .then(([itemsResult, codesResult, financialsResult, daySalesResult]) => {
+        if (itemsResult.status === "rejected") throw itemsResult.reason;
+        const items = itemsResult.value;
+        const codes = codesResult.status === "fulfilled" ? codesResult.value : {};
+        const financials = financialsResult.status === "fulfilled" ? financialsResult.value : {};
+        const daySales = daySalesResult.status === "fulfilled" ? daySalesResult.value : [];
+
+        if (codesResult.status === "rejected") {
+          toast.error("No se pudieron cargar los códigos de producto");
+        }
+        if (financialsResult.status === "rejected") {
+          toast.error("No se pudo cargar el rango de venta");
+        }
+        if (daySalesResult.status === "rejected") {
+          toast.error(toastFromSalesError(daySalesResult.reason));
+        }
+
         const merged = items.map((item) => ({
           ...item,
           codigo: codes[item.id] ?? "",
@@ -127,17 +140,18 @@ export function useAdminSalesPage(): AdminSalesPageModel {
         setProducts(merged);
         setSales(daySales);
       })
+      .catch((err: unknown) => {
+        toast.error(toastFromSalesError(err));
+        setProducts([]);
+        setSales([]);
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [date]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    loadSales(date);
-  }, [date, loadSales]);
+    load(date);
+  }, [date, load]);
 
   const selectedProduct = products.find((p) => p.id === productId);
   const availableColors = selectedProduct ? getProductColors(selectedProduct) : [];
@@ -305,7 +319,10 @@ export function useAdminSalesPage(): AdminSalesPageModel {
       toast.error(invalidMsg);
       return;
     }
-    if (!selectedProduct?.finanzas) return;
+    if (!selectedProduct?.finanzas) {
+      toast.error("Este producto no tiene costo ni rango de venta registrado");
+      return;
+    }
 
     setPendingLines((items) => [
       ...items,
@@ -339,7 +356,7 @@ export function useAdminSalesPage(): AdminSalesPageModel {
       setValidatedDni,
       setPendingLines,
       setDocumentType,
-      load,
+      load: () => load(date),
     });
 
   const handleViewDocument = (sale: DailySale) => {
@@ -375,19 +392,13 @@ export function useAdminSalesPage(): AdminSalesPageModel {
     }
     setReturning(true);
     try {
-      await markSaleReturned(selectedSale.id, motivo);
-      await restoreProductStock(selectedSale.productId, selectedSale.talla ?? null, selectedSale.cantidad);
-      const now = new Date().toISOString();
-      setSales((prev) =>
-        prev.map((s) =>
-          s.id === selectedSale.id ? { ...s, devuelto: true, motivoDevolucion: motivo, devueltoEn: now } : s
-        )
-      );
-      setSelectedSale((prev) => prev ? { ...prev, devuelto: true, motivoDevolucion: motivo, devueltoEn: now } : null);
+      const returned = await returnDailySaleAtomic(selectedSale.id, motivo);
+      await load(date);
+      setSelectedSale((prev) => prev ? { ...prev, ...returned } : null);
       setReturnMotivo("");
       toast.success("Devolución registrada y stock restaurado");
-    } catch {
-      toast.error("No se pudo registrar la devolución");
+    } catch (err: unknown) {
+      toast.error(toastFromSalesError(err));
     } finally {
       setReturning(false);
     }

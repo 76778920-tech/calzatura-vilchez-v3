@@ -38,7 +38,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
         </div>
         <div className="stat-card admin-metric-card">
           <Calculator size={22} />
-          <div><span>Productos</span><strong>{p.products.length}</strong></div>
+          <div><span>Catálogo cargado</span><strong>{p.products.length}</strong></div>
         </div>
       </div>
 

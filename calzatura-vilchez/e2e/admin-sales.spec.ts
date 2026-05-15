@@ -3,11 +3,11 @@
  *
  * Cubre:
  * 1. Flujo completo: seleccionar producto → agregar línea → registrar venta
- *    → ventasDiarias insertado + decrement_product_stock llamado (TC-SALE-001).
+ *    → register_daily_sales_atomic llamado (TC-SALE-001).
  * 2. Cantidad mayor al stock disponible muestra toast de error sin llamar RPC
  *    (TC-SALE-002).
  * 3. Devolución sin motivo muestra toast de error sin llamar RPC (TC-SALE-003).
- * 4. Devolución con motivo llama markSaleReturned + restore_product_stock
+ * 4. Devolución con motivo llama return_daily_sale_atomic
  *    (TC-SALE-004).
  */
 import { expect, test, type Page } from "@playwright/test";
@@ -121,13 +121,13 @@ async function setupBaseMocks(page: Page) {
   });
 }
 
-async function mockDecrementRpc(page: Page): Promise<() => boolean> {
+async function mockRegisterSalesRpc(page: Page): Promise<() => boolean> {
   let called = false;
   await page.route("**/*", async (route) => {
     const req = route.request();
-    if (req.method() === "POST" && req.url().includes("decrement_product_stock")) {
+    if (req.method() === "POST" && req.url().includes("register_daily_sales_atomic")) {
       called = true;
-      await route.fulfill({ status: 204, body: "" });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ids: ["sale-new-001"] }) });
       return;
     }
     await route.fallback();
@@ -135,13 +135,23 @@ async function mockDecrementRpc(page: Page): Promise<() => boolean> {
   return () => called;
 }
 
-async function mockRestoreRpc(page: Page): Promise<() => boolean> {
+async function mockReturnSaleRpc(page: Page): Promise<() => boolean> {
   let called = false;
   await page.route("**/*", async (route) => {
     const req = route.request();
-    if (req.method() === "POST" && req.url().includes("restore_product_stock")) {
+    if (req.method() === "POST" && req.url().includes("return_daily_sale_atomic")) {
       called = true;
-      await route.fulfill({ status: 204, body: "" });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          id: SALE.id,
+          productId: SALE.productId,
+          devuelto: true,
+          motivoDevolucion: "Talla equivocada",
+          devueltoEn: "2026-05-02T12:00:00.000Z",
+        }),
+      });
       return;
     }
     await route.fallback();
@@ -173,11 +183,11 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // ──────────────────────────────────────────────────────────────────────────
   // TC-SALE-001: flujo completo de venta — RPC de decremento llamado
   // ──────────────────────────────────────────────────────────────────────────
-  test("registrar venta llama decrement_product_stock (TC-SALE-001)", async ({ page }) => {
+  test("registrar venta llama register_daily_sales_atomic (TC-SALE-001)", async ({ page }) => {
     await setupBaseMocks(page);
-    await mockDecrementRpc(page);
-    const decrementPost = page.waitForRequest(
-      (req) => req.method() === "POST" && req.url().includes("decrement_product_stock"),
+    await mockRegisterSalesRpc(page);
+    const registerPost = page.waitForRequest(
+      (req) => req.method() === "POST" && req.url().includes("register_daily_sales_atomic"),
       { timeout: 15_000 },
     );
 
@@ -195,7 +205,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await page.getByRole("button", { name: /registrar venta completa/i }).click();
     await expect(page.getByText(/ventas registradas/i)).toBeVisible({ timeout: 8_000 });
 
-    await decrementPost;
+    await registerPost;
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -203,7 +213,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // ──────────────────────────────────────────────────────────────────────────
   test("cantidad mayor al stock muestra error y no agrega la línea (TC-SALE-002)", async ({ page }) => {
     await setupBaseMocks(page);
-    const wasDecremented = await mockDecrementRpc(page);
+    const wasRegistered = await mockRegisterSalesRpc(page);
 
     await goToSales(page);
     await selectProductInForm(page);
@@ -216,13 +226,13 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await expect(page.getByText(/supera el stock disponible/i)).toBeVisible({ timeout: 5_000 });
 
     // RPC no debe haberse llamado
-    expect(wasDecremented()).toBe(false);
+    expect(wasRegistered()).toBe(false);
   });
 
   // ──────────────────────────────────────────────────────────────────────────
   // TC-SALE-003: devolución sin motivo no llama RPC
   // ──────────────────────────────────────────────────────────────────────────
-  test("devolución sin motivo muestra error y no llama restore_product_stock (TC-SALE-003)", async ({ page }) => {
+  test("devolución sin motivo muestra error y no llama return_daily_sale_atomic (TC-SALE-003)", async ({ page }) => {
     await page.route("**/rest/v1/productos*", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCT]) });
     });
@@ -236,7 +246,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SALE]) });
     });
 
-    const wasRestored = await mockRestoreRpc(page);
+    const wasReturned = await mockReturnSaleRpc(page);
 
     await goToSales(page);
 
@@ -248,13 +258,13 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await page.getByRole("button", { name: /confirmar devolución/i }).click();
     await expect(page.getByText(/motivo de la devolución/i)).toBeVisible({ timeout: 5_000 });
 
-    expect(wasRestored()).toBe(false);
+    expect(wasReturned()).toBe(false);
   });
 
   // ──────────────────────────────────────────────────────────────────────────
   // TC-SALE-004: devolución con motivo llama restore_product_stock
   // ──────────────────────────────────────────────────────────────────────────
-  test("devolución con motivo llama restore_product_stock (TC-SALE-004)", async ({ page }) => {
+  test("devolución con motivo llama return_daily_sale_atomic (TC-SALE-004)", async ({ page }) => {
     await page.route("**/rest/v1/productos*", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCT]) });
     });
@@ -273,7 +283,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
       await route.fulfill({ status: 204, body: "" });
     });
 
-    const wasRestored = await mockRestoreRpc(page);
+    const wasReturned = await mockReturnSaleRpc(page);
 
     await goToSales(page);
 
@@ -288,6 +298,6 @@ test.describe("admin ventas → registro de venta y devolución", () => {
       timeout: 8_000,
     });
 
-    expect(wasRestored()).toBe(true);
+    expect(wasReturned()).toBe(true);
   });
 });
