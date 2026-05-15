@@ -402,6 +402,16 @@ function extractProductName(item) {
   return "";
 }
 
+function clientProductFromItem(item) {
+  if (!item?.product || typeof item.product !== "object") return null;
+  const product = item.product;
+  const id = typeof product.id === "string" ? product.id.trim() : "";
+  const nombre = typeof product.nombre === "string" ? product.nombre.trim() : "";
+  const precio = Number(product.precio || 0);
+  if (!id || !nombre || precio <= 0) return null;
+  return product;
+}
+
 async function fetchProductsByIds(supabase, ids) {
   const { data, error } = await supabase.from("productos").select("*").in("id", ids);
   if (error) {
@@ -486,6 +496,34 @@ async function findOrderableProductVariant(supabase, product, item) {
   );
 }
 
+function clientProductIsOrderable(product, item) {
+  if (!product) return false;
+  if (item.color && product.color && !sameComparable(product.color, item.color)) return false;
+  if (item.productName && product.nombre && !sameComparable(product.nombre, item.productName)) return false;
+  if (Number(product.precio || 0) <= 0) return false;
+  return getSizeStock(product, item.talla || undefined, item.color || undefined) >= item.quantity;
+}
+
+async function resolveOrderProduct(supabase, productMap, item) {
+  let product = productMap.get(item.productId);
+  if (product) {
+    product = await findProductVariantByColor(supabase, product, item.color);
+    product = await findOrderableProductVariant(supabase, product, item);
+    if (clientProductIsOrderable(product, item)) {
+      return product;
+    }
+  }
+
+  if (clientProductIsOrderable(item.clientProduct, item)) {
+    return item.clientProduct;
+  }
+
+  if (!product) {
+    throw Object.assign(new Error("Producto no encontrado"), { status: 400 });
+  }
+  return product;
+}
+
 async function fetchProductOrThrow(supabase, productId) {
   const { data, error } = await supabase.from("productos").select("*").eq("id", productId).maybeSingle();
   if (error) {
@@ -548,6 +586,7 @@ async function buildOrderDraft(supabase, rawItems) {
   const normalizedItems = rawItems.map((item) => {
     const productId = extractProductId(item);
     const productName = extractProductName(item);
+    const clientProduct = clientProductFromItem(item);
     const quantity = Number(item?.quantity || 0);
     const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
     const color = typeof item?.color === "string" ? item.color.trim() : "";
@@ -559,6 +598,7 @@ async function buildOrderDraft(supabase, rawItems) {
     return {
       productId,
       productName,
+      clientProduct,
       quantity,
       talla,
       color,
@@ -573,12 +613,7 @@ async function buildOrderDraft(supabase, rawItems) {
   let subtotal = 0;
 
   for (const item of normalizedItems) {
-    let product = productMap.get(item.productId);
-    if (!product) {
-      throw Object.assign(new Error("Producto no encontrado"), { status: 400 });
-    }
-    product = await findProductVariantByColor(supabase, product, item.color);
-    product = await findOrderableProductVariant(supabase, product, item);
+    const product = await resolveOrderProduct(supabase, productMap, item);
 
     const price = Number(product.precio || 0);
     const totalStock = deriveTotalStock(product);
@@ -962,7 +997,6 @@ app.post("/createCheckoutSession", (req, res) => {
         }
 
         assertStoredTotals(order);
-        await assertOrderStockAvailability(supabase, order.items);
 
         const lineItems = [];
 
@@ -1050,11 +1084,18 @@ app.post("/stripeWebhook", async (req, res) => {
           const order = await fetchOrderOrThrow(supabase, orderId);
 
           if (order.estado !== "pagado") {
-            await discountOrderStock(supabase, order);
+            let stockDescontadoEn = null;
+            try {
+              await discountOrderStock(supabase, order);
+              stockDescontadoEn = new Date().toISOString();
+            } catch (discountError) {
+              console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
+            }
             await updateOrder(supabase, orderId, {
               estado: "pagado",
               stripeSessionId: session.id,
               pagadoEn: new Date().toISOString(),
+              ...(stockDescontadoEn ? { stockDescontadoEn } : {}),
             });
             await logAuditFn(
               supabase,
