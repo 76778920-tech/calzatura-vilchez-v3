@@ -4,9 +4,11 @@ import { ShoppingBag, CreditCard, Truck, ChevronRight } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { createOrder } from "@/domains/pedidos/services/orders";
+import { fetchPublicProducts } from "@/domains/productos/services/products";
 import toast from "react-hot-toast";
-import type { Address } from "@/types";
+import type { Address, CartItem, Product } from "@/types";
 import { normalizePeruPhoneInput } from "@/utils/phone";
+import { getSizeStock } from "@/utils/stock";
 import CheckoutDeliveryBox from "@/domains/carrito/components/CheckoutDeliveryBox";
 import { useCheckoutGeocodingEffects } from "@/domains/carrito/hooks/useCheckoutGeocodingEffects";
 import { redirectStripeCheckoutForOrder } from "@/domains/carrito/services/stripeCheckoutRedirect";
@@ -17,6 +19,55 @@ import {
 import { checkoutEnvioSummaryLabel } from "@/domains/carrito/utils/checkoutEnvioSummaryLabel";
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? "";
+
+function comparable(value?: string) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function sameText(a?: string, b?: string) {
+  return comparable(a) === comparable(b);
+}
+
+function findLiveProductForCartItem(products: Product[], item: CartItem) {
+  const requestedColor = item.color || item.product.color || "";
+  const requestedName = item.product.nombre || "";
+  const requestedSize = item.talla || "";
+  const requestedQty = Number(item.quantity || 0);
+
+  const byId = products.find((product) => product.id === item.product.id);
+  if (
+    byId &&
+    (!requestedColor || sameText(byId.color, requestedColor)) &&
+    getSizeStock(byId, requestedSize || undefined) >= requestedQty
+  ) {
+    return byId;
+  }
+
+  return products.find((product) => {
+    if (!sameText(product.nombre, requestedName)) return false;
+    if (requestedColor && !sameText(product.color, requestedColor)) return false;
+    return getSizeStock(product, requestedSize || undefined) >= requestedQty;
+  });
+}
+
+async function resolveCheckoutItems(items: CartItem[]) {
+  const liveProducts = await fetchPublicProducts();
+  return items.map((item) => {
+    const liveProduct = findLiveProductForCartItem(liveProducts, item);
+    if (!liveProduct) {
+      throw new Error(`${item.product.nombre} (${item.color || item.product.color || "sin color"} talla ${item.talla || "-"}) no tiene stock disponible`);
+    }
+    return {
+      ...item,
+      product: liveProduct,
+      color: item.color || liveProduct.color,
+    };
+  });
+}
 
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart();
@@ -124,8 +175,9 @@ export default function CheckoutPage() {
     }
     setLoading(true);
     try {
+      const checkoutItems = await resolveCheckoutItems(items);
       const orderId = await createOrder({
-        items,
+        items: checkoutItems,
         direccion,
         metodoPago,
         notas: "",
