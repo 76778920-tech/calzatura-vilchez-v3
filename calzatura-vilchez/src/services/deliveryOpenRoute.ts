@@ -7,6 +7,18 @@ const ORS_GEOCODE_REVERSE = "https://api.openrouteservice.org/geocode/reverse";
 const ORS_MATRIX = "https://api.openrouteservice.org/v2/matrix/driving-car";
 
 const DEFAULT_GEOCODE_SIZE = 15;
+const ORS_UNAVAILABLE_MESSAGE =
+  "No se pudo consultar ubicaciones ahora. Completa la dirección manualmente; el envío se registrará sin cálculo automático.";
+
+class OpenRouteServiceUnavailableError extends Error {
+  readonly status?: number;
+
+  constructor(status?: number) {
+    super(ORS_UNAVAILABLE_MESSAGE);
+    this.name = "OpenRouteServiceUnavailableError";
+    this.status = status;
+  }
+}
 
 export type DeliveryQuote = {
   distanceKm: number;
@@ -30,15 +42,57 @@ export function hasOpenRouteServiceKey(): boolean {
   return Boolean(getApiKey());
 }
 
+export function isDeliveryLookupUnavailableError(err: unknown): boolean {
+  if (err instanceof OpenRouteServiceUnavailableError) return true;
+  if (!(err instanceof Error)) return false;
+  const msg = err.message.toLowerCase();
+  return msg.includes("failed to fetch") || msg.includes("load failed") || msg.includes("networkerror");
+}
+
+export function deliveryLookupErrorMessage(err: unknown, fallback: string): string {
+  if (isDeliveryLookupUnavailableError(err)) return ORS_UNAVAILABLE_MESSAGE;
+  if (err instanceof Error && err.message.trim()) return err.message;
+  return fallback;
+}
+
 /** Mensaje claro cuando ORS rechaza la clave (401/403) — suele ser clave errónea, cuota o dominio no permitido. */
 function openRouteGeocodeError(operation: string, status: number): Error {
-  if (status === 401 || status === 403) {
-    return new Error(
-      `${operation}: OpenRouteService respondió ${status}. Revisa que VITE_ORS_API_KEY en el build (p. ej. secret de GitHub Actions) sea la clave activa, ` +
-        "que no hayas superado la cuota y, en openrouteservice.org → tu clave, que el dominio del sitio (p. ej. *.web.app) esté permitido si aplica restricción por referrer.",
-    );
+  if (status === 401 || status === 403 || status === 429) {
+    if (import.meta.env.DEV) {
+      console.warn(
+        `${operation}: OpenRouteService respondio ${status}. Revisa VITE_ORS_API_KEY, cuota y restricciones por referrer.`,
+      );
+    }
+    return new OpenRouteServiceUnavailableError(status);
   }
   return new Error(`${operation}: HTTP ${status}`);
+}
+
+async function fetchOpenRoute(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  operation: string,
+  allowedStatuses: readonly number[] = [],
+): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(input, init);
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") throw err;
+    if (import.meta.env.DEV) {
+      console.warn(`${operation}: no se pudo contactar OpenRouteService`, err);
+    }
+    throw new OpenRouteServiceUnavailableError();
+  }
+  if (!response.ok && !allowedStatuses.includes(response.status)) {
+    throw openRouteGeocodeError(operation, response.status);
+  }
+  return response;
+}
+
+function optionalStructuredFallback(err: unknown): GeocodeCandidate[] {
+  if (isDeliveryLookupUnavailableError(err)) throw err;
+  return [];
 }
 
 export type GeocodeCandidate = {
@@ -346,10 +400,7 @@ async function fetchGeocodeSearch(
     qs.set("layers", extra.layers);
   }
   const url = `${ORS_GEOCODE_SEARCH}?${qs.toString()}`;
-  const response = await fetch(url, { method: "GET" });
-  if (!response.ok) {
-    throw openRouteGeocodeError("Geocodificación", response.status);
-  }
+  const response = await fetchOpenRoute(url, { method: "GET" }, "Geocodificacion");
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
   return parseGeocodeFeatures(data, text);
 }
@@ -396,10 +447,7 @@ async function fetchGeocodeAutocomplete(
     useServiceBBox: opts.useServiceBBox,
   });
   const url = `${ORS_GEOCODE_AUTOCOMPLETE}?${qs.toString()}`;
-  const response = await fetch(url, { method: "GET" });
-  if (!response.ok) {
-    throw openRouteGeocodeError("Autocompletado", response.status);
-  }
+  const response = await fetchOpenRoute(url, { method: "GET" }, "Autocompletado");
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
   return parseGeocodeFeatures(data, text);
 }
@@ -424,7 +472,7 @@ export async function geocodeSearchBarSuggestions(
             locality: context.ciudad.trim(),
           },
           size,
-        ).catch(() => [] as GeocodeCandidate[])
+        ).catch(optionalStructuredFallback)
       : [];
 
   const spatial = { useServiceBBox: true, restrictCircle: false };
@@ -457,7 +505,7 @@ export async function geocodeCheckoutFormSuggestions(args: {
       locality: args.ciudad.trim(),
     },
     size,
-  ).catch(() => [] as GeocodeCandidate[]);
+  ).catch(optionalStructuredFallback);
 
   const line = [args.direccion, args.distrito, args.ciudad].map((s) => s.trim()).filter(Boolean).join(", ");
   const lineNorm = normalizeGeocodeQuery(line);
@@ -505,13 +553,13 @@ async function geocodeStructuredCandidates(
   });
 
   const url = `${ORS_GEOCODE_STRUCTURED}?${qs.toString()}`;
-  const response = await fetch(url, { method: "GET" });
-  if (!response.ok) {
-    if (response.status === 404 || response.status === 400 || response.status === 405) {
-      return [];
-    }
-    throw openRouteGeocodeError("Geocodificación estructurada", response.status);
-  }
+  const response = await fetchOpenRoute(
+    url,
+    { method: "GET" },
+    "Geocodificacion estructurada",
+    [400, 404, 405],
+  );
+  if (!response.ok) return [];
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
   const raw = parseGeocodeFeatures(data, parts.address || parts.locality);
   return sortCandidatesForCheckout(raw);
@@ -544,10 +592,8 @@ export async function reverseGeocodeLabel(lng: number, lat: number): Promise<str
     `${ORS_GEOCODE_REVERSE}?api_key=${encodeURIComponent(apiKey)}` +
     `&point.lon=${encodeURIComponent(String(lng))}&point.lat=${encodeURIComponent(String(lat))}` +
     "&boundary.country=PE";
-  const response = await fetch(url, { method: "GET" });
-  if (!response.ok) {
-    return null;
-  }
+  const response = await fetchOpenRoute(url, { method: "GET" }, "Geocodificacion inversa").catch(() => null);
+  if (!response) return null;
   const data = (await response.json()) as {
     features?: Array<{ properties: { label?: string } }>;
   };
@@ -559,25 +605,26 @@ async function drivingDistanceKm(storeLng: number, storeLat: number, destLng: nu
   if (!apiKey) {
     throw new Error("Falta VITE_ORS_API_KEY");
   }
-  const response = await fetch(ORS_MATRIX, {
-    method: "POST",
-    headers: {
-      Authorization: apiKey,
-      "Content-Type": "application/json",
+  const response = await fetchOpenRoute(
+    ORS_MATRIX,
+    {
+      method: "POST",
+      headers: {
+        Authorization: apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        locations: [
+          [storeLng, storeLat],
+          [destLng, destLat],
+        ],
+        metrics: ["distance"],
+        units: "km",
+      }),
     },
-    body: JSON.stringify({
-      locations: [
-        [storeLng, storeLat],
-        [destLng, destLat],
-      ],
-      metrics: ["distance"],
-      units: "km",
-    }),
-  });
+    "Matrix (distancia)",
+  );
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      throw openRouteGeocodeError("Matrix (distancia)", response.status);
-    }
     const errText = await response.text().catch(() => "");
     const errSnippet = errText ? ` — ${errText.slice(0, 120)}` : "";
     throw new Error(`Matrix: HTTP ${response.status}${errSnippet}`);

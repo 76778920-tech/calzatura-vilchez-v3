@@ -267,8 +267,16 @@ export default function CheckoutPage() {
 
               {!geo.orsEnabled && (
                 <p className="checkout-delivery-muted">
-                  Sin <code className="checkout-delivery-code">VITE_ORS_API_KEY</code>, el envío se registra como S/ 0.00
-                  (configura la clave en <code className="checkout-delivery-code">.env.local</code> para cálculo automático).
+                  {geo.orsRuntimeError ? (
+                    <>
+                      {geo.orsRuntimeError} El envío se registra como S/ 0.00 hasta que el servicio vuelva a estar disponible.
+                    </>
+                  ) : (
+                    <>
+                      Sin <code className="checkout-delivery-code">VITE_ORS_API_KEY</code>, el envío se registra como S/ 0.00
+                      (configura la clave en <code className="checkout-delivery-code">.env.local</code> para cálculo automático).
+                    </>
+                  )}
                 </p>
               )}
 

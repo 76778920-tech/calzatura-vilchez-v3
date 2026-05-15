@@ -3,9 +3,11 @@ import type { Address } from "@/types";
 import { buildCheckoutAddressLine } from "@/domains/carrito/utils/checkoutAddressLine";
 import {
   calculateDeliveryForCoordinates,
+  deliveryLookupErrorMessage,
   geocodeCheckoutFormSuggestions,
   geocodeSearchBarSuggestions,
   hasOpenRouteServiceKey,
+  isDeliveryLookupUnavailableError,
   reverseGeocodeLabel,
   type DeliveryQuote,
   type GeocodeCandidate,
@@ -16,7 +18,9 @@ type Params = {
 };
 
 export function useCheckoutGeocodingEffects({ direccion }: Params) {
-  const orsEnabled = hasOpenRouteServiceKey();
+  const orsConfigured = hasOpenRouteServiceKey();
+  const [orsRuntimeError, setOrsRuntimeError] = useState("");
+  const orsEnabled = orsConfigured && !orsRuntimeError;
 
   const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
   const [deliveryQuoteLoading, setDeliveryQuoteLoading] = useState(false);
@@ -40,9 +44,16 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
   }, [selectedDelivery]);
 
   const reverseGeocodeRequestId = useRef(0);
+  const normalizeDeliveryError = useCallback((err: unknown, fallback: string) => {
+    const message = deliveryLookupErrorMessage(err, fallback);
+    if (isDeliveryLookupUnavailableError(err)) {
+      setOrsRuntimeError(message);
+    }
+    return message;
+  }, []);
 
   useEffect(() => {
-    if (!orsEnabled) {
+    if (!orsConfigured || orsRuntimeError) {
       return;
     }
     const ctrl = new AbortController();
@@ -72,7 +83,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
         } catch (err) {
           if (ctrl.signal.aborted) return;
           setAddressSuggestions([]);
-          setAddressSuggestError(err instanceof Error ? err.message : "No se pudieron cargar sugerencias");
+          setAddressSuggestError(normalizeDeliveryError(err, "No se pudieron cargar sugerencias"));
         } finally {
           if (!ctrl.signal.aborted) setAddressSuggestLoading(false);
         }
@@ -84,10 +95,10 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
       globalThis.clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- solo dirección compuesta (evita re-fetch en cada campo)
-  }, [direccion.direccion, direccion.distrito, direccion.ciudad, orsEnabled]);
+  }, [direccion.direccion, direccion.distrito, direccion.ciudad, orsConfigured, orsRuntimeError, normalizeDeliveryError]);
 
   useEffect(() => {
-    if (!orsEnabled) return;
+    if (!orsConfigured || orsRuntimeError) return;
     const ctrl = new AbortController();
     const q = mapSearchInput.trim();
     const timer = globalThis.setTimeout(() => {
@@ -110,7 +121,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
         } catch (err) {
           if (ctrl.signal.aborted) return;
           setSearchSuggestions([]);
-          setSearchSuggestError(err instanceof Error ? err.message : "Error en la búsqueda");
+          setSearchSuggestError(normalizeDeliveryError(err, "Error en la búsqueda"));
         } finally {
           if (!ctrl.signal.aborted) setSearchSuggestLoading(false);
         }
@@ -120,13 +131,13 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
       ctrl.abort();
       globalThis.clearTimeout(timer);
     };
-  }, [mapSearchInput, orsEnabled, direccion.ciudad, direccion.distrito]);
+  }, [mapSearchInput, orsConfigured, orsRuntimeError, direccion.ciudad, direccion.distrito, normalizeDeliveryError]);
 
   useEffect(() => {
-    if (!orsEnabled || !selectedDelivery) {
+    if (!orsConfigured || !selectedDelivery || orsRuntimeError) {
       startTransition(() => {
         setDeliveryQuote(null);
-        setDeliveryQuoteError("");
+        setDeliveryQuoteError(orsRuntimeError);
         setDeliveryQuoteLoading(false);
       });
       return;
@@ -149,7 +160,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
       .catch((err) => {
         if (cancelled) return;
         setDeliveryQuote(null);
-        setDeliveryQuoteError(err instanceof Error ? err.message : "No se pudo calcular el envío");
+        setDeliveryQuoteError(normalizeDeliveryError(err, "No se pudo calcular el envío"));
       })
       .finally(() => {
         if (!cancelled) setDeliveryQuoteLoading(false);
@@ -158,7 +169,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cotización al cambiar coordenadas; etiqueta vía ref
-  }, [orsEnabled, selectedDelivery?.lat, selectedDelivery?.lng]);
+  }, [orsConfigured, orsRuntimeError, selectedDelivery?.lat, selectedDelivery?.lng, normalizeDeliveryError]);
 
   useEffect(() => {
     if (!selectedDelivery?.label) return;
@@ -202,6 +213,8 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
 
   return {
     orsEnabled,
+    orsConfigured,
+    orsRuntimeError,
     deliveryQuote,
     deliveryQuoteLoading,
     deliveryQuoteError,

@@ -89,9 +89,9 @@ function toastRoleUpdateFailure(err: unknown) {
   if (isPermissionError) {
     toast.error("Sin permisos para realizar esta operación.");
   } else if (status === 401 || code === "401" || lowerMsg.includes("unauthorized") || lowerMsg.includes("jwt")) {
-    toast.error("SesiÃ³n sin autorizaciÃ³n para realizar esta operaciÃ³n.");
+    toast.error("Sesión sin autorización para realizar esta operación.");
   } else if (code === "PGRST202" || lowerMsg.includes("could not find the function")) {
-    toast.error("OperaciÃ³n no disponible en la base de datos.");
+    toast.error("Operación no disponible en la base de datos.");
   } else {
     toast.error("No se pudo actualizar el rol");
   }
