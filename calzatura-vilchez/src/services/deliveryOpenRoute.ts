@@ -85,6 +85,33 @@ export function hasOpenRouteServiceKey(): boolean {
   return Boolean(getApiKey()) || orsUsesBffProxy();
 }
 
+type BffGeocodeResponse = { candidates?: GeocodeCandidate[] };
+type BffReverseResponse = { label?: string | null };
+type BffRouteResponse = { positions?: MapRoutePosition[]; distanceKm?: number | null };
+type BffDistanceResponse = { distanceKm?: number | null };
+
+async function fetchBffDelivery<T>(path: string, qs: URLSearchParams): Promise<T | null> {
+  const bff = getBackendApiBaseUrl();
+  if (!bff) return null;
+  const q = qs.toString();
+  const url = q ? `${bff}${path}?${q}` : `${bff}${path}`;
+  try {
+    const response = await fetch(url, { method: "GET" });
+    if (!response.ok) return null;
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function bffGeocodeCandidates(query: string, limit = DEFAULT_GEOCODE_SIZE): Promise<GeocodeCandidate[]> {
+  const qs = new URLSearchParams();
+  qs.set("q", query);
+  qs.set("limit", String(limit));
+  const data = await fetchBffDelivery<BffGeocodeResponse>("/delivery/geocode", qs);
+  return Array.isArray(data?.candidates) ? data.candidates : [];
+}
+
 export function isDeliveryLookupUnavailableError(err: unknown): boolean {
   if (err instanceof OpenRouteServiceUnavailableError) return true;
   if (!(err instanceof Error)) return false;
@@ -465,6 +492,10 @@ async function geocodeForwardCandidates(
   size: number,
   opts: { restrictCircle: boolean; useServiceBBox?: boolean; boostHousenumber?: string },
 ): Promise<GeocodeCandidate[]> {
+  if (orsUsesBffProxy()) {
+    const list = await bffGeocodeCandidates(text, size);
+    return sortCandidatesForCheckout(list, { housenumber: opts.boostHousenumber });
+  }
   const useBox = opts.useServiceBBox ?? true;
   const fineLayers = "address,street,venue,neighbourhood,borough";
   let list = await fetchGeocodeSearch(text, size, {
@@ -487,6 +518,9 @@ async function fetchGeocodeAutocomplete(
   size: number,
   opts: { restrictCircle: boolean; useServiceBBox: boolean },
 ): Promise<GeocodeCandidate[]> {
+  if (orsUsesBffProxy()) {
+    return bffGeocodeCandidates(text, size);
+  }
   assertOrsAvailable();
   const qs = new URLSearchParams();
   qs.set("text", text);
@@ -512,6 +546,14 @@ export async function geocodeSearchBarSuggestions(
   if (norm.length < 3) return [];
   const parsed = parseStreetHousenumber(norm);
   const enriched = enrichGeocodeTextWithLocality(norm, context?.ciudad, context?.distrito);
+
+  if (orsUsesBffProxy()) {
+    const list = await bffGeocodeCandidates(enriched, size);
+    return preferHousenumberMatches(
+      sortCandidatesForCheckout(list, { housenumber: parsed.housenumber }),
+      parsed.housenumber,
+    );
+  }
 
   const structuredParts =
     context?.ciudad?.trim() && (parsed.street.length >= 2 || structuredAddressLine(norm, parsed).length >= 3)
@@ -563,6 +605,23 @@ export async function geocodeCheckoutFormSuggestions(args: {
   ciudad: string;
 }): Promise<GeocodeCandidate[]> {
   const size = DEFAULT_GEOCODE_SIZE;
+  const line = [args.direccion, args.distrito, args.ciudad].map((s) => s.trim()).filter(Boolean).join(", ");
+  const lineNorm = normalizeGeocodeQuery(line);
+  const lineParsed = parseStreetHousenumber(lineNorm);
+  const enrichedLine = enrichGeocodeTextWithLocality(
+    structuredAddressLine(lineNorm, lineParsed),
+    args.ciudad,
+    args.distrito,
+  );
+
+  if (orsUsesBffProxy()) {
+    const list = line.length >= 3 ? await bffGeocodeCandidates(enrichedLine, size) : [];
+    return preferHousenumberMatches(
+      sortCandidatesForCheckout(list, { housenumber: lineParsed.housenumber }),
+      lineParsed.housenumber,
+    );
+  }
+
   const addrNorm = normalizeGeocodeQuery(args.direccion);
   const parsed = parseStreetHousenumber(addrNorm);
   const addressStructured = structuredAddressLine(addrNorm, parsed);
@@ -594,14 +653,6 @@ export async function geocodeCheckoutFormSuggestions(args: {
 
   const structured = dedupeCandidates([...structuredByParts, ...structuredCombined]);
 
-  const line = [args.direccion, args.distrito, args.ciudad].map((s) => s.trim()).filter(Boolean).join(", ");
-  const lineNorm = normalizeGeocodeQuery(line);
-  const lineParsed = parseStreetHousenumber(lineNorm);
-  const enrichedLine = enrichGeocodeTextWithLocality(
-    structuredAddressLine(lineNorm, lineParsed),
-    args.ciudad,
-    args.distrito,
-  );
   const forward =
     line.length >= 5
       ? await geocodeForwardCandidates(enrichedLine, size, {
@@ -632,6 +683,12 @@ async function geocodeStructuredCandidates(
   parts: StructuredGeocodeParts,
   size: number,
 ): Promise<GeocodeCandidate[]> {
+  if (orsUsesBffProxy()) {
+    const q = [parts.street, parts.housenumber, parts.address, parts.neighbourhood, parts.locality, "Perú"]
+      .filter(Boolean)
+      .join(", ");
+    return bffGeocodeCandidates(q, size);
+  }
   assertOrsAvailable();
   const street = parts.street?.trim() ?? "";
   const housenumber = parts.housenumber?.trim() ?? "";
@@ -657,7 +714,7 @@ async function geocodeStructuredCandidates(
     url,
     { method: "GET" },
     "Geocodificacion estructurada",
-    [400, 404, 405],
+    [400, 403, 404, 405],
   );
   if (!response.ok) return [];
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
@@ -688,6 +745,13 @@ export async function reverseGeocodeLabel(lng: number, lat: number): Promise<str
   if (!hasOpenRouteServiceKey()) {
     return null;
   }
+  if (orsUsesBffProxy()) {
+    const qs = new URLSearchParams();
+    qs.set("lat", String(lat));
+    qs.set("lon", String(lng));
+    const data = await fetchBffDelivery<BffReverseResponse>("/delivery/reverse", qs);
+    return data?.label ?? null;
+  }
   const qs = new URLSearchParams();
   qs.set("point.lon", String(lng));
   qs.set("point.lat", String(lat));
@@ -708,6 +772,16 @@ export async function fetchDrivingRoutePositions(
   destLat: number,
   destLng: number,
 ): Promise<MapRoutePosition[]> {
+  if (orsUsesBffProxy()) {
+    const qs = new URLSearchParams();
+    qs.set("storeLat", String(storeLat));
+    qs.set("storeLng", String(storeLng));
+    qs.set("destLat", String(destLat));
+    qs.set("destLng", String(destLng));
+    const data = await fetchBffDelivery<BffRouteResponse>("/delivery/route", qs);
+    const positions = data?.positions;
+    return Array.isArray(positions) && positions.length >= 3 ? positions : [];
+  }
   assertOrsAvailable();
   const url = buildOrsUrl(ORS_DIRECTIONS, new URLSearchParams());
   const response = await fetchOpenRoute(
@@ -737,6 +811,17 @@ export function isDrivingRouteGeometry(positions: MapRoutePosition[] | null | un
 }
 
 async function drivingDistanceKm(storeLng: number, storeLat: number, destLng: number, destLat: number): Promise<number> {
+  if (orsUsesBffProxy()) {
+    const qs = new URLSearchParams();
+    qs.set("storeLat", String(storeLat));
+    qs.set("storeLng", String(storeLng));
+    qs.set("destLat", String(destLat));
+    qs.set("destLng", String(destLng));
+    const data = await fetchBffDelivery<BffDistanceResponse>("/delivery/distance", qs);
+    const d = data?.distanceKm;
+    if (typeof d === "number" && Number.isFinite(d)) return d;
+    throw new TypeError("No se pudo calcular la distancia");
+  }
   assertOrsAvailable();
   const url = buildOrsUrl(ORS_MATRIX, new URLSearchParams());
   const response = await fetchOpenRoute(

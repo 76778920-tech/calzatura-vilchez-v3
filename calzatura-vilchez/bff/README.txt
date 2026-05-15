@@ -8,7 +8,11 @@ Rutas (igual que antes en Firebase):
   POST /confirmCodOrder
   ALL  /favorites
   ALL  /aiAdminProxy
-  ALL  /ors/*   (proxy OpenRouteService; ORS_API_KEY solo en servidor)
+  GET  /delivery/geocode   (Nominatim; sin ORS geocoding)
+  GET  /delivery/reverse
+  GET  /delivery/route      (OSRM; ORS si la clave lo permite)
+  GET  /delivery/distance
+  ALL  /ors/*   (proxy OpenRouteService legado; preferir /delivery/*)
   GET  /health
 
 Despliegue ejemplo (Render.com):

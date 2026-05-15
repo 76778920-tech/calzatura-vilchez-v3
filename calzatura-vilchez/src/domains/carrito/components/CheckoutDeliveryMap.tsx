@@ -42,7 +42,7 @@ function FitBoundsToSignal({
   const map = useMap();
 
   useEffect(() => {
-    const id = globalThis.requestAnimationFrame(() => {
+    const timer = globalThis.setTimeout(() => {
       map.invalidateSize();
       const boundsPoints: L.LatLngExpression[] = isDrivingRouteGeometry(routePositions)
         ? routePositions!
@@ -53,9 +53,10 @@ function FitBoundsToSignal({
       map.fitBounds(L.latLngBounds(boundsPoints), {
         padding: [52, 52],
         maxZoom: 17,
+        animate: false,
       });
-    });
-    return () => globalThis.cancelAnimationFrame(id);
+    }, 120);
+    return () => globalThis.clearTimeout(timer);
   }, [map, storeLat, storeLng, customerLat, customerLng, fitBoundsNonce, routePositions]);
   return null;
 }
@@ -122,8 +123,13 @@ export default function CheckoutDeliveryMap({
         scrollWheelZoom={interactive}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          subdomains="abcd"
+          maxZoom={20}
+          updateWhenZooming={false}
+          updateWhenIdle
+          keepBuffer={3}
         />
         <FitBoundsToSignal
           storeLat={storeLat}

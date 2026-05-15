@@ -609,14 +609,86 @@ app.get("/", (_req, res) =>
 app.get("/health", (_req, res) => res.status(200).type("text/plain").send("ok"));
 
 const ORS_API_BASE = "https://api.openrouteservice.org";
+const deliveryProviders = require("./delivery.cjs");
 
 function getOrsApiKey() {
   return (
-    process.env.ORS_API_KEY?.trim() ||
-    process.env.VITE_ORS_API_KEY?.trim() ||
-    ""
+    deliveryProviders.stripEnvKey(process.env.ORS_API_KEY) ||
+    deliveryProviders.stripEnvKey(process.env.VITE_ORS_API_KEY)
   );
 }
+
+app.get("/delivery/geocode", cors, async (req, res) => {
+  try {
+    const q = String(req.query.q || req.query.text || "").trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 20);
+    if (q.length < 3) {
+      return res.status(200).json({ candidates: [] });
+    }
+    const candidates = await deliveryProviders.geocodeCandidates(q, limit);
+    return res.status(200).json({ candidates });
+  } catch (err) {
+    console.error("delivery/geocode:", err?.message || err);
+    return res.status(200).json({ candidates: [] });
+  }
+});
+
+app.get("/delivery/reverse", cors, async (req, res) => {
+  try {
+    const lat = Number(req.query.lat);
+    const lng = Number(req.query.lon ?? req.query.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ error: "lat/lon requeridos" });
+    }
+    const label = await deliveryProviders.nominatimReverse(lat, lng);
+    return res.status(200).json({ label });
+  } catch (err) {
+    console.error("delivery/reverse:", err?.message || err);
+    return res.status(200).json({ label: null });
+  }
+});
+
+app.get("/delivery/route", cors, async (req, res) => {
+  try {
+    const storeLat = Number(req.query.storeLat);
+    const storeLng = Number(req.query.storeLng);
+    const destLat = Number(req.query.destLat);
+    const destLng = Number(req.query.destLng);
+    if (![storeLat, storeLng, destLat, destLng].every(Number.isFinite)) {
+      return res.status(400).json({ error: "coordenadas invalidas" });
+    }
+    const route = await deliveryProviders.drivingRoute(storeLng, storeLat, destLng, destLat);
+    return res.status(200).json(route);
+  } catch (err) {
+    console.error("delivery/route:", err?.message || err);
+    return res.status(200).json({ positions: [], distanceKm: null });
+  }
+});
+
+app.get("/delivery/distance", cors, async (req, res) => {
+  try {
+    const storeLat = Number(req.query.storeLat);
+    const storeLng = Number(req.query.storeLng);
+    const destLat = Number(req.query.destLat);
+    const destLng = Number(req.query.destLng);
+    if (![storeLat, storeLng, destLat, destLng].every(Number.isFinite)) {
+      return res.status(400).json({ error: "coordenadas invalidas" });
+    }
+    const distanceKm = await deliveryProviders.drivingDistanceKm(
+      storeLng,
+      storeLat,
+      destLng,
+      destLat,
+    );
+    if (distanceKm == null) {
+      return res.status(200).json({ distanceKm: null });
+    }
+    return res.status(200).json({ distanceKm });
+  } catch (err) {
+    console.error("delivery/distance:", err?.message || err);
+    return res.status(200).json({ distanceKm: null });
+  }
+});
 
 /** Proxy ORS: la clave queda en el servidor (Render), no en el navegador. */
 app.use("/ors", cors, async (req, res) => {
