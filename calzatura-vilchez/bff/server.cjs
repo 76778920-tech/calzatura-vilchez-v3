@@ -23,6 +23,23 @@ function loadAllowedOrigins() {
 
 const allowedOrigins = loadAllowedOrigins();
 
+function applyCorsHeaders(req, res, next) {
+  const origin = req.headers.origin;
+  if (!origin || allowedOrigins.has(origin)) {
+    if (origin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+    }
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader("Access-Control-Max-Age", "86400");
+  }
+  if (req.method === "OPTIONS") {
+    return res.status(204).end();
+  }
+  return next();
+}
+
 const cors = require("cors")({
   origin(origin, callback) {
     if (!origin || allowedOrigins.has(origin)) {
@@ -594,8 +611,7 @@ async function discountOrderStock(supabase, order) {
 
 const app = express();
 app.set("trust proxy", 1);
-app.options("*", cors);
-app.use(cors);
+app.use(applyCorsHeaders);
 app.use(
   express.json({
     verify: (req, res, buf) => {
