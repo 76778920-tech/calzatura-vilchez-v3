@@ -608,6 +608,54 @@ app.get("/", (_req, res) =>
 
 app.get("/health", (_req, res) => res.status(200).type("text/plain").send("ok"));
 
+const ORS_API_BASE = "https://api.openrouteservice.org";
+
+function getOrsApiKey() {
+  return (
+    process.env.ORS_API_KEY?.trim() ||
+    process.env.VITE_ORS_API_KEY?.trim() ||
+    ""
+  );
+}
+
+/** Proxy ORS: la clave queda en el servidor (Render), no en el navegador. */
+app.use("/ors", cors, async (req, res) => {
+  const apiKey = getOrsApiKey();
+  if (!apiKey) {
+    return res.status(503).json({ error: "ORS_API_KEY no configurada en el BFF" });
+  }
+
+  const pathAndQuery = req.url || "/";
+  const target = new URL(`${ORS_API_BASE}${pathAndQuery}`);
+  target.searchParams.set("api_key", apiKey);
+
+  const method = req.method.toUpperCase();
+  const headers = {};
+  if (method !== "GET" && method !== "HEAD") {
+    headers["Content-Type"] = req.headers["content-type"] || "application/json";
+    headers.Authorization = apiKey;
+  }
+
+  const body =
+    method === "GET" || method === "HEAD"
+      ? undefined
+      : req.rawBody ?? (req.body != null ? JSON.stringify(req.body) : undefined);
+
+  try {
+    const upstream = await fetch(target.toString(), { method, headers, body });
+    const text = await upstream.text();
+    res.status(upstream.status);
+    const contentType = upstream.headers.get("content-type");
+    if (contentType) {
+      res.setHeader("content-type", contentType);
+    }
+    return res.send(text);
+  } catch (err) {
+    console.error("ors proxy:", err?.message || err);
+    return res.status(502).json({ error: "No se pudo contactar OpenRouteService" });
+  }
+});
+
 app.post("/createOrder", (req, res) => {
     cors(req, res, async () => {
       if (req.method !== "POST") {

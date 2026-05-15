@@ -1,11 +1,13 @@
 import { DELIVERY_CONFIG } from "@/config/delivery";
+import { getBackendApiBaseUrl } from "@/config/apiBackend";
 
-const ORS_GEOCODE_SEARCH = "https://api.openrouteservice.org/geocode/search";
-const ORS_GEOCODE_STRUCTURED = "https://api.openrouteservice.org/geocode/search/structured";
-const ORS_GEOCODE_AUTOCOMPLETE = "https://api.openrouteservice.org/geocode/autocomplete";
-const ORS_GEOCODE_REVERSE = "https://api.openrouteservice.org/geocode/reverse";
-const ORS_MATRIX = "https://api.openrouteservice.org/v2/matrix/driving-car";
-const ORS_DIRECTIONS = "https://api.openrouteservice.org/v2/directions/driving-car/geojson";
+const ORS_ORIGIN = "https://api.openrouteservice.org";
+const ORS_GEOCODE_SEARCH = "/geocode/search";
+const ORS_GEOCODE_STRUCTURED = "/geocode/search/structured";
+const ORS_GEOCODE_AUTOCOMPLETE = "/geocode/autocomplete";
+const ORS_GEOCODE_REVERSE = "/geocode/reverse";
+const ORS_MATRIX = "/v2/matrix/driving-car";
+const ORS_DIRECTIONS = "/v2/directions/driving-car/geojson";
 
 /** Coordenadas Leaflet `[lat, lng]`. */
 export type MapRoutePosition = [number, number];
@@ -42,8 +44,45 @@ function getApiKey(): string | undefined {
   return k || undefined;
 }
 
+function orsUsesBffProxy(): boolean {
+  return Boolean(getBackendApiBaseUrl());
+}
+
+function assertOrsAvailable(): void {
+  if (!hasOpenRouteServiceKey()) {
+    throw new Error("Falta VITE_ORS_API_KEY o VITE_BACKEND_API_URL (proxy ORS en BFF)");
+  }
+}
+
+/** URL absoluta hacia ORS directo o hacia el proxy del BFF (`/ors/...`). */
+function buildOrsUrl(pathname: string, qs: URLSearchParams): string {
+  const bff = getBackendApiBaseUrl();
+  if (bff) {
+    const proxyQs = new URLSearchParams();
+    qs.forEach((value, key) => {
+      if (key !== "api_key") proxyQs.set(key, value);
+    });
+    const q = proxyQs.toString();
+    return `${bff}/ors${pathname}${q ? `?${q}` : ""}`;
+  }
+  const apiKey = getApiKey();
+  if (apiKey) {
+    qs.set("api_key", apiKey);
+  }
+  return `${ORS_ORIGIN}${pathname}?${qs.toString()}`;
+}
+
+function orsJsonRequestInit(body: unknown): RequestInit {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (!orsUsesBffProxy()) {
+    const apiKey = getApiKey();
+    if (apiKey) headers.Authorization = apiKey;
+  }
+  return { method: "POST", headers, body: JSON.stringify(body) };
+}
+
 export function hasOpenRouteServiceKey(): boolean {
-  return Boolean(getApiKey());
+  return Boolean(getApiKey()) || orsUsesBffProxy();
 }
 
 export function isDeliveryLookupUnavailableError(err: unknown): boolean {
@@ -402,12 +441,8 @@ async function fetchGeocodeSearch(
   size: number,
   extra: { layers?: string; restrictCircle: boolean; useServiceBBox: boolean },
 ): Promise<GeocodeCandidate[]> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("Falta VITE_ORS_API_KEY");
-  }
+  assertOrsAvailable();
   const qs = new URLSearchParams();
-  qs.set("api_key", apiKey);
   qs.set("text", text);
   qs.set("boundary.country", "PE");
   qs.set("size", String(size));
@@ -418,7 +453,7 @@ async function fetchGeocodeSearch(
   if (extra.layers) {
     qs.set("layers", extra.layers);
   }
-  const url = `${ORS_GEOCODE_SEARCH}?${qs.toString()}`;
+  const url = buildOrsUrl(ORS_GEOCODE_SEARCH, qs);
   const response = await fetchOpenRoute(url, { method: "GET" }, "Geocodificacion");
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
   return parseGeocodeFeatures(data, text);
@@ -452,12 +487,8 @@ async function fetchGeocodeAutocomplete(
   size: number,
   opts: { restrictCircle: boolean; useServiceBBox: boolean },
 ): Promise<GeocodeCandidate[]> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("Falta VITE_ORS_API_KEY");
-  }
+  assertOrsAvailable();
   const qs = new URLSearchParams();
-  qs.set("api_key", apiKey);
   qs.set("text", text);
   qs.set("boundary.country", "PE");
   qs.set("size", String(size));
@@ -465,7 +496,7 @@ async function fetchGeocodeAutocomplete(
     restrictCircle: opts.restrictCircle,
     useServiceBBox: opts.useServiceBBox,
   });
-  const url = `${ORS_GEOCODE_AUTOCOMPLETE}?${qs.toString()}`;
+  const url = buildOrsUrl(ORS_GEOCODE_AUTOCOMPLETE, qs);
   const response = await fetchOpenRoute(url, { method: "GET" }, "Autocompletado");
   const data = (await response.json()) as { features?: GeoJsonFeature[] };
   return parseGeocodeFeatures(data, text);
@@ -601,10 +632,7 @@ async function geocodeStructuredCandidates(
   parts: StructuredGeocodeParts,
   size: number,
 ): Promise<GeocodeCandidate[]> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("Falta VITE_ORS_API_KEY");
-  }
+  assertOrsAvailable();
   const street = parts.street?.trim() ?? "";
   const housenumber = parts.housenumber?.trim() ?? "";
   const address = parts.address?.trim() ?? "";
@@ -612,7 +640,6 @@ async function geocodeStructuredCandidates(
     return [];
   }
   const qs = new URLSearchParams();
-  qs.set("api_key", apiKey);
   qs.set("size", String(size));
   if (street) qs.set("street", street);
   if (housenumber) qs.set("housenumber", housenumber);
@@ -625,7 +652,7 @@ async function geocodeStructuredCandidates(
     useServiceBBox: Boolean(DELIVERY_CONFIG.geocodeBbox),
   });
 
-  const url = `${ORS_GEOCODE_STRUCTURED}?${qs.toString()}`;
+  const url = buildOrsUrl(ORS_GEOCODE_STRUCTURED, qs);
   const response = await fetchOpenRoute(
     url,
     { method: "GET" },
@@ -658,14 +685,14 @@ export async function geocodeAddressPeru(addressLine: string): Promise<{ lat: nu
 
 /** Etiqueta legible al elegir un punto en el mapa (reverse geocode). */
 export async function reverseGeocodeLabel(lng: number, lat: number): Promise<string | null> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
+  if (!hasOpenRouteServiceKey()) {
     return null;
   }
-  const url =
-    `${ORS_GEOCODE_REVERSE}?api_key=${encodeURIComponent(apiKey)}` +
-    `&point.lon=${encodeURIComponent(String(lng))}&point.lat=${encodeURIComponent(String(lat))}` +
-    "&boundary.country=PE";
+  const qs = new URLSearchParams();
+  qs.set("point.lon", String(lng));
+  qs.set("point.lat", String(lat));
+  qs.set("boundary.country", "PE");
+  const url = buildOrsUrl(ORS_GEOCODE_REVERSE, qs);
   const response = await fetchOpenRoute(url, { method: "GET" }, "Geocodificacion inversa").catch(() => null);
   if (!response) return null;
   const data = (await response.json()) as {
@@ -681,25 +708,16 @@ export async function fetchDrivingRoutePositions(
   destLat: number,
   destLng: number,
 ): Promise<MapRoutePosition[]> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("Falta VITE_ORS_API_KEY");
-  }
+  assertOrsAvailable();
+  const url = buildOrsUrl(ORS_DIRECTIONS, new URLSearchParams());
   const response = await fetchOpenRoute(
-    ORS_DIRECTIONS,
-    {
-      method: "POST",
-      headers: {
-        Authorization: apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        coordinates: [
-          [storeLng, storeLat],
-          [destLng, destLat],
-        ],
-      }),
-    },
+    url,
+    orsJsonRequestInit({
+      coordinates: [
+        [storeLng, storeLat],
+        [destLng, destLat],
+      ],
+    }),
     "Directions (ruta)",
   );
   const data = (await response.json()) as {
@@ -719,27 +737,18 @@ export function isDrivingRouteGeometry(positions: MapRoutePosition[] | null | un
 }
 
 async function drivingDistanceKm(storeLng: number, storeLat: number, destLng: number, destLat: number): Promise<number> {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    throw new Error("Falta VITE_ORS_API_KEY");
-  }
+  assertOrsAvailable();
+  const url = buildOrsUrl(ORS_MATRIX, new URLSearchParams());
   const response = await fetchOpenRoute(
-    ORS_MATRIX,
-    {
-      method: "POST",
-      headers: {
-        Authorization: apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        locations: [
-          [storeLng, storeLat],
-          [destLng, destLat],
-        ],
-        metrics: ["distance"],
-        units: "km",
-      }),
-    },
+    url,
+    orsJsonRequestInit({
+      locations: [
+        [storeLng, storeLat],
+        [destLng, destLat],
+      ],
+      metrics: ["distance"],
+      units: "km",
+    }),
     "Matrix (distancia)",
   );
   if (!response.ok) {

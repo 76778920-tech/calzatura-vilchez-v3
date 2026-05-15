@@ -8,12 +8,14 @@ Rutas (igual que antes en Firebase):
   POST /confirmCodOrder
   ALL  /favorites
   ALL  /aiAdminProxy
+  ALL  /ors/*   (proxy OpenRouteService; ORS_API_KEY solo en servidor)
   GET  /health
 
 Despliegue ejemplo (Render.com):
   1. Nuevo "Web Service", conectar repo, root: calzatura-vilchez/bff
   2. Build: npm install   Start: npm start
   3. Copiar variables desde env.example (valores reales desde Firebase Console, Supabase, Stripe)
+     Para checkout con ruta en mapa: ORS_API_KEY (misma clave que OpenRouteService)
   4. En Stripe Dashboard → Webhooks, apuntar a https://TU-SERVICIO.onrender.com/stripeWebhook
   5. En el build del frontend (Firebase Hosting u otro), definir:
        VITE_BACKEND_API_URL=https://TU-SERVICIO.onrender.com

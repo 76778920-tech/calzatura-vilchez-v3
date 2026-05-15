@@ -69,9 +69,9 @@ export default function CheckoutPage() {
       geo.deliveryQuote.isOutOfRange);
 
   const deliveryDegradedNotice = geo.mapDegraded
-    ? geo.orsRuntimeError ||
+    ? geo.geocodeUnavailable ||
       (!geo.orsConfigured
-        ? "Falta configurar VITE_ORS_API_KEY en el build de producción."
+        ? "Falta configurar mapas: VITE_BACKEND_API_URL + ORS_API_KEY en el BFF, o VITE_ORS_API_KEY en el build."
         : "")
     : "";
 

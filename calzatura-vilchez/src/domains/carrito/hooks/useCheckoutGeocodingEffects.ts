@@ -42,9 +42,9 @@ type Params = {
 
 export function useCheckoutGeocodingEffects({ direccion }: Params) {
   const orsConfigured = hasOpenRouteServiceKey();
-  const [orsRuntimeError, setOrsRuntimeError] = useState("");
-  const orsEnabled = orsConfigured && !orsRuntimeError;
-  const mapDegraded = !orsEnabled;
+  const [geocodeUnavailable, setGeocodeUnavailable] = useState("");
+  const geocodeEnabled = orsConfigured && !geocodeUnavailable;
+  const mapDegraded = !geocodeEnabled;
   const deliveryPricingActive = orsConfigured;
 
   const [deliveryQuote, setDeliveryQuote] = useState<DeliveryQuote | null>(null);
@@ -82,12 +82,16 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     return null;
   }, [selectedDelivery, addressLine]);
 
-  const normalizeDeliveryError = useCallback((err: unknown, fallback: string) => {
+  const normalizeGeocodeError = useCallback((err: unknown, fallback: string) => {
     const message = deliveryLookupErrorMessage(err, fallback);
     if (isDeliveryLookupUnavailableError(err)) {
-      setOrsRuntimeError(message);
+      setGeocodeUnavailable(message);
     }
     return message;
+  }, []);
+
+  const deliveryPricingErrorMessage = useCallback((err: unknown, fallback: string) => {
+    return deliveryLookupErrorMessage(err, fallback);
   }, []);
 
   const confirmLocation = useCallback((c: GeocodeCandidate, refitMap: boolean) => {
@@ -97,7 +101,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
   }, []);
 
   useEffect(() => {
-    if (!orsConfigured || orsRuntimeError) {
+    if (!orsConfigured || geocodeUnavailable) {
       return;
     }
     const ctrl = new AbortController();
@@ -137,7 +141,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
         } catch (err) {
           if (ctrl.signal.aborted) return;
           setAddressSuggestions([]);
-          setAddressSuggestError(normalizeDeliveryError(err, "No se pudieron cargar sugerencias"));
+          setAddressSuggestError(normalizeGeocodeError(err, "No se pudieron cargar sugerencias"));
         } finally {
           if (!ctrl.signal.aborted) setAddressSuggestLoading(false);
         }
@@ -154,13 +158,13 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     direccion.distrito,
     direccion.ciudad,
     orsConfigured,
-    orsRuntimeError,
+    geocodeUnavailable,
     confirmLocation,
-    normalizeDeliveryError,
+    normalizeGeocodeError,
   ]);
 
   useEffect(() => {
-    if (!orsConfigured || orsRuntimeError) return;
+    if (!orsConfigured || geocodeUnavailable) return;
     const ctrl = new AbortController();
     const q = mapSearchInput.trim();
     const timer = globalThis.setTimeout(() => {
@@ -183,7 +187,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
         } catch (err) {
           if (ctrl.signal.aborted) return;
           setSearchSuggestions([]);
-          setSearchSuggestError(normalizeDeliveryError(err, "Error en la búsqueda"));
+          setSearchSuggestError(normalizeGeocodeError(err, "Error en la búsqueda"));
         } finally {
           if (!ctrl.signal.aborted) setSearchSuggestLoading(false);
         }
@@ -193,7 +197,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
       ctrl.abort();
       globalThis.clearTimeout(timer);
     };
-  }, [mapSearchInput, orsConfigured, orsRuntimeError, direccion.ciudad, direccion.distrito, normalizeDeliveryError]);
+  }, [mapSearchInput, orsConfigured, geocodeUnavailable, direccion.ciudad, direccion.distrito, normalizeGeocodeError]);
 
   useEffect(() => {
     if (mapDegraded && !selectedDelivery && addressLine.length >= ADDRESS_GEOCODE_MIN_LEN) {
@@ -209,12 +213,12 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     if (!point) {
       startTransition(() => {
         setDeliveryQuote(null);
-        setDeliveryQuoteError(mapDegraded ? "" : orsRuntimeError);
+        setDeliveryQuoteError(mapDegraded ? "" : geocodeUnavailable);
         setDeliveryQuoteLoading(false);
       });
       return;
     }
-    if (mapDegraded || isCheckoutDefaultMapPick(point)) {
+    if (!orsConfigured || isCheckoutDefaultMapPick(point)) {
       if (!locationConfirmed && isCheckoutDefaultMapPick(point)) {
         startTransition(() => {
           setDeliveryQuote(null);
@@ -249,8 +253,10 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
       })
       .catch((err) => {
         if (cancelled) return;
-        setDeliveryQuote(null);
-        setDeliveryQuoteError(normalizeDeliveryError(err, "No se pudo calcular el envío"));
+        setDeliveryQuote(
+          estimateDeliveryQuoteHaversine(point.lat, point.lng, selectedDeliveryRef.current?.label),
+        );
+        setDeliveryQuoteError(deliveryPricingErrorMessage(err, "No se pudo calcular el envío"));
       })
       .finally(() => {
         if (!cancelled) setDeliveryQuoteLoading(false);
@@ -258,11 +264,11 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     return () => {
       cancelled = true;
     };
-  }, [mapDegraded, orsRuntimeError, mapDisplayDelivery, locationConfirmed, normalizeDeliveryError]);
+  }, [orsConfigured, mapDisplayDelivery, locationConfirmed, deliveryPricingErrorMessage]);
 
   useEffect(() => {
     const point = mapDisplayDelivery;
-    if (!point || mapDegraded || isCheckoutDefaultMapPick(point)) {
+    if (!point || !orsConfigured || isCheckoutDefaultMapPick(point)) {
       startTransition(() => {
         setRoutePositions(null);
         setRouteLoading(false);
@@ -289,7 +295,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
       cancelled = true;
       globalThis.clearTimeout(timer);
     };
-  }, [mapDegraded, mapDisplayDelivery]);
+  }, [orsConfigured, mapDisplayDelivery]);
 
   useEffect(() => {
     if (!selectedDelivery?.label) return;
@@ -342,12 +348,13 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
   }, [deliveryQuote, deliveryPricingActive, locationConfirmed]);
 
   return {
-    orsEnabled,
+    orsEnabled: geocodeEnabled,
     mapDegraded,
     deliveryPricingActive,
     locationConfirmed,
     orsConfigured,
-    orsRuntimeError,
+    orsRuntimeError: geocodeUnavailable,
+    geocodeUnavailable,
     deliveryQuote,
     deliveryQuoteLoading,
     deliveryQuoteError,
