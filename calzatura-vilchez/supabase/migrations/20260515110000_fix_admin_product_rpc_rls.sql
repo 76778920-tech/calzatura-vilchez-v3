@@ -90,17 +90,18 @@ BEGIN
     "actualizadoEn"  = EXCLUDED."actualizadoEn";
 
   v_delta := v_new_stock - coalesce(v_old_stock, 0);
-  IF v_delta > 0 THEN
-    INSERT INTO "movimientosStock" (
-      "productId", tipo, fecha, "tallaStock", cantidad, observaciones
-    ) VALUES (
+  IF v_delta > 0 AND to_regclass('public."movimientosStock"') IS NOT NULL THEN
+    EXECUTE '
+      INSERT INTO "movimientosStock" (
+        "productId", tipo, fecha, "tallaStock", cantidad, observaciones
+      ) VALUES ($1, $2, CURRENT_DATE, $3, $4, $5)
+    '
+    USING
       p_id,
       'ajuste',
-      CURRENT_DATE,
       coalesce(product->'tallaStock', '{}'::jsonb),
       v_delta,
-      'Ajuste manual desde edicion de producto'
-    );
+      'Ajuste manual desde edicion de producto';
   END IF;
 END;
 $$;
@@ -175,19 +176,20 @@ BEGIN
       now()::text
     );
 
-    IF v_stock > 0 THEN
-      INSERT INTO "movimientosStock" (
-        "productId", tipo, fecha, "tallaStock", cantidad,
-        "costoUnitario", observaciones
-      ) VALUES (
+    IF v_stock > 0 AND to_regclass('public."movimientosStock"') IS NOT NULL THEN
+      EXECUTE '
+        INSERT INTO "movimientosStock" (
+          "productId", tipo, fecha, "tallaStock", cantidad,
+          "costoUnitario", observaciones
+        ) VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6)
+      '
+      USING
         pid,
         'ingreso',
-        CURRENT_DATE,
         coalesce(v->'tallaStock', '{}'::jsonb),
         v_stock,
         (v->'finanzas'->>'costoCompra')::numeric,
-        'Stock inicial al registrar producto'
-      );
+        'Stock inicial al registrar producto';
     END IF;
 
     ids := ids || pid;
@@ -264,20 +266,23 @@ BEGIN
     )
   WHERE id = p_product_id;
 
-  INSERT INTO "movimientosStock" (
-    "productId", tipo, fecha, "tallaStock", cantidad,
-    "costoUnitario", proveedor, observaciones, "registradoPor"
-  ) VALUES (
-    p_product_id,
-    'ingreso',
-    CURRENT_DATE,
-    p_talla_stock,
-    v_cantidad,
-    p_costo_unitario,
-    p_proveedor,
-    p_observaciones,
-    p_registrado_por
-  );
+  IF to_regclass('public."movimientosStock"') IS NOT NULL THEN
+    EXECUTE '
+      INSERT INTO "movimientosStock" (
+        "productId", tipo, fecha, "tallaStock", cantidad,
+        "costoUnitario", proveedor, observaciones, "registradoPor"
+      ) VALUES ($1, $2, CURRENT_DATE, $3, $4, $5, $6, $7, $8)
+    '
+    USING
+      p_product_id,
+      'ingreso',
+      p_talla_stock,
+      v_cantidad,
+      p_costo_unitario,
+      p_proveedor,
+      p_observaciones,
+      p_registrado_por;
+  END IF;
 
   RETURN jsonb_build_object(
     'ok', true,
@@ -290,3 +295,5 @@ $$;
 REVOKE ALL ON FUNCTION registrar_ingreso_stock(text, jsonb, numeric, text, text, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION registrar_ingreso_stock(text, jsonb, numeric, text, text, text) TO anon;
 GRANT EXECUTE ON FUNCTION registrar_ingreso_stock(text, jsonb, numeric, text, text, text) TO authenticated;
+
+NOTIFY pgrst, 'reload schema';
