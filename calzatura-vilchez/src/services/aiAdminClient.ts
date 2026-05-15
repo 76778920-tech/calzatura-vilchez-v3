@@ -1,4 +1,5 @@
 import { auth } from "@/firebase/config";
+import { assertHttpsInProduction } from "@/utils/requireHttpsInProd";
 
 /**
  * Modo de autenticación (Option B): el frontend envía el Firebase ID token
@@ -9,8 +10,19 @@ import { auth } from "@/firebase/config";
  * Si VITE_AI_ADMIN_PROXY_URL está definido (modo proxy legado con Cloud Function),
  * las peticiones pasan por ella; la auth sigue siendo Firebase ID token.
  */
-const PROXY_URL  = (import.meta.env.VITE_AI_ADMIN_PROXY_URL as string | undefined)?.trim();
-const DIRECT_BASE = (import.meta.env.VITE_AI_SERVICE_URL as string | undefined)?.trim() ?? "http://localhost:8000";
+const PROXY_URL_RAW = (import.meta.env.VITE_AI_ADMIN_PROXY_URL as string | undefined)?.trim() ?? "";
+const PROXY_BASE = PROXY_URL_RAW
+  ? assertHttpsInProduction(PROXY_URL_RAW.replaceAll(/\/$/g, ""), "VITE_AI_ADMIN_PROXY_URL")
+  : "";
+
+function directAiServiceBase(): string {
+  const fromEnv = (import.meta.env.VITE_AI_SERVICE_URL as string | undefined)?.trim() ?? "";
+  if (fromEnv) return assertHttpsInProduction(fromEnv.replaceAll(/\/$/g, ""), "VITE_AI_SERVICE_URL");
+  if (import.meta.env.PROD) return "";
+  return "http://localhost:8000";
+}
+
+const DIRECT_BASE = directAiServiceBase();
 
 async function firebaseUserHeaders(): Promise<Record<string, string>> {
   const user = auth.currentUser;
@@ -41,8 +53,7 @@ const PROXY_ROUTES: Record<string, { op: string; forwardParams?: boolean }> = {
 /** Convierte ruta del servicio IA directo en query de la Cloud Function (lista blanca). */
 function toProxyUrl(pathAndQuery: string): string {
   const u = new URL(pathAndQuery, "https://placeholder.local");
-  const proxyBase = PROXY_URL?.replaceAll(/\/$/g, "");
-  if (!proxyBase) {
+  if (!PROXY_BASE) {
     throw new Error("Proxy de IA no configurado.");
   }
 
@@ -56,7 +67,7 @@ function toProxyUrl(pathAndQuery: string): string {
   if (route.forwardParams) {
     u.searchParams.forEach((val, key) => q.set(key, val));
   }
-  return `${proxyBase}?${q.toString()}`;
+  return `${PROXY_BASE}?${q.toString()}`;
 }
 
 /**
@@ -66,15 +77,18 @@ function toProxyUrl(pathAndQuery: string): string {
 export async function aiAdminFetch(pathAndQuery: string, init?: RequestInit): Promise<Response> {
   const rel = pathAndQuery.startsWith("/") ? pathAndQuery : `/${pathAndQuery}`;
   const headers = { ...(await authHeaders()), ...(init?.headers as Record<string, string> | undefined) };
-  if (PROXY_URL) {
+  if (PROXY_BASE) {
     return fetch(toProxyUrl(rel), { ...init, headers });
   }
   const base = DIRECT_BASE.replaceAll(/\/$/g, "");
+  if (!base) {
+    throw new Error("En producción define VITE_AI_SERVICE_URL (https) o VITE_AI_ADMIN_PROXY_URL.");
+  }
   return fetch(`${base}${rel}`, { ...init, headers });
 }
 
 export function aiAdminUsesProxy(): boolean {
-  return Boolean(PROXY_URL);
+  return Boolean(PROXY_BASE);
 }
 
 /**
@@ -83,6 +97,7 @@ export function aiAdminUsesProxy(): boolean {
  */
 export function wakeAIService(): void {
   const base = DIRECT_BASE.replaceAll(/\/$/g, "");
+  if (!base) return;
   const controller = new AbortController();
   const timer = globalThis.setTimeout(() => controller.abort(), 6_000);
   fetch(`${base}/api/health`, { signal: controller.signal })

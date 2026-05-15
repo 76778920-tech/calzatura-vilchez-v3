@@ -1,3 +1,5 @@
+import { assertHttpsInProduction } from "@/utils/requireHttpsInProd";
+
 export interface DniLookupResult {
   dni: string;
   nombres: string;
@@ -35,8 +37,9 @@ export async function lookupDni(dni: string): Promise<DniLookupResult> {
   if (!DNI_LOOKUP_URL) {
     throw new Error("DNI_LOOKUP_NOT_CONFIGURED");
   }
+  const endpoint = assertHttpsInProduction(DNI_LOOKUP_URL, "VITE_DNI_LOOKUP_URL");
 
-  const response = await fetch(DNI_LOOKUP_URL, {
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dni: normalized }),

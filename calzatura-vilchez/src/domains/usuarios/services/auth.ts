@@ -17,6 +17,7 @@ import { isSuperAdminEmail } from "@/config/security";
 import type { UserRole } from "@/types";
 import { clearFavoriteProductsByUser } from "@/domains/clientes/services/favorites";
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
+import { assertHttpsInProduction } from "@/utils/requireHttpsInProd";
 import {
   MAX_AUTH_PASSWORD_LENGTH,
   MIN_AUTH_PASSWORD_LENGTH,
@@ -197,7 +198,7 @@ export async function ensureVerifiedUserProfile(user: User) {
 function resolveAuthLoginProxyUrl(): string | null {
   const explicit = import.meta.env.VITE_AUTH_PROXY_LOGIN_URL?.trim() ?? "";
   if (explicit === "0" || explicit === "false") return null;
-  if (explicit) return explicit.replaceAll(/\/$/g, "");
+  if (explicit) return assertHttpsInProduction(explicit.replaceAll(/\/$/g, ""), "VITE_AUTH_PROXY_LOGIN_URL");
   const backend = getBackendApiBaseUrl();
   if (backend) return `${backend}/authLogin`;
   return null;
