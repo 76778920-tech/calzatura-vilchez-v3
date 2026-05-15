@@ -11,6 +11,8 @@ import {
   geocodeSearchBarSuggestions,
   hasOpenRouteServiceKey,
   isDeliveryLookupUnavailableError,
+  normalizeGeocodeQuery,
+  parseStreetHousenumber,
   reverseGeocodeLabel,
   type DeliveryQuote,
   type GeocodeCandidate,
@@ -57,6 +59,14 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
   }, [selectedDelivery]);
 
   const addressLine = useMemo(() => buildCheckoutAddressLine(direccion), [direccion]);
+  const addressHasHouseNumber = useMemo(
+    () => Boolean(parseStreetHousenumber(normalizeGeocodeQuery(direccion.direccion)).housenumber),
+    [direccion.direccion],
+  );
+  const mapSearchHasHouseNumber = useMemo(
+    () => Boolean(parseStreetHousenumber(normalizeGeocodeQuery(mapSearchInput)).housenumber),
+    [mapSearchInput],
+  );
 
   const mapDisplayDelivery = useMemo((): GeocodeCandidate | null => {
     return locationConfirmed && selectedDelivery ? selectedDelivery : null;
@@ -304,10 +314,11 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
   const onMapCustomerMove = useCallback(
     (lat: number, lng: number) => {
       const id = ++reverseGeocodeRequestId.current;
+      const typedLabel = mapSearchInput.trim() || addressLine;
       setLocationConfirmed(true);
-      setSelectedDelivery({ lat, lng, label: "Ubicación en el mapa…" });
+      setSelectedDelivery({ lat, lng, label: typedLabel || "Ubicación en el mapa…" });
       if (mapDegraded) {
-        setSelectedDelivery({ lat, lng, label: "Ubicación elegida en el mapa" });
+        setSelectedDelivery({ lat, lng, label: typedLabel || "Ubicación elegida en el mapa" });
         return;
       }
       void (async () => {
@@ -318,10 +329,10 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
           label = null;
         }
         if (reverseGeocodeRequestId.current !== id) return;
-        setSelectedDelivery({ lat, lng, label: label ?? "Ubicación elegida en el mapa" });
+        setSelectedDelivery({ lat, lng, label: label ?? (typedLabel || "Ubicación elegida en el mapa") });
       })();
     },
-    [mapDegraded],
+    [addressLine, mapDegraded, mapSearchInput],
   );
 
   const envioMonto = useMemo(() => {
@@ -342,10 +353,12 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     deliveryQuoteLoading,
     deliveryQuoteError,
     addressSuggestions,
+    addressHasHouseNumber,
     addressSuggestLoading,
     addressSuggestError,
     mapSearchInput,
     setMapSearchInput: onMapSearchChange,
+    mapSearchHasHouseNumber,
     searchSuggestions,
     searchSuggestLoading,
     searchSuggestError,

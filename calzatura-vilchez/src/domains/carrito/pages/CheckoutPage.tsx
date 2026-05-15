@@ -268,6 +268,7 @@ export default function CheckoutPage() {
                 degradedNotice={deliveryDegradedNotice}
                 addressLineLength={addressLineLen}
                 mapSearchInput={geo.mapSearchInput}
+                mapSearchHasHouseNumber={geo.mapSearchHasHouseNumber}
                 onMapSearchChange={geo.setMapSearchInput}
                 searchSuggestLoading={geo.searchSuggestLoading}
                 searchSuggestError={geo.searchSuggestError}
@@ -277,6 +278,7 @@ export default function CheckoutPage() {
                 addressSuggestLoading={geo.addressSuggestLoading}
                 addressSuggestError={geo.addressSuggestError}
                 addressSuggestions={geo.addressSuggestions}
+                addressHasHouseNumber={geo.addressHasHouseNumber}
                 selectedDelivery={geo.selectedDelivery}
                 showDeliveryMap={geo.showDeliveryMap}
                 locationConfirmed={geo.locationConfirmed}

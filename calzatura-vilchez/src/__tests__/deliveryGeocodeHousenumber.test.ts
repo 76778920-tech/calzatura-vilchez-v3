@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addressLabelContainsHousenumber,
+  exactHousenumberMatches,
   isDrivingRouteGeometry,
   parseStreetHousenumber,
   preferHousenumberMatches,
@@ -31,6 +32,17 @@ describe("preferHousenumberMatches", () => {
     const out = preferHousenumberMatches(list, "215");
     expect(out).toHaveLength(1);
     expect(out[0].label).toContain("215");
+  });
+});
+
+describe("exactHousenumberMatches", () => {
+  it("no devuelve calles aproximadas cuando se pidio un numero exacto", () => {
+    const list = [
+      { lat: 1, lng: 1, label: "Avenida Giraldez, San Carlos, Huancayo", layer: "street" },
+      { lat: 2, lng: 2, label: "Avenida Giraldez, Hualmita, Huancayo", layer: "street" },
+    ];
+
+    expect(exactHousenumberMatches(list, "314")).toEqual([]);
   });
 });
 

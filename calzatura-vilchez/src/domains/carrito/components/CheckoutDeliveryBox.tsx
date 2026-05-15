@@ -36,6 +36,7 @@ type Props = Readonly<{
   degradedNotice?: string;
   addressLineLength: number;
   mapSearchInput: string;
+  mapSearchHasHouseNumber?: boolean;
   onMapSearchChange: (value: string) => void;
   searchSuggestLoading: boolean;
   searchSuggestError: string;
@@ -45,6 +46,7 @@ type Props = Readonly<{
   addressSuggestLoading: boolean;
   addressSuggestError: string;
   addressSuggestions: GeocodeCandidate[];
+  addressHasHouseNumber?: boolean;
   selectedDelivery: GeocodeCandidate | null;
   showDeliveryMap: boolean;
   locationConfirmed: boolean;
@@ -62,6 +64,7 @@ export default function CheckoutDeliveryBox({
   degradedNotice = "",
   addressLineLength,
   mapSearchInput,
+  mapSearchHasHouseNumber = false,
   onMapSearchChange,
   searchSuggestLoading,
   searchSuggestError,
@@ -71,6 +74,7 @@ export default function CheckoutDeliveryBox({
   addressSuggestLoading,
   addressSuggestError,
   addressSuggestions,
+  addressHasHouseNumber = false,
   selectedDelivery,
   showDeliveryMap,
   locationConfirmed,
@@ -150,6 +154,13 @@ export default function CheckoutDeliveryBox({
             onPick={(c) => onPickCandidate(c, true, true)}
           />
         )}
+        {!searchSuggestLoading && !searchSuggestError && mapSearchInput.trim().length >= 3 && searchSuggestions.length === 0 && (
+          <p className="checkout-delivery-muted">
+            {mapSearchHasHouseNumber
+              ? "No encontramos ese número exacto. Toca el mapa sobre la puerta o arrastra el pin azul."
+              : "No hay resultados exactos; prueba con vía y número, o marca el punto en el mapa."}
+          </p>
+        )}
       </div>
       )}
 
@@ -161,7 +172,11 @@ export default function CheckoutDeliveryBox({
             <p className="checkout-delivery-error">{addressSuggestError}</p>
           )}
           {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length === 0 && (
-            <p className="checkout-delivery-muted">No hay resultados; probá el buscador de arriba.</p>
+            <p className="checkout-delivery-muted">
+              {addressHasHouseNumber
+                ? "No encontramos ese número exacto. Usa el buscador o marca la puerta en el mapa."
+                : "No hay resultados; probá el buscador de arriba."}
+            </p>
           )}
           {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length > 0 && (
             <SuggestionList

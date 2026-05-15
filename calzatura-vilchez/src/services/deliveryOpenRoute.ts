@@ -416,6 +416,15 @@ export function preferHousenumberMatches(
   return matches.length > 0 ? matches : list;
 }
 
+export function exactHousenumberMatches(
+  list: GeocodeCandidate[],
+  housenumber?: string,
+): GeocodeCandidate[] {
+  const hn = housenumber?.trim();
+  if (!hn) return list;
+  return list.filter((c) => labelContainsHousenumber(c.label, hn));
+}
+
 function sortCandidatesForCheckout(
   list: GeocodeCandidate[],
   opts?: { housenumber?: string },
@@ -549,10 +558,8 @@ export async function geocodeSearchBarSuggestions(
 
   if (orsUsesBffProxy()) {
     const list = await bffGeocodeCandidates(enriched, size);
-    return preferHousenumberMatches(
-      sortCandidatesForCheckout(list, { housenumber: parsed.housenumber }),
-      parsed.housenumber,
-    );
+    const sorted = sortCandidatesForCheckout(list, { housenumber: parsed.housenumber });
+    return parsed.housenumber ? exactHousenumberMatches(sorted, parsed.housenumber) : sorted;
   }
 
   const structuredParts =
@@ -590,12 +597,10 @@ export async function geocodeSearchBarSuggestions(
     boostHousenumber: parsed.housenumber,
   });
 
-  return preferHousenumberMatches(
-    sortCandidatesForCheckout(dedupeCandidates([...structured, ...auto, ...forward]), {
-      housenumber: parsed.housenumber,
-    }),
-    parsed.housenumber,
-  );
+  const sorted = sortCandidatesForCheckout(dedupeCandidates([...structured, ...auto, ...forward]), {
+    housenumber: parsed.housenumber,
+  });
+  return parsed.housenumber ? exactHousenumberMatches(sorted, parsed.housenumber) : sorted;
 }
 
 /** Sugerencias según formulario: dirección normalizada + estructurada + búsqueda acotada al área de servicio. */
@@ -616,10 +621,8 @@ export async function geocodeCheckoutFormSuggestions(args: {
 
   if (orsUsesBffProxy()) {
     const list = line.length >= 3 ? await bffGeocodeCandidates(enrichedLine, size) : [];
-    return preferHousenumberMatches(
-      sortCandidatesForCheckout(list, { housenumber: lineParsed.housenumber }),
-      lineParsed.housenumber,
-    );
+    const sorted = sortCandidatesForCheckout(list, { housenumber: lineParsed.housenumber });
+    return lineParsed.housenumber ? exactHousenumberMatches(sorted, lineParsed.housenumber) : sorted;
   }
 
   const addrNorm = normalizeGeocodeQuery(args.direccion);
@@ -662,13 +665,10 @@ export async function geocodeCheckoutFormSuggestions(args: {
         })
       : [];
 
-  const merged = preferHousenumberMatches(
-    sortCandidatesForCheckout(dedupeCandidates([...structured, ...forward]), {
-      housenumber: lineParsed.housenumber,
-    }),
-    lineParsed.housenumber,
-  );
-  return merged;
+  const sorted = sortCandidatesForCheckout(dedupeCandidates([...structured, ...forward]), {
+    housenumber: lineParsed.housenumber,
+  });
+  return lineParsed.housenumber ? exactHousenumberMatches(sorted, lineParsed.housenumber) : sorted;
 }
 
 type StructuredGeocodeParts = {
