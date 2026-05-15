@@ -301,6 +301,118 @@ function sameComparable(a, b) {
   return normalizeComparable(a) === normalizeComparable(b);
 }
 
+/** Talla/color desde JSON pueden venir como número o string; sin esto el stock queda en 0 y createOrder falla. */
+function normalizeOrderTalla(raw) {
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(raw).trim();
+  if (typeof raw === "string") return raw.trim();
+  return String(raw).trim();
+}
+
+function normalizeOrderColor(raw) {
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "string") return raw.trim();
+  return String(raw).trim();
+}
+
+function cellQty(v) {
+  if (v == null || v === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+function toFinitePrice(value) {
+  if (value == null || value === "") return 0;
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  const s = String(value)
+    .trim()
+    .replace(/s\/\s*/gi, "")
+    .replace(/pen\s*/gi, "")
+    .replace(/[^0-9,.-]/g, "")
+    .replace(/\s/g, "");
+  if (!s) return 0;
+  let norm = s;
+  if (s.includes(",") && s.includes(".")) {
+    norm =
+      s.lastIndexOf(",") > s.lastIndexOf(".") ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+  } else if (s.includes(",") && !s.includes(".")) {
+    norm = s.replace(",", ".");
+  }
+  const n = Number(norm);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** `{}` o filas sin tallas son truthy en JS pero no son inventario por color; no deben bloquear tallaStock/stock. */
+function effectiveColorStock(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const keys = Object.keys(raw);
+  if (keys.length === 0) return null;
+  for (const k of keys) {
+    const row = raw[k];
+    if (row && typeof row === "object" && !Array.isArray(row) && Object.keys(row).length > 0) {
+      return raw;
+    }
+  }
+  return null;
+}
+
+/** `tallaStock` por defecto en BD es `{}`; truthy pero suma 0 y bloquea la columna `stock`. */
+function effectiveTallaStock(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (Object.keys(raw).length === 0) return null;
+  return raw;
+}
+
+function findTallaKeyInMap(stockBySize, talla) {
+  if (!stockBySize || !talla) return null;
+  const want = String(talla).trim();
+  if (Object.prototype.hasOwnProperty.call(stockBySize, want)) return want;
+  for (const k of Object.keys(stockBySize)) {
+    const ks = String(k).trim();
+    if (ks === want) return k;
+    if (Number(k) === Number(want) && want !== "" && Number.isFinite(Number(want))) return k;
+  }
+  return null;
+}
+
+function findColorKeyInStock(colorStock, color) {
+  if (!colorStock || !color) return null;
+  const keys = Object.keys(colorStock);
+  return keys.find((k) => sameComparable(k, color)) || null;
+}
+
+/** Coincidencia de color en JSON vs texto del carrito / columna `product.color`. */
+function resolveColorKeyForLine(colorStock, requestedColor, product) {
+  const rc = requestedColor ? String(requestedColor).trim() : "";
+  if (!colorStock || !rc) return null;
+  let k = findColorKeyInStock(colorStock, rc);
+  if (k) return k;
+  const hint = product?.color ? String(product.color).trim() : "";
+  if (hint && !sameComparable(hint, rc)) {
+    k = findColorKeyInStock(colorStock, hint);
+    if (k) return k;
+  }
+  const keys = Object.keys(colorStock);
+  if (keys.length === 1) {
+    const only = keys[0];
+    if (sameComparable(only, rc) || (hint && sameComparable(only, hint))) return only;
+  }
+  return null;
+}
+
+/** Stock por talla usando solo tallaStock o la columna `stock` (sin colorStock). */
+function lineStockFromTallaOrColumn(product, talla) {
+  const t = talla ? String(talla).trim() : "";
+  if (!t) return deriveTotalStock(product);
+  const ts = effectiveTallaStock(product.tallaStock);
+  if (ts) {
+    const tk = findTallaKeyInMap(ts, t);
+    if (tk != null) return cellQty(ts[tk]);
+    return 0;
+  }
+  return Math.max(0, Number(product.stock) || 0);
+}
+
 function aggregateColorStock(colorStock) {
   const aggregate = {};
 
@@ -314,16 +426,18 @@ function aggregateColorStock(colorStock) {
 }
 
 function getAvailableSizes(product) {
-  if (product.colorStock) {
-    const stockBySize = aggregateColorStock(product.colorStock);
+  const cs0 = effectiveColorStock(product.colorStock);
+  if (cs0) {
+    const stockBySize = aggregateColorStock(cs0);
     return Object.entries(stockBySize)
       .filter(([, qty]) => Number(qty) > 0)
       .map(([talla]) => talla)
       .sort((a, b) => Number(a) - Number(b));
   }
 
-  if (product.tallaStock) {
-    return Object.entries(product.tallaStock)
+  const ts0 = effectiveTallaStock(product.tallaStock);
+  if (ts0) {
+    return Object.entries(ts0)
       .filter(([, qty]) => Number(qty) > 0)
       .map(([talla]) => talla)
       .sort((a, b) => Number(a) - Number(b));
@@ -333,29 +447,50 @@ function getAvailableSizes(product) {
 }
 
 function deriveTotalStock(product) {
-  if (product.colorStock) {
-    return sumColorSizeStock(product.colorStock);
+  const column = Math.max(0, Number(product.stock) || 0);
+  const cs0 = effectiveColorStock(product.colorStock);
+  if (cs0) {
+    return Math.max(sumColorSizeStock(cs0), column);
   }
-  if (product.tallaStock) {
-    return sumSizeStock(product.tallaStock);
+  const ts0 = effectiveTallaStock(product.tallaStock);
+  if (ts0) {
+    return Math.max(sumSizeStock(ts0), column);
   }
-  return Math.max(0, Number(product.stock) || 0);
+  return column;
 }
 
 function getSizeStock(product, talla, color) {
-  if (product.colorStock && talla) {
-    if (color && typeof product.colorStock[color]?.[talla] === "number") {
-      return Math.max(0, Number(product.colorStock[color][talla]) || 0);
-    }
+  const t = talla ? String(talla).trim() : "";
+  const c = color ? String(color).trim() : "";
 
-    return Object.values(product.colorStock).reduce(
-      (sum, stockBySize) => sum + Math.max(0, Number(stockBySize?.[talla]) || 0),
-      0
-    );
+  const cs = effectiveColorStock(product.colorStock);
+  if (cs && t) {
+    if (c) {
+      const colorKey = resolveColorKeyForLine(cs, c, product);
+      if (!colorKey) {
+        if (Object.keys(cs).length > 1) return 0;
+        return lineStockFromTallaOrColumn(product, t);
+      }
+      const row = cs[colorKey];
+      if (!row || typeof row !== "object" || Array.isArray(row)) {
+        return lineStockFromTallaOrColumn(product, t);
+      }
+      const tallaKey = findTallaKeyInMap(row, t);
+      if (tallaKey != null) return cellQty(row[tallaKey]);
+      return lineStockFromTallaOrColumn(product, t);
+    }
+    return Object.values(cs).reduce((sum, stockBySize) => {
+      const tallaKey = findTallaKeyInMap(stockBySize, t);
+      if (tallaKey == null) return sum;
+      return sum + cellQty(stockBySize[tallaKey]);
+    }, 0);
   }
 
-  if (talla && product.tallaStock) {
-    return Math.max(0, Number(product.tallaStock[talla]) || 0);
+  const ts = effectiveTallaStock(product.tallaStock);
+  if (t && ts) {
+    const tallaKey = findTallaKeyInMap(ts, t);
+    if (tallaKey != null) return cellQty(ts[tallaKey]);
+    return 0;
   }
 
   return deriveTotalStock(product);
@@ -365,7 +500,7 @@ function sanitizeOrderProduct(product) {
   return {
     id: product.id,
     nombre: product.nombre,
-    precio: Number(product.precio || 0),
+    precio: toFinitePrice(product.precio),
     descripcion: product.descripcion || "",
     imagen: product.imagen || "",
     imagenes: Array.isArray(product.imagenes) ? product.imagenes : [],
@@ -373,8 +508,8 @@ function sanitizeOrderProduct(product) {
     categoria: product.categoria || "",
     tipoCalzado: product.tipoCalzado || "",
     tallas: getAvailableSizes(product),
-    tallaStock: product.tallaStock || null,
-    colorStock: product.colorStock || null,
+    tallaStock: effectiveTallaStock(product.tallaStock) || null,
+    colorStock: effectiveColorStock(product.colorStock) || null,
     marca: product.marca || "",
     color: product.color || "",
     colores: Array.isArray(product.colores) ? product.colores : [],
@@ -383,11 +518,15 @@ function sanitizeOrderProduct(product) {
 }
 
 function extractProductId(item) {
-  if (item?.product?.id && typeof item.product.id === "string") {
-    return item.product.id.trim();
+  const fromProduct = item?.product?.id;
+  if (fromProduct != null && fromProduct !== "") {
+    const s = String(fromProduct).trim();
+    if (s) return s;
   }
-  if (item?.productId && typeof item.productId === "string") {
-    return item.productId.trim();
+  const fromField = item?.productId;
+  if (fromField != null && fromField !== "") {
+    const s = String(fromField).trim();
+    if (s) return s;
   }
   return "";
 }
@@ -405,9 +544,9 @@ function extractProductName(item) {
 function clientProductFromItem(item) {
   if (!item?.product || typeof item.product !== "object") return null;
   const product = item.product;
-  const id = typeof product.id === "string" ? product.id.trim() : "";
+  const id = String(product.id ?? "").trim();
   const nombre = typeof product.nombre === "string" ? product.nombre.trim() : "";
-  const precio = Number(product.precio || 0);
+  const precio = toFinitePrice(product.precio);
   if (!id || !nombre || precio <= 0) return null;
   return product;
 }
@@ -446,7 +585,7 @@ async function findOrderableProductVariant(supabase, product, item) {
   const needsVariantLookup =
     !product ||
     (requestedColor && !sameComparable(product.color, requestedColor)) ||
-    Number(product.precio || 0) <= 0 ||
+    toFinitePrice(product.precio) <= 0 ||
     getSizeStock(product, item.talla || undefined, requestedColor || undefined) < item.quantity;
 
   if (!needsVariantLookup) {
@@ -489,7 +628,7 @@ async function findOrderableProductVariant(supabase, product, item) {
   return (
     uniqueCandidates.find((candidate) => {
       if (requestedColor && !sameComparable(candidate.color, requestedColor)) return false;
-      if (Number(candidate.precio || 0) <= 0) return false;
+      if (toFinitePrice(candidate.precio) <= 0) return false;
       return getSizeStock(candidate, item.talla || undefined, requestedColor || undefined) >= item.quantity;
     }) ||
     product
@@ -500,7 +639,7 @@ function clientProductIsOrderable(product, item) {
   if (!product) return false;
   if (item.color && product.color && !sameComparable(product.color, item.color)) return false;
   if (item.productName && product.nombre && !sameComparable(product.nombre, item.productName)) return false;
-  if (Number(product.precio || 0) <= 0) return false;
+  if (toFinitePrice(product.precio) <= 0) return false;
   return getSizeStock(product, item.talla || undefined, item.color || undefined) >= item.quantity;
 }
 
@@ -560,15 +699,15 @@ async function assertOrderStockAvailability(supabase, items) {
   for (const item of items || []) {
     const productId = extractProductId(item);
     const quantity = Number(item?.quantity || 0);
-    const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
-    const color = typeof item?.color === "string" ? item.color.trim() : "";
+    const talla = normalizeOrderTalla(item?.talla);
+    const color = normalizeOrderColor(item?.color);
 
     if (!productId || !Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT) {
       throw Object.assign(new Error("Producto invalido en el pedido"), { status: 400 });
     }
 
     const product = await fetchProductOrThrow(supabase, productId);
-    const price = Number(product.precio || 0);
+    const price = toFinitePrice(product.precio);
     const totalStock = deriveTotalStock(product);
     const sizeStock = getSizeStock(product, talla || undefined, color || undefined);
 
@@ -588,8 +727,8 @@ async function buildOrderDraft(supabase, rawItems) {
     const productName = extractProductName(item);
     const clientProduct = clientProductFromItem(item);
     const quantity = Number(item?.quantity || 0);
-    const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
-    const color = typeof item?.color === "string" ? item.color.trim() : "";
+    const talla = normalizeOrderTalla(item?.talla);
+    const color = normalizeOrderColor(item?.color);
 
     if (!productId || !Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT) {
       throw Object.assign(new Error("Producto invalido en el pedido"), { status: 400 });
@@ -615,7 +754,7 @@ async function buildOrderDraft(supabase, rawItems) {
   for (const item of normalizedItems) {
     const product = await resolveOrderProduct(supabase, productMap, item);
 
-    const price = Number(product.precio || 0);
+    const price = toFinitePrice(product.precio);
     const totalStock = deriveTotalStock(product);
     const sizeStock = getSizeStock(product, item.talla || undefined, item.color || undefined);
 
@@ -660,21 +799,44 @@ async function updateOrder(supabase, orderId, patch) {
   }
 }
 
-function resolveColorBucket(colorStock, talla, quantity, preferredColor) {
-  if (preferredColor && typeof colorStock[preferredColor]?.[talla] === "number") {
-    return preferredColor;
-  }
+function resolveColorBucket(colorStock, talla, quantity, preferredColor, fallbackColor) {
+  const t = String(talla || "").trim();
+  if (!t || !colorStock) return null;
+  const pref = preferredColor ? String(preferredColor).trim() : "";
+  const fb = fallbackColor ? String(fallbackColor).trim() : "";
 
+  const tryResolve = (label) => {
+    if (!label) return null;
+    let ck = findColorKeyInStock(colorStock, label);
+    const keys = Object.keys(colorStock);
+    if (!ck && keys.length === 1) ck = keys[0];
+    if (!ck) return null;
+    const row = colorStock[ck];
+    const tk = findTallaKeyInMap(row, t);
+    if (tk != null && cellQty(row[tk]) >= quantity) return ck;
+    return null;
+  };
+
+  if (pref) {
+    const hit = tryResolve(pref) || (fb && !sameComparable(pref, fb) ? tryResolve(fb) : null);
+    if (hit) return hit;
+  } else if (fb) {
+    const hit = tryResolve(fb);
+    if (hit) return hit;
+  }
   return Object.keys(colorStock).find((colorKey) => {
-    return Math.max(0, Number(colorStock[colorKey]?.[talla]) || 0) >= quantity;
+    const row = colorStock[colorKey];
+    const tk = findTallaKeyInMap(row, t);
+    if (tk == null) return false;
+    return cellQty(row[tk]) >= quantity;
   });
 }
 
 async function discountOrderItemStock(supabase, item) {
   const productId = extractProductId(item);
   const quantity = Number(item?.quantity || 0);
-  const talla = typeof item?.talla === "string" ? item.talla.trim() : "";
-  const color = typeof item?.color === "string" ? item.color.trim() : "";
+  const talla = normalizeOrderTalla(item?.talla);
+  const color = normalizeOrderColor(item?.color);
 
   if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
     throw new Error("Producto invalido al descontar stock");
@@ -690,28 +852,32 @@ async function discountOrderItemStock(supabase, item) {
 
   const updates = {};
 
-  if (product.colorStock && talla) {
+  const csDiscount = effectiveColorStock(product.colorStock);
+  if (csDiscount && talla) {
     const colorStock = {
-      ...product.colorStock,
+      ...csDiscount,
     };
-    const colorKey = resolveColorBucket(colorStock, talla, quantity, color || undefined);
+    const colorKey = resolveColorBucket(colorStock, talla, quantity, color || undefined, product.color || undefined);
 
     if (!colorKey) {
       throw new Error("No se encontro stock de color para descontar");
     }
 
+    const tallaKey = findTallaKeyInMap(colorStock[colorKey], talla) || talla;
     colorStock[colorKey] = {
       ...colorStock[colorKey],
-      [talla]: Math.max(0, Number(colorStock[colorKey][talla] || 0) - quantity),
+      [tallaKey]: Math.max(0, cellQty(colorStock[colorKey][tallaKey]) - quantity),
     };
 
     updates.colorStock = colorStock;
     updates.tallas = getAvailableSizes({ ...product, colorStock });
     updates.stock = sumColorSizeStock(colorStock);
-  } else if (product.tallaStock && talla) {
+  } else if (effectiveTallaStock(product.tallaStock) && talla) {
+    const baseTs = effectiveTallaStock(product.tallaStock);
+    const tallaKey = findTallaKeyInMap(baseTs, talla) || talla;
     const tallaStock = {
-      ...product.tallaStock,
-      [talla]: Math.max(0, Number(product.tallaStock[talla] || 0) - quantity),
+      ...baseTs,
+      [tallaKey]: Math.max(0, cellQty(baseTs[tallaKey]) - quantity),
     };
 
     updates.tallaStock = tallaStock;
@@ -1039,6 +1205,7 @@ app.post("/createCheckoutSession", (req, res) => {
 
         const payerEmail = String(order.userEmail || "").trim();
         const sessionPayload = {
+          ui_mode: "hosted_page",
           payment_method_types: ["card"],
           line_items: lineItems,
           mode: "payment",
@@ -1054,7 +1221,24 @@ app.post("/createCheckoutSession", (req, res) => {
 
         await updateOrder(supabase, orderId, { stripeSessionId: session.id });
 
-        return res.status(200).json({ sessionId: session.id });
+        let checkoutUrl = session.url;
+        if (!checkoutUrl && session.id) {
+          const retrieved = await stripe.checkout.sessions.retrieve(session.id);
+          checkoutUrl = retrieved.url;
+        }
+        if (!checkoutUrl || typeof checkoutUrl !== "string" || !checkoutUrl.startsWith("https://")) {
+          console.error("Stripe checkout session sin URL", {
+            sessionId: session.id,
+            ui_mode: session.ui_mode,
+            status: session.status,
+          });
+          return res.status(500).json({
+            error:
+              "Stripe no devolvio el enlace de pago (session.url). Revisa la cuenta Stripe y los logs del BFF.",
+          });
+        }
+
+        return res.status(200).json({ sessionId: session.id, url: checkoutUrl });
       } catch (error) {
         console.error("Stripe error:", error);
         return res.status(error.status || 500).json({ error: publicError(error) });

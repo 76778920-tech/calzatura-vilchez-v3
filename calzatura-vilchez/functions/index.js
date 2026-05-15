@@ -15,7 +15,8 @@ const {
   normalizeOptionalText, normalizeAddress,
   sumSizeStock, sumColorSizeStock, getAvailableSizes, deriveTotalStock, getSizeStock,
   sanitizeOrderProduct, extractItemFields, assertStoredTotals,
-  assertStockAndPrice, resolveColorBucket,
+  assertStockAndPrice, resolveColorBucket, findTallaKeyInMap, cellQty,
+  toFinitePrice, effectiveColorStock, effectiveTallaStock,
   resolveAiAdminUpstreamRequest, sendUpstreamToClient,
   aiAdminProxyErrorStatus, aiAdminProxyErrorMessage,
 } = require("./fnUtils");
@@ -179,7 +180,7 @@ async function assertOrderStockAvailability(supabase, items) {
     }
 
     const product = await fetchProductOrThrow(supabase, productId);
-    const price = toN(product.precio);
+    const price = toFinitePrice(product.precio);
     const totalStock = deriveTotalStock(product);
     const sizeStock = getSizeStock(product, orUndef(talla), orUndef(color));
 
@@ -220,7 +221,7 @@ async function buildOrderDraft(supabase, rawItems) {
       throw Object.assign(new Error("Producto no encontrado"), { status: 400 });
     }
 
-    const price = toN(product.precio);
+    const price = toFinitePrice(product.precio);
     const totalStock = deriveTotalStock(product);
     const sizeStock = getSizeStock(product, orUndef(item.talla), orUndef(item.color));
 
@@ -273,28 +274,32 @@ async function discountOrderItemStock(supabase, item) {
 
   const updates = {};
 
-  if (product.colorStock && talla) {
+  const csDiscount = effectiveColorStock(product.colorStock);
+  if (csDiscount && talla) {
     const colorStock = {
-      ...product.colorStock,
+      ...csDiscount,
     };
-    const colorKey = resolveColorBucket(colorStock, talla, quantity, orUndef(color));
+    const colorKey = resolveColorBucket(colorStock, talla, quantity, orUndef(color), strOr(product.color));
 
     if (!colorKey) {
       throw new Error("No se encontro stock de color para descontar");
     }
 
+    const tallaKey = findTallaKeyInMap(colorStock[colorKey], talla) || talla;
     colorStock[colorKey] = {
       ...colorStock[colorKey],
-      [talla]: Math.max(0, toN(colorStock[colorKey][talla]) - quantity),
+      [tallaKey]: Math.max(0, cellQty(colorStock[colorKey][tallaKey]) - quantity),
     };
 
     updates.colorStock = colorStock;
     updates.tallas = getAvailableSizes({ ...product, colorStock });
     updates.stock = sumColorSizeStock(colorStock);
-  } else if (product.tallaStock && talla) {
+  } else if (effectiveTallaStock(product.tallaStock) && talla) {
+    const baseTs = effectiveTallaStock(product.tallaStock);
+    const tallaKey = findTallaKeyInMap(baseTs, talla) || talla;
     const tallaStock = {
-      ...product.tallaStock,
-      [talla]: Math.max(0, toN(product.tallaStock[talla]) - quantity),
+      ...baseTs,
+      [tallaKey]: Math.max(0, cellQty(baseTs[tallaKey]) - quantity),
     };
 
     updates.tallaStock = tallaStock;
@@ -491,6 +496,7 @@ exports.createCheckoutSession = onRequest(
 
         const payerEmail = strOr(order.userEmail).trim();
         const sessionPayload = {
+          ui_mode: "hosted_page",
           payment_method_types: ["card"],
           line_items: lineItems,
           mode: "payment",
@@ -506,7 +512,24 @@ exports.createCheckoutSession = onRequest(
 
         await updateOrder(supabase, orderId, { stripeSessionId: session.id });
 
-        return res.status(200).json({ sessionId: session.id });
+        let checkoutUrl = session.url;
+        if (!checkoutUrl && session.id) {
+          const retrieved = await stripe.checkout.sessions.retrieve(session.id);
+          checkoutUrl = retrieved.url;
+        }
+        if (!checkoutUrl || typeof checkoutUrl !== "string" || !checkoutUrl.startsWith("https://")) {
+          console.error("Stripe checkout session sin URL", {
+            sessionId: session.id,
+            ui_mode: session.ui_mode,
+            status: session.status,
+          });
+          return res.status(500).json({
+            error:
+              "Stripe no devolvio el enlace de pago (session.url). Revisa la cuenta Stripe y los logs del servidor.",
+          });
+        }
+
+        return res.status(200).json({ sessionId: session.id, url: checkoutUrl });
       } catch (error) {
         console.error("Stripe error:", error);
         return res.status(errorStatus(error)).json({ error: publicError(error) });

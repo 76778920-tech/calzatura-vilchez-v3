@@ -6,6 +6,27 @@ const ORDER_QTY_LIMIT = 100;
 function strOr(v, d = "") { return v || d; }
 function arrOr(v) { return Array.isArray(v) ? v : []; }
 function toN(v) { return Number(v) || 0; }
+
+function toFinitePrice(v) {
+  if (v == null || v === "") return 0;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  const s = String(v)
+    .trim()
+    .replace(/s\/\s*/gi, "")
+    .replace(/pen\s*/gi, "")
+    .replace(/[^0-9,.-]/g, "")
+    .replace(/\s/g, "");
+  if (!s) return 0;
+  let norm = s;
+  if (s.includes(",") && s.includes(".")) {
+    norm =
+      s.lastIndexOf(",") > s.lastIndexOf(".") ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+  } else if (s.includes(",") && !s.includes(".")) {
+    norm = s.replace(",", ".");
+  }
+  const n = Number(norm);
+  return Number.isFinite(n) ? n : 0;
+}
 function orUndef(v) { return v || undefined; }
 function objOr(v) { return v || {}; }
 function compareSizes(a, b) { return Number(a) - Number(b); }
@@ -124,6 +145,94 @@ function sameComparable(a, b) {
   return normalizeComparable(a) === normalizeComparable(b);
 }
 
+function normalizeOrderTalla(raw) {
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "number" && Number.isFinite(raw)) return String(raw).trim();
+  if (typeof raw === "string") return raw.trim();
+  return String(raw).trim();
+}
+
+function normalizeOrderColor(raw) {
+  if (raw == null || raw === "") return "";
+  if (typeof raw === "string") return raw.trim();
+  return String(raw).trim();
+}
+
+function cellQty(v) {
+  if (v == null || v === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+function findTallaKeyInMap(stockBySize, talla) {
+  if (!stockBySize || !talla) return null;
+  const want = String(talla).trim();
+  if (Object.prototype.hasOwnProperty.call(stockBySize, want)) return want;
+  for (const k of Object.keys(stockBySize)) {
+    const ks = String(k).trim();
+    if (ks === want) return k;
+    if (Number(k) === Number(want) && want !== "" && Number.isFinite(Number(want))) return k;
+  }
+  return null;
+}
+
+function findColorKeyInStock(colorStock, color) {
+  if (!colorStock || !color) return null;
+  const keys = Object.keys(colorStock);
+  return keys.find((k) => sameComparable(k, color)) || null;
+}
+
+/** `{}` o filas sin tallas: truthy pero no representan inventario por color. */
+function effectiveColorStock(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const keys = Object.keys(raw);
+  if (keys.length === 0) return null;
+  for (const k of keys) {
+    const row = raw[k];
+    if (row && typeof row === "object" && !Array.isArray(row) && Object.keys(row).length > 0) {
+      return raw;
+    }
+  }
+  return null;
+}
+
+/** `tallaStock` por defecto `{}` en BD: truthy pero suma 0 y anula `stock`. */
+function effectiveTallaStock(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  if (Object.keys(raw).length === 0) return null;
+  return raw;
+}
+
+function resolveColorKeyForLine(colorStock, requestedColor, product) {
+  const rc = requestedColor ? String(requestedColor).trim() : "";
+  if (!colorStock || !rc) return null;
+  let k = findColorKeyInStock(colorStock, rc);
+  if (k) return k;
+  const hint = product?.color ? String(product.color).trim() : "";
+  if (hint && !sameComparable(hint, rc)) {
+    k = findColorKeyInStock(colorStock, hint);
+    if (k) return k;
+  }
+  const keys = Object.keys(colorStock);
+  if (keys.length === 1) {
+    const only = keys[0];
+    if (sameComparable(only, rc) || (hint && sameComparable(only, hint))) return only;
+  }
+  return null;
+}
+
+function lineStockFromTallaOrColumn(product, talla) {
+  const t = talla ? String(talla).trim() : "";
+  if (!t) return deriveTotalStock(product);
+  const ts = effectiveTallaStock(product.tallaStock);
+  if (ts) {
+    const tk = findTallaKeyInMap(ts, t);
+    if (tk != null) return cellQty(ts[tk]);
+    return 0;
+  }
+  return Math.max(0, toN(product.stock));
+}
+
 function aggregateColorStock(colorStock) {
   const aggregate = {};
   Object.values(objOr(colorStock)).forEach((stockBySize) => {
@@ -142,30 +251,60 @@ function sizesFromStockMap(stockBySize) {
 }
 
 function getAvailableSizes(product) {
-  if (product.colorStock) return sizesFromStockMap(aggregateColorStock(product.colorStock));
-  if (product.tallaStock) return sizesFromStockMap(product.tallaStock);
+  const cs0 = effectiveColorStock(product.colorStock);
+  if (cs0) return sizesFromStockMap(aggregateColorStock(cs0));
+  const ts0 = effectiveTallaStock(product.tallaStock);
+  if (ts0) return sizesFromStockMap(ts0);
   return Array.isArray(product.tallas) ? product.tallas : [];
 }
 
 function deriveTotalStock(product) {
-  if (product.colorStock) return sumColorSizeStock(product.colorStock);
-  if (product.tallaStock) return sumSizeStock(product.tallaStock);
-  return Math.max(0, toN(product.stock));
+  const column = Math.max(0, toN(product.stock));
+  const cs0 = effectiveColorStock(product.colorStock);
+  if (cs0) {
+    return Math.max(sumColorSizeStock(cs0), column);
+  }
+  const ts0 = effectiveTallaStock(product.tallaStock);
+  if (ts0) {
+    return Math.max(sumSizeStock(ts0), column);
+  }
+  return column;
 }
 
 function getSizeStock(product, talla, color) {
-  if (product.colorStock && talla) {
-    if (color && typeof product.colorStock[color]?.[talla] === "number") {
-      return Math.max(0, toN(product.colorStock[color][talla]));
+  const t = talla ? String(talla).trim() : "";
+  const c = color ? String(color).trim() : "";
+
+  const cs = effectiveColorStock(product.colorStock);
+  if (cs && t) {
+    if (c) {
+      const colorKey = resolveColorKeyForLine(cs, c, product);
+      if (!colorKey) {
+        if (Object.keys(cs).length > 1) return 0;
+        return lineStockFromTallaOrColumn(product, t);
+      }
+      const row = cs[colorKey];
+      if (!row || typeof row !== "object" || Array.isArray(row)) {
+        return lineStockFromTallaOrColumn(product, t);
+      }
+      const tallaKey = findTallaKeyInMap(row, t);
+      if (tallaKey != null) return cellQty(row[tallaKey]);
+      return lineStockFromTallaOrColumn(product, t);
     }
-    return Object.values(product.colorStock).reduce(
-      (sum, stockBySize) => sum + Math.max(0, toN(stockBySize?.[talla])),
-      0
-    );
+    return Object.values(cs).reduce((sum, stockBySize) => {
+      const tallaKey = findTallaKeyInMap(stockBySize, t);
+      if (tallaKey == null) return sum;
+      return sum + cellQty(stockBySize[tallaKey]);
+    }, 0);
   }
-  if (talla && product.tallaStock) {
-    return Math.max(0, toN(product.tallaStock[talla]));
+
+  const ts = effectiveTallaStock(product.tallaStock);
+  if (t && ts) {
+    const tallaKey = findTallaKeyInMap(ts, t);
+    if (tallaKey != null) return cellQty(ts[tallaKey]);
+    return 0;
   }
+
   return deriveTotalStock(product);
 }
 
@@ -173,7 +312,7 @@ function sanitizeOrderProduct(product) {
   return {
     id: product.id,
     nombre: product.nombre,
-    precio: toN(product.precio),
+    precio: toFinitePrice(product.precio),
     descripcion: strOr(product.descripcion),
     imagen: strOr(product.imagen),
     imagenes: arrOr(product.imagenes),
@@ -181,8 +320,8 @@ function sanitizeOrderProduct(product) {
     categoria: strOr(product.categoria),
     tipoCalzado: strOr(product.tipoCalzado),
     tallas: getAvailableSizes(product),
-    tallaStock: product.tallaStock || null,
-    colorStock: product.colorStock || null,
+    tallaStock: effectiveTallaStock(product.tallaStock) || null,
+    colorStock: effectiveColorStock(product.colorStock) || null,
     marca: strOr(product.marca),
     color: strOr(product.color),
     colores: arrOr(product.colores),
@@ -191,11 +330,15 @@ function sanitizeOrderProduct(product) {
 }
 
 function extractProductId(item) {
-  if (item?.product?.id && typeof item.product.id === "string") {
-    return item.product.id.trim();
+  const fromProduct = item?.product?.id;
+  if (fromProduct != null && fromProduct !== "") {
+    const s = String(fromProduct).trim();
+    if (s) return s;
   }
-  if (item?.productId && typeof item.productId === "string") {
-    return item.productId.trim();
+  const fromField = item?.productId;
+  if (fromField != null && fromField !== "") {
+    const s = String(fromField).trim();
+    if (s) return s;
   }
   return "";
 }
@@ -204,8 +347,8 @@ function extractItemFields(item) {
   return {
     productId: extractProductId(item),
     quantity: toN(item?.quantity),
-    talla: trimStr(item?.talla),
-    color: trimStr(item?.color),
+    talla: normalizeOrderTalla(item?.talla),
+    color: normalizeOrderColor(item?.color),
   };
 }
 
@@ -233,12 +376,36 @@ function assertStockAndPrice(price, totalStock, sizeStock, quantity) {
   }
 }
 
-function resolveColorBucket(colorStock, talla, quantity, preferredColor) {
-  if (preferredColor && typeof colorStock[preferredColor]?.[talla] === "number") {
-    return preferredColor;
+function resolveColorBucket(colorStock, talla, quantity, preferredColor, fallbackColor) {
+  const t = String(talla || "").trim();
+  if (!t || !colorStock) return null;
+  const pref = preferredColor ? String(preferredColor).trim() : "";
+  const fb = fallbackColor ? String(fallbackColor).trim() : "";
+
+  const tryResolve = (label) => {
+    if (!label) return null;
+    let ck = findColorKeyInStock(colorStock, label);
+    const keys = Object.keys(colorStock);
+    if (!ck && keys.length === 1) ck = keys[0];
+    if (!ck) return null;
+    const row = colorStock[ck];
+    const tk = findTallaKeyInMap(row, t);
+    if (tk != null && cellQty(row[tk]) >= quantity) return ck;
+    return null;
+  };
+
+  if (pref) {
+    const hit = tryResolve(pref) || (fb && !sameComparable(pref, fb) ? tryResolve(fb) : null);
+    if (hit) return hit;
+  } else if (fb) {
+    const hit = tryResolve(fb);
+    if (hit) return hit;
   }
   return Object.keys(colorStock).find((colorKey) => {
-    return Math.max(0, toN(colorStock[colorKey]?.[talla])) >= quantity;
+    const row = colorStock[colorKey];
+    const tk = findTallaKeyInMap(row, t);
+    if (tk == null) return false;
+    return cellQty(row[tk]) >= quantity;
   });
 }
 
@@ -352,6 +519,9 @@ module.exports = {
   strOr,
   arrOr,
   toN,
+  toFinitePrice,
+  effectiveColorStock,
+  effectiveTallaStock,
   orUndef,
   objOr,
   compareSizes,
@@ -386,6 +556,8 @@ module.exports = {
   assertStoredTotals,
   assertStockAndPrice,
   resolveColorBucket,
+  findTallaKeyInMap,
+  cellQty,
   parseQueryInt,
   resolveAiAdminUpstreamRequest,
   sendUpstreamToClient,
