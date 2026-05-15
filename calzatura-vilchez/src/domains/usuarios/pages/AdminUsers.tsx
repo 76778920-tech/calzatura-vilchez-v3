@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   BriefcaseBusiness,
   Mail,
@@ -40,6 +40,19 @@ function roleLabel(role: UserRole) {
   return labels[role];
 }
 
+function userCreatedAtValue(user: UserProfile) {
+  const time = user.creadoEn ? new Date(user.creadoEn).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+}
+
+function sortAdminUsers(users: UserProfile[]) {
+  return [...users].sort((a, b) => {
+    const byDate = userCreatedAtValue(b) - userCreatedAtValue(a);
+    if (byDate !== 0) return byDate;
+    return fullName(a).localeCompare(fullName(b), "es", { sensitivity: "base" });
+  });
+}
+
 function userSearchBlob(user: UserProfile, orders: Order[]): string {
   const role = normalizeRole(user.rol);
   const orderCount = orders.filter((order) => order.userId === user.uid).length;
@@ -70,9 +83,15 @@ function toastRoleUpdateFailure(err: unknown) {
     msg = String(record.message);
   }
   const code = record && "code" in record ? String(record.code) : "";
-  const isPermissionError = code === "42501" || msg.toLowerCase().includes("row-level security");
+  const status = record && "status" in record ? Number((record as { status?: unknown }).status) : 0;
+  const lowerMsg = `${msg} ${code}`.toLowerCase();
+  const isPermissionError = code === "42501" || lowerMsg.includes("row-level security");
   if (isPermissionError) {
     toast.error("Sin permisos para realizar esta operación.");
+  } else if (status === 401 || code === "401" || lowerMsg.includes("unauthorized") || lowerMsg.includes("jwt")) {
+    toast.error("SesiÃ³n sin autorizaciÃ³n para realizar esta operaciÃ³n.");
+  } else if (code === "PGRST202" || lowerMsg.includes("could not find the function")) {
+    toast.error("OperaciÃ³n no disponible en la base de datos.");
   } else {
     toast.error("No se pudo actualizar el rol");
   }
@@ -87,15 +106,35 @@ export default function AdminUsers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filter, setFilter] = useState<UserFilter>("todos");
   const [savingRoleId, setSavingRoleId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
 
-  useEffect(() => {
-    Promise.all([fetchAllUsers(), fetchAllOrders()])
-      .then(([userItems, orderItems]) => {
-        setUsers(userItems);
-        setOrders(orderItems);
+  const loadUsers = useCallback(() => {
+    setLoading(true);
+    setLoadError("");
+    Promise.allSettled([fetchAllUsers(), fetchAllOrders()])
+      .then(([usersResult, ordersResult]) => {
+        if (usersResult.status === "rejected") {
+          throw usersResult.reason;
+        }
+        if (ordersResult.status === "rejected") {
+          toast.error("No se pudieron cargar los pedidos de usuarios");
+        }
+        setUsers(sortAdminUsers(usersResult.value));
+        setOrders(ordersResult.status === "fulfilled" ? ordersResult.value : []);
+      })
+      .catch(() => {
+        setUsers([]);
+        setOrders([]);
+        setLoadError("No se pudieron cargar los usuarios");
+        toast.error("No se pudieron cargar los usuarios");
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    const timer = globalThis.setTimeout(loadUsers, 0);
+    return () => globalThis.clearTimeout(timer);
+  }, [loadUsers]);
 
   const stats = useMemo(() => {
     return users.reduce(
@@ -125,9 +164,9 @@ export default function AdminUsers() {
     try {
       await updateUserRole(targetUser.uid, nextRole);
       setUsers((items) =>
-        items.map((item) =>
+        sortAdminUsers(items.map((item) =>
           item.uid === targetUser.uid ? { ...item, rol: nextRole } : item
-        )
+        ))
       );
       toast.success(`Rol actualizado a ${roleLabel(nextRole)}`);
     } catch (err: unknown) {
@@ -201,6 +240,15 @@ export default function AdminUsers() {
           </select>
         </div>
       </div>
+
+      {loadError && (
+        <div className="admin-inline-alert" role="alert">
+          <span>{loadError}</span>
+          <button type="button" className="btn-secondary" onClick={loadUsers}>
+            Reintentar
+          </button>
+        </div>
+      )}
 
       <div className="admin-table-wrapper product-table-wrapper">
         <table className="admin-table">

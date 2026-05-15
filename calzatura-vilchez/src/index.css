@@ -6665,6 +6665,15 @@ button.dash-order-row-btn:hover { background: var(--bg-alt); }
 .admin-manufacturer-filter-grid { grid-template-columns: minmax(130px, 150px) auto; }
 .admin-clear-filters { min-height: 42px; justify-content: center; color: var(--black); border-color: var(--border); }
 .admin-toolbar-create { min-height: 42px; justify-content: center; white-space: nowrap; padding-inline: 1rem; }
+.admin-inline-alert {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.85rem;
+  border: 1.5px solid #f3c6c6; background: #fff5f5; color: #8f1d1d;
+  border-radius: var(--radius-sm); padding: 0.85rem 1rem; font-size: 14px; font-weight: 700;
+}
+.admin-inline-alert .btn-secondary {
+  min-height: 36px; border: 1.5px solid #d58b8b; background: #fff; color: #8f1d1d;
+  border-radius: var(--radius-sm); padding: 0 0.85rem; font-weight: 800;
+}
 .product-table-wrapper {
   background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-md);
   box-shadow: 0 10px 30px rgba(0,0,0,0.035);

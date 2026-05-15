@@ -57,13 +57,23 @@ const ALL_USERS = [MOCK_ADMIN, MOCK_CLIENTE, MOCK_TRABAJADOR, MOCK_ADMIN_OTHER];
 
 async function setupUserMocks(
   page: Page,
-  opts: { patchStatus?: number } = {},
+  opts: { patchStatus?: number; ordersStatus?: number; usersStatus?: number } = {},
 ) {
   const patchStatus = opts.patchStatus ?? 204;
+  const ordersStatus = opts.ordersStatus ?? 200;
+  const usersStatus = opts.usersStatus ?? 200;
 
   await page.route("**/rest/v1/usuarios*", async (route) => {
     const method = route.request().method();
     if (method === "GET") {
+      if (usersStatus !== 200) {
+        await route.fulfill({
+          status: usersStatus,
+          contentType: "application/json",
+          body: JSON.stringify({ code: "42501", message: "row-level security policy" }),
+        });
+        return;
+      }
       const url = route.request().url();
       if (url.includes("uid=eq.")) {
         await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([MOCK_ADMIN]) });
@@ -89,6 +99,14 @@ async function setupUserMocks(
 
   await page.route("**/rest/v1/pedidos*", async (route) => {
     if (route.request().method() !== "GET") { await route.fallback(); return; }
+    if (ordersStatus !== 200) {
+      await route.fulfill({
+        status: ordersStatus,
+        contentType: "application/json",
+        body: JSON.stringify({ code: "42501", message: "row-level security policy" }),
+      });
+      return;
+    }
     await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
   });
 
@@ -141,6 +159,22 @@ test.describe("admin usuarios → KPIs, filtro y roles", () => {
 
     await expect(page.locator("table tbody tr:not(:has(td[colspan]))")).toHaveCount(1);
     await expect(page.locator("table tbody tr").first()).toContainText("cliente@test.com");
+  });
+
+  test("si pedidos falla, mantiene usuarios y muestra aviso (TC-USR-005)", async ({ page }) => {
+    await setupUserMocks(page, { ordersStatus: 403 });
+    await goToUsers(page);
+
+    await expect(page.getByText(/No se pudieron cargar los pedidos de usuarios/i).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator("table tbody tr:not(:has(td[colspan]))")).toHaveCount(4);
+  });
+
+  test("si usuarios falla, muestra error con reintento (TC-USR-006)", async ({ page }) => {
+    await setupUserMocks(page, { usersStatus: 403 });
+    await goToUsers(page);
+
+    await expect(page.getByRole("alert")).toContainText("No se pudieron cargar los usuarios");
+    await expect(page.getByRole("button", { name: /reintentar/i })).toBeVisible();
   });
 
   // ──────────────────────────────────────────────────────────────────────────
