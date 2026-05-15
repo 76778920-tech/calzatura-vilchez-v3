@@ -3,7 +3,6 @@ import type { Address } from "@/types";
 import { buildCheckoutAddressLine } from "@/domains/carrito/utils/checkoutAddressLine";
 import { DELIVERY_CONFIG } from "@/config/delivery";
 import {
-  addressLabelContainsHousenumber,
   calculateDeliveryForCoordinates,
   deliveryLookupErrorMessage,
   estimateDeliveryQuoteHaversine,
@@ -12,8 +11,6 @@ import {
   geocodeSearchBarSuggestions,
   hasOpenRouteServiceKey,
   isDeliveryLookupUnavailableError,
-  normalizeGeocodeQuery,
-  parseStreetHousenumber,
   reverseGeocodeLabel,
   type DeliveryQuote,
   type GeocodeCandidate,
@@ -22,17 +19,6 @@ import {
 
 const ROUTE_FETCH_DEBOUNCE_MS = 320;
 const ADDRESS_GEOCODE_MIN_LEN = 8;
-
-function isConfidentGeocodePick(best: GeocodeCandidate, streetLine: string): boolean {
-  if (best.layer === "address" || best.layer === "street" || best.layer === "venue") {
-    return true;
-  }
-  const parsed = parseStreetHousenumber(normalizeGeocodeQuery(streetLine));
-  if (!parsed.housenumber) {
-    return best.layer === "tertiary" || best.layer === "neighbourhood";
-  }
-  return addressLabelContainsHousenumber(best.label, parsed.housenumber);
-}
 
 type Params = {
   direccion: Address;
@@ -128,12 +114,6 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
           });
           if (ctrl.signal.aborted) return;
           setAddressSuggestions(list);
-          if (list.length > 0) {
-            const best = list[0];
-            if (isConfidentGeocodePick(best, direccion.direccion)) {
-              confirmLocation(best, true);
-            }
-          }
         } catch (err) {
           if (ctrl.signal.aborted) return;
           setAddressSuggestions([]);
@@ -195,35 +175,6 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     };
   }, [mapSearchInput, orsConfigured, geocodeUnavailable, direccion.ciudad, direccion.distrito, normalizeGeocodeError]);
 
-  useEffect(() => {
-    if (searchSuggestLoading || searchSuggestions.length === 0) return;
-    const q = normalizeGeocodeQuery(mapSearchInput.trim());
-    if (q.length < 8) return;
-    const parsed = parseStreetHousenumber(q);
-    if (!parsed.housenumber) return;
-    const best =
-      searchSuggestions.find((c) => addressLabelContainsHousenumber(c.label, parsed.housenumber!)) ??
-      searchSuggestions[0];
-    if (!isConfidentGeocodePick(best, q)) return;
-    if (
-      locationConfirmed &&
-      selectedDelivery &&
-      Math.abs(selectedDelivery.lat - best.lat) < 0.00005 &&
-      Math.abs(selectedDelivery.lng - best.lng) < 0.00005
-    ) {
-      return;
-    }
-    setMapSearchInput(best.label);
-    confirmLocation(best, true);
-  }, [
-    searchSuggestions,
-    searchSuggestLoading,
-    mapSearchInput,
-    locationConfirmed,
-    selectedDelivery,
-    confirmLocation,
-  ]);
-
   const onMapSearchChange = useCallback((value: string) => {
     setMapSearchInput(value);
     setLocationConfirmed(false);
@@ -231,6 +182,10 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     setRoutePositions(null);
     setDeliveryQuote(null);
     setDeliveryQuoteError("");
+    if (value.trim().length < 3) {
+      setSearchSuggestions([]);
+      setSearchSuggestError("");
+    }
   }, []);
 
   useEffect(() => {
@@ -329,11 +284,21 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
   }, [selectedDelivery]);
 
   const pickCandidate = useCallback(
-    (c: GeocodeCandidate, refitMap: boolean) => {
-      setMapSearchInput(c.label);
+    (c: GeocodeCandidate, refitMap: boolean, syncSearchInput = true) => {
+      if (syncSearchInput) {
+        setMapSearchInput(c.label);
+      }
       confirmLocation(c, refitMap);
     },
     [confirmLocation],
+  );
+
+  const pickSearchSuggestion = useCallback(
+    (index: number) => {
+      const c = searchSuggestions[index];
+      if (c) pickCandidate(c, true, true);
+    },
+    [searchSuggestions, pickCandidate],
   );
 
   const onMapCustomerMove = useCallback(
@@ -391,6 +356,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     routePositions,
     routeLoading,
     pickCandidate,
+    pickSearchSuggestion,
     onMapCustomerMove,
     envioMonto,
     addressLine: () => addressLine,

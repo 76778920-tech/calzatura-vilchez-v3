@@ -273,6 +273,7 @@ export default function CheckoutPage() {
                 searchSuggestError={geo.searchSuggestError}
                 searchSuggestions={geo.searchSuggestions}
                 onPickCandidate={geo.pickCandidate}
+                onPickSearchByIndex={geo.pickSearchSuggestion}
                 addressSuggestLoading={geo.addressSuggestLoading}
                 addressSuggestError={geo.addressSuggestError}
                 addressSuggestions={geo.addressSuggestions}

@@ -40,7 +40,8 @@ type Props = Readonly<{
   searchSuggestLoading: boolean;
   searchSuggestError: string;
   searchSuggestions: GeocodeCandidate[];
-  onPickCandidate: (c: GeocodeCandidate, refitMap: boolean) => void;
+  onPickCandidate: (c: GeocodeCandidate, refitMap: boolean, syncSearchInput?: boolean) => void;
+  onPickSearchByIndex?: (index: number) => void;
   addressSuggestLoading: boolean;
   addressSuggestError: string;
   addressSuggestions: GeocodeCandidate[];
@@ -66,6 +67,7 @@ export default function CheckoutDeliveryBox({
   searchSuggestError,
   searchSuggestions,
   onPickCandidate,
+  onPickSearchByIndex,
   addressSuggestLoading,
   addressSuggestError,
   addressSuggestions,
@@ -127,8 +129,9 @@ export default function CheckoutDeliveryBox({
           onKeyDown={(e) => {
             if (e.key === "Enter") {
               e.preventDefault();
-              const first = searchSuggestions[0];
-              if (first) onPickCandidate(first, true);
+              if (searchSuggestions.length > 0) {
+                onPickSearchByIndex?.(0);
+              }
             }
           }}
           className="form-input"
@@ -144,7 +147,7 @@ export default function CheckoutDeliveryBox({
             candidates={searchSuggestions}
             keyPrefix="s"
             ariaLabel="Resultados de búsqueda"
-            onPick={(c) => onPickCandidate(c, true)}
+            onPick={(c) => onPickCandidate(c, true, true)}
           />
         )}
       </div>
@@ -165,10 +168,10 @@ export default function CheckoutDeliveryBox({
               candidates={addressSuggestions}
               keyPrefix="a"
               ariaLabel="Sugerencias por dirección"
-              onPick={(c) => onPickCandidate(c, true)}
-            />
-          )}
-        </div>
+            onPick={(c) => onPickCandidate(c, true, false)}
+          />
+        )}
+      </div>
       )}
 
       {showDeliveryMap ? (
