@@ -2,12 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import {
   calculatePriceRange,
-  deleteProductFinancial,
   fetchProductFinancials,
 } from "@/domains/ventas/services/finance";
 import {
-  deleteProduct,
-  deleteProductCode,
+  deleteProductAtomic,
   fetchProductCodes,
   fetchProducts,
   registrarIngresoStock,
@@ -150,14 +148,30 @@ export function useAdminProductsPage() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([fetchProducts(), fetchProductCodes(), fetchProductFinancials()])
-      .then(([items, codes, financials]) => {
+    Promise.allSettled([fetchProducts(), fetchProductCodes(), fetchProductFinancials()])
+      .then(([itemsResult, codesResult, financialsResult]) => {
+        if (itemsResult.status === "rejected") throw itemsResult.reason;
+        const items = itemsResult.value;
+        const codes = codesResult.status === "fulfilled" ? codesResult.value : {};
+        const financials = financialsResult.status === "fulfilled" ? financialsResult.value : {};
+
+        if (codesResult.status === "rejected") {
+          toast.error("No se pudieron cargar los códigos de producto");
+        }
+        if (financialsResult.status === "rejected") {
+          toast.error("No se pudo cargar el rango de venta");
+        }
+
         setProducts(items.map((item) => ({
           ...item,
           codigo: codes[item.id] ?? "",
           categoria: normalizeAdminCategory(item.categoria),
           finanzas: financials[item.id],
         })));
+      })
+      .catch(() => {
+        toast.error("No se pudieron cargar los productos");
+        setProducts([]);
       })
       .finally(() => setLoading(false));
   };
@@ -609,11 +623,7 @@ export function useAdminProductsPage() {
   const handleDelete = async (product: AdminProduct) => {
     if (!confirm(`¿Eliminar "${product.nombre}"?`)) return;
     try {
-      await Promise.all([
-        deleteProduct(product.id),
-        deleteProductCode(product.id),
-        deleteProductFinancial(product.id),
-      ]);
+      await deleteProductAtomic(product.id, product.nombre);
       toast.success("Producto eliminado");
       void invalidateAICache("product_deleted");
       load();

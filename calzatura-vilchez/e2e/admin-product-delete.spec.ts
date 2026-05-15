@@ -4,11 +4,10 @@
  * Cubre:
  * 1. Aceptar el confirm() elimina el producto: estado vacío en UI + producto ausente (TC-PROD-DEL01).
  *    (El estado vacío es un <tr> en <tbody>, no usar toHaveCount(0) sobre filas.)
- * 2. Rechazar el confirm() no llama a DELETE y el producto permanece (TC-PROD-DEL02).
+ * 2. Rechazar el confirm() no llama al RPC y el producto permanece (TC-PROD-DEL02).
  *
  * handleDelete usa window.confirm(); Playwright lo intercepta con page.on("dialog").
- * Los tres DELETE (productos / productoCodigos / productoFinanzas) se mockean por
- * separado para poder afirmar si fueron o no llamados.
+ * El borrado se mockea como RPC atómico `delete_product_atomic`.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
@@ -40,24 +39,17 @@ const PRODUCT = {
 // ─── Setup helper ─────────────────────────────────────────────────────────────
 
 interface Counters {
-  productosDeleteCalls: number;
-  codigosDeleteCalls: number;
-  finanzasDeleteCalls: number;
+  deleteProductAtomicCalls: number;
 }
 
 async function setupMocks(page: Page): Promise<Counters> {
-  const counters: Counters = { productosDeleteCalls: 0, codigosDeleteCalls: 0, finanzasDeleteCalls: 0 };
+  const counters: Counters = { deleteProductAtomicCalls: 0 };
 
   await page.route("**/rest/v1/productos*", async (route) => {
     const method = route.request().method();
     if (method === "GET") {
-      const body = counters.productosDeleteCalls > 0 ? "[]" : JSON.stringify([PRODUCT]);
+      const body = counters.deleteProductAtomicCalls > 0 ? "[]" : JSON.stringify([PRODUCT]);
       await route.fulfill({ status: 200, contentType: "application/json", body });
-      return;
-    }
-    if (method === "DELETE") {
-      counters.productosDeleteCalls += 1;
-      await route.fulfill({ status: 204, body: "" });
       return;
     }
     await route.fallback();
@@ -69,11 +61,6 @@ async function setupMocks(page: Page): Promise<Counters> {
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
       return;
     }
-    if (method === "DELETE") {
-      counters.codigosDeleteCalls += 1;
-      await route.fulfill({ status: 204, body: "" });
-      return;
-    }
     await route.fallback();
   });
 
@@ -83,12 +70,12 @@ async function setupMocks(page: Page): Promise<Counters> {
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
       return;
     }
-    if (method === "DELETE") {
-      counters.finanzasDeleteCalls += 1;
-      await route.fulfill({ status: 204, body: "" });
-      return;
-    }
     await route.fallback();
+  });
+
+  await page.route("**/rest/v1/rpc/delete_product_atomic*", async (route) => {
+    counters.deleteProductAtomicCalls += 1;
+    await route.fulfill({ status: 204, body: "" });
   });
 
   // logAudit lanza un INSERT a auditoria; el try/catch de logAudit absorbe errores,
@@ -141,16 +128,14 @@ test.describe("admin productos → borrado con confirmación", () => {
     await expect(page.getByText("No hay productos. Crea el primero.")).toBeVisible({ timeout: 8_000 });
     await expect(page.getByRole("table")).not.toContainText("Bota Borrable E2E");
 
-    // Los tres DELETE deben haberse llamado exactamente una vez
-    expect(counters.productosDeleteCalls).toBe(1);
-    expect(counters.codigosDeleteCalls).toBe(1);
-    expect(counters.finanzasDeleteCalls).toBe(1);
+    // El RPC atómico debe haberse llamado exactamente una vez
+    expect(counters.deleteProductAtomicCalls).toBe(1);
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // TC-PROD-DEL02: rechazar el confirm → no llama DELETE, producto permanece
+  // TC-PROD-DEL02: rechazar el confirm → no llama RPC, producto permanece
   // ──────────────────────────────────────────────────────────────────────────
-  test("rechazar el confirm no llama DELETE y el producto permanece (TC-PROD-DEL02)", async ({ page }) => {
+  test("rechazar el confirm no llama al RPC y el producto permanece (TC-PROD-DEL02)", async ({ page }) => {
     await goToProducts(page);
     const counters = await setupMocks(page);
 
@@ -165,9 +150,7 @@ test.describe("admin productos → borrado con confirmación", () => {
     await expect(page.locator("table tbody tr")).toHaveCount(1);
     await expect(page.locator("table tbody tr").first()).toContainText("Bota Borrable E2E");
 
-    // Ningún DELETE fue llamado
-    expect(counters.productosDeleteCalls).toBe(0);
-    expect(counters.codigosDeleteCalls).toBe(0);
-    expect(counters.finanzasDeleteCalls).toBe(0);
+    // Ningún RPC fue llamado
+    expect(counters.deleteProductAtomicCalls).toBe(0);
   });
 });

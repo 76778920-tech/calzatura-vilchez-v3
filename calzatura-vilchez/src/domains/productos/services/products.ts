@@ -166,6 +166,14 @@ export async function deleteProduct(id: string): Promise<void> {
   void logAudit("eliminar", "producto", id, id);
 }
 
+export async function deleteProductAtomic(id: string, nombre?: string): Promise<void> {
+  const { error } = await supabase.rpc("delete_product_atomic", {
+    p_id: id,
+  });
+  if (error) throw error;
+  void logAudit("eliminar", "producto", id, nombre ?? id);
+}
+
 export async function registrarIngresoStock(
   productId: string,
   productNombre: string,

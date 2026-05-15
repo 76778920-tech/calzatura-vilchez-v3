@@ -41,7 +41,7 @@ export function AdminProductCreateVariantsPanel({
   }
 
   return (
-    <section>
+    <section className="admin-variants-panel">
       <div
         ref={variantsCarouselRef}
         role="application"
