@@ -178,10 +178,21 @@ async function logAuditFn(supabase, accion, entidad, entidadId, entidadNombre, u
   }
 }
 
+/** Stripe y otros SDK usan `statusCode`; nuestros throws usan `status`. */
+function httpErrorStatus(error) {
+  if (!error || typeof error !== "object") return 500;
+  const s = error.status ?? error.statusCode;
+  if (typeof s === "number" && s >= 400 && s <= 599) return s;
+  return 500;
+}
+
 function publicError(error) {
-  if (error && error.status && error.status < 500) {
-    return error.message;
-  }
+  if (!error) return "No se pudo procesar la solicitud";
+  const http = error.status ?? error.statusCode;
+  const msg = typeof error.message === "string" ? error.message.trim() : "";
+  if (msg && typeof http === "number" && http < 500) return msg;
+  if (msg && error.type && String(error.type).includes("Stripe")) return msg;
+  if (error.status && error.status < 500 && msg) return msg;
   return "No se pudo procesar la solicitud";
 }
 
@@ -1129,7 +1140,7 @@ app.post("/createOrder", (req, res) => {
         });
       } catch (error) {
         console.error("Create order error:", error);
-        return res.status(error.status || 500).json({ error: publicError(error) });
+        return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
       }
     });
 });
@@ -1205,7 +1216,6 @@ app.post("/createCheckoutSession", (req, res) => {
 
         const payerEmail = String(order.userEmail || "").trim();
         const sessionPayload = {
-          ui_mode: "hosted_page",
           payment_method_types: ["card"],
           line_items: lineItems,
           mode: "payment",
@@ -1241,7 +1251,7 @@ app.post("/createCheckoutSession", (req, res) => {
         return res.status(200).json({ sessionId: session.id, url: checkoutUrl });
       } catch (error) {
         console.error("Stripe error:", error);
-        return res.status(error.status || 500).json({ error: publicError(error) });
+        return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
       }
     });
 });
@@ -1301,7 +1311,7 @@ app.post("/stripeWebhook", async (req, res) => {
           // No actualizamos ni auditamos de nuevo para evitar duplicados.
         } catch (error) {
           console.error("Stripe webhook order error:", error);
-          return res.status(error.status || 500).json({ error: publicError(error) });
+          return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
         }
       }
     }
@@ -1359,7 +1369,7 @@ app.post("/confirmCodOrder", (req, res) => {
         return res.status(200).json({ success: true });
       } catch (error) {
         console.error("COD confirm error:", error);
-        return res.status(error.status || 500).json({ error: publicError(error) });
+        return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
       }
     });
 });
@@ -1461,7 +1471,7 @@ app.all("/favorites", (req, res) => {
         return res.status(405).json({ error: "Metodo no permitido" });
       } catch (error) {
         console.error("Favorites error:", error);
-        return res.status(error.status || 500).json({ error: publicError(error) });
+        return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
       }
     });
 });

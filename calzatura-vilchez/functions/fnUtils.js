@@ -30,7 +30,12 @@ function toFinitePrice(v) {
 function orUndef(v) { return v || undefined; }
 function objOr(v) { return v || {}; }
 function compareSizes(a, b) { return Number(a) - Number(b); }
-function errorStatus(e) { return e.status || 500; }
+function errorStatus(e) {
+  if (!e || typeof e !== "object") return 500;
+  const s = e.status ?? e.statusCode;
+  if (typeof s === "number" && s >= 400 && s <= 599) return s;
+  return 500;
+}
 function trimStr(v) { return typeof v === "string" ? v.trim() : ""; }
 function isValidItemArray(items) {
   return Array.isArray(items) && items.length > 0 && items.length <= ORDER_ITEM_LIMIT;
@@ -79,9 +84,12 @@ function validStripeImage(image) {
 }
 
 function publicError(error) {
-  if (error?.status && error.status < 500) {
-    return error.message;
-  }
+  if (!error) return "No se pudo procesar la solicitud";
+  const http = error.status ?? error.statusCode;
+  const msg = typeof error.message === "string" ? error.message.trim() : "";
+  if (msg && typeof http === "number" && http < 500) return msg;
+  if (msg && error.type && String(error.type).includes("Stripe")) return msg;
+  if (error.status && error.status < 500 && msg) return msg;
   return "No se pudo procesar la solicitud";
 }
 

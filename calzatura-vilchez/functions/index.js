@@ -496,7 +496,6 @@ exports.createCheckoutSession = onRequest(
 
         const payerEmail = strOr(order.userEmail).trim();
         const sessionPayload = {
-          ui_mode: "hosted_page",
           payment_method_types: ["card"],
           line_items: lineItems,
           mode: "payment",
