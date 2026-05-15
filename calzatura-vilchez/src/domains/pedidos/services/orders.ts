@@ -25,14 +25,19 @@ export async function createOrder(data: {
   }
 
   const idToken = await user.getIdToken();
-  const response = await fetch(`${base}/createOrder`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify(data),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${base}/createOrder`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(data),
+    });
+  } catch {
+    throw new Error("No se pudo conectar con el servidor de pedidos. Intenta otra vez en unos segundos.");
+  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {

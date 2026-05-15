@@ -236,7 +236,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     return () => {
       cancelled = true;
     };
-  }, [orsConfigured, mapDisplayDelivery, locationConfirmed, deliveryPricingErrorMessage]);
+  }, [orsConfigured, mapDisplayDelivery, mapDegraded, geocodeUnavailable, deliveryPricingErrorMessage]);
 
   useEffect(() => {
     const point = mapDisplayDelivery;

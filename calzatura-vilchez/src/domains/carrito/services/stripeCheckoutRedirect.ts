@@ -12,14 +12,19 @@ export async function redirectStripeCheckoutForOrder(user: User, orderId: string
   const stripe = await loadStripe(stripePublicKey);
   if (!stripe) throw new Error("Stripe no disponible");
 
-  const res = await fetch(`${base}/createCheckoutSession`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${idToken}`,
-    },
-    body: JSON.stringify({ orderId }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base}/createCheckoutSession`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ orderId }),
+    });
+  } catch {
+    throw new Error("No se pudo conectar con el servidor de pagos. Intenta otra vez en unos segundos.");
+  }
 
   const payload = await res.json();
   if (!res.ok) {

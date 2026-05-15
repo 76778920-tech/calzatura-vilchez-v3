@@ -594,6 +594,8 @@ async function discountOrderStock(supabase, order) {
 
 const app = express();
 app.set("trust proxy", 1);
+app.options("*", cors);
+app.use(cors);
 app.use(
   express.json({
     verify: (req, res, buf) => {
