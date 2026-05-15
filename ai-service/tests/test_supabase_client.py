@@ -124,6 +124,14 @@ def test_get_client_devuelve_url_y_headers(monkeypatch):
     assert "apikey" in headers
 
 
+def test_get_headers_reutiliza_valores_cacheados():
+    """Segunda llamada no reconstruye URL ni headers (rama del if omitida)."""
+    u1, h1 = supabase_client._get_headers()
+    u2, h2 = supabase_client._get_headers()
+    assert u1 is u2
+    assert h1 is h2
+
+
 def test_fetch_daily_sales_sin_days(monkeypatch):
     def fake_get(url, headers, params, timeout):
         return FakeResponse(200, [{"productId": "p1", "fecha": "2026-05-01"}])
@@ -174,6 +182,29 @@ def test_fetch_products(monkeypatch):
     monkeypatch.setattr(supabase_client.requests, "get", fake_get)
     rows = supabase_client.fetch_products()
     assert rows == [{"id": "p1", "nombre": "Zapatilla"}]
+
+
+def test_fetch_stock_movements_sin_days(monkeypatch):
+    def fake_get(url, headers, params, timeout):
+        assert "movimientosStock" in url
+        assert "fecha" not in (params or {})
+        return FakeResponse(200, [{"productId": "p1", "tipo": "ingreso"}])
+
+    monkeypatch.setattr(supabase_client.requests, "get", fake_get)
+    rows = supabase_client.fetch_stock_movements()
+    assert rows == [{"productId": "p1", "tipo": "ingreso"}]
+
+
+def test_fetch_stock_movements_con_days(monkeypatch):
+    captured = {}
+
+    def fake_get(url, headers, params, timeout):
+        captured["params"] = params
+        return FakeResponse(200, [])
+
+    monkeypatch.setattr(supabase_client.requests, "get", fake_get)
+    supabase_client.fetch_stock_movements(days=14)
+    assert captured["params"]["fecha"].startswith("gte.")
 
 
 def test_fetch_product_codes(monkeypatch):
