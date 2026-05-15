@@ -207,6 +207,18 @@ def test_fetch_stock_movements_con_days(monkeypatch):
     assert captured["params"]["fecha"].startswith("gte.")
 
 
+def test_fetch_stock_movements_days_cero_no_anade_fecha(monkeypatch):
+    captured = {}
+
+    def fake_get(url, headers, params, timeout):
+        captured["params"] = params or {}
+        return FakeResponse(200, [])
+
+    monkeypatch.setattr(supabase_client.requests, "get", fake_get)
+    supabase_client.fetch_stock_movements(days=0)
+    assert "fecha" not in captured["params"]
+
+
 def test_fetch_product_codes(monkeypatch):
     def fake_get(url, headers, params, timeout):
         return FakeResponse(200, [{"productoId": "p1", "codigo": "CV-001"}])

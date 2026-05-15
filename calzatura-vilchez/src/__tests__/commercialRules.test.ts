@@ -18,6 +18,7 @@ import {
   validateCommercialProductDraft,
   orderedStyleTokensFromCsv,
   normalizeEstiloField,
+  describeCommercialDraftError,
   type CommercialDraft,
 } from "@/domains/productos/utils/commercialRules";
 
@@ -298,5 +299,31 @@ describe("validateCommercialProductDraft", () => {
       validDraft({ margenMinimo: 20, margenObjetivo: 90, margenMaximo: 80 })
     );
     expect(errors.some((e) => e.includes("márgenes"))).toBe(true);
+  });
+});
+
+describe("describeCommercialDraftError", () => {
+  it("mapea errores cv_guard de Supabase a mensajes de negocio", () => {
+    expect(describeCommercialDraftError(new Error("cv_guard_producto_tipo: inválido"))).toBe(
+      "El tipo de calzado no corresponde a la categoría seleccionada.",
+    );
+    expect(describeCommercialDraftError(new Error("cv_guard_producto_estilo: inválido"))).toBe(
+      "El estilo seleccionado no corresponde al tipo de calzado.",
+    );
+    expect(describeCommercialDraftError(new Error("cv_guard_producto_material: inválido"))).toBe(
+      "El material seleccionado no pertenece a la paleta comercial permitida.",
+    );
+    expect(describeCommercialDraftError(new Error("cv_guard_producto_precio: fuera"))).toBe(
+      "El precio público quedó fuera del rango comercial permitido.",
+    );
+    expect(describeCommercialDraftError(new Error("cv_guard_producto_finanzas: márgenes"))).toBe(
+      "Los márgenes o el rango de precio no coinciden con la regla comercial del producto.",
+    );
+  });
+
+  it("error desconocido u objeto sin message devuelve cadena vacía", () => {
+    expect(describeCommercialDraftError(new Error("otro error"))).toBe("");
+    expect(describeCommercialDraftError(null)).toBe("");
+    expect(describeCommercialDraftError({})).toBe("");
   });
 });

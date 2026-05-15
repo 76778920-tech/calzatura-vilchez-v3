@@ -28,4 +28,8 @@ describe("assertHttpsInProduction", () => {
   it("en producción acepta https://", () => {
     expect(assertHttpsInProduction("https://ok.example", "X", true)).toBe("https://ok.example");
   });
+
+  it("sin tercer argumento usa import.meta.env.PROD (rama por defecto)", () => {
+    expect(assertHttpsInProduction("https://default-arg.example/", "X")).toBe("https://default-arg.example");
+  });
 });

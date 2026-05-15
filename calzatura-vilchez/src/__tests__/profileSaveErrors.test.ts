@@ -35,6 +35,16 @@ describe("profileSaveErrorToast", () => {
     );
   });
 
+  it("NOT_FOUND en mayúsculas", () => {
+    expect(profileSaveErrorToast(new Error("NOT_FOUND resource"))).toBe(
+      "Documento no encontrado. Recarga la pagina e intenta de nuevo",
+    );
+  });
+
+  it("objeto con message string (no instancia de Error)", () => {
+    expect(profileSaveErrorToast({ message: "fallo remoto" })).toBe("Error: fallo remoto");
+  });
+
   it("genérico", () => {
     expect(profileSaveErrorToast(new Error("boom"))).toBe("Error: boom");
     expect(profileSaveErrorToast("x")).toBe("Error: no se pudo guardar");

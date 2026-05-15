@@ -13,6 +13,8 @@ Semáforo:
 """
 import pytest
 from datetime import date, datetime, timedelta
+from collections import defaultdict
+
 from models.revenue import (
     _safe_float,
     _iso_date,
@@ -20,6 +22,10 @@ from models.revenue import (
     _build_date_range,
     build_daily_revenue_series,
     forecast_revenue,
+    _revenue_growth_rate,
+    _build_revenue_forecast_rows,
+    _accumulate_tienda_revenue,
+    _accumulate_web_revenue,
 )
 
 
@@ -296,3 +302,50 @@ class TestForecastRevenue:
         orders = [make_order(today(-1), 350.0)]
         result = forecast_revenue([], orders, horizon_days=7)
         assert result["summary"]["total_historico_web"] == 350.0
+
+
+# ─── helpers internos (cobertura Sonar) ──────────────────────────────────────
+
+
+class TestRevenueGrowthRate:
+    def test_crecimiento_moderado_sin_clamp(self):
+        g = _revenue_growth_rate([6.0], [5.0], 1, 1, 1.0)
+        assert g == pytest.approx(0.2)
+
+    def test_prior_promedio_cero_reciente_positivo(self):
+        g = _revenue_growth_rate([4.0, 4.0], [0.0, 0.0, 0.0, 0.0, 0.0], 2, 5, 1.0)
+        assert g == pytest.approx(0.12)
+
+    def test_ambos_promedios_cero(self):
+        g = _revenue_growth_rate([0.0], [0.0], 1, 1, 0.0)
+        assert g == pytest.approx(0.0)
+
+    def test_clamp_superior(self):
+        g = _revenue_growth_rate([100.0], [1.0], 1, 1, 1.0)
+        assert g == pytest.approx(0.35)
+
+
+def test_build_revenue_forecast_rows_produce_horizonte():
+    recent = defaultdict(list)
+    all_wd = defaultdict(list)
+    fc = _build_revenue_forecast_rows(5, recent, all_wd, 100.0, 0.0, 0.0)
+    assert len(fc) == 5
+    assert all("fecha" in r and "ingresos" in r for r in fc)
+
+
+def test_accumulate_tienda_ignora_canal_web_y_sin_fecha():
+    by_date = defaultdict(float)
+    dr = {today(0)}
+    sales = [
+        make_sale(today(-1), 10.0, canal="web"),
+        make_sale("", 5.0),
+    ]
+    total = _accumulate_tienda_revenue(sales, by_date, dr)
+    assert total == 0.0
+
+
+def test_accumulate_web_ignora_total_cero():
+    by_date = defaultdict(float)
+    dr = {today(-1)}
+    orders = [make_order(today(-1), 0.0)]
+    assert _accumulate_web_revenue(orders, by_date, dr) == 0.0

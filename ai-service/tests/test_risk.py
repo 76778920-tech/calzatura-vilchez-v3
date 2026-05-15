@@ -9,7 +9,18 @@ Semáforo:
   🟢 _clamp nunca devuelve valor fuera de [lo, hi] — VERIFICADO
 """
 import pytest
-from models.risk import _clamp, compute_ire, compute_ire_proyectado
+from models.risk import (
+    _clamp,
+    compute_ire,
+    compute_ire_proyectado,
+    _format_weight,
+    _ire_formula,
+    _ire_nivel_descripcion,
+    _score_contributions,
+    _ire_revenue_risk,
+    _ire_stock_risk_and_counts,
+    _ire_demand_risk_and_counts,
+)
 
 
 # ─── _clamp ───────────────────────────────────────────────────────────────────
@@ -248,3 +259,55 @@ class TestComputeIreProyectado:
         preds = [make_pred(stock=40, consumo=1.0, nivel_riesgo="estable")] * 5
         result = compute_ire_proyectado(preds, None, 15)
         assert result["score"] >= 0
+
+
+# ─── helpers internos (cobertura) ─────────────────────────────────────────────
+
+
+def test_format_weight_y_formula_ire():
+    assert _format_weight(0.4) == "0.40"
+    assert "riesgo_stock" in _ire_formula() and "0.40" in _ire_formula()
+
+
+def test_ire_nivel_descripcion_bandas():
+    assert _ire_nivel_descripcion(10)[0] == "bajo"
+    assert _ire_nivel_descripcion(30)[0] == "moderado"
+    assert _ire_nivel_descripcion(60)[0] == "alto"
+    assert _ire_nivel_descripcion(90)[0] == "critico"
+
+
+def test_score_contributions_suma_igual_score():
+    dims = {"riesgo_stock": 50.0, "riesgo_ingresos": 40.0, "riesgo_demanda": 30.0}
+    score = 42
+    parts = _score_contributions(dims, score)
+    assert sum(parts.values()) == score
+
+
+def test_ire_revenue_risk_ramas():
+    assert _ire_revenue_risk(None) == pytest.approx(45.0)
+    assert _ire_revenue_risk({}) == pytest.approx(45.0)
+    assert _ire_revenue_risk({"summary": {}}) == pytest.approx(45.0)
+    subiendo = _ire_revenue_risk(make_revenue("subiendo", 10.0, 90))
+    estable = _ire_revenue_risk(make_revenue("estable", 0.0, 90))
+    bajando = _ire_revenue_risk(make_revenue("bajando", -10.0, 50))
+    assert bajando >= estable
+    assert subiendo < estable
+
+
+def test_stock_y_demanda_con_total_cero():
+    sr, *_ = _ire_stock_risk_and_counts([], 0)
+    dr, *_ = _ire_demand_risk_and_counts([], 0)
+    assert sr == pytest.approx(40.0)
+    assert dr == pytest.approx(25.0)
+
+
+def test_compute_ire_proyectado_nivel_critico_por_stock_cero():
+    preds = [make_pred(stock=5, consumo=1.0, nivel_riesgo="estable")]
+    out = compute_ire_proyectado(preds, None, 10)
+    assert out["horizonte_dias"] == 10
+
+
+def test_compute_ire_proyectado_dias_altos_estable():
+    preds = [make_pred(stock=500, consumo=0.5, nivel_riesgo="estable")]
+    out = compute_ire_proyectado(preds, None, 5)
+    assert out["score"] >= 0

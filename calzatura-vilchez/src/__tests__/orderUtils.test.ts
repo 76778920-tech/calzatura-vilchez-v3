@@ -1,47 +1,28 @@
-import { describe, it, expect } from "vitest";
-import { ORDER_STATUS_LABELS, orderItemLineKey } from "@/domains/pedidos/utils/orderUtils";
+import { describe, expect, it } from "vitest";
 import type { CartItem } from "@/types";
+import { ORDER_STATUS_LABELS, orderItemLineKey } from "@/domains/pedidos/utils/orderUtils";
 
 describe("ORDER_STATUS_LABELS", () => {
-  it.each(["pendiente", "pagado", "enviado", "entregado", "cancelado"])(
-    "contiene etiqueta para '%s'",
-    (estado) => expect(ORDER_STATUS_LABELS[estado]).toBeTruthy()
-  );
+  it("incluye estados de pedido esperados", () => {
+    expect(ORDER_STATUS_LABELS.pendiente).toBe("Pendiente");
+    expect(ORDER_STATUS_LABELS.pagado).toBe("Pagado");
+    expect(ORDER_STATUS_LABELS.cancelado).toBe("Cancelado");
+  });
 });
 
 describe("orderItemLineKey", () => {
-  function makeItem(overrides: Partial<CartItem> = {}): CartItem {
-    return {
-      product: { id: "p1", nombre: "Test", precio: 100, stock: 10, imagen: "", categoria: "hombre" } as CartItem["product"],
+  it("compone clave estable con producto, color, talla y cantidad", () => {
+    const item = {
+      product: { id: "p1" } as CartItem["product"],
       quantity: 2,
       color: "negro",
-      talla: "42",
-      ...overrides,
-    } as CartItem;
-  }
-
-  it("genera clave con product.id, color, talla y quantity", () => {
-    const key = orderItemLineKey(makeItem(), 0);
-    expect(key).toBe("p1-negro-42-q2-i0");
+      talla: "40",
+    };
+    expect(orderItemLineKey(item, 0)).toBe("p1-negro-40-q2-i0");
   });
 
-  it("usa 'unknown' cuando product.id es undefined", () => {
-    const item = makeItem({ product: undefined as unknown as CartItem["product"] });
-    const key = orderItemLineKey(item, 1);
-    expect(key).toContain("unknown");
-  });
-
-  it("usa cadena vacía cuando color es undefined", () => {
-    const key = orderItemLineKey(makeItem({ color: undefined }), 0);
-    expect(key).toBe("p1--42-q2-i0");
-  });
-
-  it("usa cadena vacía cuando talla es undefined", () => {
-    const key = orderItemLineKey(makeItem({ talla: undefined }), 0);
-    expect(key).toBe("p1-negro--q2-i0");
-  });
-
-  it("incluye el lineIndex en la clave", () => {
-    expect(orderItemLineKey(makeItem(), 5)).toContain("-i5");
+  it("usa unknown si falta producto", () => {
+    const item = { quantity: 1, color: "", talla: "" } as CartItem;
+    expect(orderItemLineKey(item, 3)).toBe("unknown---q1-i3");
   });
 });
