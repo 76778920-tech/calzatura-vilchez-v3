@@ -20,5 +20,7 @@ Despliegue ejemplo (Render.com):
      Opcional: VITE_AUTH_PROXY_LOGIN_URL si el login BFF vive en otra URL.
      Desactivar proxy de login con VITE_AUTH_PROXY_LOGIN_URL=0
 
-Nota: FIREBASE_SERVICE_ACCOUNT_JSON es el JSON de cuenta de servicio descargado desde
-Firebase → Project settings → Service accounts.
+Nota Firebase Admin (Render suele truncar JSON largo en variables):
+  - Preferido: Secret File en Render + FIREBASE_SERVICE_ACCOUNT_FILE=/etc/secrets/<nombre>.json
+  - Alternativa: FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 (ver env.example)
+  - Último recurso: FIREBASE_SERVICE_ACCOUNT_JSON en una sola línea (JSON minificado completo desde { hasta })

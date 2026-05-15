@@ -2,6 +2,7 @@
 /* BFF Express: mismo contrato de rutas que Cloud Functions. Desplegar en Render/Fly/Railway (sin plan Blaze). */
 require("dotenv").config();
 
+const fs = require("fs");
 const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
 const admin = require("firebase-admin");
@@ -32,14 +33,54 @@ const cors = require("cors")({
   },
 });
 
-const saJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
-if (saJson) {
-  try {
-    admin.initializeApp({ credential: admin.credential.cert(JSON.parse(saJson)) });
-  } catch (e) {
-    console.error("FIREBASE_SERVICE_ACCOUNT_JSON invalido:", e.message);
-    process.exit(1);
+function loadFirebaseServiceAccount() {
+  const filePath = process.env.FIREBASE_SERVICE_ACCOUNT_FILE;
+  if (filePath && String(filePath).trim()) {
+    const p = String(filePath).trim();
+    try {
+      if (!fs.existsSync(p)) {
+        console.error("FIREBASE_SERVICE_ACCOUNT_FILE: archivo no existe:", p);
+        process.exit(1);
+      }
+      const raw = fs.readFileSync(p, "utf8");
+      return JSON.parse(raw);
+    } catch (e) {
+      console.error("FIREBASE_SERVICE_ACCOUNT_FILE invalido:", e.message);
+      process.exit(1);
+    }
   }
+
+  const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_JSON_BASE64;
+  if (b64 && String(b64).trim()) {
+    try {
+      const raw = Buffer.from(String(b64).trim(), "base64").toString("utf8");
+      return JSON.parse(raw);
+    } catch (e) {
+      console.error("FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 invalido:", e.message);
+      process.exit(1);
+    }
+  }
+  const saJson = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  if (saJson && String(saJson).trim()) {
+    const t = String(saJson).trim();
+    try {
+      return JSON.parse(t);
+    } catch (e) {
+      if (t.startsWith("-----BEGIN") || t.startsWith('"-----BEGIN')) {
+        console.error(
+          "FIREBASE_SERVICE_ACCOUNT_JSON: valor incorrecto (PEM suelto). Usa el .json completo, FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, o FIREBASE_SERVICE_ACCOUNT_FILE (Render Secret File)."
+        );
+      }
+      console.error("FIREBASE_SERVICE_ACCOUNT_JSON invalido:", e.message);
+      process.exit(1);
+    }
+  }
+  return null;
+}
+
+const serviceAccount = loadFirebaseServiceAccount();
+if (serviceAccount) {
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 } else {
   admin.initializeApp();
 }
@@ -610,8 +651,32 @@ app.post("/createOrder", (req, res) => {
           throw Object.assign(new Error("No se pudo crear el pedido"), { status: 500 });
         }
 
+        const orderId = data.id;
+
+        if (metodoPago === "contraentrega") {
+          try {
+            const inserted = await fetchOrderOrThrow(supabase, orderId);
+            await discountOrderStock(supabase, inserted);
+            const stockMark = new Date().toISOString();
+            await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
+            await logAuditFn(
+              supabase,
+              "descontar_stock_pedido",
+              "pedido",
+              orderId,
+              `#${orderId.slice(-8).toUpperCase()}`,
+              decodedToken.uid,
+              decodedToken.email || "",
+              { source: "createOrder_cod", metodoPago: "contraentrega" },
+            );
+          } catch (discountErr) {
+            await supabase.from("pedidos").delete().eq("id", orderId);
+            throw discountErr;
+          }
+        }
+
         return res.status(200).json({
-          orderId: data.id,
+          orderId,
           subtotal: draft.subtotal,
           envio,
           total,
@@ -694,14 +759,20 @@ app.post("/createCheckoutSession", (req, res) => {
 
         const appUrl = process.env.APP_URL || "https://calzaturavilchez-ab17f.web.app";
 
-        const session = await stripe.checkout.sessions.create({
+        const payerEmail = String(order.userEmail || "").trim();
+        const sessionPayload = {
           payment_method_types: ["card"],
           line_items: lineItems,
           mode: "payment",
           success_url: `${appUrl}/pedido-exitoso/${orderId}?session_id={CHECKOUT_SESSION_ID}`,
           cancel_url: `${appUrl}/checkout`,
           metadata: { orderId, userId: decodedToken.uid },
-        });
+        };
+        if (payerEmail.includes("@")) {
+          sessionPayload.customer_email = payerEmail;
+        }
+
+        const session = await stripe.checkout.sessions.create(sessionPayload);
 
         await updateOrder(supabase, orderId, { stripeSessionId: session.id });
 
@@ -796,8 +867,25 @@ app.post("/confirmCodOrder", (req, res) => {
           return res.status(400).json({ error: "Pedido sin productos validos" });
         }
 
+        if (order.stockDescontadoEn) {
+          return res.status(200).json({ success: true, alreadyProcessed: true });
+        }
+
         assertStoredTotals(order);
         await assertOrderStockAvailability(supabase, order.items);
+        await discountOrderStock(supabase, order);
+        const stockMark = new Date().toISOString();
+        await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
+        await logAuditFn(
+          supabase,
+          "descontar_stock_pedido",
+          "pedido",
+          orderId,
+          `#${orderId.slice(-8).toUpperCase()}`,
+          decodedToken.uid,
+          order.userEmail || "",
+          { source: "confirmCodOrder", metodoPago: "contraentrega" },
+        );
 
         return res.status(200).json({ success: true });
       } catch (error) {
