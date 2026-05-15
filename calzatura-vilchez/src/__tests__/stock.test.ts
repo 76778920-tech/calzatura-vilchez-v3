@@ -44,6 +44,11 @@ describe("getSizeStock", () => {
     expect(getSizeStock(p)).toBe(12);
   });
 
+  it("con talla inexistente en tallaStock devuelve cero", () => {
+    const p = product({ id: "1", stock: 12, tallaStock: { "39": 4 } });
+    expect(getSizeStock(p, "40")).toBe(0);
+  });
+
   it("sin tallaStock cae en product.stock", () => {
     const p = product({ id: "1", stock: 7 });
     expect(getSizeStock(p, "40")).toBe(7);

@@ -289,6 +289,18 @@ function sumColorSizeStock(colorStock) {
   );
 }
 
+function normalizeComparable(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function sameComparable(a, b) {
+  return normalizeComparable(a) === normalizeComparable(b);
+}
+
 function aggregateColorStock(colorStock) {
   const aggregate = {};
 
@@ -342,7 +354,7 @@ function getSizeStock(product, talla, color) {
     );
   }
 
-  if (talla && product.tallaStock && typeof product.tallaStock[talla] === "number") {
+  if (talla && product.tallaStock) {
     return Math.max(0, Number(product.tallaStock[talla]) || 0);
   }
 
@@ -386,6 +398,26 @@ async function fetchProductsByIds(supabase, ids) {
     throw Object.assign(new Error("No se pudo consultar productos"), { status: 500 });
   }
   return data || [];
+}
+
+async function findProductVariantByColor(supabase, product, requestedColor) {
+  if (!requestedColor || !product || sameComparable(product.color, requestedColor)) {
+    return product;
+  }
+
+  let query = supabase.from("productos").select("*").limit(20);
+  if (product.familiaId) {
+    query = query.eq("familiaId", product.familiaId);
+  } else {
+    query = query.eq("nombre", product.nombre);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw Object.assign(new Error("No se pudo consultar variantes del producto"), { status: 500 });
+  }
+
+  return (data || []).find((candidate) => sameComparable(candidate.color, requestedColor)) || product;
 }
 
 async function fetchProductOrThrow(supabase, productId) {
@@ -473,10 +505,11 @@ async function buildOrderDraft(supabase, rawItems) {
   let subtotal = 0;
 
   for (const item of normalizedItems) {
-    const product = productMap.get(item.productId);
+    let product = productMap.get(item.productId);
     if (!product) {
       throw Object.assign(new Error("Producto no encontrado"), { status: 400 });
     }
+    product = await findProductVariantByColor(supabase, product, item.color);
 
     const price = Number(product.precio || 0);
     const totalStock = deriveTotalStock(product);

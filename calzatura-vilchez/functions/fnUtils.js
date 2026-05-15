@@ -112,6 +112,18 @@ function sumColorSizeStock(colorStock) {
   );
 }
 
+function normalizeComparable(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function sameComparable(a, b) {
+  return normalizeComparable(a) === normalizeComparable(b);
+}
+
 function aggregateColorStock(colorStock) {
   const aggregate = {};
   Object.values(objOr(colorStock)).forEach((stockBySize) => {
@@ -151,7 +163,7 @@ function getSizeStock(product, talla, color) {
       0
     );
   }
-  if (talla && product.tallaStock && typeof product.tallaStock[talla] === "number") {
+  if (talla && product.tallaStock) {
     return Math.max(0, toN(product.tallaStock[talla]));
   }
   return deriveTotalStock(product);
@@ -360,6 +372,8 @@ module.exports = {
   normalizeAddress,
   sumSizeStock,
   sumColorSizeStock,
+  normalizeComparable,
+  sameComparable,
   aggregateColorStock,
   sizesFromStockMap,
   getAvailableSizes,

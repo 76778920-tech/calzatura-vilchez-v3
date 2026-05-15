@@ -5,8 +5,8 @@ export function sumSizeStock(tallaStock: Record<string, number>) {
 }
 
 export function getSizeStock(product: Product, talla?: string) {
-  if (talla && product.tallaStock && typeof product.tallaStock[talla] === "number") {
-    return Math.max(0, product.tallaStock[talla]);
+  if (talla && product.tallaStock) {
+    return Math.max(0, Number(product.tallaStock[talla]) || 0);
   }
   return Math.max(0, product.stock);
 }
