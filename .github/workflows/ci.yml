@@ -78,6 +78,7 @@ jobs:
           # VITE_AI_SERVICE_BEARER_TOKEN no va en el build — el token vive en la Cloud Function.
           # El guard en vite.config.ts rechaza builds donde el token esté sin proxy.
           VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
+          VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL || 'https://ci-bff-placeholder.onrender.com' }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY || 'ci-test-api-key' }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN || 'ci-test.firebaseapp.com' }}
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID || 'ci-test' }}
@@ -88,6 +89,7 @@ jobs:
   #
   # Requisitos en GitHub → Settings → Secrets:
   #   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY — arrancan el dev server sin errores de init.
+  #   VITE_BACKEND_API_URL — opcional en CI (hay placeholder); en deploy Firebase debe estar definido.
   #   El resto de VITE_* se pasan para evitar advertencias de Vite en tiempo de build/dev.
   #   Los tests usan mocks de red (page.route) para Supabase, Firebase e IA;
   #   ninguna llamada real llega a los servicios externos durante e2e.
@@ -188,6 +190,7 @@ jobs:
           VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL || 'https://ci-placeholder.vercel.app/api/lookup-dni' }}
           VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL || 'https://ci-placeholder.onrender.com' }}
           VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
+          VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL || 'https://ci-bff-placeholder.onrender.com' }}
           # VITE_AI_SERVICE_BEARER_TOKEN omitido: E2E usa mocks de red, no llama al servicio real.
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY || 'AIzaSyBAnVUP4M6wujGs-x8EytdGabkIP7EJkwo' }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN || 'calzaturavilchez-ab17f.firebaseapp.com' }}

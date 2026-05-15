@@ -49,6 +49,7 @@ jobs:
           VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
           VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
           VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
+          VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
 
       - name: Deploy a Firebase Hosting + Firestore
         uses: FirebaseExtended/action-hosting-deploy@e2eda2e106cfa35cdbcf4ac9ddaf6c4756df2c8c # v0
