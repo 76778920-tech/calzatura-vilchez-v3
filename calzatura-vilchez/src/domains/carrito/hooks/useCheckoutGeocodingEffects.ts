@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, startTransition } from "react";
 import type { Address } from "@/types";
 import { buildCheckoutAddressLine } from "@/domains/carrito/utils/checkoutAddressLine";
-import {
-  CHECKOUT_DEFAULT_MAP_PICK,
-  isCheckoutDefaultMapPick,
-} from "@/domains/carrito/utils/checkoutMapDefaults";
 import { DELIVERY_CONFIG } from "@/config/delivery";
 import {
   addressLabelContainsHousenumber,
@@ -32,7 +28,9 @@ function isConfidentGeocodePick(best: GeocodeCandidate, streetLine: string): boo
     return true;
   }
   const parsed = parseStreetHousenumber(normalizeGeocodeQuery(streetLine));
-  if (!parsed.housenumber) return false;
+  if (!parsed.housenumber) {
+    return best.layer === "tertiary" || best.layer === "neighbourhood";
+  }
   return addressLabelContainsHousenumber(best.label, parsed.housenumber);
 }
 
@@ -75,12 +73,10 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
   const addressLine = useMemo(() => buildCheckoutAddressLine(direccion), [direccion]);
 
   const mapDisplayDelivery = useMemo((): GeocodeCandidate | null => {
-    if (selectedDelivery) return selectedDelivery;
-    if (addressLine.length >= ADDRESS_GEOCODE_MIN_LEN) {
-      return CHECKOUT_DEFAULT_MAP_PICK;
-    }
-    return null;
-  }, [selectedDelivery, addressLine]);
+    return locationConfirmed && selectedDelivery ? selectedDelivery : null;
+  }, [selectedDelivery, locationConfirmed]);
+
+  const showDeliveryMap = addressLine.length >= ADDRESS_GEOCODE_MIN_LEN;
 
   const normalizeGeocodeError = useCallback((err: unknown, fallback: string) => {
     const message = deliveryLookupErrorMessage(err, fallback);
@@ -200,13 +196,42 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
   }, [mapSearchInput, orsConfigured, geocodeUnavailable, direccion.ciudad, direccion.distrito, normalizeGeocodeError]);
 
   useEffect(() => {
-    if (mapDegraded && !selectedDelivery && addressLine.length >= ADDRESS_GEOCODE_MIN_LEN) {
-      startTransition(() => {
-        setSelectedDelivery(CHECKOUT_DEFAULT_MAP_PICK);
-        setMapFitNonce((n) => n + 1);
-      });
+    if (searchSuggestLoading || searchSuggestions.length === 0) return;
+    const q = normalizeGeocodeQuery(mapSearchInput.trim());
+    if (q.length < 8) return;
+    const parsed = parseStreetHousenumber(q);
+    if (!parsed.housenumber) return;
+    const best =
+      searchSuggestions.find((c) => addressLabelContainsHousenumber(c.label, parsed.housenumber!)) ??
+      searchSuggestions[0];
+    if (!isConfidentGeocodePick(best, q)) return;
+    if (
+      locationConfirmed &&
+      selectedDelivery &&
+      Math.abs(selectedDelivery.lat - best.lat) < 0.00005 &&
+      Math.abs(selectedDelivery.lng - best.lng) < 0.00005
+    ) {
+      return;
     }
-  }, [mapDegraded, selectedDelivery, addressLine]);
+    setMapSearchInput(best.label);
+    confirmLocation(best, true);
+  }, [
+    searchSuggestions,
+    searchSuggestLoading,
+    mapSearchInput,
+    locationConfirmed,
+    selectedDelivery,
+    confirmLocation,
+  ]);
+
+  const onMapSearchChange = useCallback((value: string) => {
+    setMapSearchInput(value);
+    setLocationConfirmed(false);
+    setSelectedDelivery(null);
+    setRoutePositions(null);
+    setDeliveryQuote(null);
+    setDeliveryQuoteError("");
+  }, []);
 
   useEffect(() => {
     const point = mapDisplayDelivery;
@@ -218,15 +243,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
       });
       return;
     }
-    if (!orsConfigured || isCheckoutDefaultMapPick(point)) {
-      if (!locationConfirmed && isCheckoutDefaultMapPick(point)) {
-        startTransition(() => {
-          setDeliveryQuote(null);
-          setDeliveryQuoteError("");
-          setDeliveryQuoteLoading(false);
-        });
-        return;
-      }
+    if (!orsConfigured) {
       startTransition(() => {
         setDeliveryQuote(
           estimateDeliveryQuoteHaversine(point.lat, point.lng, selectedDeliveryRef.current?.label),
@@ -268,7 +285,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
 
   useEffect(() => {
     const point = mapDisplayDelivery;
-    if (!point || !orsConfigured || isCheckoutDefaultMapPick(point)) {
+    if (!point || !orsConfigured) {
       startTransition(() => {
         setRoutePositions(null);
         setRouteLoading(false);
@@ -313,6 +330,7 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
 
   const pickCandidate = useCallback(
     (c: GeocodeCandidate, refitMap: boolean) => {
+      setMapSearchInput(c.label);
       confirmLocation(c, refitMap);
     },
     [confirmLocation],
@@ -362,12 +380,13 @@ export function useCheckoutGeocodingEffects({ direccion }: Params) {
     addressSuggestLoading,
     addressSuggestError,
     mapSearchInput,
-    setMapSearchInput,
+    setMapSearchInput: onMapSearchChange,
     searchSuggestions,
     searchSuggestLoading,
     searchSuggestError,
     selectedDelivery,
     mapDisplayDelivery,
+    showDeliveryMap,
     mapFitNonce,
     routePositions,
     routeLoading,

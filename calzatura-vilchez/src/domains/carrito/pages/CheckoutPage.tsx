@@ -277,7 +277,7 @@ export default function CheckoutPage() {
                 addressSuggestError={geo.addressSuggestError}
                 addressSuggestions={geo.addressSuggestions}
                 selectedDelivery={geo.selectedDelivery}
-                mapDisplayDelivery={geo.mapDisplayDelivery}
+                showDeliveryMap={geo.showDeliveryMap}
                 locationConfirmed={geo.locationConfirmed}
                 mapFitNonce={geo.mapFitNonce}
                 routePositions={geo.routePositions}

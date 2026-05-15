@@ -3,7 +3,6 @@ import { DELIVERY_CONFIG } from "@/config/delivery";
 import type { DeliveryQuote, GeocodeCandidate, MapRoutePosition } from "@/services/deliveryOpenRoute";
 import CheckoutDeliveryMap from "@/domains/carrito/components/CheckoutDeliveryMap";
 import { checkoutGeoLayerHint } from "@/domains/carrito/utils/checkoutGeoHints";
-import { isCheckoutDefaultMapPick } from "@/domains/carrito/utils/checkoutMapDefaults";
 
 function SuggestionList({ candidates, keyPrefix, ariaLabel, onPick }: Readonly<{
   candidates: GeocodeCandidate[];
@@ -46,7 +45,7 @@ type Props = Readonly<{
   addressSuggestError: string;
   addressSuggestions: GeocodeCandidate[];
   selectedDelivery: GeocodeCandidate | null;
-  mapDisplayDelivery: GeocodeCandidate | null;
+  showDeliveryMap: boolean;
   locationConfirmed: boolean;
   mapFitNonce: number;
   routePositions?: MapRoutePosition[] | null;
@@ -71,7 +70,7 @@ export default function CheckoutDeliveryBox({
   addressSuggestError,
   addressSuggestions,
   selectedDelivery,
-  mapDisplayDelivery,
+  showDeliveryMap,
   locationConfirmed,
   mapFitNonce,
   routePositions = null,
@@ -125,8 +124,15 @@ export default function CheckoutDeliveryBox({
           type="text"
           value={mapSearchInput}
           onChange={(e) => onMapSearchChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              const first = searchSuggestions[0];
+              if (first) onPickCandidate(first, true);
+            }
+          }}
           className="form-input"
-          placeholder="Ej: Jr. Puno 123, Huancayo"
+          placeholder="Ej: Av. Giraldez 314, Huancayo"
           autoComplete="street-address"
         />
         {searchSuggestLoading && <p className="checkout-delivery-muted">Buscando…</p>}
@@ -165,16 +171,16 @@ export default function CheckoutDeliveryBox({
         </div>
       )}
 
-      {mapDisplayDelivery ? (
+      {showDeliveryMap ? (
         <CheckoutDeliveryMap
           storeLat={DELIVERY_CONFIG.storeLat}
           storeLng={DELIVERY_CONFIG.storeLng}
-          customerLat={mapDisplayDelivery.lat}
-          customerLng={mapDisplayDelivery.lng}
+          customerLat={locationConfirmed && selectedDelivery ? selectedDelivery.lat : null}
+          customerLng={locationConfirmed && selectedDelivery ? selectedDelivery.lng : null}
+          locationConfirmed={locationConfirmed}
           fitBoundsNonce={mapFitNonce}
           routePositions={routePositions}
           routeLoading={routeLoading}
-          locationPending={!locationConfirmed && isCheckoutDefaultMapPick(mapDisplayDelivery)}
           interactive
           onCustomerPositionChange={onMapCustomerMove}
         />

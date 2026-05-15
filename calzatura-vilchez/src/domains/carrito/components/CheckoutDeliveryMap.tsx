@@ -14,17 +14,16 @@ import { isDrivingRouteGeometry, type MapRoutePosition } from "@/services/delive
 type Props = Readonly<{
   storeLat: number;
   storeLng: number;
-  customerLat: number;
-  customerLng: number;
+  customerLat?: number | null;
+  customerLng?: number | null;
+  locationConfirmed: boolean;
   fitBoundsNonce: number;
   routePositions?: MapRoutePosition[] | null;
   routeLoading?: boolean;
-  locationPending?: boolean;
   interactive?: boolean;
   onCustomerPositionChange?: (lat: number, lng: number) => void;
 }>;
 
-/** Encuadra tienda + entrega solo al elegir ubicación (no al cargar la ruta; evita tiles cancelados). */
 function FitBoundsToSignal({
   storeLat,
   storeLng,
@@ -64,6 +63,23 @@ function FitBoundsToSignal({
   return null;
 }
 
+function CenterStoreOnMount({ storeLat, storeLng }: { storeLat: number; storeLng: number }) {
+  const map = useMap();
+  const didCenterRef = useRef(false);
+
+  useEffect(() => {
+    if (didCenterRef.current) return;
+    didCenterRef.current = true;
+    const timer = globalThis.setTimeout(() => {
+      map.invalidateSize();
+      map.setView([storeLat, storeLng], 14, { animate: false });
+    }, 100);
+    return () => globalThis.clearTimeout(timer);
+  }, [map, storeLat, storeLng]);
+
+  return null;
+}
+
 function MapPickHandler({
   enabled,
   onPick,
@@ -97,25 +113,32 @@ function makePinIcon(fill: string, stroke: string) {
 export default function CheckoutDeliveryMap({
   storeLat,
   storeLng,
-  customerLat,
-  customerLng,
+  customerLat = null,
+  customerLng = null,
+  locationConfirmed,
   fitBoundsNonce,
   routePositions = null,
   routeLoading = false,
-  locationPending = false,
   interactive = false,
   onCustomerPositionChange,
 }: Props) {
   const store: L.LatLngTuple = [storeLat, storeLng];
-  const customer: L.LatLngTuple = [customerLat, customerLng];
-  const hasDrivingRoute = isDrivingRouteGeometry(routePositions);
+  const hasCustomer =
+    locationConfirmed &&
+    customerLat != null &&
+    customerLng != null &&
+    Number.isFinite(customerLat) &&
+    Number.isFinite(customerLng);
+  const customer: L.LatLngTuple = [customerLat ?? storeLat, customerLng ?? storeLng];
+  const hasDrivingRoute = hasCustomer && isDrivingRouteGeometry(routePositions);
+  const showFallbackLine = hasCustomer && !hasDrivingRoute;
 
   const storeIcon = useMemo(() => makePinIcon("#d97706", "#92400e"), []);
   const customerIcon = useMemo(() => makePinIcon("#3b82f6", "#1e40af"), []);
 
   return (
     <div
-      className={`checkout-delivery-map ${interactive ? "checkout-delivery-map--interactive" : ""}${locationPending ? " checkout-delivery-map--pending" : ""}`}
+      className={`checkout-delivery-map ${interactive ? "checkout-delivery-map--interactive" : ""}${!locationConfirmed ? " checkout-delivery-map--pending" : ""}`}
       aria-busy={routeLoading}
     >
       {routeLoading ? <div className="checkout-delivery-map-loading" aria-hidden="true" /> : null}
@@ -136,13 +159,17 @@ export default function CheckoutDeliveryMap({
           updateWhenIdle
           keepBuffer={3}
         />
-        <FitBoundsToSignal
-          storeLat={storeLat}
-          storeLng={storeLng}
-          fitBoundsNonce={fitBoundsNonce}
-          customerLat={customerLat}
-          customerLng={customerLng}
-        />
+        {hasCustomer ? (
+          <FitBoundsToSignal
+            storeLat={storeLat}
+            storeLng={storeLng}
+            fitBoundsNonce={fitBoundsNonce}
+            customerLat={customer[0]}
+            customerLng={customer[1]}
+          />
+        ) : (
+          <CenterStoreOnMount storeLat={storeLat} storeLng={storeLng} />
+        )}
         {interactive && onCustomerPositionChange ? (
           <MapPickHandler enabled={interactive} onPick={onCustomerPositionChange} />
         ) : null}
@@ -171,7 +198,7 @@ export default function CheckoutDeliveryMap({
               }}
             />
           </>
-        ) : (
+        ) : showFallbackLine ? (
           <Polyline
             interactive={false}
             positions={[store, customer]}
@@ -182,40 +209,44 @@ export default function CheckoutDeliveryMap({
               opacity: routeLoading ? 0.35 : 0.7,
             }}
           />
-        )}
+        ) : null}
         <Marker position={store} icon={storeIcon} interactive={false} />
-        {interactive && onCustomerPositionChange ? (
-          <Marker
-            position={customer}
-            icon={customerIcon}
-            draggable
-            eventHandlers={{
-              dragend: (e) => {
-                const ll = e.target.getLatLng();
-                onCustomerPositionChange(ll.lat, ll.lng);
-              },
-            }}
-          />
-        ) : (
-          <Marker position={customer} icon={customerIcon} interactive={false} />
-        )}
+        {hasCustomer ? (
+          interactive && onCustomerPositionChange ? (
+            <Marker
+              position={customer}
+              icon={customerIcon}
+              draggable
+              eventHandlers={{
+                dragend: (e) => {
+                  const ll = e.target.getLatLng();
+                  onCustomerPositionChange(ll.lat, ll.lng);
+                },
+              }}
+            />
+          ) : (
+            <Marker position={customer} icon={customerIcon} interactive={false} />
+          )
+        ) : null}
       </MapContainer>
       <div className="checkout-delivery-map-legend">
         <span className="checkout-delivery-map-legend-item">
           <span className="checkout-delivery-map-dot checkout-delivery-map-dot--store" /> Tienda
         </span>
-        <span className="checkout-delivery-map-legend-item">
-          <span className="checkout-delivery-map-dot checkout-delivery-map-dot--delivery" /> Entrega
-        </span>
+        {hasCustomer ? (
+          <span className="checkout-delivery-map-legend-item">
+            <span className="checkout-delivery-map-dot checkout-delivery-map-dot--delivery" /> Entrega
+          </span>
+        ) : null}
         {hasDrivingRoute ? (
           <span className="checkout-delivery-map-legend-item">
             <span className="checkout-delivery-map-route-line" /> Ruta en auto
           </span>
         ) : null}
       </div>
-      {locationPending ? (
+      {!locationConfirmed ? (
         <p className="checkout-delivery-map-hint checkout-delivery-map-hint--warn">
-          Elegí una sugerencia o mové el pin azul para confirmar la entrega.
+          Elegí una sugerencia de la lista o tocá el mapa para marcar tu entrega.
         </p>
       ) : routeLoading ? (
         <p className="checkout-delivery-map-hint">Calculando ruta por calles…</p>
@@ -223,7 +254,7 @@ export default function CheckoutDeliveryMap({
         <p className="checkout-delivery-map-hint">
           {hasDrivingRoute
             ? "La línea azul es la ruta estimada. Podés afinar la ubicación arrastrando el pin."
-            : "Tocá el mapa o arrastrá el pin azul hasta tu puerta."}
+            : "Podés afinar la ubicación arrastrando el pin azul."}
         </p>
       ) : null}
     </div>
