@@ -160,12 +160,6 @@ export async function updateProductAtomic(
   void logAudit("editar", "producto", id, product.nombre, { campos: Object.keys(product) });
 }
 
-export async function deleteProduct(id: string): Promise<void> {
-  const { error } = await supabase.from(COL).delete().eq("id", id);
-  if (error) throw error;
-  void logAudit("eliminar", "producto", id, id);
-}
-
 export async function deleteProductAtomic(id: string, nombre?: string): Promise<void> {
   const { error } = await supabase.rpc("delete_product_atomic", {
     p_id: id,
@@ -216,11 +210,6 @@ export async function upsertProductCode(productId: string, codigo: string): Prom
     codigo,
     actualizadoEn: new Date().toISOString(),
   }, { onConflict: "productoId" });
-  if (error) throw error;
-}
-
-export async function deleteProductCode(productId: string): Promise<void> {
-  const { error } = await supabase.from(CODE_COL).delete().eq("productoId", productId);
   if (error) throw error;
 }
 

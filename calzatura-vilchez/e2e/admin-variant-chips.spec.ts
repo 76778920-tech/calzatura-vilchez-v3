@@ -55,6 +55,27 @@ test.describe("admin → nuevo producto: chips de 5 colores", () => {
     }
   });
 
+  test("al elegir Color 2 hace auto-scroll al bloque nuevo", async ({ page }) => {
+    await page.evaluate(() => {
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function patchedScrollIntoView(this: Element, arg?: boolean | ScrollIntoViewOptions) {
+        globalThis.sessionStorage.setItem(
+          "lastScrolledVariantSlot",
+          this.getAttribute("data-variant-slot-index") ?? "",
+        );
+        original.call(this, arg);
+      };
+    });
+
+    await page.locator(".variant-chip").nth(0).click();
+    await page.locator(".admin-color-popover-item").filter({ hasText: COLORS[0] }).first().click();
+    await page.locator(".variant-chip").nth(1).click();
+    await page.locator(".admin-color-popover-item").filter({ hasText: COLORS[1] }).first().click();
+
+    await expect.poll(async () => page.evaluate(() => sessionStorage.getItem("lastScrolledVariantSlot")))
+      .toBe("1");
+  });
+
   test("quitar Color 3 limpia ese bloque y los siguientes, manteniendo Color 1 y 2", async ({ page }) => {
     // Activar los 5
     for (let i = 0; i < 5; i++) {

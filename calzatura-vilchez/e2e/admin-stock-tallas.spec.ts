@@ -332,4 +332,39 @@ test.describe("admin productos → tallas y stock — edición + persistencia", 
     // Listar: el nuevo producto debe aparecer en la tabla
     await expect(page.getByText("Zapato Nuevo E2E")).toBeVisible({ timeout: 10_000 });
   });
+
+  test("ingreso de mercancía envía delta por talla al RPC registrar_ingreso_stock", async ({ page }) => {
+    await setupMocks(page);
+
+    let rpcBody: Record<string, unknown> | null = null;
+    await page.route("**/rest/v1/rpc/registrar_ingreso_stock*", async (route) => {
+      rpcBody = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, cantidad: 4, tallaStock: { "40": 13, "41": 6 } }),
+      });
+    });
+
+    await page.getByRole("button", { name: /ingresar stock de zapato tallas e2e/i }).click();
+    await expect(page.getByRole("heading", { name: /ingresar mercanc/i })).toBeVisible({ timeout: 5_000 });
+
+    await page.locator("dialog .admin-size-stock-item").filter({ hasText: "40" }).locator("input").fill("3");
+    await page.locator("dialog .admin-size-stock-item").filter({ hasText: "41" }).locator("input").fill("1");
+    await page.locator("#stock-proveedor").fill("Proveedor E2E");
+    await page.locator("#stock-costo").fill("62.5");
+    await page.locator("#stock-obs").fill("Ingreso de prueba");
+
+    await page.getByRole("button", { name: /registrar \+4/i }).click();
+    await expect(page.getByText("Ingreso registrado")).toBeVisible({ timeout: 10_000 });
+
+    expect(rpcBody).not.toBeNull();
+    expect(rpcBody).toMatchObject({
+      p_product_id: SEED_ID,
+      p_talla_stock: { "40": 3, "41": 1 },
+      p_costo_unitario: 62.5,
+      p_proveedor: "Proveedor E2E",
+      p_observaciones: "Ingreso de prueba",
+    });
+  });
 });

@@ -48,6 +48,7 @@ import {
   remapVariantSlotsStockForCategory,
   runAdminProductSaveFlow,
   sizesFromStock,
+  toastFromSaveError,
   LOW_STOCK_LIMIT,
   type AdminProduct,
   type ProductForm,
@@ -146,7 +147,9 @@ export function useAdminProductsPage() {
     fileInputRefs.current[index] = element;
   }, []);
 
-  const load = () => {
+  const pendingRealtimeRef = useRef(false);
+
+  const load = useCallback(() => {
     setLoading(true);
     Promise.allSettled([fetchProducts(), fetchProductCodes(), fetchProductFinancials()])
       .then(([itemsResult, codesResult, financialsResult]) => {
@@ -174,14 +177,28 @@ export function useAdminProductsPage() {
         setProducts([]);
       })
       .finally(() => setLoading(false));
-  };
+  }, []);
 
   useEffect(() => {
     const timer = globalThis.setTimeout(load, 0);
     return () => globalThis.clearTimeout(timer);
-  }, []);
+  }, [load]);
 
-  useProductsRealtime(load);
+  const handleRealtimeProductsChange = useCallback(() => {
+    if (showModal || showStockModal || saving) {
+      pendingRealtimeRef.current = true;
+      return;
+    }
+    load();
+  }, [load, saving, showModal, showStockModal]);
+
+  useProductsRealtime(handleRealtimeProductsChange);
+
+  useEffect(() => {
+    if (showModal || showStockModal || saving || !pendingRealtimeRef.current) return;
+    pendingRealtimeRef.current = false;
+    load();
+  }, [load, saving, showModal, showStockModal]);
 
   useEffect(() => {
     if (!colorPaletteOpen) return undefined;
@@ -384,6 +401,13 @@ export function useAdminProductsPage() {
       })
     );
     setActiveColorSlot(null);
+    if (normalizedColor) {
+      globalThis.setTimeout(() => {
+        variantsCarouselRef.current
+          ?.querySelector(`[data-variant-slot-index="${slotIndex}"]`)
+          ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }, 0);
+    }
   };
 
   const openCreate = () => {
@@ -572,6 +596,10 @@ export function useAdminProductsPage() {
     event.preventDefault();
     const codigo = normalizeVariantCode(form.codigo ?? "");
     const saveEvent = editingId ? "product_updated" : "product_created";
+    const reloadAfterMutation = () => {
+      pendingRealtimeRef.current = false;
+      load();
+    };
     await runAdminProductSaveFlow({
       codigo,
       form,
@@ -580,7 +608,7 @@ export function useAdminProductsPage() {
       variantSlots,
       setSaving,
       closeModal,
-      load,
+      load: reloadAfterMutation,
     });
     void invalidateAICache(saveEvent);
   };
@@ -614,9 +642,10 @@ export function useAdminProductsPage() {
       toast.success("Ingreso registrado");
       void invalidateAICache("stock_entry");
       closeStockModal();
+      pendingRealtimeRef.current = false;
       load();
-    } catch {
-      toast.error("Error al registrar el ingreso de stock");
+    } catch (err) {
+      toast.error(toastFromSaveError(err));
     }
   };
 
@@ -626,9 +655,10 @@ export function useAdminProductsPage() {
       await deleteProductAtomic(product.id, product.nombre);
       toast.success("Producto eliminado");
       void invalidateAICache("product_deleted");
+      pendingRealtimeRef.current = false;
       load();
-    } catch {
-      toast.error("Error al eliminar");
+    } catch (err) {
+      toast.error(toastFromSaveError(err));
     }
   };
   return {

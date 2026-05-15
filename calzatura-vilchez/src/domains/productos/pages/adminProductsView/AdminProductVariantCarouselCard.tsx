@@ -27,7 +27,7 @@ export function AdminProductVariantCarouselCard({
   const colorHex = getColorHex(slot.color);
 
   return (
-    <div className="admin-variant-carousel-card">
+    <div className="admin-variant-carousel-card" data-variant-slot-index={slotIndex}>
       <div className="admin-variant-block-header">
         <span className="admin-variant-block-label">
           <span className="admin-variant-color-dot" style={{ background: colorHex }} />

@@ -70,23 +70,24 @@ Formulario de creación y edición de productos con variantes, galería de imág
 
 ---
 
-### A5 — Flujo de borrado con confirmación sin cobertura E2E
+### A5 - Flujo de borrado con confirmacion cubierto por E2E
 
 **Severidad:** Media (cobertura)
 
-**Antes:** `handleDelete` usa `window.confirm()` para confirmar el borrado y llama DELETE en tres tablas (`productos`, `productoCodigos`, `productoFinanzas`). No había ningún test E2E que verificara ni que el DELETE se ejecuta al aceptar ni que no se ejecuta al cancelar.
+**Antes:** `handleDelete` usaba `window.confirm()` para confirmar el borrado y llamaba DELETE en tres tablas (`productos`, `productoCodigos`, `productoFinanzas`). No habia ningun test E2E que verificara ni que el borrado se ejecutara al aceptar ni que no se ejecutara al cancelar.
 
-**Después:**
+**Despues:**
+- El borrado usa el RPC atomico `delete_product_atomic`.
 - Nuevo spec `e2e/admin-product-delete.spec.ts` con `page.once("dialog", ...)` para interceptar `window.confirm()`:
 
-| ID | Descripción | Estado |
+| ID | Descripcion | Estado |
 |---|---|---|
-| TC-PROD-DEL01 | Aceptar confirm → 3 DELETE + texto estado vacío + producto no visible (no contar filas: el vacío es un `<tr>`) | ✅ |
-| TC-PROD-DEL02 | Rechazar confirm → 0 DELETE + producto permanece | ✅ |
+| TC-PROD-DEL01 | Aceptar confirm -> RPC `delete_product_atomic` + texto estado vacio + producto no visible (no contar filas: el vacio es un `<tr>`) | OK |
+| TC-PROD-DEL02 | Rechazar confirm -> 0 llamadas al RPC + producto permanece | OK |
 
-**Nota:** El handler GET de productos devuelve `[]` después del primer DELETE para simular la recarga de lista que hace el componente tras borrar.
+**Nota:** El handler GET de productos devuelve `[]` despues de la llamada al RPC para simular la recarga de lista que hace el componente tras borrar.
 
-**Estado:** ✅ Cerrado
+**Estado:** OK Cerrado
 
 ---
 

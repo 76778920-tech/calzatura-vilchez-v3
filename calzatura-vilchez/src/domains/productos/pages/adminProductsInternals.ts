@@ -316,14 +316,50 @@ export function validateEditProductPayload(form: ProductForm): string | null {
   return null;
 }
 
+function errorText(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (!err || typeof err !== "object") return "";
+  const fields = ["message", "details", "hint", "error", "description"] as const;
+  return fields
+    .map((field) => (err as Record<string, unknown>)[field])
+    .filter((value): value is string => typeof value === "string")
+    .join(" ");
+}
+
+function errorStatus(err: unknown): number {
+  if (!err || typeof err !== "object") return 0;
+  const record = err as Record<string, unknown>;
+  const directStatus = Number(record.status ?? record.statusCode);
+  if (Number.isFinite(directStatus)) return directStatus;
+  const cause = record.cause;
+  if (cause && typeof cause === "object") {
+    const causeStatus = Number((cause as Record<string, unknown>).status ?? (cause as Record<string, unknown>).statusCode);
+    if (Number.isFinite(causeStatus)) return causeStatus;
+  }
+  return 0;
+}
+
 export function toastFromSaveError(err: unknown): string {
-  const msg = err instanceof Error ? err.message : "";
+  const msg = errorText(err);
   const code = typeof err === "object" && err && "code" in err ? String((err as { code?: unknown }).code) : "";
-  const isPermissionError = code === "42501" || msg.toLowerCase().includes("row-level security");
+  const status = errorStatus(err);
+  const lowerMsg = `${msg} ${code}`.toLowerCase();
+  const isPermissionError = code === "42501" || lowerMsg.includes("row-level security");
+  const isUnauthorizedError =
+    status === 401 ||
+    code === "401" ||
+    lowerMsg.includes("401") ||
+    lowerMsg.includes("unauthorized") ||
+    lowerMsg.includes("jwt") ||
+    lowerMsg.includes("invalid token");
+  const isMissingRpcError =
+    code === "PGRST202" ||
+    lowerMsg.includes("could not find the function") ||
+    (lowerMsg.includes("function") && lowerMsg.includes("not found"));
   const isUniqueCodeError =
     code === "23505" ||
-    msg.toLowerCase().includes("duplicate key value") ||
-    msg.toLowerCase().includes("unique");
+    lowerMsg.includes("duplicate key value") ||
+    lowerMsg.includes("unique");
   const commercialError = describeCommercialDraftError(err);
   if (msg === "TIMEOUT") {
     return "Tiempo agotado. Inténtalo de nuevo o revisa tu conexión.";
@@ -336,6 +372,12 @@ export function toastFromSaveError(err: unknown): string {
   }
   if (isPermissionError) {
     return "Sin permisos para realizar esta operación.";
+  }
+  if (isUnauthorizedError) {
+    return "Sesión sin autorización para realizar esta operación.";
+  }
+  if (isMissingRpcError) {
+    return "Operación no disponible en la base de datos. Aplica las migraciones pendientes.";
   }
   return `Error: ${msg || "no se pudo guardar el producto"}`;
 }

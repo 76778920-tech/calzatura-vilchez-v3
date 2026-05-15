@@ -57,7 +57,7 @@ export function AdminProductCreateVariantsPanel({
           if (!slot.color) return null;
           return (
             <AdminProductVariantCarouselCard
-              key={slot.color}
+              key={`variant-slot-${slotIndex}`}
               slot={slot}
               slotIndex={slotIndex}
               compressing={compressing}
