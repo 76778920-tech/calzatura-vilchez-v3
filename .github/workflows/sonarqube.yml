@@ -97,6 +97,18 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Diagnostico cobertura (logs; revisar si Sonar no baja lineas)
+        if: steps.sonar-config.outputs.ready == 'true'
+        shell: bash
+        run: |
+          echo "=== LCOV: primeras rutas SF: (deben empezar por calzatura-vilchez/) ==="
+          grep '^SF:' calzatura-vilchez/coverage/lcov.info | head -8
+          echo "=== Cobertura XML: fuente y revenue ==="
+          grep -m1 '<source>' ai-service/coverage.xml
+          grep 'filename="ai-service/models/revenue.py"' ai-service/coverage.xml | head -1 || true
+          echo "=== stock.ts en lcov (fragmento) ==="
+          grep -A2 'SF:calzatura-vilchez/src/utils/stock.ts' calzatura-vilchez/coverage/lcov.info | head -6 || true
+
       # Ayuda a diagnosticar "Project not found": debe coincidir con SonarCloud → Project information → Project key
       - name: Mostrar claves Sonar (sin SONAR_TOKEN)
         if: steps.sonar-config.outputs.ready == 'true'
