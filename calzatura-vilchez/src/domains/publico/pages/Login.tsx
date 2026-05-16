@@ -84,16 +84,9 @@ export default function Login() {
 
       toast.success(isAdmin ? "Bienvenido al panel administrativo" : "Bienvenido");
       navigate(redirect, { replace: true });
-    } catch (err: unknown) {
-      const code = err instanceof Error ? err.message : "";
-      if (code === "AUTH_RATE_LIMITED") {
-        toast.error("Demasiados intentos. Intenta más tarde.");
-      } else if (code === "AUTH_UNAVAILABLE") {
-        toast.error("No se pudo iniciar sesión. Intenta de nuevo en unos minutos.");
-      } else {
-        // ISO/IEC 27002: un solo mensaje ante fallo de credenciales; no exponer códigos ni si el correo existe.
-        toast.error("Correo o contraseña incorrectos");
-      }
+    } catch {
+      // ISO/IEC 27002: un solo mensaje ante fallo de credenciales; no exponer códigos ni si el correo existe.
+      toast.error("Correo o contraseña incorrectos");
     } finally {
       setLoading(false);
     }

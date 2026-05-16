@@ -1625,7 +1625,7 @@ app.all("/aiAdminProxy", (req, res) => {
 
 /**
  * BFF de login: el navegador no llama a identitytoolkit; solo a este servidor.
- * Códigos HTTP semánticos (401/429/500) para WAF y monitoreo; cuerpo JSON genérico sin códigos de Google.
+ * Respuesta siempre 200 + JSON genérico (ok) para no exponer códigos de Google en el cliente.
  * Requiere FIREBASE_WEB_API_KEY (misma clave web del proyecto) y cuenta de servicio para custom token.
  */
 app.all("/authLogin", (req, res) => {
@@ -1639,23 +1639,21 @@ app.all("/authLogin", (req, res) => {
 
     const ip = getClientIp(req);
     if (isLoginRateLimited(ip)) {
-      const retryAfterSec = Math.ceil(LOGIN_RATE_WINDOW_MS / 1000);
-      res.setHeader("Retry-After", String(retryAfterSec));
-      return res.status(429).json({ ok: false });
+      return res.status(200).json({ ok: false });
     }
 
     try {
       const rawEmail = req.body && req.body.email;
       const rawPassword = req.body && req.body.password;
       if (!isValidLoginEmail(rawEmail) || !isValidLoginPassword(rawPassword)) {
-        return res.status(401).json({ ok: false });
+        return res.status(200).json({ ok: false });
       }
       const email = String(rawEmail).trim().toLowerCase();
       const password = String(rawPassword);
       const apiKey = process.env.FIREBASE_WEB_API_KEY;
       if (!apiKey) {
         console.error("authLogin: falta FIREBASE_WEB_API_KEY en entorno del BFF");
-        return res.status(500).json({ ok: false });
+        return res.status(200).json({ ok: false });
       }
 
       const identityUrl =
@@ -1668,14 +1666,14 @@ app.all("/authLogin", (req, res) => {
       });
       const identityJson = await identityRes.json();
       if (!identityRes.ok || !identityJson.localId) {
-        return res.status(401).json({ ok: false });
+        return res.status(200).json({ ok: false });
       }
 
       const customToken = await admin.auth().createCustomToken(identityJson.localId);
       return res.status(200).json({ ok: true, customToken });
     } catch {
       console.error("authLogin: error interno");
-      return res.status(500).json({ ok: false });
+      return res.status(200).json({ ok: false });
     }
   });
 });

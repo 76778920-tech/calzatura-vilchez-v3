@@ -112,22 +112,20 @@ export default async function handler(req, res) {
 
   const ip = getClientIp(req);
   if (isLoginRateLimited(ip)) {
-    const retryAfterSec = Math.ceil(LOGIN_RATE_WINDOW_MS / 1000);
-    res.setHeader("Retry-After", String(retryAfterSec));
-    return res.status(429).json({ ok: false });
+    return res.status(200).json({ ok: false });
   }
 
   try {
     ensureAdmin();
   } catch (e) {
     console.error("auth-login: init admin", e.message);
-    return res.status(500).json({ ok: false });
+    return res.status(200).json({ ok: false });
   }
 
   const rawEmail = req.body?.email;
   const rawPassword = req.body?.password;
   if (!isValidLoginEmail(rawEmail) || !isValidLoginPassword(rawPassword)) {
-    return res.status(401).json({ ok: false });
+    return res.status(200).json({ ok: false });
   }
 
   const email = String(rawEmail).trim().toLowerCase();
@@ -135,7 +133,7 @@ export default async function handler(req, res) {
   const apiKey = process.env.FIREBASE_WEB_API_KEY?.trim();
   if (!apiKey) {
     console.error("auth-login: falta FIREBASE_WEB_API_KEY");
-    return res.status(500).json({ ok: false });
+    return res.status(200).json({ ok: false });
   }
 
   try {
@@ -149,13 +147,13 @@ export default async function handler(req, res) {
     });
     const identityJson = await identityRes.json();
     if (!identityRes.ok || !identityJson.localId) {
-      return res.status(401).json({ ok: false });
+      return res.status(200).json({ ok: false });
     }
 
     const customToken = await admin.auth().createCustomToken(identityJson.localId);
     return res.status(200).json({ ok: true, customToken });
   } catch (e) {
     console.error("auth-login: error interno", e);
-    return res.status(500).json({ ok: false });
+    return res.status(200).json({ ok: false });
   }
 }
