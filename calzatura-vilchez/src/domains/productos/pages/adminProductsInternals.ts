@@ -3,7 +3,8 @@ import { createProductVariantsAtomic, updateProductAtomic } from "@/domains/prod
 import { buildColorStockForVariant } from "@/utils/colorStockPayload";
 import { calculatePriceRange } from "@/domains/ventas/services/finance";
 import { capitalizeWords } from "@/utils/colors";
-import { sumSizeStock } from "@/utils/stock";
+import { listSortedSizesWithPositiveQty, sumSizeStock } from "@/utils/stock";
+import { unknownClientErrorHttpStatus, unknownClientErrorMessage } from "@/utils/unknownClientError";
 import { normalizeCloudinaryImageUrl } from "@/domains/administradores/services/cloudinary";
 import {
   describeCommercialDraftError,
@@ -128,10 +129,7 @@ export function filterStockByCategory(tallaStock: Record<string, number>, catego
 }
 
 export function sizesFromStock(tallaStock: Record<string, number>) {
-  return Object.entries(tallaStock)
-    .filter(([, qty]) => qty > 0)
-    .map(([size]) => size)
-    .sort((a, b) => Number(a) - Number(b));
+  return listSortedSizesWithPositiveQty(tallaStock);
 }
 
 export function createEmptyStockForCategory(category: string) {
@@ -317,33 +315,10 @@ export function validateEditProductPayload(form: ProductForm): string | null {
   return null;
 }
 
-function errorText(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (!err || typeof err !== "object") return "";
-  const fields = ["message", "details", "hint", "error", "description"] as const;
-  return fields
-    .map((field) => (err as Record<string, unknown>)[field])
-    .filter((value): value is string => typeof value === "string")
-    .join(" ");
-}
-
-function errorStatus(err: unknown): number {
-  if (!err || typeof err !== "object") return 0;
-  const record = err as Record<string, unknown>;
-  const directStatus = Number(record.status ?? record.statusCode);
-  if (Number.isFinite(directStatus)) return directStatus;
-  const cause = record.cause;
-  if (cause && typeof cause === "object") {
-    const causeStatus = Number((cause as Record<string, unknown>).status ?? (cause as Record<string, unknown>).statusCode);
-    if (Number.isFinite(causeStatus)) return causeStatus;
-  }
-  return 0;
-}
-
 export function toastFromSaveError(err: unknown): string {
-  const msg = errorText(err);
+  const msg = unknownClientErrorMessage(err);
   const code = typeof err === "object" && err && "code" in err ? String((err as { code?: unknown }).code) : "";
-  const status = errorStatus(err);
+  const status = unknownClientErrorHttpStatus(err);
   const lowerMsg = `${msg} ${code}`.toLowerCase();
   const isPermissionError = code === "42501" || lowerMsg.includes("row-level security");
   const isUnauthorizedError =

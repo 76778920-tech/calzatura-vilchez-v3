@@ -2,8 +2,8 @@ import type { Product } from "@/types";
 
 type ColorStockMap = Record<string, Record<string, unknown>>;
 
-function normalizeComparable(value: string | undefined) {
-  return String(value || "")
+function normalizeComparable(value: string) {
+  return value
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
@@ -16,14 +16,13 @@ function cellQty(v: unknown): number {
   return Number.isFinite(n) ? Math.max(0, n) : 0;
 }
 
-function findTallaKey(stockBySize: Record<string, unknown> | undefined, talla: string): string | null {
-  if (!stockBySize || !talla) return null;
+function findTallaKey(stockBySize: Record<string, unknown>, talla: string): string | null {
   const want = String(talla).trim();
   if (Object.hasOwn(stockBySize, want)) return want;
   for (const k of Object.keys(stockBySize)) {
     const ks = String(k).trim();
     if (ks === want) return k;
-    if (Number(k) === Number(want) && want !== "" && Number.isFinite(Number(want))) return k;
+    if (Number(k) === Number(want) && Number.isFinite(Number(want))) return k;
   }
   return null;
 }
@@ -51,7 +50,6 @@ function colorStockOf(p: Product): ColorStockMap | undefined {
 
 function resolveColorKeyForLine(cs: ColorStockMap, requestedColor: string, product: Product): string | undefined {
   const rc = requestedColor.trim();
-  if (!rc) return undefined;
   const keys = Object.keys(cs);
   const hit = keys.find((k) => normalizeComparable(k) === normalizeComparable(rc));
   if (hit) return hit;
@@ -65,7 +63,6 @@ function resolveColorKeyForLine(cs: ColorStockMap, requestedColor: string, produ
 
 function lineStockFromTallaOrColumn(product: Product, talla: string): number {
   const t = talla.trim();
-  if (!t) return deriveTotalFromProduct(product);
   const ts = effectiveTallaStock(product.tallaStock);
   if (ts) {
     const tk = findTallaKey(ts, t);
@@ -122,6 +119,14 @@ export function sumSizeStock(tallaStock: Record<string, number>) {
   return Object.values(tallaStock).reduce((sum, qty) => sum + Math.max(0, Number(qty) || 0), 0);
 }
 
+/** Tallas con cantidad > 0, orden numérico (catálogo admin, alineado con reglas de stock). */
+export function listSortedSizesWithPositiveQty(stockBySize: Record<string, unknown>): string[] {
+  return Object.entries(stockBySize)
+    .filter(([, qty]) => Number(qty) > 0)
+    .map(([talla]) => talla)
+    .sort((a, b) => Number(a) - Number(b));
+}
+
 /** Stock para una talla (y color si el producto usa `colorStock`). Alineado con la lógica del BFF. */
 export function getSizeStock(product: Product, talla?: string, color?: string) {
   const t = talla?.trim() ?? "";
@@ -162,10 +167,7 @@ export function getAvailableSizes(product: Product) {
   }
   const ts = effectiveTallaStock(product.tallaStock);
   if (ts) {
-    return Object.entries(ts)
-      .filter(([, qty]) => Number(qty) > 0)
-      .map(([talla]) => talla)
-      .sort((a, b) => Number(a) - Number(b));
+    return listSortedSizesWithPositiveQty(ts);
   }
   return product.tallas ?? [];
 }

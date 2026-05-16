@@ -292,6 +292,46 @@ describe("getSizeStock", () => {
     }) as Product;
     expect(getSizeStock(onlyBad, "38")).toBe(5);
   });
+
+  it("colorStock fila sin la talla: tallaStock no tiene esa talla => cero desde lineStock", () => {
+    const p = Object.assign(product({ id: "1", stock: 0 }), {
+      tallaStock: { "39": 3 },
+      colorStock: { N: { "38": 1 } },
+    }) as Product;
+    expect(getSizeStock(p, "40", "N")).toBe(0);
+  });
+
+  it("hint product.color sin clave coincidente en colorStock no resuelve color", () => {
+    const p = Object.assign(product({ id: "1", stock: 0, color: "Camel" }), {
+      colorStock: { Negro: { "38": 2 } },
+    }) as Product;
+    expect(getSizeStock(p, "38", "Azul")).toBe(0);
+  });
+
+  it("clave Infinity no matchea comparación numérica no finita (findTallaKey)", () => {
+    const p = Object.assign(product({ id: "1", stock: 0 }), {
+      tallaStock: { Infinity: 9 } as unknown as Record<string, number>,
+    }) as Product;
+    expect(getSizeStock(p, "infinity")).toBe(0);
+  });
+
+  it("colorStock solo espacios pide todas las variantes pero filas vacías no suman talla", () => {
+    const p = Object.assign(product({ id: "1", stock: 0 }), {
+      colorStock: {
+        SoloEspacios: { " ": 9 } as unknown as Record<string, unknown>,
+      },
+    }) as Product;
+    expect(getSizeStock(p, "38")).toBe(0);
+  });
+
+  it("clave de color con carácter no recortado resuelve fila (\u200c separador sin ancho)", () => {
+    const zwj = "\u200c";
+    const p = Object.assign(product({ id: "1", stock: 0 }), {
+      colorStock: { [zwj]: { "40": 3 } },
+    }) as Product;
+    expect(zwj.trim()).toBe(zwj);
+    expect(getSizeStock(p, "40", zwj)).toBe(3);
+  });
 });
 
 describe("deriveTotalFromProduct", () => {

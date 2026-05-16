@@ -5,6 +5,7 @@ import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services
 import type { SaleCustomer, SaleDocumentType } from "@/types";
 import { closeSaleDocumentWindow, openSaleDocumentWindow, renderSaleDocument, type SaleDocumentLine } from "@/utils/saleDocument";
 import type { PendingSaleLine, SaleProduct } from "./adminSalesTypes";
+import { unknownClientErrorHttpStatus, unknownClientErrorMessage } from "@/utils/unknownClientError";
 
 export const EMPTY_SALE_CUSTOMER: SaleCustomer = { dni: "", nombres: "", apellidos: "" };
 
@@ -59,33 +60,10 @@ export function isDniLookupError(err: unknown) {
   return ["DNI_INVALID", "DNI_LOOKUP_NOT_CONFIGURED", "DNI_NOT_FOUND", "DNI_LOOKUP_FAILED"].includes(msg);
 }
 
-function errorText(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (!err || typeof err !== "object") return "";
-  const fields = ["message", "details", "hint", "error", "description"] as const;
-  return fields
-    .map((field) => (err as Record<string, unknown>)[field])
-    .filter((value): value is string => typeof value === "string")
-    .join(" ");
-}
-
-function errorStatus(err: unknown): number {
-  if (!err || typeof err !== "object") return 0;
-  const record = err as Record<string, unknown>;
-  const direct = Number(record.status ?? record.statusCode);
-  if (Number.isFinite(direct)) return direct;
-  const cause = record.cause;
-  if (cause && typeof cause === "object") {
-    const nested = Number((cause as Record<string, unknown>).status ?? (cause as Record<string, unknown>).statusCode);
-    if (Number.isFinite(nested)) return nested;
-  }
-  return 0;
-}
-
 export function toastFromSalesError(err: unknown): string {
-  const msg = errorText(err);
+  const msg = unknownClientErrorMessage(err);
   const code = typeof err === "object" && err && "code" in err ? String((err as { code?: unknown }).code) : "";
-  const status = errorStatus(err);
+  const status = unknownClientErrorHttpStatus(err);
   const lower = `${msg} ${code}`.toLowerCase();
   if (
     lower.includes("insufficient_stock") ||
