@@ -185,7 +185,7 @@ export default function CheckoutPage() {
       });
 
       if (metodoPago === "stripe" && STRIPE_PK) {
-        await redirectStripeCheckoutForOrder(user, orderId, STRIPE_PK);
+        await redirectStripeCheckoutForOrder(user, orderId);
       } else {
         clearCart();
         navigate(`/pedido-exitoso/${orderId}`);

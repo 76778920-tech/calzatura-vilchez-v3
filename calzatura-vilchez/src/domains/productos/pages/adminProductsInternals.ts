@@ -1,5 +1,6 @@
 import type { Product, ProductFinancial } from "@/types";
 import { createProductVariantsAtomic, updateProductAtomic } from "@/domains/productos/services/products";
+import { buildColorStockForVariant } from "@/utils/colorStockPayload";
 import { calculatePriceRange } from "@/domains/ventas/services/finance";
 import { capitalizeWords } from "@/utils/colors";
 import { sumSizeStock } from "@/utils/stock";
@@ -407,6 +408,7 @@ async function persistAdminProductEdit(input: {
   const tallaStock = filterStockByCategory(form.tallaStock, form.categoria);
   const totalStock = sumSizeStock(tallaStock);
   const color = capitalizeWords(form.color ?? "");
+  const colorStock = buildColorStockForVariant(color, tallaStock);
   const payload: Omit<Product, "id"> = {
     nombre: form.nombre.trim(),
     precio: form.precio,
@@ -418,6 +420,7 @@ async function persistAdminProductEdit(input: {
     tipoCalzado: form.tipoCalzado?.trim() ?? "",
     tallas: sizesFromStock(tallaStock),
     tallaStock: Object.fromEntries(Object.entries(tallaStock).filter(([, qty]) => qty > 0)),
+    ...(colorStock ? { colorStock } : {}),
     marca: form.marca?.trim() ?? "",
     material: form.material?.trim() || undefined,
     estilo: normalizeEstiloField(form.estilo),

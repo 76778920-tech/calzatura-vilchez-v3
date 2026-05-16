@@ -122,7 +122,7 @@ export function CartProvider({ children }: CartProviderProps) {
   const addItem = useCallback(
     (product: Product, quantity = 1, talla?: string, color?: string) => {
       setItems((prev) => {
-        const available = getSizeStock(product, talla);
+        const available = getSizeStock(product, talla, color);
         const existing = prev.find(
           (i) => i.product.id === product.id && i.talla === talla && i.color === color
         );
@@ -163,7 +163,7 @@ export function CartProvider({ children }: CartProviderProps) {
       setItems((prev) => {
         const newItems = prev.map((i) =>
           i.product.id === productId && i.talla === talla && i.color === color
-            ? { ...i, quantity: Math.min(getSizeStock(i.product, talla), quantity) }
+            ? { ...i, quantity: Math.min(getSizeStock(i.product, talla, color), quantity) }
             : i
         );
         persistItems(newItems);

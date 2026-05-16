@@ -53,6 +53,59 @@ describe("getSizeStock", () => {
     const p = product({ id: "1", stock: 7 });
     expect(getSizeStock(p, "40")).toBe(7);
   });
+
+  it("talla numérica en JSON coincide con clave string en tallaStock", () => {
+    const p = product({ id: "1", tallaStock: { "38": 3 }, stock: 0 });
+    expect(getSizeStock(p, "38")).toBe(3);
+    expect(getSizeStock(p, String(38))).toBe(3);
+  });
+
+  it("colorStock: cantidad como string y color sin acento", () => {
+    const base = product({ id: "1", stock: 0 });
+    const p = Object.assign(base, {
+      colorStock: { Camel: { "38": "2" } },
+    }) as Product;
+    expect(getSizeStock(p, "38", "camel")).toBe(2);
+  });
+
+  it("colorStock: color inexistente no suma otras variantes", () => {
+    const base = product({ id: "1", stock: 99 });
+    const p = Object.assign(base, {
+      colorStock: { Camel: { "38": 2 }, Negro: { "38": 5 } },
+    }) as Product;
+    expect(getSizeStock(p, "38", "Rojo")).toBe(0);
+  });
+
+  it("colorStock vacío o solo filas sin tallas: usa tallaStock", () => {
+    const onlyEmptyRows = Object.assign(product({ id: "1", stock: 0, tallaStock: { "38": 4 } }), {
+      colorStock: { Camel: {} },
+    }) as Product;
+    expect(getSizeStock(onlyEmptyRows, "38", "Camel")).toBe(4);
+
+    const emptyMap = Object.assign(product({ id: "1", stock: 0, tallaStock: { "38": 2 } }), {
+      colorStock: {},
+    }) as Product;
+    expect(getSizeStock(emptyMap, "38")).toBe(2);
+  });
+
+  it("tallaStock vacío {} usa columna stock (mismo caso que RPC coalesce a {})", () => {
+    const p = Object.assign(product({ id: "1", stock: 9, tallaStock: {} as Record<string, number> }), {});
+    expect(getSizeStock(p, "38")).toBe(9);
+    expect(getSizeStock(p)).toBe(9);
+  });
+
+  it("colorStock con fila de color vacía: usa tallaStock para esa talla", () => {
+    const base = product({
+      id: "1",
+      stock: 6,
+      color: "Negro",
+      tallaStock: { "39": 5 },
+    });
+    const p = Object.assign(base, {
+      colorStock: { Negro: {}, Camel: { "39": 1 } },
+    }) as Product;
+    expect(getSizeStock(p, "39", "Negro")).toBe(5);
+  });
 });
 
 describe("getAvailableSizes", () => {

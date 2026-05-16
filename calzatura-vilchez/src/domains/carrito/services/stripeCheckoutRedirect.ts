@@ -5,7 +5,7 @@ import { getBackendApiBaseUrl } from "@/config/apiBackend";
  * Stripe.js ya no expone `redirectToCheckout` en versiones recientes.
  * El flujo correcto es abrir la URL hospedada que devuelve la API (`session.url`).
  */
-export async function redirectStripeCheckoutForOrder(user: User, orderId: string, _stripePublicKey: string): Promise<void> {
+export async function redirectStripeCheckoutForOrder(user: User, orderId: string): Promise<void> {
   const base = getBackendApiBaseUrl();
   if (!base) {
     throw new Error("VITE_BACKEND_API_URL no configurada (BFF Stripe Checkout)");

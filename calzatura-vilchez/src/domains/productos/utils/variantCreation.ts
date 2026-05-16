@@ -1,4 +1,5 @@
 import type { Product } from "@/types";
+import { buildColorStockForVariant } from "@/utils/colorStockPayload";
 
 export function normalizeVariantCode(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 40);
@@ -63,6 +64,8 @@ export function buildVariantCreationPlan(
     );
     const descripcionVariante = slot.descripcion?.trim();
     const descripcionFinal = (descripcionVariante || base.descripcion).trim();
+    const colorForRow = slot.color.trim();
+    const colorStock = buildColorStockForVariant(colorForRow, tallaStockFiltered);
     const product: Omit<Product, "id"> = {
       nombre: base.nombre.trim(),
       precio: base.precio,
@@ -74,10 +77,11 @@ export function buildVariantCreationPlan(
       tipoCalzado: base.tipoCalzado?.trim() || "",
       tallas: sizesFromTallaStock(slot.tallaStock),
       tallaStock: tallaStockFiltered,
+      ...(colorStock ? { colorStock } : {}),
       marca: base.marca.trim(),
       material: base.material?.trim() || undefined,
       estilo: base.estilo?.trim() || undefined,
-      color: slot.color,
+      color: colorForRow,
       familiaId: base.familiaId,
       destacado: base.destacado,
       activo: slot.activo ?? base.activo ?? true,

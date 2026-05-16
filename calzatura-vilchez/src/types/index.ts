@@ -10,6 +10,11 @@ export interface Product {
   tipoCalzado?: string;
   tallas?: string[];
   tallaStock?: Record<string, number>;
+  /**
+   * Stock por color (clave = nombre del color en catálogo), cada valor es talla → cantidad.
+   * Debe coincidir con `color` de la variante para checkout/BFF.
+   */
+  colorStock?: Record<string, Record<string, number>>;
   marca?: string;
   material?: string;
   estilo?: string;
