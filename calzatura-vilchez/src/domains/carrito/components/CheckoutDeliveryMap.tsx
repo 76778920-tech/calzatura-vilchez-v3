@@ -24,19 +24,49 @@ type Props = Readonly<{
   onCustomerPositionChange?: (lat: number, lng: number) => void;
 }>;
 
-function FitBoundsToSignal({
-  storeLat,
-  storeLng,
-  fitBoundsNonce,
-  customerLat,
-  customerLng,
-}: {
+type FitBoundsToSignalProps = Readonly<{
   storeLat: number;
   storeLng: number;
   fitBoundsNonce: number;
   customerLat: number;
   customerLng: number;
-}) {
+}>;
+
+type StorePositionProps = Readonly<{
+  storeLat: number;
+  storeLng: number;
+}>;
+
+type MapPickHandlerProps = Readonly<{
+  enabled: boolean;
+  onPick: (lat: number, lng: number) => void;
+}>;
+
+type RouteLayerProps = Readonly<{
+  routePositions: MapRoutePosition[] | null;
+  showFallbackLine: boolean;
+  store: L.LatLngTuple;
+  customer: L.LatLngTuple;
+  routeLoading: boolean;
+}>;
+
+type CustomerMarkerProps = Readonly<{
+  hasCustomer: boolean;
+  interactive: boolean;
+  onCustomerPositionChange?: (lat: number, lng: number) => void;
+  customer: L.LatLngTuple;
+  customerIcon: L.Icon;
+}>;
+
+type MapHintProps = Readonly<{
+  locationConfirmed: boolean;
+  routeLoading: boolean;
+  interactive: boolean;
+  hasDrivingRoute: boolean;
+}>;
+
+function FitBoundsToSignal(props: FitBoundsToSignalProps) {
+  const { storeLat, storeLng, fitBoundsNonce, customerLat, customerLng } = props;
   const map = useMap();
   const didInvalidateRef = useRef(false);
 
@@ -63,7 +93,8 @@ function FitBoundsToSignal({
   return null;
 }
 
-function CenterStoreOnMount({ storeLat, storeLng }: { storeLat: number; storeLng: number }) {
+function CenterStoreOnMount(props: StorePositionProps) {
+  const { storeLat, storeLng } = props;
   const map = useMap();
   const didCenterRef = useRef(false);
 
@@ -80,11 +111,13 @@ function CenterStoreOnMount({ storeLat, storeLng }: { storeLat: number; storeLng
   return null;
 }
 
-function MapPickHandler({ enabled, onPick }: { enabled: boolean; onPick: (lat: number, lng: number) => void }) {
+function MapPickHandler(props: MapPickHandlerProps) {
+  const { enabled, onPick } = props;
   useMapEvents({
     click: (e) => {
-      if (enabled === false) return;
-      onPick(e.latlng.lat, e.latlng.lng);
+      if (enabled) {
+        onPick(e.latlng.lat, e.latlng.lng);
+      }
     },
   });
   return null;
@@ -111,19 +144,8 @@ function mapClassName(interactive: boolean, locationConfirmed: boolean) {
   return classes.join(" ");
 }
 
-function RouteLayer({
-  routePositions,
-  showFallbackLine,
-  store,
-  customer,
-  routeLoading,
-}: {
-  routePositions: MapRoutePosition[] | null;
-  showFallbackLine: boolean;
-  store: L.LatLngTuple;
-  customer: L.LatLngTuple;
-  routeLoading: boolean;
-}) {
+function RouteLayer(props: RouteLayerProps) {
+  const { routePositions, showFallbackLine, store, customer, routeLoading } = props;
   if (routePositions) {
     return (
       <>
@@ -156,19 +178,8 @@ function RouteLayer({
   );
 }
 
-function CustomerMarker({
-  hasCustomer,
-  interactive,
-  onCustomerPositionChange,
-  customer,
-  customerIcon,
-}: {
-  hasCustomer: boolean;
-  interactive: boolean;
-  onCustomerPositionChange?: (lat: number, lng: number) => void;
-  customer: L.LatLngTuple;
-  customerIcon: L.Icon;
-}) {
+function CustomerMarker(props: CustomerMarkerProps) {
+  const { hasCustomer, interactive, onCustomerPositionChange, customer, customerIcon } = props;
   if (hasCustomer === false) return null;
   if (interactive === false || !onCustomerPositionChange) {
     return <Marker position={customer} icon={customerIcon} interactive={false} />;
@@ -188,17 +199,8 @@ function CustomerMarker({
   );
 }
 
-function MapHint({
-  locationConfirmed,
-  routeLoading,
-  interactive,
-  hasDrivingRoute,
-}: {
-  locationConfirmed: boolean;
-  routeLoading: boolean;
-  interactive: boolean;
-  hasDrivingRoute: boolean;
-}) {
+function MapHint(props: MapHintProps) {
+  const { locationConfirmed, routeLoading, interactive, hasDrivingRoute } = props;
   if (locationConfirmed === false) {
     return (
       <p className="checkout-delivery-map-hint checkout-delivery-map-hint--warn">
@@ -215,18 +217,19 @@ function MapHint({
   return <p className="checkout-delivery-map-hint">{hint}</p>;
 }
 
-export default function CheckoutDeliveryMap({
-  storeLat,
-  storeLng,
-  customerLat = null,
-  customerLng = null,
-  locationConfirmed,
-  fitBoundsNonce,
-  routePositions = null,
-  routeLoading = false,
-  interactive = false,
-  onCustomerPositionChange,
-}: Props) {
+export default function CheckoutDeliveryMap(props: Props) {
+  const {
+    storeLat,
+    storeLng,
+    customerLat = null,
+    customerLng = null,
+    locationConfirmed,
+    fitBoundsNonce,
+    routePositions = null,
+    routeLoading = false,
+    interactive = false,
+    onCustomerPositionChange,
+  } = props;
   const store: L.LatLngTuple = [storeLat, storeLng];
   const hasCustomer =
     locationConfirmed &&

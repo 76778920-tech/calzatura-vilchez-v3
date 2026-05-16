@@ -77,25 +77,31 @@ function quoteStatus(quote: DeliveryQuote) {
   );
 }
 
-function SearchGroup({
-  mapSearchInput,
-  mapSearchHasHouseNumber,
-  onMapSearchChange,
-  searchSuggestLoading,
-  searchSuggestError,
-  searchSuggestions,
-  onPickCandidate,
-  onPickSearchByIndex,
-}: Pick<Props,
-  | "mapSearchInput"
-  | "mapSearchHasHouseNumber"
-  | "onMapSearchChange"
-  | "searchSuggestLoading"
-  | "searchSuggestError"
-  | "searchSuggestions"
-  | "onPickCandidate"
-  | "onPickSearchByIndex"
->) {
+type SearchGroupProps = Readonly<
+  Pick<
+    Props,
+    | "mapSearchInput"
+    | "mapSearchHasHouseNumber"
+    | "onMapSearchChange"
+    | "searchSuggestLoading"
+    | "searchSuggestError"
+    | "searchSuggestions"
+    | "onPickCandidate"
+    | "onPickSearchByIndex"
+  >
+>;
+
+function SearchGroup(props: SearchGroupProps) {
+  const {
+    mapSearchInput,
+    mapSearchHasHouseNumber,
+    onMapSearchChange,
+    searchSuggestLoading,
+    searchSuggestError,
+    searchSuggestions,
+    onPickCandidate,
+    onPickSearchByIndex,
+  } = props;
   const showEmpty = !searchSuggestLoading && !searchSuggestError && mapSearchInput.trim().length >= 3 && searchSuggestions.length === 0;
   const emptyMessage = mapSearchHasHouseNumber
     ? "No encontramos ese numero exacto. Toca el mapa sobre la puerta o arrastra el pin azul."
@@ -136,19 +142,25 @@ function SearchGroup({
   );
 }
 
-function AddressSuggestBlock({
-  addressSuggestLoading,
-  addressSuggestError,
-  addressSuggestions,
-  addressHasHouseNumber,
-  onPickCandidate,
-}: Pick<Props,
-  | "addressSuggestLoading"
-  | "addressSuggestError"
-  | "addressSuggestions"
-  | "addressHasHouseNumber"
-  | "onPickCandidate"
->) {
+type AddressSuggestBlockProps = Readonly<
+  Pick<
+    Props,
+    | "addressSuggestLoading"
+    | "addressSuggestError"
+    | "addressSuggestions"
+    | "addressHasHouseNumber"
+    | "onPickCandidate"
+  >
+>;
+
+function AddressSuggestBlock(props: AddressSuggestBlockProps) {
+  const {
+    addressSuggestLoading,
+    addressSuggestError,
+    addressSuggestions,
+    addressHasHouseNumber,
+    onPickCandidate,
+  } = props;
   const showEmpty = !addressSuggestLoading && !addressSuggestError && addressSuggestions.length === 0;
   const emptyMessage = addressHasHouseNumber
     ? "No encontramos ese numero exacto. Usa el buscador o marca la puerta en el mapa."
@@ -174,11 +186,10 @@ function AddressSuggestBlock({
   );
 }
 
-function QuoteSummary({
-  deliveryQuoteLoading,
-  deliveryQuoteError,
-  deliveryQuote,
-}: Pick<Props, "deliveryQuoteLoading" | "deliveryQuoteError" | "deliveryQuote">) {
+type QuoteSummaryProps = Readonly<Pick<Props, "deliveryQuoteLoading" | "deliveryQuoteError" | "deliveryQuote">>;
+
+function QuoteSummary(props: QuoteSummaryProps) {
+  const { deliveryQuoteLoading, deliveryQuoteError, deliveryQuote } = props;
   if (deliveryQuoteLoading) return <p className="checkout-delivery-muted">Calculando distancia y costo...</p>;
   if (deliveryQuoteError) return <p className="checkout-delivery-error">{deliveryQuoteError}</p>;
   if (!deliveryQuote) return null;
@@ -199,6 +210,74 @@ function introCopy(mapDegraded: boolean) {
     return "Toca el mapa o arrastra el pin azul hasta tu puerta. Las busquedas automaticas vuelven cuando el servicio de mapas este disponible.";
   }
   return "La lista prioriza direcciones y calles sobre solo ciudad. Incluye en Direccion el nombre de la via y el numero (ej. Jr. Puno 245). Si no aparece tu puerta exacta, toca el mapa o arrastra el pin azul.";
+}
+
+function DeliveryBoxTitle({ mapDegraded }: Readonly<{ mapDegraded: boolean }>) {
+  return (
+    <p className="checkout-delivery-title">
+      {mapDegraded ? "Ubicacion de entrega" : "Envio y ruta de entrega"}
+    </p>
+  );
+}
+
+function DegradedBanner({ mapDegraded, degradedNotice }: Readonly<{ mapDegraded: boolean; degradedNotice: string }>) {
+  if (!mapDegraded || !degradedNotice.trim()) return null;
+  return (
+    <output className="checkout-delivery-warn">
+      {degradedNotice} Puedes marcar el punto en el mapa; el costo usa distancia aproximada.
+    </output>
+  );
+}
+
+function DeliveryMapSection(
+  props: Readonly<{
+    showDeliveryMap: boolean;
+    locationConfirmed: boolean;
+    selectedDelivery: GeocodeCandidate | null;
+    mapFitNonce: number;
+    routePositions: MapRoutePosition[] | null | undefined;
+    routeLoading: boolean;
+    onMapCustomerMove: (lat: number, lng: number) => void;
+  }>,
+) {
+  const {
+    showDeliveryMap,
+    locationConfirmed,
+    selectedDelivery,
+    mapFitNonce,
+    routePositions,
+    routeLoading,
+    onMapCustomerMove,
+  } = props;
+  if (!showDeliveryMap) return null;
+  const customerLat = locationConfirmed && selectedDelivery ? selectedDelivery.lat : null;
+  const customerLng = locationConfirmed && selectedDelivery ? selectedDelivery.lng : null;
+  return (
+    <CheckoutDeliveryMap
+      storeLat={DELIVERY_CONFIG.storeLat}
+      storeLng={DELIVERY_CONFIG.storeLng}
+      customerLat={customerLat}
+      customerLng={customerLng}
+      locationConfirmed={locationConfirmed}
+      fitBoundsNonce={mapFitNonce}
+      routePositions={routePositions}
+      routeLoading={routeLoading}
+      interactive
+      onCustomerPositionChange={onMapCustomerMove}
+    />
+  );
+}
+
+function SelectedDeliveryHighlight(
+  props: Readonly<{ selectedDelivery: GeocodeCandidate | null; locationConfirmed: boolean }>,
+) {
+  const { selectedDelivery, locationConfirmed } = props;
+  if (!selectedDelivery?.label || !locationConfirmed) return null;
+  return (
+    <output className="checkout-delivery-selected">
+      Punto de entrega: <strong>{selectedDelivery.label}</strong>
+    </output>
+  );
 }
 
 export default function CheckoutDeliveryBox({
@@ -234,14 +313,8 @@ export default function CheckoutDeliveryBox({
 
   return (
     <div className="checkout-delivery-box">
-      <p className="checkout-delivery-title">
-        {mapDegraded ? "Ubicacion de entrega" : "Envio y ruta de entrega"}
-      </p>
-      {mapDegraded && degradedNotice ? (
-        <output className="checkout-delivery-warn">
-          {degradedNotice} Puedes marcar el punto en el mapa; el costo usa distancia aproximada.
-        </output>
-      ) : null}
+      <DeliveryBoxTitle mapDegraded={mapDegraded} />
+      <DegradedBanner mapDegraded={mapDegraded} degradedNotice={degradedNotice} />
       <p className="checkout-delivery-muted checkout-delivery-intro">{introCopy(mapDegraded)}</p>
 
       {shouldShowSearch ? (
@@ -267,26 +340,17 @@ export default function CheckoutDeliveryBox({
         />
       ) : null}
 
-      {showDeliveryMap ? (
-        <CheckoutDeliveryMap
-          storeLat={DELIVERY_CONFIG.storeLat}
-          storeLng={DELIVERY_CONFIG.storeLng}
-          customerLat={locationConfirmed && selectedDelivery ? selectedDelivery.lat : null}
-          customerLng={locationConfirmed && selectedDelivery ? selectedDelivery.lng : null}
-          locationConfirmed={locationConfirmed}
-          fitBoundsNonce={mapFitNonce}
-          routePositions={routePositions}
-          routeLoading={routeLoading}
-          interactive
-          onCustomerPositionChange={onMapCustomerMove}
-        />
-      ) : null}
+      <DeliveryMapSection
+        showDeliveryMap={showDeliveryMap}
+        locationConfirmed={locationConfirmed}
+        selectedDelivery={selectedDelivery}
+        mapFitNonce={mapFitNonce}
+        routePositions={routePositions}
+        routeLoading={routeLoading}
+        onMapCustomerMove={onMapCustomerMove}
+      />
 
-      {selectedDelivery?.label && locationConfirmed ? (
-        <output className="checkout-delivery-selected">
-          Punto de entrega: <strong>{selectedDelivery.label}</strong>
-        </output>
-      ) : null}
+      <SelectedDeliveryHighlight selectedDelivery={selectedDelivery} locationConfirmed={locationConfirmed} />
 
       <QuoteSummary
         deliveryQuoteLoading={deliveryQuoteLoading}

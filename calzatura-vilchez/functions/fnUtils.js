@@ -235,8 +235,8 @@ function lineStockFromTallaOrColumn(product, talla) {
   const ts = effectiveTallaStock(product.tallaStock);
   if (ts) {
     const tk = findTallaKeyInMap(ts, t);
-    if (tk != null) return cellQty(ts[tk]);
-    return 0;
+    if (tk == null) return 0;
+    return cellQty(ts[tk]);
   }
   return Math.max(0, toN(product.stock));
 }
@@ -281,15 +281,15 @@ function deriveTotalStock(product) {
 
 function stockFromColorRow(colorStock, color, talla, product) {
   const colorKey = resolveColorKeyForLine(colorStock, color, product);
-  if (!colorKey) {
-    return Object.keys(colorStock).length > 1 ? 0 : lineStockFromTallaOrColumn(product, talla);
+  if (colorKey) {
+    const row = colorStock[colorKey];
+    if (!row || typeof row !== "object" || Array.isArray(row)) {
+      return lineStockFromTallaOrColumn(product, talla);
+    }
+    const tallaKey = findTallaKeyInMap(row, talla);
+    return tallaKey == null ? lineStockFromTallaOrColumn(product, talla) : cellQty(row[tallaKey]);
   }
-  const row = colorStock[colorKey];
-  if (!row || typeof row !== "object" || Array.isArray(row)) {
-    return lineStockFromTallaOrColumn(product, talla);
-  }
-  const tallaKey = findTallaKeyInMap(row, talla);
-  return tallaKey != null ? cellQty(row[tallaKey]) : lineStockFromTallaOrColumn(product, talla);
+  return Object.keys(colorStock).length > 1 ? 0 : lineStockFromTallaOrColumn(product, talla);
 }
 
 function stockFromAllColorRows(colorStock, talla) {
@@ -312,8 +312,8 @@ function getSizeStock(product, talla, color) {
   const ts = effectiveTallaStock(product.tallaStock);
   if (t && ts) {
     const tallaKey = findTallaKeyInMap(ts, t);
-    if (tallaKey != null) return cellQty(ts[tallaKey]);
-    return 0;
+    if (tallaKey == null) return 0;
+    return cellQty(ts[tallaKey]);
   }
 
   return deriveTotalStock(product);

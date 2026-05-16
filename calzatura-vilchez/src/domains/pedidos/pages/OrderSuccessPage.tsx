@@ -105,13 +105,13 @@ export default function OrderSuccessPage() {
         </p>
 
         {paymentSyncTimeout && order?.estado === "pendiente" && (
-          <p className="success-message" role="status">
+          <output className="success-message" aria-live="polite">
             El pago puede tardar unos segundos en reflejarse. Revisa{" "}
             <Link to="/mis-pedidos" className="success-inline-link">
               Mis pedidos
             </Link>{" "}
             en un momento o actualiza esta página.
-          </p>
+          </output>
         )}
 
         {order && (
