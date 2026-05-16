@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { DELIVERY_CONFIG } from "@/config/delivery";
 import type { DeliveryQuote, GeocodeCandidate, MapRoutePosition } from "@/services/deliveryOpenRoute";
 import CheckoutDeliveryMap from "@/domains/carrito/components/CheckoutDeliveryMap";
@@ -12,21 +11,22 @@ function SuggestionList({ candidates, keyPrefix, ariaLabel, onPick }: Readonly<{
 }>) {
   return (
     <ul className="checkout-delivery-suggest-list" aria-label={ariaLabel}>
-      {candidates.map((c, i) => (
-        <li key={`${keyPrefix}-${i}-${c.lat}-${c.lng}`}>
-          <button
-            type="button"
-            className="checkout-delivery-suggest-btn"
-            title={c.label}
-            onClick={() => onPick(c)}
-          >
-            <span className="checkout-delivery-suggest-label">{c.label}</span>
-            {checkoutGeoLayerHint(c.layer) ? (
-              <span className="checkout-delivery-layer-hint">{checkoutGeoLayerHint(c.layer)}</span>
-            ) : null}
-          </button>
-        </li>
-      ))}
+      {candidates.map((c, i) => {
+        const layerHint = checkoutGeoLayerHint(c.layer);
+        return (
+          <li key={`${keyPrefix}-${i}-${c.lat}-${c.lng}`}>
+            <button
+              type="button"
+              className="checkout-delivery-suggest-btn"
+              title={c.label}
+              onClick={() => onPick(c)}
+            >
+              <span className="checkout-delivery-suggest-label">{c.label}</span>
+              {layerHint ? <span className="checkout-delivery-layer-hint">{layerHint}</span> : null}
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -59,6 +59,148 @@ type Props = Readonly<{
   deliveryQuote: DeliveryQuote | null;
 }>;
 
+function quoteStatus(quote: DeliveryQuote) {
+  if (quote.isOutOfRange) {
+    return (
+      <p className="checkout-delivery-error">
+        Fuera de zona de reparto (maximo {DELIVERY_CONFIG.maxDeliveryKm} km).
+      </p>
+    );
+  }
+  if (quote.isFreeDelivery) {
+    return <p className="checkout-delivery-ok">Envio gratis en tu zona.</p>;
+  }
+  return (
+    <p className="checkout-delivery-line">
+      Costo de envio: <strong>{quote.costFormatted}</strong>
+    </p>
+  );
+}
+
+function SearchGroup({
+  mapSearchInput,
+  mapSearchHasHouseNumber,
+  onMapSearchChange,
+  searchSuggestLoading,
+  searchSuggestError,
+  searchSuggestions,
+  onPickCandidate,
+  onPickSearchByIndex,
+}: Pick<Props,
+  | "mapSearchInput"
+  | "mapSearchHasHouseNumber"
+  | "onMapSearchChange"
+  | "searchSuggestLoading"
+  | "searchSuggestError"
+  | "searchSuggestions"
+  | "onPickCandidate"
+  | "onPickSearchByIndex"
+>) {
+  const showEmpty = !searchSuggestLoading && !searchSuggestError && mapSearchInput.trim().length >= 3 && searchSuggestions.length === 0;
+  const emptyMessage = mapSearchHasHouseNumber
+    ? "No encontramos ese numero exacto. Toca el mapa sobre la puerta o arrastra el pin azul."
+    : "No hay resultados exactos; prueba con via y numero, o marca el punto en el mapa.";
+
+  return (
+    <div className="form-group checkout-delivery-search-group">
+      <label htmlFor="checkout-delivery-map-search">Buscar ubicacion en el mapa</label>
+      <input
+        id="checkout-delivery-map-search"
+        type="text"
+        value={mapSearchInput}
+        onChange={(e) => onMapSearchChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (searchSuggestions.length > 0) onPickSearchByIndex?.(0);
+          }
+        }}
+        className="form-input"
+        placeholder="Ej: Av. Giraldez 314, Huancayo"
+        autoComplete="street-address"
+      />
+      {searchSuggestLoading && <p className="checkout-delivery-muted">Buscando...</p>}
+      {!searchSuggestLoading && searchSuggestError ? (
+        <p className="checkout-delivery-error">{searchSuggestError}</p>
+      ) : null}
+      {!searchSuggestLoading && !searchSuggestError && searchSuggestions.length > 0 ? (
+        <SuggestionList
+          candidates={searchSuggestions}
+          keyPrefix="s"
+          ariaLabel="Resultados de busqueda"
+          onPick={(c) => onPickCandidate(c, true, true)}
+        />
+      ) : null}
+      {showEmpty ? <p className="checkout-delivery-muted">{emptyMessage}</p> : null}
+    </div>
+  );
+}
+
+function AddressSuggestBlock({
+  addressSuggestLoading,
+  addressSuggestError,
+  addressSuggestions,
+  addressHasHouseNumber,
+  onPickCandidate,
+}: Pick<Props,
+  | "addressSuggestLoading"
+  | "addressSuggestError"
+  | "addressSuggestions"
+  | "addressHasHouseNumber"
+  | "onPickCandidate"
+>) {
+  const showEmpty = !addressSuggestLoading && !addressSuggestError && addressSuggestions.length === 0;
+  const emptyMessage = addressHasHouseNumber
+    ? "No encontramos ese numero exacto. Usa el buscador o marca la puerta en el mapa."
+    : "No hay resultados; prueba el buscador de arriba.";
+
+  return (
+    <div className="checkout-delivery-suggest-block">
+      <p className="checkout-delivery-subtitle">Sugerencias segun tu direccion</p>
+      {addressSuggestLoading && <p className="checkout-delivery-muted">Cargando sugerencias...</p>}
+      {!addressSuggestLoading && addressSuggestError ? (
+        <p className="checkout-delivery-error">{addressSuggestError}</p>
+      ) : null}
+      {showEmpty ? <p className="checkout-delivery-muted">{emptyMessage}</p> : null}
+      {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length > 0 ? (
+        <SuggestionList
+          candidates={addressSuggestions}
+          keyPrefix="a"
+          ariaLabel="Sugerencias por direccion"
+          onPick={(c) => onPickCandidate(c, true, false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function QuoteSummary({
+  deliveryQuoteLoading,
+  deliveryQuoteError,
+  deliveryQuote,
+}: Pick<Props, "deliveryQuoteLoading" | "deliveryQuoteError" | "deliveryQuote">) {
+  if (deliveryQuoteLoading) return <p className="checkout-delivery-muted">Calculando distancia y costo...</p>;
+  if (deliveryQuoteError) return <p className="checkout-delivery-error">{deliveryQuoteError}</p>;
+  if (!deliveryQuote) return null;
+
+  return (
+    <>
+      <p className="checkout-delivery-line">
+        Distancia aprox.: <strong>{deliveryQuote.distanceFormatted}</strong>
+        {deliveryQuote.label ? <span className="checkout-delivery-muted"> - {deliveryQuote.label}</span> : null}
+      </p>
+      {quoteStatus(deliveryQuote)}
+    </>
+  );
+}
+
+function introCopy(mapDegraded: boolean) {
+  if (mapDegraded) {
+    return "Toca el mapa o arrastra el pin azul hasta tu puerta. Las busquedas automaticas vuelven cuando el servicio de mapas este disponible.";
+  }
+  return "La lista prioriza direcciones y calles sobre solo ciudad. Incluye en Direccion el nombre de la via y el numero (ej. Jr. Puno 245). Si no aparece tu puerta exacta, toca el mapa o arrastra el pin azul.";
+}
+
 export default function CheckoutDeliveryBox({
   mapDegraded = false,
   degradedNotice = "",
@@ -86,108 +228,44 @@ export default function CheckoutDeliveryBox({
   deliveryQuoteError,
   deliveryQuote,
 }: Props) {
-  let deliveryQuoteStatus: ReactNode = null;
-  if (!deliveryQuoteLoading && !deliveryQuoteError && deliveryQuote) {
-    const q = deliveryQuote;
-    if (q.isOutOfRange) {
-      deliveryQuoteStatus = (
-        <p className="checkout-delivery-error">
-          Fuera de zona de reparto (máximo {DELIVERY_CONFIG.maxDeliveryKm} km).
-        </p>
-      );
-    } else if (q.isFreeDelivery) {
-      deliveryQuoteStatus = <p className="checkout-delivery-ok">Envío gratis en tu zona.</p>;
-    } else {
-      deliveryQuoteStatus = (
-        <p className="checkout-delivery-line">
-          Costo de envío: <strong>{q.costFormatted}</strong>
-        </p>
-      );
-    }
-  }
+  const shouldShowSearch = !mapDegraded;
+  const shouldShowAddressSuggestions = !mapDegraded && addressLineLength >= 10;
+  const shouldShowCompletionHint = !mapDegraded && addressLineLength < 8;
 
   return (
     <div className="checkout-delivery-box">
       <p className="checkout-delivery-title">
-        {mapDegraded ? "Ubicación de entrega" : "Envío y ruta de entrega"}
+        {mapDegraded ? "Ubicacion de entrega" : "Envio y ruta de entrega"}
       </p>
       {mapDegraded && degradedNotice ? (
-        <p className="checkout-delivery-warn" role="status">
-          {degradedNotice} Podés marcar el punto en el mapa; el costo usa distancia aproximada (línea recta).
-        </p>
+        <output className="checkout-delivery-warn">
+          {degradedNotice} Puedes marcar el punto en el mapa; el costo usa distancia aproximada.
+        </output>
       ) : null}
-      <p className="checkout-delivery-muted checkout-delivery-intro">
-        {mapDegraded
-          ? "Tocá el mapa o arrastrá el pin azul hasta tu puerta. Las búsquedas automáticas vuelven cuando el servicio de mapas esté disponible."
-          : "La lista prioriza direcciones y calles sobre solo «ciudad». Incluí en Dirección el nombre de la vía y el número (ej. Jr. Puno 245). Si no aparece tu puerta exacta, tocá el mapa o arrastrá el pin azul."}
-      </p>
+      <p className="checkout-delivery-muted checkout-delivery-intro">{introCopy(mapDegraded)}</p>
 
-      {!mapDegraded && (
-      <div className="form-group checkout-delivery-search-group">
-        <label htmlFor="checkout-delivery-map-search">Buscar ubicación en el mapa</label>
-        <input
-          id="checkout-delivery-map-search"
-          type="text"
-          value={mapSearchInput}
-          onChange={(e) => onMapSearchChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              if (searchSuggestions.length > 0) {
-                onPickSearchByIndex?.(0);
-              }
-            }
-          }}
-          className="form-input"
-          placeholder="Ej: Av. Giraldez 314, Huancayo"
-          autoComplete="street-address"
+      {shouldShowSearch ? (
+        <SearchGroup
+          mapSearchInput={mapSearchInput}
+          mapSearchHasHouseNumber={mapSearchHasHouseNumber}
+          onMapSearchChange={onMapSearchChange}
+          searchSuggestLoading={searchSuggestLoading}
+          searchSuggestError={searchSuggestError}
+          searchSuggestions={searchSuggestions}
+          onPickCandidate={onPickCandidate}
+          onPickSearchByIndex={onPickSearchByIndex}
         />
-        {searchSuggestLoading && <p className="checkout-delivery-muted">Buscando…</p>}
-        {!searchSuggestLoading && searchSuggestError && (
-          <p className="checkout-delivery-error">{searchSuggestError}</p>
-        )}
-        {!searchSuggestLoading && !searchSuggestError && searchSuggestions.length > 0 && (
-          <SuggestionList
-            candidates={searchSuggestions}
-            keyPrefix="s"
-            ariaLabel="Resultados de búsqueda"
-            onPick={(c) => onPickCandidate(c, true, true)}
-          />
-        )}
-        {!searchSuggestLoading && !searchSuggestError && mapSearchInput.trim().length >= 3 && searchSuggestions.length === 0 && (
-          <p className="checkout-delivery-muted">
-            {mapSearchHasHouseNumber
-              ? "No encontramos ese número exacto. Toca el mapa sobre la puerta o arrastra el pin azul."
-              : "No hay resultados exactos; prueba con vía y número, o marca el punto en el mapa."}
-          </p>
-        )}
-      </div>
-      )}
+      ) : null}
 
-      {!mapDegraded && addressLineLength >= 10 && (
-        <div className="checkout-delivery-suggest-block">
-          <p className="checkout-delivery-subtitle">Sugerencias según tu dirección</p>
-          {addressSuggestLoading && <p className="checkout-delivery-muted">Cargando sugerencias…</p>}
-          {!addressSuggestLoading && addressSuggestError && (
-            <p className="checkout-delivery-error">{addressSuggestError}</p>
-          )}
-          {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length === 0 && (
-            <p className="checkout-delivery-muted">
-              {addressHasHouseNumber
-                ? "No encontramos ese número exacto. Usa el buscador o marca la puerta en el mapa."
-                : "No hay resultados; probá el buscador de arriba."}
-            </p>
-          )}
-          {!addressSuggestLoading && !addressSuggestError && addressSuggestions.length > 0 && (
-            <SuggestionList
-              candidates={addressSuggestions}
-              keyPrefix="a"
-              ariaLabel="Sugerencias por dirección"
-            onPick={(c) => onPickCandidate(c, true, false)}
-          />
-        )}
-      </div>
-      )}
+      {shouldShowAddressSuggestions ? (
+        <AddressSuggestBlock
+          addressSuggestLoading={addressSuggestLoading}
+          addressSuggestError={addressSuggestError}
+          addressSuggestions={addressSuggestions}
+          addressHasHouseNumber={addressHasHouseNumber}
+          onPickCandidate={onPickCandidate}
+        />
+      ) : null}
 
       {showDeliveryMap ? (
         <CheckoutDeliveryMap
@@ -205,28 +283,20 @@ export default function CheckoutDeliveryBox({
       ) : null}
 
       {selectedDelivery?.label && locationConfirmed ? (
-        <p className="checkout-delivery-selected" role="status">
+        <output className="checkout-delivery-selected">
           Punto de entrega: <strong>{selectedDelivery.label}</strong>
-        </p>
+        </output>
       ) : null}
 
-      {deliveryQuoteLoading && <p className="checkout-delivery-muted">Calculando distancia y costo…</p>}
-      {!deliveryQuoteLoading && deliveryQuoteError && (
-        <p className="checkout-delivery-error">{deliveryQuoteError}</p>
-      )}
-      {!deliveryQuoteLoading && !deliveryQuoteError && deliveryQuote && (
-        <>
-          <p className="checkout-delivery-line">
-            Distancia aprox.: <strong>{deliveryQuote.distanceFormatted}</strong>
-            {deliveryQuote.label ? <span className="checkout-delivery-muted"> — {deliveryQuote.label}</span> : null}
-          </p>
-          {deliveryQuoteStatus}
-        </>
-      )}
+      <QuoteSummary
+        deliveryQuoteLoading={deliveryQuoteLoading}
+        deliveryQuoteError={deliveryQuoteError}
+        deliveryQuote={deliveryQuote}
+      />
 
-      {!mapDegraded && addressLineLength < 8 && (
-        <p className="checkout-delivery-muted">Completa dirección, distrito y ciudad para ver el mapa y las sugerencias.</p>
-      )}
+      {shouldShowCompletionHint ? (
+        <p className="checkout-delivery-muted">Completa direccion, distrito y ciudad para ver el mapa y las sugerencias.</p>
+      ) : null}
     </div>
   );
 }

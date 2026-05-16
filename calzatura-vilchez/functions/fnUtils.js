@@ -15,12 +15,12 @@ function toFinitePrice(v) {
     .replace(/s\/\s*/gi, "")
     .replace(/pen\s*/gi, "")
     .replace(/[^0-9,.-]/g, "")
-    .replace(/\s/g, "");
+    .replaceAll(/\s/g, "");
   if (!s) return 0;
   let norm = s;
   if (s.includes(",") && s.includes(".")) {
     norm =
-      s.lastIndexOf(",") > s.lastIndexOf(".") ? s.replace(/\./g, "").replace(",", ".") : s.replace(/,/g, "");
+      s.lastIndexOf(",") > s.lastIndexOf(".") ? s.replaceAll(".", "").replace(",", ".") : s.replaceAll(",", "");
   } else if (s.includes(",") && !s.includes(".")) {
     norm = s.replace(",", ".");
   }
@@ -175,7 +175,7 @@ function cellQty(v) {
 function findTallaKeyInMap(stockBySize, talla) {
   if (!stockBySize || !talla) return null;
   const want = String(talla).trim();
-  if (Object.prototype.hasOwnProperty.call(stockBySize, want)) return want;
+  if (Object.hasOwn(stockBySize, want)) return want;
   for (const k of Object.keys(stockBySize)) {
     const ks = String(k).trim();
     if (ks === want) return k;
@@ -279,31 +279,34 @@ function deriveTotalStock(product) {
   return column;
 }
 
+function stockFromColorRow(colorStock, color, talla, product) {
+  const colorKey = resolveColorKeyForLine(colorStock, color, product);
+  if (!colorKey) {
+    return Object.keys(colorStock).length > 1 ? 0 : lineStockFromTallaOrColumn(product, talla);
+  }
+  const row = colorStock[colorKey];
+  if (!row || typeof row !== "object" || Array.isArray(row)) {
+    return lineStockFromTallaOrColumn(product, talla);
+  }
+  const tallaKey = findTallaKeyInMap(row, talla);
+  return tallaKey != null ? cellQty(row[tallaKey]) : lineStockFromTallaOrColumn(product, talla);
+}
+
+function stockFromAllColorRows(colorStock, talla) {
+  return Object.values(colorStock).reduce((sum, stockBySize) => {
+    const tallaKey = findTallaKeyInMap(stockBySize, talla);
+    if (tallaKey == null) return sum;
+    return sum + cellQty(stockBySize[tallaKey]);
+  }, 0);
+}
+
 function getSizeStock(product, talla, color) {
   const t = talla ? String(talla).trim() : "";
   const c = color ? String(color).trim() : "";
 
   const cs = effectiveColorStock(product.colorStock);
   if (cs && t) {
-    if (c) {
-      const colorKey = resolveColorKeyForLine(cs, c, product);
-      if (!colorKey) {
-        if (Object.keys(cs).length > 1) return 0;
-        return lineStockFromTallaOrColumn(product, t);
-      }
-      const row = cs[colorKey];
-      if (!row || typeof row !== "object" || Array.isArray(row)) {
-        return lineStockFromTallaOrColumn(product, t);
-      }
-      const tallaKey = findTallaKeyInMap(row, t);
-      if (tallaKey != null) return cellQty(row[tallaKey]);
-      return lineStockFromTallaOrColumn(product, t);
-    }
-    return Object.values(cs).reduce((sum, stockBySize) => {
-      const tallaKey = findTallaKeyInMap(stockBySize, t);
-      if (tallaKey == null) return sum;
-      return sum + cellQty(stockBySize[tallaKey]);
-    }, 0);
+    return c ? stockFromColorRow(cs, c, t, product) : stockFromAllColorRows(cs, t);
   }
 
   const ts = effectiveTallaStock(product.tallaStock);

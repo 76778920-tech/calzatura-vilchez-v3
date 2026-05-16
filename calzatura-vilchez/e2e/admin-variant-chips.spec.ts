@@ -72,6 +72,7 @@ test.describe("admin → nuevo producto: chips de 5 colores", () => {
     await page.locator(".variant-chip").nth(1).click();
     await page.locator(".admin-color-popover-item").filter({ hasText: COLORS[1] }).first().click();
 
+    await expect(page.locator(VARIANT_CARDS)).toHaveCount(2);
     await expect.poll(async () => page.evaluate(() => sessionStorage.getItem("lastScrolledVariantSlot")))
       .toBe("1");
   });

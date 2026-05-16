@@ -69,6 +69,13 @@ async function resolveCheckoutItems(items: CartItem[]) {
   });
 }
 
+function deliveryDegradedNotice(geo: ReturnType<typeof useCheckoutGeocodingEffects>) {
+  if (!geo.mapDegraded) return "";
+  if (geo.geocodeUnavailable) return geo.geocodeUnavailable;
+  if (geo.orsConfigured) return "";
+  return "Falta configurar mapas: VITE_BACKEND_API_URL + ORS_API_KEY en el BFF, o VITE_ORS_API_KEY en el build.";
+}
+
 export default function CheckoutPage() {
   const { items, subtotal, clearCart } = useCart();
   const { user, userProfile } = useAuth();
@@ -119,12 +126,7 @@ export default function CheckoutPage() {
       !geo.deliveryQuote ||
       geo.deliveryQuote.isOutOfRange);
 
-  const deliveryDegradedNotice = geo.mapDegraded
-    ? geo.geocodeUnavailable ||
-      (!geo.orsConfigured
-        ? "Falta configurar mapas: VITE_BACKEND_API_URL + ORS_API_KEY en el BFF, o VITE_ORS_API_KEY en el build."
-        : "")
-    : "";
+  const degradedNotice = deliveryDegradedNotice(geo);
 
   if (items.length === 0) {
     return (
@@ -317,7 +319,7 @@ export default function CheckoutPage() {
 
               <CheckoutDeliveryBox
                 mapDegraded={geo.mapDegraded}
-                degradedNotice={deliveryDegradedNotice}
+                degradedNotice={degradedNotice}
                 addressLineLength={addressLineLen}
                 mapSearchInput={geo.mapSearchInput}
                 mapSearchHasHouseNumber={geo.mapSearchHasHouseNumber}

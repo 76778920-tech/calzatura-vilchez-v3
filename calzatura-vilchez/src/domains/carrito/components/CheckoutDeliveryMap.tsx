@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from "react";
 import {
   MapContainer,
-  TileLayer,
-  Polyline,
-  useMap,
   Marker,
+  Polyline,
+  TileLayer,
+  useMap,
   useMapEvents,
 } from "react-leaflet";
 import L from "leaflet";
@@ -42,7 +42,7 @@ function FitBoundsToSignal({
 
   useEffect(() => {
     const timer = globalThis.setTimeout(() => {
-      if (!didInvalidateRef.current) {
+      if (didInvalidateRef.current === false) {
         map.invalidateSize();
         didInvalidateRef.current = true;
       }
@@ -80,16 +80,10 @@ function CenterStoreOnMount({ storeLat, storeLng }: { storeLat: number; storeLng
   return null;
 }
 
-function MapPickHandler({
-  enabled,
-  onPick,
-}: {
-  enabled: boolean;
-  onPick: (lat: number, lng: number) => void;
-}) {
+function MapPickHandler({ enabled, onPick }: { enabled: boolean; onPick: (lat: number, lng: number) => void }) {
   useMapEvents({
     click: (e) => {
-      if (!enabled) return;
+      if (enabled === false) return;
       onPick(e.latlng.lat, e.latlng.lng);
     },
   });
@@ -108,6 +102,117 @@ function makePinIcon(fill: string, stroke: string) {
     iconSize: [32, 40],
     iconAnchor: [16, 40],
   });
+}
+
+function mapClassName(interactive: boolean, locationConfirmed: boolean) {
+  const classes = ["checkout-delivery-map"];
+  if (interactive) classes.push("checkout-delivery-map--interactive");
+  if (locationConfirmed === false) classes.push("checkout-delivery-map--pending");
+  return classes.join(" ");
+}
+
+function RouteLayer({
+  routePositions,
+  showFallbackLine,
+  store,
+  customer,
+  routeLoading,
+}: {
+  routePositions: MapRoutePosition[] | null;
+  showFallbackLine: boolean;
+  store: L.LatLngTuple;
+  customer: L.LatLngTuple;
+  routeLoading: boolean;
+}) {
+  if (routePositions) {
+    return (
+      <>
+        <Polyline
+          interactive={false}
+          positions={routePositions}
+          pathOptions={{ color: "#ffffff", weight: 7, opacity: 0.85, lineJoin: "round", lineCap: "round" }}
+        />
+        <Polyline
+          interactive={false}
+          positions={routePositions}
+          pathOptions={{ color: "#2563eb", weight: 4, opacity: 0.92, lineJoin: "round", lineCap: "round" }}
+        />
+      </>
+    );
+  }
+
+  if (showFallbackLine === false) return null;
+  return (
+    <Polyline
+      interactive={false}
+      positions={[store, customer]}
+      pathOptions={{
+        color: "#94a3b8",
+        weight: 2,
+        dashArray: "7 7",
+        opacity: routeLoading ? 0.35 : 0.7,
+      }}
+    />
+  );
+}
+
+function CustomerMarker({
+  hasCustomer,
+  interactive,
+  onCustomerPositionChange,
+  customer,
+  customerIcon,
+}: {
+  hasCustomer: boolean;
+  interactive: boolean;
+  onCustomerPositionChange?: (lat: number, lng: number) => void;
+  customer: L.LatLngTuple;
+  customerIcon: L.Icon;
+}) {
+  if (hasCustomer === false) return null;
+  if (interactive === false || !onCustomerPositionChange) {
+    return <Marker position={customer} icon={customerIcon} interactive={false} />;
+  }
+  return (
+    <Marker
+      position={customer}
+      icon={customerIcon}
+      draggable
+      eventHandlers={{
+        dragend: (e) => {
+          const ll = e.target.getLatLng();
+          onCustomerPositionChange(ll.lat, ll.lng);
+        },
+      }}
+    />
+  );
+}
+
+function MapHint({
+  locationConfirmed,
+  routeLoading,
+  interactive,
+  hasDrivingRoute,
+}: {
+  locationConfirmed: boolean;
+  routeLoading: boolean;
+  interactive: boolean;
+  hasDrivingRoute: boolean;
+}) {
+  if (locationConfirmed === false) {
+    return (
+      <p className="checkout-delivery-map-hint checkout-delivery-map-hint--warn">
+        Elige una sugerencia de la lista o toca el mapa para marcar tu entrega.
+      </p>
+    );
+  }
+  if (routeLoading) return <p className="checkout-delivery-map-hint">Calculando ruta por calles...</p>;
+  if (interactive === false) return null;
+
+  const hint = hasDrivingRoute
+    ? "La linea azul es la ruta estimada. Puedes afinar la ubicacion arrastrando el pin."
+    : "Puedes afinar la ubicacion arrastrando el pin azul.";
+  return <p className="checkout-delivery-map-hint">{hint}</p>;
 }
 
 export default function CheckoutDeliveryMap({
@@ -131,16 +236,14 @@ export default function CheckoutDeliveryMap({
     Number.isFinite(customerLng);
   const customer: L.LatLngTuple = [customerLat ?? storeLat, customerLng ?? storeLng];
   const hasDrivingRoute = hasCustomer && isDrivingRouteGeometry(routePositions);
-  const showFallbackLine = hasCustomer && !hasDrivingRoute;
+  const drivingRoutePositions = hasDrivingRoute ? routePositions : null;
+  const showFallbackLine = hasCustomer && hasDrivingRoute === false;
 
   const storeIcon = useMemo(() => makePinIcon("#d97706", "#92400e"), []);
   const customerIcon = useMemo(() => makePinIcon("#3b82f6", "#1e40af"), []);
 
   return (
-    <div
-      className={`checkout-delivery-map ${interactive ? "checkout-delivery-map--interactive" : ""}${!locationConfirmed ? " checkout-delivery-map--pending" : ""}`}
-      aria-busy={routeLoading}
-    >
+    <div className={mapClassName(interactive, locationConfirmed)} aria-busy={routeLoading}>
       {routeLoading ? <div className="checkout-delivery-map-loading" aria-hidden="true" /> : null}
       <MapContainer
         key="checkout-delivery-map"
@@ -173,61 +276,21 @@ export default function CheckoutDeliveryMap({
         {interactive && onCustomerPositionChange ? (
           <MapPickHandler enabled={interactive} onPick={onCustomerPositionChange} />
         ) : null}
-        {hasDrivingRoute ? (
-          <>
-            <Polyline
-              interactive={false}
-              positions={routePositions!}
-              pathOptions={{
-                color: "#ffffff",
-                weight: 7,
-                opacity: 0.85,
-                lineJoin: "round",
-                lineCap: "round",
-              }}
-            />
-            <Polyline
-              interactive={false}
-              positions={routePositions!}
-              pathOptions={{
-                color: "#2563eb",
-                weight: 4,
-                opacity: 0.92,
-                lineJoin: "round",
-                lineCap: "round",
-              }}
-            />
-          </>
-        ) : showFallbackLine ? (
-          <Polyline
-            interactive={false}
-            positions={[store, customer]}
-            pathOptions={{
-              color: "#94a3b8",
-              weight: 2,
-              dashArray: "7 7",
-              opacity: routeLoading ? 0.35 : 0.7,
-            }}
-          />
-        ) : null}
+        <RouteLayer
+          routePositions={drivingRoutePositions}
+          showFallbackLine={showFallbackLine}
+          store={store}
+          customer={customer}
+          routeLoading={routeLoading}
+        />
         <Marker position={store} icon={storeIcon} interactive={false} />
-        {hasCustomer ? (
-          interactive && onCustomerPositionChange ? (
-            <Marker
-              position={customer}
-              icon={customerIcon}
-              draggable
-              eventHandlers={{
-                dragend: (e) => {
-                  const ll = e.target.getLatLng();
-                  onCustomerPositionChange(ll.lat, ll.lng);
-                },
-              }}
-            />
-          ) : (
-            <Marker position={customer} icon={customerIcon} interactive={false} />
-          )
-        ) : null}
+        <CustomerMarker
+          hasCustomer={hasCustomer}
+          interactive={interactive}
+          onCustomerPositionChange={onCustomerPositionChange}
+          customer={customer}
+          customerIcon={customerIcon}
+        />
       </MapContainer>
       <div className="checkout-delivery-map-legend">
         <span className="checkout-delivery-map-legend-item">
@@ -244,19 +307,12 @@ export default function CheckoutDeliveryMap({
           </span>
         ) : null}
       </div>
-      {!locationConfirmed ? (
-        <p className="checkout-delivery-map-hint checkout-delivery-map-hint--warn">
-          Elegí una sugerencia de la lista o tocá el mapa para marcar tu entrega.
-        </p>
-      ) : routeLoading ? (
-        <p className="checkout-delivery-map-hint">Calculando ruta por calles…</p>
-      ) : interactive ? (
-        <p className="checkout-delivery-map-hint">
-          {hasDrivingRoute
-            ? "La línea azul es la ruta estimada. Podés afinar la ubicación arrastrando el pin."
-            : "Podés afinar la ubicación arrastrando el pin azul."}
-        </p>
-      ) : null}
+      <MapHint
+        locationConfirmed={locationConfirmed}
+        routeLoading={routeLoading}
+        interactive={interactive}
+        hasDrivingRoute={hasDrivingRoute}
+      />
     </div>
   );
 }

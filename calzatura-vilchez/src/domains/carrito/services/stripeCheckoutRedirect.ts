@@ -33,7 +33,7 @@ export async function redirectStripeCheckoutForOrder(user: User, orderId: string
 
   const url = typeof payload.url === "string" ? payload.url.trim() : "";
   if (url.startsWith("https://") || url.startsWith("http://")) {
-    window.location.assign(url);
+    globalThis.location.assign(url);
     return;
   }
 

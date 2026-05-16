@@ -63,7 +63,8 @@ function buildOrsUrl(pathname: string, qs: URLSearchParams): string {
       if (key !== "api_key") proxyQs.set(key, value);
     });
     const q = proxyQs.toString();
-    return `${bff}/ors${pathname}${q ? `?${q}` : ""}`;
+    const suffix = q ? `?${q}` : "";
+    return `${bff}/ors${pathname}${suffix}`;
   }
   const apiKey = getApiKey();
   if (apiKey) {

@@ -90,7 +90,7 @@ export async function registerDailySalesAtomic(sales: DailySaleAtomicInput[]): P
     p_sales: sales,
   });
   if (error) throw error;
-  return ((data as { ids?: string[] })?.ids ?? []) as string[];
+  return (data as { ids?: string[] } | null)?.ids ?? [];
 }
 
 export async function markSaleReturned(saleId: string, motivo: string): Promise<void> {

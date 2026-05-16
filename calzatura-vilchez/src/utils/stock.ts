@@ -19,7 +19,7 @@ function cellQty(v: unknown): number {
 function findTallaKey(stockBySize: Record<string, unknown> | undefined, talla: string): string | null {
   if (!stockBySize || !talla) return null;
   const want = String(talla).trim();
-  if (Object.prototype.hasOwnProperty.call(stockBySize, want)) return want;
+  if (Object.hasOwn(stockBySize, want)) return want;
   for (const k of Object.keys(stockBySize)) {
     const ks = String(k).trim();
     if (ks === want) return k;
@@ -30,27 +30,23 @@ function findTallaKey(stockBySize: Record<string, unknown> | undefined, talla: s
 
 function effectiveColorStock(raw: unknown): ColorStockMap | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
-  const obj = raw as Record<string, unknown>;
-  const keys = Object.keys(obj);
-  if (keys.length === 0) return undefined;
-  for (const k of keys) {
-    const row = obj[k];
-    if (row && typeof row === "object" && !Array.isArray(row) && Object.keys(row as Record<string, unknown>).length > 0) {
-      return obj as ColorStockMap;
+  const stock: ColorStockMap = {};
+  for (const [color, row] of Object.entries(raw)) {
+    if (row && typeof row === "object" && !Array.isArray(row) && Object.keys(row).length > 0) {
+      stock[color] = Object.fromEntries(Object.entries(row));
     }
   }
-  return undefined;
+  return Object.keys(stock).length > 0 ? stock : undefined;
 }
 
-function effectiveTallaStock(raw: Record<string, number> | undefined): Record<string, number> | undefined {
+function effectiveTallaStock(raw: Record<string, number> | undefined): Record<string, unknown> | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   if (Object.keys(raw).length === 0) return undefined;
   return raw;
 }
 
 function colorStockOf(p: Product): ColorStockMap | undefined {
-  const raw = (p as Product & { colorStock?: ColorStockMap }).colorStock;
-  return effectiveColorStock(raw);
+  return effectiveColorStock(p.colorStock);
 }
 
 function resolveColorKeyForLine(cs: ColorStockMap, requestedColor: string, product: Product): string | undefined {
@@ -81,8 +77,8 @@ function lineStockFromTallaOrColumn(product: Product, talla: string): number {
   if (!t) return deriveTotalFromProduct(product);
   const ts = effectiveTallaStock(product.tallaStock);
   if (ts) {
-    const tk = findTallaKey(ts as Record<string, unknown>, t);
-    if (tk != null) return cellQty((ts as Record<string, unknown>)[tk]);
+    const tk = findTallaKey(ts, t);
+    if (tk != null) return cellQty(ts[tk]);
     return 0;
   }
   return Math.max(0, product.stock);
@@ -92,17 +88,41 @@ function deriveTotalFromProduct(product: Product): number {
   const column = Math.max(0, product.stock);
   const cs = colorStockOf(product);
   if (cs) {
-    const sum = Object.values(cs).reduce((acc, row) => {
-      const r = row as Record<string, unknown>;
-      return acc + Object.values(r).reduce((inner: number, q: unknown) => inner + cellQty(q), 0);
-    }, 0);
+    const sum = Object.values(cs).reduce<number>((acc, row) => acc + sumUnknownSizeStock(row), 0);
     return Math.max(sum, column);
   }
   if (product.tallaStock) {
     const ts = effectiveTallaStock(product.tallaStock);
-    if (ts) return Math.max(sumSizeStock(ts), column);
+    if (ts) return Math.max(sumUnknownSizeStock(ts), column);
   }
   return column;
+}
+
+function sumUnknownSizeStock(tallaStock: Record<string, unknown>): number {
+  return Object.values(tallaStock).reduce<number>((sum, qty) => sum + cellQty(qty), 0);
+}
+
+function stockFromColorRow(
+  colorStock: ColorStockMap,
+  color: string,
+  talla: string,
+  product: Product,
+): number {
+  const keys = Object.keys(colorStock);
+  const colorKey = resolveColorKeyForLine(colorStock, color, product);
+  if (!colorKey) {
+    return keys.length > 1 ? 0 : lineStockFromTallaOrColumn(product, talla);
+  }
+  const row = colorStock[colorKey];
+  const tk = findTallaKey(row, talla);
+  return tk != null ? cellQty(row[tk]) : lineStockFromTallaOrColumn(product, talla);
+}
+
+function stockFromAllColorRows(colorStock: ColorStockMap, talla: string): number {
+  return Object.values(colorStock).reduce((sum, row) => {
+    const tk = findTallaKey(row, talla);
+    return tk != null ? sum + cellQty(row[tk]) : sum;
+  }, 0);
 }
 
 export function sumSizeStock(tallaStock: Record<string, number>) {
@@ -116,34 +136,17 @@ export function getSizeStock(product: Product, talla?: string, color?: string) {
   const colorStock = colorStockOf(product);
 
   if (!t) {
-    if (colorStock) return deriveTotalFromProduct(product);
-    return Math.max(0, product.stock);
+    return colorStock ? deriveTotalFromProduct(product) : Math.max(0, product.stock);
   }
 
-  if (colorStock && t) {
-    const keys = Object.keys(colorStock);
-    if (c) {
-      const colorKey = resolveColorKeyForLine(colorStock, c, product);
-      if (!colorKey) {
-        if (keys.length > 1) return 0;
-        return lineStockFromTallaOrColumn(product, t);
-      }
-      const row = colorStock[colorKey] as Record<string, unknown>;
-      const tk = findTallaKey(row, t);
-      if (tk != null) return cellQty(row[tk]);
-      return lineStockFromTallaOrColumn(product, t);
-    }
-    return keys.reduce((sum, k) => {
-      const row = colorStock[k] as Record<string, unknown>;
-      const tk = findTallaKey(row, t);
-      return tk != null ? sum + cellQty(row[tk]) : sum;
-    }, 0);
+  if (colorStock) {
+    return c ? stockFromColorRow(colorStock, c, t, product) : stockFromAllColorRows(colorStock, t);
   }
 
   const ts = effectiveTallaStock(product.tallaStock);
   if (t && ts) {
-    const tk = findTallaKey(ts as Record<string, unknown>, t);
-    if (tk != null) return cellQty((ts as Record<string, unknown>)[tk]);
+    const tk = findTallaKey(ts, t);
+    if (tk != null) return cellQty(ts[tk]);
     return 0;
   }
 
@@ -155,8 +158,7 @@ export function getAvailableSizes(product: Product) {
   if (cs) {
     const agg: Record<string, number> = {};
     for (const row of Object.values(cs)) {
-      const r = row as Record<string, unknown>;
-      for (const [sz, q] of Object.entries(r)) {
+      for (const [sz, q] of Object.entries(row)) {
         agg[sz] = (agg[sz] || 0) + cellQty(q);
       }
     }
