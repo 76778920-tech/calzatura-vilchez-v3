@@ -106,6 +106,66 @@ describe("getSizeStock", () => {
     }) as Product;
     expect(getSizeStock(p, "39", "Negro")).toBe(5);
   });
+
+  it("sin talla con colorStock usa max entre suma por color y columna stock", () => {
+    const p = Object.assign(product({ id: "1", stock: 10 }), {
+      colorStock: { A: { "38": 2 }, B: { "38": 3 } },
+    }) as Product;
+    expect(getSizeStock(p)).toBe(10);
+    expect(getSizeStock(p, "   ")).toBe(10);
+  });
+
+  it("sin talla sin colorStock usa columna stock", () => {
+    const p = product({ id: "1", stock: 4 });
+    expect(getSizeStock(p)).toBe(4);
+  });
+
+  it("colorStock sin color pide suma de todas las filas para esa talla", () => {
+    const p = Object.assign(product({ id: "1", stock: 0 }), {
+      colorStock: { A: { "38": 2 }, B: { "38": 3 }, C: { "39": 1 } },
+    }) as Product;
+    expect(getSizeStock(p, "38")).toBe(5);
+    expect(getSizeStock(p, "39")).toBe(1);
+  });
+
+  it("resuelve color por hint product.color cuando el pedido pide otro nombre", () => {
+    const p = Object.assign(product({ id: "1", stock: 0, color: "Camel" }), {
+      colorStock: { Camel: { "38": 7 } },
+    }) as Product;
+    expect(getSizeStock(p, "38", "Rojo")).toBe(7);
+  });
+
+  it("un solo color en mapa: sin coincidencia de nombre usa tallaStock o stock", () => {
+    const p = Object.assign(product({ id: "1", stock: 8, tallaStock: { "38": 2 } }), {
+      colorStock: { Único: { "38": 0 } },
+    }) as Product;
+    expect(getSizeStock(p, "38", "OtroColor")).toBe(2);
+  });
+
+  it("colorStock con talla inexistente en la fila resuelta usa lineStock / columna", () => {
+    const p = Object.assign(product({ id: "1", stock: 3, tallaStock: { "40": 9 } }), {
+      colorStock: { Negro: { "38": 5 } },
+    }) as Product;
+    expect(getSizeStock(p, "40", "Negro")).toBe(9);
+  });
+
+  it("tallaStock objeto vacío ignora tallas y usa stock de columna", () => {
+    const p = Object.assign(product({ id: "1", stock: 11, tallaStock: {} as Record<string, number> }), {
+      colorStock: undefined,
+    });
+    expect(getSizeStock(p, "99")).toBe(11);
+  });
+
+  it("colorStock ignora filas vacías o no objeto al derivar total sin talla", () => {
+    const p = Object.assign(product({ id: "1", stock: 1 }), {
+      colorStock: {
+        Vacio: {},
+        Mal: [] as unknown as Record<string, number>,
+        Bueno: { "38": 2 },
+      },
+    }) as Product;
+    expect(getSizeStock(p)).toBe(2);
+  });
 });
 
 describe("getAvailableSizes", () => {
@@ -125,5 +185,15 @@ describe("getAvailableSizes", () => {
   it("sin tallaStock ni tallas devuelve array vacío", () => {
     const p = product({ id: "1" });
     expect(getAvailableSizes(p)).toEqual([]);
+  });
+
+  it("agrega tallas desde colorStock en varias variantes", () => {
+    const p = Object.assign(product({ id: "1" }), {
+      colorStock: {
+        A: { "38": 1, "40": 0 },
+        B: { "38": 2, "39": 1 },
+      },
+    }) as Product;
+    expect(getAvailableSizes(p)).toEqual(["38", "39"]);
   });
 });
