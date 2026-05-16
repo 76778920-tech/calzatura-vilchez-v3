@@ -1,6 +1,6 @@
 import json
 import sys
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -79,13 +79,13 @@ def reset_app(monkeypatch):
 
 def test_cutoff_iso_returns_iso_date():
     result = firebase_client._cutoff_iso(0)
-    assert result == date.today().isoformat()
+    expected = (datetime.now(timezone.utc).date()).isoformat()
+    assert result == expected
 
 
 def test_cutoff_iso_subtracts_days():
     result = firebase_client._cutoff_iso(1)
-    from datetime import timedelta
-    expected = (date.today() - timedelta(days=1)).isoformat()
+    expected = (datetime.now(timezone.utc).date() - timedelta(days=1)).isoformat()
     assert result == expected
 
 

@@ -66,6 +66,10 @@ jobs:
         working-directory: ai-service
         run: python -m pytest --cov=. --cov-config=.coveragerc --cov-report=xml:coverage.xml
 
+      - name: Ajustar coverage.xml a rutas monorepo Sonar
+        working-directory: ai-service
+        run: python scripts/fix_coverage_xml_for_sonar.py
+
       - name: Generar informe Bandit (JSON para SonarQube)
         working-directory: ai-service
         run: python -m bandit -r main.py models services -f json -o bandit-report.json --exit-zero
@@ -77,6 +81,8 @@ jobs:
           test -f ai-service/coverage.xml
           test -f calzatura-vilchez/eslint-report.json
           test -f ai-service/bandit-report.json
+          grep -q 'SF:calzatura-vilchez/src/' calzatura-vilchez/coverage/lcov.info
+          grep -q 'filename="ai-service/models/revenue.py"' ai-service/coverage.xml
 
       - name: Validar configuracion SonarQube
         id: sonar-config
