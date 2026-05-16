@@ -15,6 +15,7 @@
     "test": "node scripts/run-clean-env.mjs vitest run",
     "test:watch": "node scripts/run-clean-env.mjs vitest",
     "test:coverage": "node scripts/run-clean-env.mjs vitest run --coverage",
+    "test:coverage:sonar": "node scripts/run-clean-env.mjs vitest run --coverage && node scripts/fix-lcov-for-sonar.mjs",
     "test:e2e": "node scripts/run-playwright.mjs test",
     "test:e2e:admin": "node scripts/run-playwright.mjs test e2e/admin-*.spec.ts",
     "test:e2e:admin:codes": "node scripts/run-playwright.mjs test e2e/admin-code-guards.spec.ts",

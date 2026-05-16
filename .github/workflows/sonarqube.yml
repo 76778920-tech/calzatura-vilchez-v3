@@ -37,9 +37,9 @@ jobs:
         working-directory: calzatura-vilchez
         run: npm ci --ignore-scripts
 
-      - name: Generar cobertura frontend (Vitest LCOV)
+      - name: Generar cobertura frontend (Vitest LCOV + rutas para Sonar)
         working-directory: calzatura-vilchez
-        run: npm run test:coverage
+        run: npm run test:coverage:sonar
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY || 'ci-test-api-key' }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN || 'ci-test.firebaseapp.com' }}
