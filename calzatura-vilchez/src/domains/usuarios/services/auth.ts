@@ -210,15 +210,25 @@ async function loginThroughAuthProxy(proxyUrl: string, email: string, password: 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
+
+  if (res.status === 429) {
+    throw new Error("AUTH_RATE_LIMITED");
+  }
+  if (res.status >= 500) {
+    throw new Error("AUTH_UNAVAILABLE");
+  }
+
   let json: { ok?: boolean; customToken?: string };
   try {
     json = (await res.json()) as { ok?: boolean; customToken?: string };
   } catch {
     throw new Error("AUTH_FAILED");
   }
-  if (!json.ok || typeof json.customToken !== "string" || json.customToken.length === 0) {
+
+  if (res.status === 401 || !json.ok || typeof json.customToken !== "string" || json.customToken.length === 0) {
     throw new Error("AUTH_FAILED");
   }
+
   const cred = await signInWithCustomToken(auth, json.customToken);
   return cred.user;
 }

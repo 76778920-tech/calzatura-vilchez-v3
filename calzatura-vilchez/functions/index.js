@@ -809,7 +809,7 @@ exports.aiAdminProxy = onRequest(
 
 /**
  * BFF de login: el navegador no llama a identitytoolkit; solo a esta función.
- * Respuesta siempre 200 + JSON genérico (ok) para no exponer códigos de Google en el cliente.
+ * Códigos HTTP semánticos (401/429/500) para WAF y monitoreo; cuerpo JSON genérico sin códigos de Google.
  * Configurar parámetro FIREBASE_WEB_API_KEY (misma clave web del proyecto) en entorno de Functions.
  */
 exports.authLogin = onRequest(
@@ -829,21 +829,23 @@ exports.authLogin = onRequest(
 
       const ip = getClientIp(req);
       if (isLoginRateLimited(ip)) {
-        return res.status(200).json({ ok: false });
+        const retryAfterSec = Math.ceil(LOGIN_RATE_WINDOW_MS / 1000);
+        res.setHeader("Retry-After", String(retryAfterSec));
+        return res.status(429).json({ ok: false });
       }
 
       try {
         const rawEmail = req.body?.email;
         const rawPassword = req.body?.password;
         if (!isValidLoginEmail(rawEmail) || !isValidLoginPassword(rawPassword)) {
-          return res.status(200).json({ ok: false });
+          return res.status(401).json({ ok: false });
         }
         const email = String(rawEmail).trim().toLowerCase();
         const password = String(rawPassword);
         const apiKey = FIREBASE_WEB_API_KEY.value();
         if (!apiKey) {
           console.error("authLogin: falta FIREBASE_WEB_API_KEY en parametros de Functions");
-          return res.status(200).json({ ok: false });
+          return res.status(500).json({ ok: false });
         }
 
         const identityUrl =
@@ -856,14 +858,14 @@ exports.authLogin = onRequest(
         });
         const identityJson = await identityRes.json();
         if (!identityRes.ok || !identityJson.localId) {
-          return res.status(200).json({ ok: false });
+          return res.status(401).json({ ok: false });
         }
 
         const customToken = await admin.auth().createCustomToken(identityJson.localId);
         return res.status(200).json({ ok: true, customToken });
       } catch {
         console.error("authLogin: error interno");
-        return res.status(200).json({ ok: false });
+        return res.status(500).json({ ok: false });
       }
     });
   }

@@ -46,22 +46,32 @@ export default defineConfig({
   },
   build: {
     sourcemap: false,
-    chunkSizeWarningLimit: 800,
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
         manualChunks(id) {
+          if (id.includes('/src/domains/')) {
+            if (
+              id.includes('/administradores/') ||
+              id.includes('/fabricantes/') ||
+              id.includes('/Admin') ||
+              id.includes('/ventas/')
+            ) {
+              return 'app-admin'
+            }
+            if (id.includes('/carrito/') || id.includes('/pedidos/') || id.includes('/Checkout')) {
+              return 'app-checkout'
+            }
+            return 'app-public'
+          }
+
           if (!id.includes('node_modules')) return undefined
 
-          if (id.includes('@react-three/drei')) {
-            return 'three-drei'
-          }
-
-          if (id.includes('@react-three/fiber')) {
-            return 'three-fiber'
-          }
-
-          if (id.includes('/three/')) {
-            return 'three-core'
+          if (
+            id.includes('@react-three/') ||
+            id.includes('/three/')
+          ) {
+            return 'three'
           }
 
           if (id.includes('/xlsx/')) {
@@ -74,27 +84,6 @@ export default defineConfig({
 
           if (id.includes('@supabase/')) {
             return 'supabase'
-          }
-
-          if (
-            id.includes('/react/') ||
-            id.includes('/react-dom/') ||
-            id.includes('/react-router-dom/')
-          ) {
-            return 'react-core'
-          }
-
-          if (
-            id.includes('/framer-motion/') ||
-            id.includes('/lucide-react/') ||
-            id.includes('/react-hot-toast/') ||
-            id.includes('@radix-ui/')
-          ) {
-            return 'ui-stack'
-          }
-
-          if (id.includes('/@stripe/')) {
-            return 'payments'
           }
 
           return 'vendor'
