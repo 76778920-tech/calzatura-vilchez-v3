@@ -2,8 +2,7 @@ import type { Product } from "@/types";
 
 type ColorStockMap = Record<string, Record<string, unknown>>;
 
-/** Expuesto para tests: comparación insensible a acentos y mayúsculas. */
-export function normalizeComparable(value: string | undefined) {
+function normalizeComparable(value: string | undefined) {
   return String(value || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -11,15 +10,13 @@ export function normalizeComparable(value: string | undefined) {
     .toLowerCase();
 }
 
-/** Expuesto para tests: cantidad numérica no negativa en celdas de stock. */
-export function cellQty(v: unknown): number {
-  if (v == null || v === "") return 0;
+function cellQty(v: unknown): number {
+  if (v === null || v === undefined || v === "") return 0;
   const n = Number(v);
   return Number.isFinite(n) ? Math.max(0, n) : 0;
 }
 
-/** Expuesto para tests: resuelve clave de talla en un mapa por talla. */
-export function findTallaKey(stockBySize: Record<string, unknown> | undefined, talla: string): string | null {
+function findTallaKey(stockBySize: Record<string, unknown> | undefined, talla: string): string | null {
   if (!stockBySize || !talla) return null;
   const want = String(talla).trim();
   if (Object.hasOwn(stockBySize, want)) return want;
@@ -31,8 +28,7 @@ export function findTallaKey(stockBySize: Record<string, unknown> | undefined, t
   return null;
 }
 
-/** Expuesto para tests: normaliza `colorStock` del API a mapa filas→tallas. */
-export function effectiveColorStock(raw: unknown): ColorStockMap | undefined {
+function effectiveColorStock(raw: unknown): ColorStockMap | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   const stock: ColorStockMap = {};
   for (const [color, row] of Object.entries(raw)) {
@@ -43,8 +39,7 @@ export function effectiveColorStock(raw: unknown): ColorStockMap | undefined {
   return Object.keys(stock).length > 0 ? stock : undefined;
 }
 
-/** Expuesto para tests: tallaStock coercible a mapa talla→cantidad. */
-export function effectiveTallaStock(raw: Record<string, number> | undefined): Record<string, unknown> | undefined {
+function effectiveTallaStock(raw: Record<string, number> | undefined): Record<string, unknown> | undefined {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
   if (Object.keys(raw).length === 0) return undefined;
   return raw;
@@ -54,12 +49,7 @@ function colorStockOf(p: Product): ColorStockMap | undefined {
   return effectiveColorStock(p.colorStock);
 }
 
-/** Expuesto para tests: resolución de clave de color en `colorStock`. */
-export function resolveColorKeyForLine(
-  cs: Record<string, Record<string, unknown>>,
-  requestedColor: string,
-  product: Product,
-): string | undefined {
+function resolveColorKeyForLine(cs: ColorStockMap, requestedColor: string, product: Product): string | undefined {
   const rc = requestedColor.trim();
   if (!rc) return undefined;
   const keys = Object.keys(cs);
@@ -73,8 +63,7 @@ export function resolveColorKeyForLine(
   return undefined;
 }
 
-/** Expuesto para tests: stock por talla o columna cuando no hay `colorStock` en la fila. */
-export function lineStockFromTallaOrColumn(product: Product, talla: string): number {
+function lineStockFromTallaOrColumn(product: Product, talla: string): number {
   const t = talla.trim();
   if (!t) return deriveTotalFromProduct(product);
   const ts = effectiveTallaStock(product.tallaStock);
@@ -86,7 +75,7 @@ export function lineStockFromTallaOrColumn(product: Product, talla: string): num
   return Math.max(0, product.stock);
 }
 
-/** Expuesto para tests: total agregado (colorStock / tallaStock / columna). */
+/** Total agregado (colorStock / tallaStock / columna). Exportado para tests y uso BFF/checkout. */
 export function deriveTotalFromProduct(product: Product): number {
   const column = Math.max(0, product.stock);
   const cs = colorStockOf(product);
