@@ -2,6 +2,7 @@
 # Varias banderas --cov= provocaban varias raíces y ambigüedad de __init__.py.
 [run]
 branch = false
+relative_files = True
 omit =
     tests/*
     */tests/*

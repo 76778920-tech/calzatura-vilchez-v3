@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 """
-Cobertura.py escribe <source>.../ai-service</source> y filename="services/foo.py".
-SonarScanner (projectBaseDir = raíz del monorepo, sonar.sources = ai-service/...) resuelve
-la ruta como ai-service/services/foo.py al unir <source> + filename.
+Normaliza coverage.xml (Cobertura) para SonarCloud en monorepo.
 
-Formato alternativo (repo + filename=ai-service/...) también vale; este formato coincide
-con la raíz ai-service que pytest-cov usa por defecto.
+Sonar indexa archivos como ai-service/services/foo.py (desde projectBaseDir).
+El informe debe usar <source>=raíz del repo y filename con prefijo ai-service/.
 """
 from __future__ import annotations
 
@@ -22,20 +20,20 @@ def main() -> None:
 
     tree = ET.parse(path)
     root = tree.getroot()
-    ai_source = str(ai_service_dir).replace("\\", "/")
+    repo_source = str(repo_root).replace("\\", "/")
     for src in root.iter("source"):
-        src.text = ai_source
+        src.text = repo_source
     for el in root.iter():
         fn = el.get("filename")
         if not fn:
             continue
         norm = fn.replace("\\", "/").strip()
-        if norm.startswith("ai-service/"):
-            norm = norm[len("ai-service/") :]
+        if not norm.startswith("ai-service/"):
+            norm = f"ai-service/{norm}"
         el.set("filename", norm)
 
     tree.write(path, encoding="utf-8", xml_declaration=True)
-    print("fix_coverage_xml_for_sonar: <source>=ai-service y filename relativos en", path)
+    print("fix_coverage_xml_for_sonar: <source>=repo y filename=ai-service/... en", path)
 
 
 if __name__ == "__main__":

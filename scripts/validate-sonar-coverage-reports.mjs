@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const lcovPath = path.join(repoRoot, "calzatura-vilchez", "coverage", "lcov.info");
 const xmlPath = path.join(repoRoot, "ai-service", "coverage.xml");
+const genericPath = path.join(repoRoot, "ai-service", "coverage-sonar-generic.xml");
 
 function fail(msg) {
   console.error(`validate-sonar-coverage-reports: ${msg}`);
@@ -17,6 +18,7 @@ function fail(msg) {
 
 if (!fs.existsSync(lcovPath)) fail(`no existe ${lcovPath}`);
 if (!fs.existsSync(xmlPath)) fail(`no existe ${xmlPath}`);
+if (!fs.existsSync(genericPath)) fail(`no existe ${genericPath}`);
 
 const lcov = fs.readFileSync(lcovPath, "utf8");
 const badSf = lcov
@@ -43,6 +45,7 @@ for (const rel of requiredTs) {
 }
 
 const xml = fs.readFileSync(xmlPath, "utf8");
+const generic = fs.readFileSync(genericPath, "utf8");
 if (!xml.includes("<source>") || !xml.match(/<source>[^<]+<\/source>/)) {
   fail("coverage.xml sin <source> válido");
 }
@@ -50,30 +53,35 @@ const sourceText = (xml.match(/<source>([^<]*)<\/source>/)?.[1] ?? "").replace(/
 if (sourceText === "." || sourceText.trim() === "") {
   fail('coverage.xml usa <source>.</source>; ejecuta fix_coverage_xml_for_sonar.py');
 }
-if (!sourceText.endsWith("/ai-service") && !sourceText.endsWith("\\ai-service")) {
-  fail(`<source> debe apuntar a ai-service/ (actual: ${sourceText})`);
+if (!sourceText.endsWith("calzatura-vilchez-v3") && !sourceText.includes("Cazatura Vilchez V3")) {
+  // En CI termina en .../calzatura-vilchez-v3; local puede variar — solo exigir que no sea ai-service aislado.
+  if (sourceText.endsWith("/ai-service")) {
+    fail(`<source> debe ser la raíz del monorepo, no ai-service (actual: ${sourceText})`);
+  }
 }
 
-/** Rutas en coverage.xml (relativas a ai-service/) y ruta Sonar (desde raíz del repo). */
 const requiredPy = [
-  { xmlRel: "models/revenue.py", sonarPath: "ai-service/models/revenue.py" },
-  { xmlRel: "models/risk.py", sonarPath: "ai-service/models/risk.py" },
-  { xmlRel: "services/supabase_client.py", sonarPath: "ai-service/services/supabase_client.py" },
+  "ai-service/models/revenue.py",
+  "ai-service/models/risk.py",
+  "ai-service/services/supabase_client.py",
 ];
-for (const { xmlRel, sonarPath } of requiredPy) {
-  if (!xml.includes(`filename="${xmlRel}"`)) {
-    fail(`coverage.xml sin filename="${xmlRel}" (${sonarPath})`);
+for (const fn of requiredPy) {
+  if (!xml.includes(`filename="${fn}"`)) {
+    fail(`coverage.xml sin filename="${fn}"`);
   }
   const rate = xml.match(
-    new RegExp(`filename="${xmlRel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*line-rate="([0-9.]+)"`),
+    new RegExp(`filename="${fn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*line-rate="([0-9.]+)"`),
   )?.[1];
   if (!rate || Number(rate) < 0.99) {
-    fail(`${sonarPath}: line-rate=${rate ?? "missing"} (esperado >= 0.99)`);
+    fail(`${fn}: line-rate=${rate ?? "missing"} (esperado >= 0.99)`);
   }
 }
 
+const supabasePath = "ai-service/services/supabase_client.py";
 const supabaseBlock = xml.match(
-  /filename="services\/supabase_client\.py"[^>]*>[\s\S]*?<\/class>/,
+  new RegExp(
+    `filename="${supabasePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*>[\\s\\S]*?</class>`,
+  ),
 )?.[0];
 if (supabaseBlock) {
   const misses = [...supabaseBlock.matchAll(/<line number="(\d+)" hits="0"/g)];
@@ -84,4 +92,17 @@ if (supabaseBlock) {
   }
 }
 
-console.log("validate-sonar-coverage-reports: LCOV y coverage.xml listos para SonarCloud");
+if (!generic.includes(`path="${supabasePath}"`)) {
+  fail(`coverage-sonar-generic.xml sin path="${supabasePath}"`);
+}
+const supabaseFileBlock = generic.match(
+  new RegExp(
+    `<file path="${supabasePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[\\s\\S]*?</file>`,
+  ),
+)?.[0];
+const genericUncovered = supabaseFileBlock?.match(/covered="false"/g);
+if (genericUncovered?.length) {
+  fail(`supabase_client en generic: ${genericUncovered.length} líneas covered=false`);
+}
+
+console.log("validate-sonar-coverage-reports: LCOV, coverage.xml y generic listos para SonarCloud");
