@@ -30,7 +30,9 @@ export function estimateOrderProfit(order: Order, financials: Record<string, Pro
   }, 0);
 }
 
-export function getLast7Days(): { iso: string; label: string }[] {
+export type DashboardChartDay = { iso: string; label: string };
+
+export function getLast7Days(): DashboardChartDay[] {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));

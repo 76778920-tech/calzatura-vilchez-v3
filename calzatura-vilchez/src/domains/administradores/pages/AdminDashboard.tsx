@@ -9,6 +9,7 @@ import {
   computeDashboardFromFetchedData,
   getLast7Days,
   toDate,
+  type DashboardChartDay,
   type DashboardStats,
 } from "@/domains/administradores/utils/adminDashboardMetrics";
 import { fetchProducts } from "@/domains/productos/services/products";
@@ -567,7 +568,7 @@ export default function AdminDashboard() {
             <p className="dash-channel-chart-kicker">Actividad de ventas</p>
             <h3 className="dash-channel-chart-title">Últimos 7 días — web</h3>
             <SalesBarChart
-              days={last7Days.map((d) => d.label)}
+              days={last7Days.map((d: DashboardChartDay) => d.label)}
               values={chartWeb}
               variant="web"
             />
@@ -609,7 +610,7 @@ export default function AdminDashboard() {
             <p className="dash-channel-chart-kicker">Actividad de ventas</p>
             <h3 className="dash-channel-chart-title">Últimos 7 días — tienda física</h3>
             <SalesBarChart
-              days={last7Days.map((d) => d.label)}
+              days={last7Days.map((d: DashboardChartDay) => d.label)}
               values={chartTienda}
               variant="tienda"
             />
