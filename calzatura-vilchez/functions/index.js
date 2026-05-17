@@ -19,6 +19,7 @@ const {
   assertStockAndPrice,   resolveColorBucket, findTallaKeyInMap, cellQty,
   toFinitePrice, effectiveColorStock, effectiveTallaStock,
   discountOrderStockRpc,
+  applyOrderStatusStockSideEffects,
   resolveAiAdminUpstreamRequest, sendUpstreamToClient,
   aiAdminProxyErrorStatus, aiAdminProxyErrorMessage,
 } = require("./fnUtils");
@@ -416,27 +417,35 @@ exports.updateOrderStatus = onRequest(
         const patch = { estado };
         if (estado === "pagado") {
           patch.pagadoEn = new Date().toISOString();
-          if (!order.stockDescontadoEn) {
-            try {
-              await discountOrderStockRpc(supabase, order);
-              patch.stockDescontadoEn = new Date().toISOString();
-              await logAuditFn({
-                supabase,
-                accion: "descontar_stock_pedido",
-                entidad: "pedido",
-                entidadId: orderId,
-                entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
-                usuarioUid: decodedToken.uid,
-                usuarioEmail: strOr(decodedToken.email),
-                detalle: { source: "updateOrderStatus_pagado", metodoPago: order.metodoPago },
-              });
-            } catch (discountErr) {
-              console.error("updateOrderStatus stock discount:", discountErr?.message || discountErr);
-              return res.status(409).json({
-                error: "No se pudo descontar stock. Revisa inventario antes de marcar como pagado.",
-              });
-            }
+        }
+        try {
+          const stockFx = await applyOrderStatusStockSideEffects(supabase, order, orderId, estado);
+          if (stockFx.patch) {
+            Object.assign(patch, stockFx.patch);
           }
+          if (stockFx.audit) {
+            await logAuditFn({
+              supabase,
+              accion: stockFx.audit.accion,
+              entidad: "pedido",
+              entidadId: orderId,
+              entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
+              usuarioUid: decodedToken.uid,
+              usuarioEmail: strOr(decodedToken.email),
+              detalle: {
+                source: stockFx.audit.source,
+                metodoPago: order.metodoPago,
+              },
+            });
+          }
+        } catch (stockErr) {
+          console.error("updateOrderStatus stock:", stockErr?.message || stockErr);
+          const isRestore = estado === "cancelado";
+          return res.status(409).json({
+            error: isRestore
+              ? "No se pudo restaurar stock al cancelar. Revisa inventario o contacta soporte."
+              : "No se pudo descontar stock. Revisa inventario antes de marcar como pagado.",
+          });
         }
 
         await updateOrder(supabase, orderId, patch);

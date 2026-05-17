@@ -469,6 +469,58 @@ async function discountOrderStockRpc(supabase, order) {
   }
 }
 
+function mapOrderStockRestoreRpcError(error) {
+  const msg = typeof error?.message === "string" ? error.message : "";
+  if (msg.includes("product_not_found")) {
+    return new Error("Producto no encontrado al restaurar stock");
+  }
+  if (msg.includes("no_color_stock_restore")) {
+    return new Error("No se pudo ubicar la variante de color para restaurar stock");
+  }
+  if (msg.includes("invalid_order")) {
+    return new Error("Producto invalido al restaurar stock");
+  }
+  if (msg.includes("function") && msg.includes("does not exist")) {
+    return new Error("Migraciones de Supabase pendientes (RPC restore_order_stock).");
+  }
+  return new Error("No se pudo restaurar stock del pedido");
+}
+
+function shouldRestoreOrderStockOnCancel(order) {
+  return Boolean(order?.stockDescontadoEn) && !order?.stockRestauradoEn;
+}
+
+async function restoreOrderStockRpc(supabase, order) {
+  const items = buildOrderStockRpcItems(order);
+  if (items.length === 0) {
+    throw new Error("Producto invalido al restaurar stock");
+  }
+  for (const line of items) {
+    if (isInvalidOrderQty(line.productId, line.cantidad)) {
+      throw new Error("Producto invalido al restaurar stock");
+    }
+  }
+  const { error } = await supabase.rpc("restore_order_stock", { p_items: items });
+  if (error) {
+    throw mapOrderStockRestoreRpcError(error);
+  }
+}
+
+async function applyOrderStatusStockSideEffects(supabase, order, orderId, estado) {
+  const patch = {};
+  if (estado === "pagado" && !order.stockDescontadoEn) {
+    await discountOrderStockRpc(supabase, order);
+    patch.stockDescontadoEn = new Date().toISOString();
+    return { patch, audit: { accion: "descontar_stock_pedido", source: "updateOrderStatus_pagado" } };
+  }
+  if (estado === "cancelado" && shouldRestoreOrderStockOnCancel(order)) {
+    await restoreOrderStockRpc(supabase, order);
+    patch.stockRestauradoEn = new Date().toISOString();
+    return { patch, audit: { accion: "restaurar_stock_pedido", source: "updateOrderStatus_cancelado" } };
+  }
+  return { patch: null, audit: null };
+}
+
 function resolveColorBucket(colorStock, talla, quantity, preferredColor, fallbackColor) {
   const t = String(talla || "").trim();
   if (!t || !colorStock) return null;
@@ -654,7 +706,11 @@ module.exports = {
   resolveColorBucket,
   buildOrderStockRpcItems,
   discountOrderStockRpc,
+  restoreOrderStockRpc,
+  shouldRestoreOrderStockOnCancel,
+  applyOrderStatusStockSideEffects,
   mapOrderStockRpcError,
+  mapOrderStockRestoreRpcError,
   findTallaKeyInMap,
   cellQty,
   parseQueryInt,
