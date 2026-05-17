@@ -1318,7 +1318,7 @@ app.post("/createProductVariantsAtomic", (req, res) => {
       }
       const { data, error } = await supabase.rpc("create_product_variants_atomic", { variants });
       if (error) handleAdminRpcError(error);
-      const ids = (data?.ids ?? []) as string[];
+      const ids = Array.isArray(data?.ids) ? data.ids : [];
       return res.status(200).json({ ok: true, ids });
     } catch (error) {
       console.error("createProductVariantsAtomic error:", error);
