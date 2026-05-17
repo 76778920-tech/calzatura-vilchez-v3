@@ -3,14 +3,20 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Package, ShoppingBag, Users, TrendingUp, CircleDollarSign,
   AlertCircle, Factory, X, MapPin, Phone, Mail, ChevronRight,
-  BarChart2, Clock, Brain,
+  BarChart2, Clock, Brain, Store, Globe,
 } from "lucide-react";
+import {
+  computeDashboardFromFetchedData,
+  getLast7Days,
+  toDate,
+  type DashboardStats,
+} from "@/domains/administradores/utils/adminDashboardMetrics";
 import { fetchProducts } from "@/domains/productos/services/products";
 import { fetchAllOrders } from "@/domains/pedidos/services/orders";
 import { fetchDailySales, fetchProductFinancials } from "@/domains/ventas/services/finance";
 import { fetchAllUsers } from "@/domains/usuarios/services/users";
 import { fetchRecentAudit } from "@/services/audit";
-import type { Order, Product, ProductFinancial, DailySale, UserProfile, CartItem } from "@/types";
+import type { Order, CartItem } from "@/types";
 import type { AuditEntry } from "@/services/audit";
 import { ADMIN_ROUTES } from "@/routes/paths";
 import toast from "react-hot-toast";
@@ -22,112 +28,11 @@ function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function toDate(value: Order["creadoEn"]) {
-  return value ? new Date(value) : new Date();
-}
-
-function toLocalISODate(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function isCompletedOrder(order: Order) {
-  return order.estado === "pagado" || order.estado === "enviado" || order.estado === "entregado";
-}
-
-function estimateOrderProfit(order: Order, financials: Record<string, ProductFinancial>) {
-  return order.items.reduce((acc, item) => {
-    const unitPrice = Number(item.product.precio) || 0;
-    const unitCost = financials[item.product.id]?.costoCompra ?? unitPrice;
-    return acc + (unitPrice - unitCost) * item.quantity;
-  }, 0);
-}
-
-function getLast7Days(): { iso: string; label: string }[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    const iso = toLocalISODate(d);
-    const label = d.toLocaleDateString("es-PE", { weekday: "short" });
-    return { iso, label: label.charAt(0).toUpperCase() + label.slice(1).replace(".", "") };
-  });
-}
-
 function greetingText() {
   const h = new Date().getHours();
   if (h < 12) return "Buenos días";
   if (h < 19) return "Buenas tardes";
   return "Buenas noches";
-}
-
-function dashboardSalesTotalForDate(sales: DailySale[], iso: string): number {
-  return sales.filter((s) => s.fecha === iso).reduce((acc, s) => acc + s.total, 0);
-}
-
-function dashboardOrdersTotalForDate(orders: Order[], iso: string): number {
-  return orders
-    .filter((o) => toLocalISODate(toDate(o.creadoEn)) === iso)
-    .reduce((acc, o) => acc + (o.total ?? 0), 0);
-}
-
-function buildDashboardChartSeries(
-  last7Days: { iso: string }[],
-  sales: DailySale[],
-  completedOrders: Order[]
-): number[] {
-  return last7Days.map(
-    ({ iso }) => dashboardSalesTotalForDate(sales, iso) + dashboardOrdersTotalForDate(completedOrders, iso)
-  );
-}
-
-function computeDashboardFromFetchedData(
-  today: string,
-  last7Days: { iso: string; label: string }[],
-  products: Product[],
-  orders: Order[],
-  sales: DailySale[],
-  financials: Record<string, ProductFinancial>,
-  users: UserProfile[]
-): {
-  stats: {
-    productos: number;
-    pedidos: number;
-    ingresos: number;
-    pendientes: number;
-    ventasHoy: number;
-    gananciaHoy: number;
-    usuarios: number;
-  };
-  chart: number[];
-} {
-  const completedOrders = orders.filter(isCompletedOrder);
-  const completedOrdersToday = completedOrders.filter(
-    (o) => toLocalISODate(toDate(o.creadoEn)) === today
-  );
-  const ingresos = completedOrders.reduce((acc, o) => acc + (o.total ?? 0), 0);
-  const pendientes = orders.filter((o) => o.estado === "pendiente").length;
-
-  const ventasManualesHoy = dashboardSalesTotalForDate(sales, today);
-  const gananciasManualesHoy = sales.filter((s) => s.fecha === today).reduce((acc, s) => acc + s.ganancia, 0);
-  const ventasPedidosHoy = completedOrdersToday.reduce((acc, o) => acc + (o.total ?? 0), 0);
-  const gananciasPedidosHoy = completedOrdersToday.reduce(
-    (acc, o) => acc + estimateOrderProfit(o, financials),
-    0
-  );
-
-  const chart = buildDashboardChartSeries(last7Days, sales, completedOrders);
-
-  return {
-    stats: {
-      productos: products.length,
-      pedidos: orders.length,
-      ingresos,
-      pendientes,
-      ventasHoy: ventasManualesHoy + ventasPedidosHoy,
-      gananciaHoy: gananciasManualesHoy + gananciasPedidosHoy,
-      usuarios: users.length,
-    },
-    chart,
-  };
 }
 
 function formatCurrency(n: number) {
@@ -272,22 +177,67 @@ function OrderDetailModal({ order, onClose }: Readonly<{ order: Order; onClose: 
 
 // ─── Bar Chart ──────────────────────────────────────────────────────────────
 
-function SalesBarChart({ days, values }: Readonly<{ days: string[]; values: number[] }>) {
-  const max = Math.max(...values, 1);
+function SalesSplitBarChart({
+  days,
+  webValues,
+  tiendaValues,
+}: Readonly<{ days: string[]; webValues: number[]; tiendaValues: number[] }>) {
+  const totals = days.map((_, i) => webValues[i] + tiendaValues[i]);
+  const max = Math.max(...totals, 1);
   return (
-    <div className="dash-chart-bars">
-      {days.map((label, i) => (
-        <div key={label} className="dash-chart-col">
-          <span className="dash-chart-val">{values[i] > 0 ? `S/${values[i].toFixed(0)}` : ""}</span>
-          <div className="dash-chart-track">
-            <div
-              className="dash-chart-fill"
-              style={{ height: `${Math.max((values[i] / max) * 100, values[i] > 0 ? 4 : 0)}%` }}
-            />
-          </div>
-          <span className="dash-chart-label">{label}</span>
-        </div>
-      ))}
+    <>
+      <div className="dash-chart-legend">
+        <span className="dash-chart-legend-item">
+          <span className="dash-chart-legend-swatch dash-chart-legend-web" aria-hidden="true" />
+          Tienda web (pedidos)
+        </span>
+        <span className="dash-chart-legend-item">
+          <span className="dash-chart-legend-swatch dash-chart-legend-tienda" aria-hidden="true" />
+          Tienda física (ventas)
+        </span>
+      </div>
+      <div className="dash-chart-bars">
+        {days.map((label, i) => {
+          const web = webValues[i];
+          const tienda = tiendaValues[i];
+          const total = web + tienda;
+          const webPct = total > 0 ? (web / total) * 100 : 0;
+          const tiendaPct = total > 0 ? (tienda / total) * 100 : 0;
+          const barHeight = Math.max((total / max) * 100, total > 0 ? 4 : 0);
+          return (
+            <div key={label} className="dash-chart-col">
+              <span className="dash-chart-val">{total > 0 ? `S/${total.toFixed(0)}` : ""}</span>
+              <div className="dash-chart-track dash-chart-track-stack" style={{ height: `${barHeight}%` }}>
+                {tienda > 0 && (
+                  <div className="dash-chart-fill dash-chart-fill-tienda" style={{ height: `${tiendaPct}%` }} />
+                )}
+                {web > 0 && (
+                  <div className="dash-chart-fill dash-chart-fill-web" style={{ height: `${webPct}%` }} />
+                )}
+              </div>
+              <span className="dash-chart-label">{label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function ChannelSectionHeading({
+  icon,
+  title,
+  subtitle,
+}: Readonly<{ icon: ReactNode; title: string; subtitle: string }>) {
+  return (
+    <div className="dash-channel-heading">
+      <span className="dash-channel-heading-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <div>
+        <h2 className="dash-channel-title">{title}</h2>
+        <p className="dash-channel-subtitle">{subtitle}</p>
+      </div>
     </div>
   );
 }
@@ -321,13 +271,22 @@ function OrderStatusSummary({ orders }: Readonly<{ orders: Order[] }>) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    productos: 0, pedidos: 0, ingresos: 0, pendientes: 0,
-    ventasHoy: 0, gananciaHoy: 0, usuarios: 0,
+  const [stats, setStats] = useState<DashboardStats>({
+    productos: 0,
+    pedidos: 0,
+    pendientes: 0,
+    usuarios: 0,
+    ingresosWeb: 0,
+    ingresosTienda: 0,
+    ventasHoyWeb: 0,
+    ventasHoyTienda: 0,
+    gananciaHoyWeb: 0,
+    gananciaHoyTienda: 0,
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
-  const [chartData, setChartData] = useState<number[]>(new Array(7).fill(0));
+  const [chartWeb, setChartWeb] = useState<number[]>(new Array(7).fill(0));
+  const [chartTienda, setChartTienda] = useState<number[]>(new Array(7).fill(0));
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -359,7 +318,8 @@ export default function AdminDashboard() {
       setStats(stats);
       setRecentOrders(orders.slice(0, 6));
       setAllOrders(orders);
-      setChartData(chart);
+      setChartWeb(chart.web);
+      setChartTienda(chart.tienda);
     }).catch(() => {
       setLoadError(true);
       toast.error("No se pudieron cargar los datos del dashboard. Verifica tu conexión.");
@@ -465,17 +425,17 @@ export default function AdminDashboard() {
         <button type="button" className="dash-kpi-card dash-kpi-green" onClick={() => navigate(ADMIN_ROUTES.orders)}>
           <div className="dash-kpi-icon"><ShoppingBag size={22} /></div>
           <div className="dash-kpi-body">
-            <p className="dash-kpi-label">Pedidos Totales</p>
+            <p className="dash-kpi-label">Pedidos web (total)</p>
             <p className="dash-kpi-value">{stats.pedidos}</p>
           </div>
           <ChevronRight size={16} className="dash-kpi-arrow" />
         </button>
 
-        <button type="button" className="dash-kpi-card dash-kpi-purple" onClick={() => navigate(ADMIN_ROUTES.sales)}>
+        <button type="button" className="dash-kpi-card dash-kpi-purple" onClick={() => navigate(ADMIN_ROUTES.orders)}>
           <div className="dash-kpi-icon"><TrendingUp size={22} /></div>
           <div className="dash-kpi-body">
-            <p className="dash-kpi-label">Ingresos Pedidos</p>
-            <p className="dash-kpi-value">{formatCurrency(stats.ingresos)}</p>
+            <p className="dash-kpi-label">Ingresos web</p>
+            <p className="dash-kpi-value">{formatCurrency(stats.ingresosWeb)}</p>
           </div>
           <ChevronRight size={16} className="dash-kpi-arrow" />
         </button>
@@ -490,20 +450,24 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      {/* KPI row 2 — today */}
-      <div className="dash-today-grid">
-        <div className="dash-today-card dash-today-gold">
+      <ChannelSectionHeading
+        icon={<Globe size={20} />}
+        title="Tienda web"
+        subtitle="Pedidos online completados (pagado, enviado o entregado)"
+      />
+      <div className="dash-channel-metrics">
+        <div className="dash-today-card dash-today-web">
           <CircleDollarSign size={20} />
           <div>
-            <p className="dash-today-label">Ventas hoy</p>
-            <p className="dash-today-value">{formatCurrency(stats.ventasHoy)}</p>
+            <p className="dash-today-label">Ventas hoy — web</p>
+            <p className="dash-today-value">{formatCurrency(stats.ventasHoyWeb)}</p>
           </div>
         </div>
-        <div className="dash-today-card dash-today-gold">
+        <div className="dash-today-card dash-today-web">
           <BarChart2 size={20} />
           <div>
-            <p className="dash-today-label">Ganancia estimada hoy <span style={{ fontSize: "10px", opacity: 0.6, fontWeight: 400 }}>(est.)</span></p>
-            <p className="dash-today-value">{formatCurrency(stats.gananciaHoy)}</p>
+            <p className="dash-today-label">Ganancia hoy — web (est.)</p>
+            <p className="dash-today-value">{formatCurrency(stats.gananciaHoyWeb)}</p>
           </div>
         </div>
         <button
@@ -520,6 +484,36 @@ export default function AdminDashboard() {
         </button>
       </div>
 
+      <ChannelSectionHeading
+        icon={<Store size={20} />}
+        title="Tienda física"
+        subtitle="Ventas registradas en Admin → Ventas"
+      />
+      <div className="dash-channel-metrics">
+        <button type="button" className="dash-kpi-card dash-kpi-gold dash-channel-kpi" onClick={() => navigate(ADMIN_ROUTES.sales)}>
+          <div className="dash-kpi-icon"><Store size={22} /></div>
+          <div className="dash-kpi-body">
+            <p className="dash-kpi-label">Ingresos tienda física</p>
+            <p className="dash-kpi-value">{formatCurrency(stats.ingresosTienda)}</p>
+          </div>
+          <ChevronRight size={16} className="dash-kpi-arrow" />
+        </button>
+        <div className="dash-today-card dash-today-gold">
+          <CircleDollarSign size={20} />
+          <div>
+            <p className="dash-today-label">Ventas hoy — física</p>
+            <p className="dash-today-value">{formatCurrency(stats.ventasHoyTienda)}</p>
+          </div>
+        </div>
+        <div className="dash-today-card dash-today-gold">
+          <BarChart2 size={20} />
+          <div>
+            <p className="dash-today-label">Ganancia hoy — física</p>
+            <p className="dash-today-value">{formatCurrency(stats.gananciaHoyTienda)}</p>
+          </div>
+        </div>
+      </div>
+
       {/* Chart */}
       <div className="dash-card dash-chart-card">
         <div className="dash-card-header">
@@ -531,7 +525,11 @@ export default function AdminDashboard() {
             Ver ventas <ChevronRight size={14} />
           </Link>
         </div>
-        <SalesBarChart days={last7Days.map((d) => d.label)} values={chartData} />
+        <SalesSplitBarChart
+          days={last7Days.map((d) => d.label)}
+          webValues={chartWeb}
+          tiendaValues={chartTienda}
+        />
       </div>
 
       {/* Orders + Status */}
@@ -541,7 +539,7 @@ export default function AdminDashboard() {
           <div className="dash-card-header">
             <div>
               <p className="dash-card-kicker">Últimas transacciones</p>
-              <h2 className="dash-card-title">Pedidos Recientes</h2>
+              <h2 className="dash-card-title">Pedidos recientes (tienda web)</h2>
             </div>
             <Link to={ADMIN_ROUTES.orders} className="admin-link dash-card-link">
               Ver todos <ChevronRight size={14} />
