@@ -7,34 +7,44 @@ import main
 from services.firebase_verifier import is_firebase_admin
 
 
+def _contract_product_ids() -> list[str]:
+    return [f"p-contract-{i}" for i in range(1, 6)]
+
+
 def _sales_rows(days: int = 35) -> list[dict]:
     today = date.today()
-    return [
-        {
-            "productId": "p-contract-1",
-            "fecha": (today - timedelta(days=days - 1 - index)).isoformat(),
-            "cantidad": 1,
-            "total": 120.0,
-            "devuelto": False,
-            "nombre": "Zapatilla Contrato",
-            "categoria": "hombre",
-            "precioVenta": 120.0,
-            "codigo": "CV-CONTRACT-1",
-        }
-        for index in range(days)
-    ]
+    rows: list[dict] = []
+    for pid in _contract_product_ids():
+        num = pid.rsplit("-", 1)[-1]
+        for index in range(days):
+            rows.append(
+                {
+                    "productId": pid,
+                    "fecha": (today - timedelta(days=days - 1 - index)).isoformat(),
+                    "cantidad": 1,
+                    "total": 120.0,
+                    "devuelto": False,
+                    "nombre": f"Zapatilla Contrato {num}",
+                    "categoria": "hombre",
+                    "precioVenta": 120.0,
+                    "codigo": f"CV-CONTRACT-{num}",
+                    "canal": "tienda",
+                }
+            )
+    return rows
 
 
 def _products() -> list[dict]:
     return [
         {
-            "id": "p-contract-1",
-            "nombre": "Zapatilla Contrato",
+            "id": pid,
+            "nombre": f"Zapatilla Contrato {pid.rsplit('-', 1)[-1]}",
             "categoria": "hombre",
             "precio": 120.0,
             "stock": 20,
             "imagen": "",
         }
+        for pid in _contract_product_ids()
     ]
 
 
@@ -50,7 +60,7 @@ def _client(monkeypatch, save_ire=None) -> TestClient:
             _sales_rows(),
             [],
             _products(),
-            {"p-contract-1": "CV-CONTRACT-1"},
+            {pid: f"CV-CONTRACT-{pid.rsplit('-', 1)[-1]}" for pid in _contract_product_ids()},
             [],
         ),
     )
@@ -83,6 +93,7 @@ def test_predict_combined_expone_contrato_ire(monkeypatch):
     assert {"productos_bajando", "alta_demanda_bajo_stock", "productos_drift_alto"} <= set(ire["detalle"])
     assert payload["ire_proyectado"]["version"] == ire["version"]
     assert payload["warnings"] == []
+    assert payload["demand"]["modelo_meta"]["data_sufficient"] is True
 
 
 def test_predict_combined_no_falla_si_historial_ire_no_se_guarda(monkeypatch):
