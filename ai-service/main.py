@@ -15,7 +15,13 @@ from slowapi.errors import RateLimitExceeded
 
 from models.campaign import detect_campaign, _compute_feedback_adjustments
 from services.firebase_verifier import is_firebase_admin
-from models.demand import build_daily_sales_by_product, get_stock_alerts, get_weekly_chart, predict_demand
+from models.demand import (
+    build_daily_sales_by_product,
+    get_stock_alerts,
+    get_weekly_chart,
+    predict_demand,
+    training_data_quality_meta,
+)
 from models.revenue import forecast_revenue
 from models.risk import compute_ire, compute_ire_proyectado
 from services.supabase_client import (
@@ -437,6 +443,15 @@ def combined_prediction(
             _prediction_log.pop(0)
 
         warnings: list[str] = []
+        quality = training_data_quality_meta(training_meta)
+        if not quality.get("data_sufficient"):
+            reason = str(quality.get("insufficient_reason") or "").strip()
+            warnings.append(
+                reason
+                if reason
+                else "Datos históricos insuficientes: las predicciones no son representativas."
+            )
+
         try:
             revenue = forecast_revenue(
                 daily_sales=daily_sales,

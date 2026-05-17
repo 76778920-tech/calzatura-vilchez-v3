@@ -38,6 +38,10 @@ import {
   type RevenueForecast,
   type WeekPoint,
 } from "./adminPredictionsLogic";
+import {
+  isPredictionDataSufficient,
+  predictionInsufficientMessage,
+} from "./predictionDataQuality";
 
 type CombinedPredictionsPayload = {
   demand?: { predictions?: Prediction[]; modelo_meta?: ModeloMeta | null };
@@ -317,6 +321,16 @@ export function useAdminPredictionsModel() {
     [predictionsForView],
   );
 
+  const predictionDataSufficient = useMemo(
+    () => isPredictionDataSufficient(modeloMeta),
+    [modeloMeta],
+  );
+
+  const predictionInsufficientReason = useMemo(
+    () => predictionInsufficientMessage(modeloMeta),
+    [modeloMeta],
+  );
+
   const resumenEjecutivo = useMemo(
     () =>
       buildResumenEjecutivoBloques({
@@ -469,6 +483,8 @@ export function useAdminPredictionsModel() {
     handleSend,
     assistantQuickActions,
     assistantQuestionIdeas,
+    predictionDataSufficient,
+    predictionInsufficientReason,
   };
 }
 

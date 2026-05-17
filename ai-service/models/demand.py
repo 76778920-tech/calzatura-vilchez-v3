@@ -35,6 +35,9 @@ from models.safe_limits import (
 
 # Minimum training rows (product × day pairs) to use the ML model.
 MIN_TRAIN_ROWS = 30
+
+# Mínimo de productos con ventas para considerar el panel de predicciones representativo.
+MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS = 5
 SEASONAL_FEATURES = [
     "temporada_verano",
     "temporada_escolar",
@@ -164,7 +167,7 @@ def build_daily_sales_by_product(
             result[pid][fecha] += qty
 
     for order in completed_orders:
-        fecha = _iso_date(order.get("creadoEn"))
+        fecha = _iso_date(order.get("pagadoEn") or order.get("creadoEn"))
         if not fecha:
             continue
         for item in order.get("items", []):
@@ -898,7 +901,50 @@ def predict_demand(
             -item["prediccion_unidades"],
         )
     )
+    training_meta = {
+        **training_meta,
+        **training_data_quality_meta(training_meta),
+    }
     return predictions, training_meta
+
+
+def training_data_quality_meta(training_meta: dict) -> dict:
+    """
+    Metadatos para API/UI: indica si hay historial suficiente para confiar
+    en predicciones ML (misma lógica que _train_global_model).
+    """
+    n_samples = int(training_meta.get("n_samples") or 0)
+    n_products = int(training_meta.get("n_products") or 0)
+    model_type = str(training_meta.get("model_type") or "")
+    ml_active = model_type == "random_forest"
+
+    reasons: list[str] = []
+    if n_samples < MIN_TRAIN_ROWS:
+        reasons.append(
+            f"Muestras de entrenamiento ({n_samples}) por debajo del mínimo ({MIN_TRAIN_ROWS})."
+        )
+    if not ml_active:
+        reasons.append(
+            "No se entrenó Random Forest; las predicciones usan promedio móvil (menos fiables)."
+        )
+    if n_products < MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS:
+        reasons.append(
+            f"Pocos productos con ventas en el historial ({n_products} "
+            f"< {MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS})."
+        )
+
+    data_sufficient = (
+        ml_active
+        and n_samples >= MIN_TRAIN_ROWS
+        and n_products >= MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS
+    )
+    return {
+        "data_sufficient": data_sufficient,
+        "ml_active": ml_active,
+        "min_train_rows": MIN_TRAIN_ROWS,
+        "min_products_reliable": MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS,
+        "insufficient_reason": " ".join(reasons),
+    }
 
 
 # ---------------------------------------------------------------------------

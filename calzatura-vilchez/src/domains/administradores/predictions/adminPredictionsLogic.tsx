@@ -162,6 +162,12 @@ export interface ModeloMeta {
   data_hash: string;
   model_type: string;
   cached_at?: string;
+  /** true si hay historial suficiente para Random Forest (API demand.py). */
+  data_sufficient?: boolean;
+  ml_active?: boolean;
+  min_train_rows?: number;
+  min_products_reliable?: number;
+  insufficient_reason?: string;
 }
 
 export interface ModelMetrics {

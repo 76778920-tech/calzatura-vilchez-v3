@@ -23,6 +23,7 @@ from models.demand import (
     _season_flags,
     build_daily_sales_by_product,
     predict_demand,
+    training_data_quality_meta,
 )
 
 
@@ -225,6 +226,21 @@ class TestBuildDailySalesByProduct:
         result = build_daily_sales_by_product([], orders)
         assert result.get("p2", {}).get(self._today(-2), 0) == 3
 
+    def test_pedidos_usan_pagadoEn_si_existe(self):
+        orders = [
+            {
+                "creadoEn": self._today(-10),
+                "pagadoEn": self._today(-1),
+                "items": [
+                    {"product": {"id": "p3", "nombre": "C", "categoria": "hombre", "precio": 90},
+                     "quantity": 1, "size": "40"}
+                ],
+            }
+        ]
+        result = build_daily_sales_by_product([], orders)
+        assert result.get("p3", {}).get(self._today(-1), 0) == 1
+        assert result.get("p3", {}).get(self._today(-10), 0) == 0
+
     def test_no_cuenta_ventas_sin_product_id(self):
         sales = [
             {"productId": None, "fecha": self._today(-1), "cantidad": 2, "devuelto": False,
@@ -280,40 +296,77 @@ class TestSeasonalityAndCampaignFeatures:
 
     def test_predict_demand_expone_campana_y_features_estacionales_en_meta(self):
         today = date.today()
-        product = {
-            "id": "p1",
-            "nombre": "Zapato escolar",
-            "categoria": "escolar",
-            "precio": 120,
-            "stock": 20,
-            "imagen": "",
-            "campana": "nueva-temporada",
-        }
-        sales = [
+        products = [
             {
-                "productId": "p1",
-                "fecha": (today - timedelta(days=day)).isoformat(),
-                "cantidad": 1 + (day % 3),
-                "devuelto": False,
-                "nombre": product["nombre"],
-                "categoria": product["categoria"],
-                "precioVenta": product["precio"],
-                "codigo": "ESC-001",
+                "id": f"p{i}",
+                "nombre": f"Zapato {i}",
+                "categoria": "escolar",
+                "precio": 120,
+                "stock": 20,
+                "imagen": "",
+                "campana": "nueva-temporada" if i == 1 else "",
             }
-            for day in range(0, 31)
+            for i in range(1, 6)
         ]
+        sales = []
+        for product in products:
+            for day in range(0, 31):
+                sales.append({
+                    "productId": product["id"],
+                    "fecha": (today - timedelta(days=day)).isoformat(),
+                    "cantidad": 1 + (day % 3),
+                    "devuelto": False,
+                    "nombre": product["nombre"],
+                    "categoria": product["categoria"],
+                    "precioVenta": product["precio"],
+                    "codigo": f"ESC-{product['id']}",
+                })
 
         predictions, meta = predict_demand(
             sales,
             [],
-            [product],
+            products,
             horizon_days=7,
             history_days=30,
         )
+        product = products[0]
 
         assert "campana" in meta["feature_cols"]
         assert "temporada_escolar" in meta["seasonality_features"]
         assert "temporada_navidad" in meta["seasonality_features"]
         assert "nueva-temporada" in meta["campaign_values"]
-        assert predictions[0]["campana"] == "nueva-temporada"
-        assert predictions[0]["modelo"] == "random_forest"
+        p1 = next(p for p in predictions if p["productId"] == "p1")
+        assert p1["campana"] == "nueva-temporada"
+        assert p1["modelo"] == "random_forest"
+        assert meta["data_sufficient"] is True
+        assert meta["ml_active"] is True
+
+
+class TestTrainingDataQualityMeta:
+    def test_insuficiente_con_promedio_movil(self):
+        meta = training_data_quality_meta({
+            "n_samples": 10,
+            "n_products": 2,
+            "model_type": "promedio_movil",
+        })
+        assert meta["data_sufficient"] is False
+        assert meta["ml_active"] is False
+        assert "promedio móvil" in meta["insufficient_reason"].lower() or "promedio movil" in meta["insufficient_reason"].lower()
+
+    def test_suficiente_con_random_forest(self):
+        meta = training_data_quality_meta({
+            "n_samples": 120,
+            "n_products": 8,
+            "model_type": "random_forest",
+        })
+        assert meta["data_sufficient"] is True
+        assert meta["ml_active"] is True
+
+    def test_insuficiente_con_pocos_productos_aunque_haya_rf(self):
+        meta = training_data_quality_meta({
+            "n_samples": 240,
+            "n_products": 2,
+            "model_type": "random_forest",
+        })
+        assert meta["data_sufficient"] is False
+        assert "Pocos productos" in meta["insufficient_reason"]

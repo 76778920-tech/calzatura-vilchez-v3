@@ -41,14 +41,25 @@ try:
 except Exception:  # pragma: no cover
     np = None  # type: ignore[assignment]
 
-from services.supabase_client import fetch_completed_orders, fetch_daily_sales
+from models.demand import (
+    FEATURE_COLS,
+    MIN_TRAIN_ROWS,
+    SEASONAL_FEATURES,
+    _init_sale_meta_from_sources,
+    _lag_features,
+    _normalize_campaign,
+    build_daily_sales_by_product,
+)
+from services.supabase_client import (
+    fetch_completed_orders,
+    fetch_daily_sales,
+    fetch_products,
+)
 
 # ── Constantes ────────────────────────────────────────────────────────────────
-MIN_TRAIN_ROWS  = 30
+# Features = mismas columnas que models/demand.py (producción en Render).
+# Hiperparámetros de experimentos aquí pueden diferir del RF de producción (50/8/3).
 DEFAULT_HISTORY = 180
-FEATURE_COLS     = ["weekday", "month", "day_of_month", "lag_7", "lag_30", "categoria"]
-# Excluye 'categoria' (constante=0 en este dataset → ruido puro para el modelo)
-FEATURE_COLS_EXP = ["weekday", "month", "day_of_month", "lag_7", "lag_30"]
 # Seeds para promediar en la curva de aprendizaje (reduce varianza por esparsidad)
 LC_SEEDS = [42, 43, 44]
 
@@ -59,6 +70,11 @@ FEATURE_LABELS = {
     "month":        "Mes del año",
     "day_of_month": "Día del mes",
     "categoria":    "Categoría del producto",
+    "campana":      "Campaña comercial",
+    "temporada_verano": "Temporada verano",
+    "temporada_escolar": "Temporada escolar",
+    "temporada_fiestas_patrias": "Fiestas Patrias",
+    "temporada_navidad": "Temporada navidad",
 }
 
 
@@ -95,37 +111,6 @@ def _ensure_runtime_dependencies() -> None:
 
 # ── Preparación de datos ──────────────────────────────────────────────────────
 
-def build_sale_meta(daily_sales: list, completed_orders: list) -> dict:
-    """
-    Extrae nombre, categoría y precio de cada producto a partir de las
-    ventas diarias y pedidos completados.
-    Retorna {productId: {nombre, categoria, precio}}.
-    """
-    meta: dict[str, dict] = {}
-
-    for sale in daily_sales:
-        pid = sale.get("productId", "")
-        if pid and pid not in meta:
-            meta[pid] = {
-                "nombre":    sale.get("nombre", pid),
-                "categoria": sale.get("categoria", "") or "",
-                "precio":    _safe_float(sale.get("precioVenta", 0)),
-            }
-
-    for order in completed_orders:
-        for item in order.get("items", []):
-            product = item.get("product", {})
-            pid = product.get("id", "")
-            if pid and pid not in meta:
-                meta[pid] = {
-                    "nombre":    product.get("nombre", pid),
-                    "categoria": product.get("categoria", "") or "",
-                    "precio":    _safe_float(product.get("precio", 0)),
-                }
-
-    return meta
-
-
 def build_dataset(
     sales_map: dict,
     sale_meta: dict,
@@ -139,15 +124,18 @@ def build_dataset(
       - lag_30 = media de ventas de los 30 días ANTERIORES a la fecha.
       - Nunca se usan datos del día actual ni del futuro para calcular lags.
 
-    Columnas del DataFrame resultante:
-      pid, fecha, categoria_raw,
-      weekday, month, day_of_month, lag_7, lag_30, categoria (encoded),
-      y (unidades vendidas ese día — variable objetivo)
+    Columnas: mismas que demand.FEATURE_COLS + pid, fecha, y (objetivo).
     """
-    # Label-encode categorías usando solo los valores presentes en el dataset
     categories = list({(sale_meta.get(pid, {}).get("categoria") or "") for pid in sales_map})
     le = LabelEncoder()
     le.fit(categories + [""])
+
+    campaigns = list({
+        _normalize_campaign(sale_meta.get(pid, {}).get("campana"))
+        for pid in sales_map
+    })
+    campaign_le = LabelEncoder()
+    campaign_le.fit(campaigns + [""])
 
     rows = []
     for pid, day_sales in sales_map.items():
@@ -156,32 +144,21 @@ def build_dataset(
             cat_enc = int(le.transform([cat_raw])[0])
         except ValueError:
             cat_enc = 0
+        campaign_raw = _normalize_campaign(sale_meta.get(pid, {}).get("campana"))
+        try:
+            campaign_enc = int(campaign_le.transform([campaign_raw])[0])
+        except ValueError:
+            campaign_enc = 0
 
         for fecha in all_dates:
             current_date = date.fromisoformat(fecha)
-
-            # Lag features — SOLO días anteriores (sin leakage)
-            lag_7 = sum(
-                day_sales.get((current_date - timedelta(days=d)).isoformat(), 0.0)
-                for d in range(1, 8)
-            ) / 7.0
-
-            lag_30 = sum(
-                day_sales.get((current_date - timedelta(days=d)).isoformat(), 0.0)
-                for d in range(1, 31)
-            ) / 30.0
-
+            feat = _lag_features(current_date, day_sales, cat_enc, campaign_enc)
             rows.append({
-                "pid":          pid,
-                "fecha":        fecha,
+                "pid": pid,
+                "fecha": fecha,
                 "categoria_raw": cat_raw,
-                "weekday":      current_date.weekday(),
-                "month":        current_date.month,
-                "day_of_month": current_date.day,
-                "lag_7":        lag_7,
-                "lag_30":       lag_30,
-                "categoria":    cat_enc,
-                "y":            day_sales.get(fecha, 0.0),
+                **feat,
+                "y": day_sales.get(fecha, 0.0),
             })
 
     df = pd.DataFrame(rows)
@@ -259,7 +236,7 @@ def train_rf(
     feature_cols: list | None = None,
 ):
     """Entrena RandomForestRegressor con hiperparámetros explícitos (reutilizable en grid search)."""
-    cols = feature_cols if feature_cols is not None else FEATURE_COLS_EXP
+    cols = feature_cols if feature_cols is not None else FEATURE_COLS
     X = df_train[cols].values
     y = df_train["y"].values
     model = RandomForestRegressor(
@@ -275,7 +252,7 @@ def train_rf(
 
 def predict_rf(model, df: pd.DataFrame, feature_cols: list | None = None) -> np.ndarray:
     """Genera predicciones del RF clippeadas a >= 0."""
-    cols = feature_cols if feature_cols is not None else FEATURE_COLS_EXP
+    cols = feature_cols if feature_cols is not None else FEATURE_COLS
     return np.clip(model.predict(df[cols].values), 0.0, None)
 
 
@@ -366,7 +343,7 @@ def run_experiment_1(df: pd.DataFrame) -> tuple:
         sys.exit(1)
 
     print("\n  Entrenando RandomForestRegressor...")
-    print(f"    features={FEATURE_COLS_EXP}")
+    print(f"    features={FEATURE_COLS}")
     print("    n_estimators=100  max_depth=None  min_samples_leaf=1  random_state=42")
     model = train_rf(df_train)
 
@@ -639,9 +616,9 @@ def learning_curve_rf(df: pd.DataFrame) -> list:
         # Promedio sobre LC_SEEDS para reducir varianza (datos esparsos)
         all_preds = [
             predict_rf(
-                train_rf(df_tr, random_state=s, feature_cols=FEATURE_COLS_EXP),
+                train_rf(df_tr, random_state=s, feature_cols=FEATURE_COLS),
                 df_test,
-                feature_cols=FEATURE_COLS_EXP,
+                feature_cols=FEATURE_COLS,
             )
             for s in LC_SEEDS
         ]
@@ -810,6 +787,57 @@ def run_experiment_4(df: pd.DataFrame, df_ppm: pd.DataFrame) -> dict:
 
 # ── Parte E: Reporte final ───────────────────────────────────────────────────
 
+def _report_conclusion_lines(res: dict) -> list[str]:
+    """Conclusiones derivadas de las metricas reales (no texto fijo de plantilla)."""
+    n_folds = int(res.get("n_folds", 0))
+    wins_mape = int(res.get("n_wins_mape", 0))
+    wins_mae = int(res.get("n_wins_mae", 0))
+    mape_delta = float(res.get("avg_mape_base", 0)) - float(res.get("avg_mape_rf", 0))
+    density = float(res.get("density_pct", 0))
+    n_products = int(res.get("n_products", 0))
+    wilcoxon = res.get("wilcoxon") or {}
+
+    lines: list[str] = []
+    if density < 5.0 or n_products < 5:
+        lines.extend([
+            "  AVISO: dataset muy escaso para conclusiones de tesis.",
+            f"    Densidad {density:.1f}% | Productos con ventas: {n_products}",
+            "    Registra ventas en tienda (Admin > Ventas) y completa pedidos web",
+            "    (estado pagado/enviado/entregado) antes de re-ejecutar evaluate.py.",
+            "",
+        ])
+
+    lines.extend([
+        f"  1. Backtesting ({n_folds} folds): RF gana MAPE en {wins_mape}/{n_folds} folds"
+        f" y MAE en {wins_mae}/{n_folds} folds.",
+        f"     MAPE promedio RF={res['avg_mape_rf']:.1f}% vs Baseline={res['avg_mape_base']:.1f}%"
+        f" (delta {mape_delta:+.1f}pp; positivo = RF mejor).",
+        "  2. Con alta esparsidad, priorizar MAPE sobre MAE global (dias sin venta).",
+    ])
+
+    if res.get("best_params"):
+        lines.append("  3. Grid search: ver seccion 4 para hiperparametros optimos en validacion interna.")
+    else:
+        lines.append("  3. Grid search omitido: train insuficiente para comparar 27 configuraciones.")
+
+    if "error" in wilcoxon:
+        lines.append(f"  4. Wilcoxon no aplicable: {wilcoxon['error']}")
+    else:
+        lines.append(
+            f"  4. Wilcoxon: p={wilcoxon.get('p_value')} — {wilcoxon.get('conclusion', 'sin conclusion')}."
+        )
+
+    if len(res.get("lc_results") or []) >= 2:
+        lc = res["lc_results"]
+        d_mape = lc[-1]["mape_rf"] - lc[0]["mape_rf"]
+        lines.append(f"  5. Curva de aprendizaje: variacion MAPE {lc[0]['frac']:.0%}->{lc[-1]['frac']:.0%} = {d_mape:+.1f}pp.")
+    else:
+        lines.append("  5. Curva de aprendizaje: datos insuficientes.")
+
+    lines.append("")
+    return lines
+
+
 def _report_exp3_lines(res: dict) -> list[str]:
     if not res.get("top_configs") or not res.get("best_params"):
         return ["  (grid search omitido: train insuficiente)", ""]
@@ -861,8 +889,8 @@ def generate_report(res: dict, output_path: str = "") -> str:
         f"  Periodo   : {res['date_start']}  ->  {res['date_end']}",
         f"  Productos : {res['n_products']}  |  Dias: {res['n_days']}  |  Filas: {res['n_rows']:,}",
         f"  Densidad  : {res['density_pct']:.1f}%  ({res['n_with_sales']:,}/{res['n_rows']:,} filas con ventas)",
-        f"  Features  : {', '.join(FEATURE_COLS_EXP)}",
-        "             ['categoria' excluida: constante=0 en este dataset]",
+        f"  Features  : {', '.join(FEATURE_COLS)}",
+        f"             (alineado con producción; estacionalidad: {', '.join(SEASONAL_FEATURES)})",
         "",
         sep("-"),
         "2. EXPERIMENTO 1 — SPLIT TEMPORAL 80/20",
@@ -939,17 +967,7 @@ def generate_report(res: dict, output_path: str = "") -> str:
         sep("-"),
         "6. CONCLUSIONES",
         sep("-"),
-        "  1. El RandomForest mejora el MAPE en 6/6 folds del backtesting",
-        f"     (RF={res['avg_mape_rf']:.1f}% vs Baseline={res['avg_mape_base']:.1f}%,"
-        f" mejora={res['avg_mape_base']-res['avg_mape_rf']:.1f}pp).",
-        "  2. El MAE global favorece al baseline por la alta esparsidad (82% ceros).",
-        "     El MAPE es la metrica relevante al evaluar dias con demanda real.",
-        "  3. El grid search confirma que la configuracion por defecto es optima.",
-        "  4. La curva de aprendizaje muestra estabilidad; el modelo no degrada",
-        "     con mas datos y mejora su MAE al usar el historial completo.",
-        "  5. El test de Wilcoxon no alcanza significancia (n=10, alta esparsidad);",
-        "     la evidencia cuantitativa principal es el MAPE consistente en 6 folds.",
-        "",
+    ] + _report_conclusion_lines(res) + [
         sep(),
         "FIN DEL REPORTE",
         sep(),
@@ -993,7 +1011,6 @@ def main():
     print("=" * 60)
 
     _ensure_runtime_dependencies()
-    from models.demand import build_daily_sales_by_product
 
     # 1. Cargar datos desde Supabase
     print(f"\n[1/3] Cargando datos de Supabase (últimos {args.history} días)...")
@@ -1008,14 +1025,30 @@ def main():
     print(f"  Ventas diarias      : {len(daily_sales):,} registros")
     print(f"  Pedidos completados : {len(completed_orders):,} registros")
 
+    if len(daily_sales) < 30:
+        print(
+            f"\n  AVISO: ventasDiarias tiene pocas filas ({len(daily_sales)}) "
+            f"en los ultimos {args.history} dias."
+        )
+        print("        evaluate.py funciona, pero las metricas no son representativas para tesis.")
+        print("        Usa Admin > Ventas o importa historico en Supabase.")
+
+    if len(completed_orders) < 5:
+        print(
+            f"\n  AVISO: solo {len(completed_orders)} pedido(s) pagado/enviado/entregado "
+            f"en el periodo (hay mas pedidos cancelados u otros estados en la BD)."
+        )
+
     if len(daily_sales) == 0 and len(completed_orders) == 0:
         print("\n  ERROR: No hay datos disponibles. Verifica las credenciales y el historial.")
         sys.exit(1)
 
     # 2. Construir mapa de ventas y metadatos
     print("\n[2/3] Construyendo dataset con control estricto de leakage...")
+    products = fetch_products()
+    product_map = {p["id"]: p for p in products}
     sales_map = build_daily_sales_by_product(daily_sales, completed_orders)
-    sale_meta = build_sale_meta(daily_sales, completed_orders)
+    sale_meta = _init_sale_meta_from_sources(daily_sales, completed_orders, product_map)
 
     today      = date.today()
     hist_start = today - timedelta(days=args.history - 1)

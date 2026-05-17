@@ -6,6 +6,8 @@ import { predictionTabPanels } from "./predictionTabRegistry";
 export function AdminPredictionsDashboard(props: Readonly<AdminPredictionsModelState>) {
   const {
     aiWarnings,
+    predictionDataSufficient,
+    predictionInsufficientReason,
     activeTab,
     alertDays,
     campanaData,
@@ -17,6 +19,8 @@ export function AdminPredictionsDashboard(props: Readonly<AdminPredictionsModelS
     setAlertDays,
     setHistory,
     setHorizon,
+    loading,
+    error,
   } = props;
 
   const TabPanel = predictionTabPanels[activeTab];
@@ -33,6 +37,20 @@ export function AdminPredictionsDashboard(props: Readonly<AdminPredictionsModelS
               <li key={w}>{w}</li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {!loading && !error && !predictionDataSufficient && (
+        <div className="pred-warnings-banner pred-data-insufficient" role="status">
+          <AlertTriangle size={16} aria-hidden="true" />
+          <div>
+            <strong>Datos insuficientes para predicciones fiables</strong>
+            <p style={{ margin: "0.35rem 0 0" }}>{predictionInsufficientReason}</p>
+            <p className="pred-sub" style={{ margin: "0.5rem 0 0" }}>
+              Las cifras de demanda proyectada no se muestran hasta tener más ventas en tienda y pedidos completados.
+              El stock, historial y el IRE siguen visibles.
+            </p>
+          </div>
         </div>
       )}
 

@@ -16,6 +16,7 @@ import {
 import { motion } from "framer-motion";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import type { AdminPredictionsModelState } from "./useAdminPredictionsModel";
+import { shouldMaskPredictionMetrics } from "./predictionDataQuality";
 import type { LearningStatsUmbrales } from "./adminPredictionsLogic";
 import {
   AnimatedKpi,
@@ -422,6 +423,7 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
     search,
     setSearch,
     porOrden,
+    predictionDataSufficient,
   } = props;
   return (
         <motion.div
@@ -554,6 +556,8 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
                         <td>
                           {prediction.sin_historial ? (
                             <span className="pred-sub">-</span>
+                          ) : shouldMaskPredictionMetrics(predictionDataSufficient, prediction) ? (
+                            <span className="pred-sub" title="Datos históricos insuficientes">—</span>
                           ) : (
                             <>
                               <strong className="pred-value">{formatUnits(prediction.prediccion_unidades)}</strong>
@@ -564,6 +568,8 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
                         <td>
                           {prediction.sin_historial ? (
                             <span className="pred-sub">-</span>
+                          ) : shouldMaskPredictionMetrics(predictionDataSufficient, prediction) ? (
+                            <span className="pred-sub" title="Datos históricos insuficientes">—</span>
                           ) : (
                             <>
                               <strong>{formatUnits(prediction.prediccion_semanal)}</strong>
@@ -590,6 +596,8 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
                         <td>
                           {prediction.sin_historial ? (
                             <span className="pred-sub">-</span>
+                          ) : shouldMaskPredictionMetrics(predictionDataSufficient, prediction) ? (
+                            <span className="pred-sub">Datos insuficientes</span>
                           ) : (
                             <div className="pred-cell-stack">
                               <TendenciaCell t={prediction.tendencia} />
