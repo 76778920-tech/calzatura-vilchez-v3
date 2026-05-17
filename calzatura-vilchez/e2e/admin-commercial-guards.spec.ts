@@ -34,12 +34,6 @@ const SEED_PRODUCT = {
   descuento: null,
 };
 
-// Error PostgREST que devuelve Supabase cuando un trigger lanza RAISE EXCEPTION.
-// code "P0001" es el default de PostgreSQL para RAISE EXCEPTION sin SQLSTATE.
-function postgrestTriggerError(triggerMessage: string) {
-  return JSON.stringify({ code: "P0001", details: null, hint: null, message: triggerMessage });
-}
-
 async function setupMocks(page: Page) {
   await page.route("**/rest/v1/productos*", async (route) => {
     if (route.request().method() === "GET") {
