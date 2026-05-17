@@ -32,7 +32,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION cv_jsonb_find_talla_key(row jsonb, p_talla text)
+CREATE OR REPLACE FUNCTION cv_jsonb_find_talla_key(p_size_map jsonb, p_talla text)
 RETURNS text
 LANGUAGE plpgsql
 IMMUTABLE
@@ -41,13 +41,13 @@ DECLARE
   k text;
   want text := trim(COALESCE(p_talla, ''));
 BEGIN
-  IF row IS NULL OR jsonb_typeof(row) <> 'object' OR want = '' THEN
+  IF p_size_map IS NULL OR jsonb_typeof(p_size_map) <> 'object' OR want = '' THEN
     RETURN NULL;
   END IF;
-  IF row ? want THEN
+  IF p_size_map ? want THEN
     RETURN want;
   END IF;
-  FOR k IN SELECT jsonb_object_keys(row) LOOP
+  FOR k IN SELECT jsonb_object_keys(p_size_map) LOOP
     IF trim(k) = want THEN
       RETURN k;
     END IF;
