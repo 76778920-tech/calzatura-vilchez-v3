@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { DELIVERY_CONFIG } from "@/config/delivery";
 import type { DeliveryQuote, GeocodeCandidate, MapRoutePosition } from "@/services/deliveryOpenRoute";
 import CheckoutDeliveryMap from "@/domains/carrito/components/CheckoutDeliveryMap";
@@ -249,10 +250,17 @@ function DeliveryMapSection(
     routeLoading,
     onMapCustomerMove,
   } = props;
-  if (!showDeliveryMap) return null;
+  const [mapMounted, setMapMounted] = useState(showDeliveryMap);
+  useEffect(() => {
+    if (showDeliveryMap) setMapMounted(true);
+  }, [showDeliveryMap]);
+
+  if (!mapMounted) return null;
+
   const customerLat = locationConfirmed && selectedDelivery ? selectedDelivery.lat : null;
   const customerLng = locationConfirmed && selectedDelivery ? selectedDelivery.lng : null;
   return (
+    <div className="checkout-delivery-map-shell" hidden={showDeliveryMap ? undefined : true}>
     <CheckoutDeliveryMap
       storeLat={DELIVERY_CONFIG.storeLat}
       storeLng={DELIVERY_CONFIG.storeLng}
@@ -265,6 +273,7 @@ function DeliveryMapSection(
       interactive
       onCustomerPositionChange={onMapCustomerMove}
     />
+    </div>
   );
 }
 

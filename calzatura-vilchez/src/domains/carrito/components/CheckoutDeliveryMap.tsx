@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import {
-  MapContainer,
-  Marker,
-  Polyline,
-  TileLayer,
-  useMap,
-  useMapEvents,
-} from "react-leaflet";
+import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { isDrivingRouteGeometry, type MapRoutePosition } from "@/services/deliveryOpenRoute";
@@ -24,92 +17,27 @@ type Props = Readonly<{
   onCustomerPositionChange?: (lat: number, lng: number) => void;
 }>;
 
-type FitBoundsToSignalProps = Readonly<{
-  storeLat: number;
-  storeLng: number;
-  fitBoundsNonce: number;
-  customerLat: number;
-  customerLng: number;
-}>;
-
-type StorePositionProps = Readonly<{
-  storeLat: number;
-  storeLng: number;
-}>;
-
 type MapPickHandlerProps = Readonly<{
   enabled: boolean;
   onPick: (lat: number, lng: number) => void;
 }>;
 
-type RouteLayerProps = Readonly<{
+type MapViewControllerProps = Readonly<{
+  storeLat: number;
+  storeLng: number;
+  fitBoundsNonce: number;
+  hasCustomer: boolean;
+  customerLat: number;
+  customerLng: number;
+}>;
+
+type RouteLayersProps = Readonly<{
   routePositions: MapRoutePosition[] | null;
   showFallbackLine: boolean;
   store: L.LatLngTuple;
   customer: L.LatLngTuple;
   routeLoading: boolean;
 }>;
-
-type CustomerMarkerProps = Readonly<{
-  hasCustomer: boolean;
-  interactive: boolean;
-  onCustomerPositionChange?: (lat: number, lng: number) => void;
-  customer: L.LatLngTuple;
-  customerIcon: L.Icon;
-}>;
-
-type MapHintProps = Readonly<{
-  locationConfirmed: boolean;
-  routeLoading: boolean;
-  interactive: boolean;
-  hasDrivingRoute: boolean;
-}>;
-
-function FitBoundsToSignal(props: FitBoundsToSignalProps) {
-  const { storeLat, storeLng, fitBoundsNonce, customerLat, customerLng } = props;
-  const map = useMap();
-  const didInvalidateRef = useRef(false);
-
-  useEffect(() => {
-    const timer = globalThis.setTimeout(() => {
-      if (didInvalidateRef.current === false) {
-        map.invalidateSize();
-        didInvalidateRef.current = true;
-      }
-      map.fitBounds(
-        L.latLngBounds([
-          [storeLat, storeLng],
-          [customerLat, customerLng],
-        ]),
-        {
-          padding: [52, 52],
-          maxZoom: 17,
-          animate: false,
-        },
-      );
-    }, 200);
-    return () => globalThis.clearTimeout(timer);
-  }, [map, storeLat, storeLng, customerLat, customerLng, fitBoundsNonce]);
-  return null;
-}
-
-function CenterStoreOnMount(props: StorePositionProps) {
-  const { storeLat, storeLng } = props;
-  const map = useMap();
-  const didCenterRef = useRef(false);
-
-  useEffect(() => {
-    if (didCenterRef.current) return;
-    didCenterRef.current = true;
-    const timer = globalThis.setTimeout(() => {
-      map.invalidateSize();
-      map.setView([storeLat, storeLng], 14, { animate: false });
-    }, 100);
-    return () => globalThis.clearTimeout(timer);
-  }, [map, storeLat, storeLng]);
-
-  return null;
-}
 
 function MapPickHandler(props: MapPickHandlerProps) {
   const { enabled, onPick } = props;
@@ -120,6 +48,100 @@ function MapPickHandler(props: MapPickHandlerProps) {
       }
     },
   });
+  return null;
+}
+
+/** Un solo efecto de cámara evita montar/desmontar hijos que rompen el DOM de Leaflet. */
+function MapViewController(props: MapViewControllerProps) {
+  const { storeLat, storeLng, fitBoundsNonce, hasCustomer, customerLat, customerLng } = props;
+  const map = useMap();
+  const didInvalidateRef = useRef(false);
+
+  useEffect(() => {
+    const timer = globalThis.setTimeout(() => {
+      if (!didInvalidateRef.current) {
+        map.invalidateSize();
+        didInvalidateRef.current = true;
+      }
+      if (hasCustomer) {
+        map.fitBounds(
+          L.latLngBounds([
+            [storeLat, storeLng],
+            [customerLat, customerLng],
+          ]),
+          { padding: [52, 52], maxZoom: 17, animate: false },
+        );
+        return;
+      }
+      map.setView([storeLat, storeLng], 14, { animate: false });
+    }, 200);
+    return () => globalThis.clearTimeout(timer);
+  }, [map, storeLat, storeLng, hasCustomer, customerLat, customerLng, fitBoundsNonce]);
+
+  return null;
+}
+
+/** Capas de ruta vía API Leaflet (no Polyline de react-leaflet) para evitar removeChild con React 19. */
+function RouteLayers(props: RouteLayersProps) {
+  const { routePositions, showFallbackLine, store, customer, routeLoading } = props;
+  const map = useMap();
+  const groupRef = useRef<L.LayerGroup | null>(null);
+
+  useEffect(() => {
+    if (!groupRef.current) {
+      groupRef.current = L.layerGroup().addTo(map);
+    }
+    const group = groupRef.current;
+    group.clearLayers();
+
+    if (routePositions && routePositions.length >= 2) {
+      group.addLayer(
+        L.polyline(routePositions, {
+          color: "#ffffff",
+          weight: 7,
+          opacity: 0.85,
+          lineJoin: "round",
+          lineCap: "round",
+          interactive: false,
+        }),
+      );
+      group.addLayer(
+        L.polyline(routePositions, {
+          color: "#2563eb",
+          weight: 4,
+          opacity: 0.92,
+          lineJoin: "round",
+          lineCap: "round",
+          interactive: false,
+        }),
+      );
+    } else if (showFallbackLine) {
+      group.addLayer(
+        L.polyline([store, customer], {
+          color: "#94a3b8",
+          weight: 2,
+          dashArray: "7 7",
+          opacity: routeLoading ? 0.35 : 0.7,
+          interactive: false,
+        }),
+      );
+    }
+
+    return () => {
+      group.clearLayers();
+    };
+  }, [map, routePositions, showFallbackLine, store, customer, routeLoading]);
+
+  useEffect(() => {
+    return () => {
+      if (groupRef.current) {
+        groupRef.current.clearLayers();
+        map.removeLayer(groupRef.current);
+        groupRef.current = null;
+      }
+    };
+  }, [map]);
+
   return null;
 }
 
@@ -144,62 +166,12 @@ function mapClassName(interactive: boolean, locationConfirmed: boolean) {
   return classes.join(" ");
 }
 
-function RouteLayer(props: RouteLayerProps) {
-  const { routePositions, showFallbackLine, store, customer, routeLoading } = props;
-  if (routePositions) {
-    return (
-      <>
-        <Polyline
-          interactive={false}
-          positions={routePositions}
-          pathOptions={{ color: "#ffffff", weight: 7, opacity: 0.85, lineJoin: "round", lineCap: "round" }}
-        />
-        <Polyline
-          interactive={false}
-          positions={routePositions}
-          pathOptions={{ color: "#2563eb", weight: 4, opacity: 0.92, lineJoin: "round", lineCap: "round" }}
-        />
-      </>
-    );
-  }
-
-  if (showFallbackLine === false) return null;
-  return (
-    <Polyline
-      interactive={false}
-      positions={[store, customer]}
-      pathOptions={{
-        color: "#94a3b8",
-        weight: 2,
-        dashArray: "7 7",
-        opacity: routeLoading ? 0.35 : 0.7,
-      }}
-    />
-  );
-}
-
-function CustomerMarker(props: CustomerMarkerProps) {
-  const { hasCustomer, interactive, onCustomerPositionChange, customer, customerIcon } = props;
-  if (hasCustomer === false) return null;
-  if (interactive === false || !onCustomerPositionChange) {
-    return <Marker position={customer} icon={customerIcon} interactive={false} />;
-  }
-  return (
-    <Marker
-      position={customer}
-      icon={customerIcon}
-      draggable
-      eventHandlers={{
-        dragend: (e) => {
-          const ll = e.target.getLatLng();
-          onCustomerPositionChange(ll.lat, ll.lng);
-        },
-      }}
-    />
-  );
-}
-
-function MapHint(props: MapHintProps) {
+function MapHint(props: Readonly<{
+  locationConfirmed: boolean;
+  routeLoading: boolean;
+  interactive: boolean;
+  hasDrivingRoute: boolean;
+}>) {
   const { locationConfirmed, routeLoading, interactive, hasDrivingRoute } = props;
   if (locationConfirmed === false) {
     return (
@@ -246,10 +218,9 @@ export default function CheckoutDeliveryMap(props: Props) {
   const customerIcon = useMemo(() => makePinIcon("#3b82f6", "#1e40af"), []);
 
   return (
-    <div className={mapClassName(interactive, locationConfirmed)} aria-busy={routeLoading}>
+    <div className={mapClassName(interactive, locationConfirmed)} aria-busy={routeLoading ? true : undefined}>
       {routeLoading ? <div className="checkout-delivery-map-loading" aria-hidden="true" /> : null}
       <MapContainer
-        key="checkout-delivery-map"
         center={store}
         zoom={14}
         className="checkout-delivery-map-inner"
@@ -265,21 +236,18 @@ export default function CheckoutDeliveryMap(props: Props) {
           updateWhenIdle
           keepBuffer={3}
         />
-        {hasCustomer ? (
-          <FitBoundsToSignal
-            storeLat={storeLat}
-            storeLng={storeLng}
-            fitBoundsNonce={fitBoundsNonce}
-            customerLat={customer[0]}
-            customerLng={customer[1]}
-          />
-        ) : (
-          <CenterStoreOnMount storeLat={storeLat} storeLng={storeLng} />
-        )}
+        <MapViewController
+          storeLat={storeLat}
+          storeLng={storeLng}
+          fitBoundsNonce={fitBoundsNonce}
+          hasCustomer={hasCustomer}
+          customerLat={customer[0]}
+          customerLng={customer[1]}
+        />
         {interactive && onCustomerPositionChange ? (
           <MapPickHandler enabled={interactive} onPick={onCustomerPositionChange} />
         ) : null}
-        <RouteLayer
+        <RouteLayers
           routePositions={drivingRoutePositions}
           showFallbackLine={showFallbackLine}
           store={store}
@@ -287,13 +255,24 @@ export default function CheckoutDeliveryMap(props: Props) {
           routeLoading={routeLoading}
         />
         <Marker position={store} icon={storeIcon} interactive={false} />
-        <CustomerMarker
-          hasCustomer={hasCustomer}
-          interactive={interactive}
-          onCustomerPositionChange={onCustomerPositionChange}
-          customer={customer}
-          customerIcon={customerIcon}
-        />
+        {hasCustomer ? (
+          <Marker
+            key="checkout-customer-marker"
+            position={customer}
+            icon={customerIcon}
+            draggable={interactive && Boolean(onCustomerPositionChange)}
+            eventHandlers={
+              interactive && onCustomerPositionChange
+                ? {
+                    dragend: (e) => {
+                      const ll = e.target.getLatLng();
+                      onCustomerPositionChange(ll.lat, ll.lng);
+                    },
+                  }
+                : undefined
+            }
+          />
+        ) : null}
       </MapContainer>
       <div className="checkout-delivery-map-legend">
         <span className="checkout-delivery-map-legend-item">
