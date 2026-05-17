@@ -83,6 +83,24 @@ jobs:
           test -f ai-service/bandit-report.json
           grep -q 'SF:calzatura-vilchez/src/' calzatura-vilchez/coverage/lcov.info
           grep -q 'filename="ai-service/models/revenue.py"' ai-service/coverage.xml
+          node scripts/validate-sonar-coverage-reports.mjs
+
+      - name: Comprobar cobertura local en archivos críticos (Sonar)
+        shell: bash
+        run: |
+          check_lcov() {
+            local file="$1"
+            local block
+            block=$(grep -A999 "SF:calzatura-vilchez/${file}" calzatura-vilchez/coverage/lcov.info | head -n 400)
+            echo "$block" | grep -q '^LH:' || { echo "Sin LH en ${file}"; exit 1; }
+            local lf lh
+            lf=$(echo "$block" | grep '^LF:' | head -1 | cut -d: -f2)
+            lh=$(echo "$block" | grep '^LH:' | head -1 | cut -d: -f2)
+            test "$lh" = "$lf" || { echo "${file}: LH=${lh} LF=${lf}"; exit 1; }
+          }
+          check_lcov "src/utils/stock.ts"
+          check_lcov "src/domains/productos/utils/commercialRules.ts"
+          check_lcov "src/domains/administradores/utils/adminDashboardMetrics.ts"
 
       - name: Validar configuracion SonarQube
         id: sonar-config
@@ -130,3 +148,6 @@ jobs:
           # false: sube el analisis; revisar QG en sonarcloud.io hasta endurecer de nuevo el CI.
           args: >
             "-Dsonar.qualitygate.wait=false"
+            "-Dsonar.projectBaseDir=."
+            "-Dsonar.javascript.lcov.reportPaths=calzatura-vilchez/coverage/lcov.info"
+            "-Dsonar.python.coverage.reportPaths=ai-service/coverage.xml"

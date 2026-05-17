@@ -29,11 +29,14 @@ vi.mock("@/supabase/client", () => ({
 
 import {
   addDailySale,
+  calculatePriceRange,
   decrementProductStock,
   deleteProductFinancial,
   fetchDailySales,
   fetchProductFinancials,
   markSaleReturned,
+  registerDailySalesAtomic,
+  returnDailySaleAtomic,
   restoreProductStock,
   upsertProductFinancial,
 } from "@/domains/ventas/services/finance";
@@ -58,6 +61,31 @@ describe("finance service", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+  });
+
+  it("fetchDailySalesViaBff devuelve null si fetch lanza", async () => {
+    getBackendApiBaseUrlMock.mockReturnValue("https://bff.example");
+    authState.user = { getIdToken: getIdTokenMock };
+    vi.mocked(fetch).mockRejectedValue(new Error("network"));
+
+    rpcMock.mockResolvedValueOnce({
+      data: [{ id: "rpc-1", creadoEn: "2026-05-13T10:00:00.000Z" }],
+      error: null,
+    });
+
+    const rows = await fetchDailySales("2026-05-13");
+    expect(rows).toHaveLength(1);
+  });
+
+  it("fetchDailySalesRpc propaga error no ignorables", async () => {
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "permission denied for ventasDiarias" },
+    });
+
+    await expect(fetchDailySales("2026-05-13")).rejects.toMatchObject({
+      message: "permission denied for ventasDiarias",
+    });
   });
 
   it("fetchDailySales usa BFF cuando hay sesión y responde sales", async () => {
@@ -247,5 +275,35 @@ describe("finance service", () => {
       p_talla: null,
       p_cantidad: 2,
     });
+  });
+
+  it("registerDailySalesAtomic devuelve ids del RPC", async () => {
+    rpcMock.mockResolvedValue({ data: { ids: ["s1", "s2"] }, error: null });
+
+    await expect(
+      registerDailySalesAtomic([
+        { fecha: "2026-05-13", total: 50, productId: "p1", cantidad: 1 } as never,
+      ]),
+    ).resolves.toEqual(["s1", "s2"]);
+  });
+
+  it("returnDailySaleAtomic devuelve fila devuelta", async () => {
+    const row = {
+      id: "s1",
+      productId: "p1",
+      devuelto: true,
+      motivoDevolucion: "Cambio",
+      devueltoEn: "2026-05-13T10:00:00.000Z",
+    };
+    rpcMock.mockResolvedValue({ data: row, error: null });
+
+    await expect(returnDailySaleAtomic("s1", "Cambio")).resolves.toEqual(row);
+  });
+
+  it("calculatePriceRange redondea montos", () => {
+    const range = calculatePriceRange(100, 20, 40, 60);
+    expect(range.precioMinimo).toBe(120);
+    expect(range.precioSugerido).toBe(140);
+    expect(range.precioMaximo).toBe(160);
   });
 });
