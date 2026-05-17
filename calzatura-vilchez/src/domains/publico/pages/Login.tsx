@@ -114,6 +114,7 @@ export default function Login() {
               <Mail size={16} className="input-icon" />
               <input
                 id="login-email"
+                name="email"
                 type="email"
                 inputMode="email"
                 autoComplete="email"
@@ -133,6 +134,7 @@ export default function Login() {
               <Lock size={16} className="input-icon" />
               <input
                 id="login-password"
+                name="password"
                 type={showPass ? "text" : "password"}
                 autoComplete="current-password"
                 value={password}

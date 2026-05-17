@@ -120,6 +120,7 @@ export default function Register() {
               <IdCard size={16} className="input-icon" />
               <input
                 id="register-dni"
+                name="dni"
                 type="text"
                 inputMode="numeric"
                 value={dni}
@@ -157,6 +158,7 @@ export default function Register() {
                 <User size={16} className="input-icon" />
                 <input
                   id="register-nombres"
+                  name="nombres"
                   type="text"
                   value={nombres}
                   disabled
@@ -173,6 +175,7 @@ export default function Register() {
                 <User size={16} className="input-icon" />
                 <input
                   id="register-apellidos"
+                  name="apellidos"
                   type="text"
                   value={apellidos}
                   disabled
@@ -190,6 +193,7 @@ export default function Register() {
               <Mail size={16} className="input-icon" />
               <input
                 id="register-email"
+                name="email"
                 type="email"
                 inputMode="email"
                 autoComplete="email"
@@ -209,6 +213,7 @@ export default function Register() {
               <Smartphone size={16} className="input-icon" />
               <input
                 id="register-celular"
+                name="celular"
                 type="tel"
                 inputMode="numeric"
                 autoComplete="tel"
@@ -229,6 +234,7 @@ export default function Register() {
                 <Lock size={16} className="input-icon" />
                 <input
                   id="register-password"
+                  name="password"
                   type={showPass ? "text" : "password"}
                   autoComplete="new-password"
                   value={password}
@@ -250,6 +256,7 @@ export default function Register() {
                 <Lock size={16} className="input-icon" />
                 <input
                   id="register-confirm-password"
+                  name="password-confirm"
                   type={showPass ? "text" : "password"}
                   autoComplete="new-password"
                   value={confirmPass}

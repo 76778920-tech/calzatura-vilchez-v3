@@ -17,6 +17,7 @@ import { isSuperAdminEmail } from "@/config/security";
 import type { UserRole } from "@/types";
 import { clearFavoriteProductsByUser } from "@/domains/clientes/services/favorites";
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
+import { clearSensitiveClientStorage } from "@/utils/clientStorageCleanup";
 import { assertHttpsInProduction } from "@/utils/requireHttpsInProd";
 import {
   MAX_AUTH_PASSWORD_LENGTH,
@@ -238,6 +239,7 @@ export async function loginUser(email: string, password: string) {
 
 export async function logoutUser() {
   await signOut(auth);
+  clearSensitiveClientStorage();
 }
 
 export async function resetPassword(email: string): Promise<void> {

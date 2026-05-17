@@ -8,7 +8,9 @@ import App from "./App.tsx";
 import { AuthProvider } from "@/domains/usuarios/context/AuthContext";
 import { AppErrorBoundary } from "./components/layout/AppErrorBoundary";
 import { installChunkErrorRecovery } from "./utils/chunkRecovery";
+import { installClientStorageGuard } from "./utils/clientStorageGuard";
 
+installClientStorageGuard();
 installChunkErrorRecovery();
 
 createRoot(document.getElementById("root")!).render(

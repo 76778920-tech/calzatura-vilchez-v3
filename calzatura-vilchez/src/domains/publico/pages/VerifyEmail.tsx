@@ -5,6 +5,7 @@ import { getCurrentAuthUser, reloadCurrentUser, resendVerificationEmail } from "
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { PUBLIC_ROUTES } from "@/routes/paths";
 import { clearPendingVerificationEmail, getPendingVerificationEmail } from "@/utils/pendingVerification";
+import { maskEmailForDisplay } from "@/utils/maskEmail";
 import toast from "react-hot-toast";
 
 export default function VerifyEmail() {
@@ -15,9 +16,13 @@ export default function VerifyEmail() {
   const [cooldown, setCooldown] = useState(0);
   const verificationUser = user ?? getCurrentAuthUser();
 
-  const pendingEmail = useMemo(
-    () => verificationUser?.email ?? getPendingVerificationEmail() ?? "tu correo",
-    [verificationUser?.email]
+  const pendingEmailRaw = useMemo(
+    () => verificationUser?.email ?? getPendingVerificationEmail() ?? null,
+    [verificationUser?.email],
+  );
+  const pendingEmailDisplay = useMemo(
+    () => (pendingEmailRaw ? maskEmailForDisplay(pendingEmailRaw) : "tu correo"),
+    [pendingEmailRaw],
   );
 
   const handleVerifiedSuccess = useCallback(() => {
@@ -167,8 +172,8 @@ export default function VerifyEmail() {
               Enviamos un enlace de confirmacion a esta direccion. Apenas lo abras,
               tu cuenta quedara lista para entrar.
             </p>
-            <div className="verify-email-pill" title={pendingEmail}>
-              {pendingEmail}
+            <div className="verify-email-pill" title={pendingEmailDisplay}>
+              {pendingEmailDisplay}
             </div>
           </div>
         </div>
