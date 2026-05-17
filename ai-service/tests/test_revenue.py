@@ -333,6 +333,19 @@ def test_build_revenue_forecast_rows_produce_horizonte():
     assert all("fecha" in r and "ingresos" in r for r in fc)
 
 
+def test_build_revenue_forecast_rows_sin_estacional_usa_promedios():
+    """seasonal_base <= 0 usa recent_avg u overall_avg."""
+    fc = _build_revenue_forecast_rows(2, defaultdict(list), defaultdict(list), 50.0, 12.0, 0.05)
+    assert len(fc) == 2
+    assert fc[0]["ingresos"] >= 0
+
+
+def test_forecast_revenue_crecimiento_horizonte_cero_sin_historial():
+    result = forecast_revenue([], [], horizon_days=7)
+    assert result["summary"]["crecimiento_estimado_horizonte_pct"] == 0.0
+    assert result["summary"]["ultimo_horizonte"] == 0.0
+
+
 def test_accumulate_tienda_ignora_canal_web_y_sin_fecha():
     by_date = defaultdict(float)
     dr = {today(0)}

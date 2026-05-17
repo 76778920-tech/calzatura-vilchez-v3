@@ -1,16 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fromMock, rpcMock } = vi.hoisted(() => ({
+const { fromMock, rpcMock, getBackendApiBaseUrlMock, getIdTokenMock, authState } = vi.hoisted(() => ({
   fromMock: vi.fn(),
   rpcMock: vi.fn(),
+  getBackendApiBaseUrlMock: vi.fn(() => ""),
+  getIdTokenMock: vi.fn(),
+  authState: { user: null as null | { getIdToken: () => Promise<string> } },
 }));
 
 vi.mock("@/firebase/config", () => ({
-  auth: { currentUser: null },
+  auth: {
+    get currentUser() {
+      return authState.user;
+    },
+  },
 }));
 
 vi.mock("@/config/apiBackend", () => ({
-  getBackendApiBaseUrl: () => "",
+  getBackendApiBaseUrl: getBackendApiBaseUrlMock,
 }));
 
 vi.mock("@/supabase/client", () => ({
@@ -37,14 +44,75 @@ describe("finance service", () => {
     vi.setSystemTime(new Date("2026-05-13T10:00:00.000Z"));
     fromMock.mockReset();
     rpcMock.mockReset();
+    getBackendApiBaseUrlMock.mockReturnValue("");
+    authState.user = null;
+    getIdTokenMock.mockReset();
+    getIdTokenMock.mockResolvedValue("token-test");
     rpcMock.mockResolvedValue({
       data: null,
       error: { message: "Could not find the function list_ventas_diarias_by_fecha", code: "PGRST202" },
     });
+    vi.stubGlobal("fetch", vi.fn());
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("fetchDailySales usa BFF cuando hay sesión y responde sales", async () => {
+    getBackendApiBaseUrlMock.mockReturnValue("https://bff.example");
+    authState.user = { getIdToken: getIdTokenMock };
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        sales: [
+          { id: "b1", creadoEn: "2026-05-13T11:00:00.000Z" },
+          { id: "b2", creadoEn: "2026-05-13T09:00:00.000Z" },
+        ],
+      }),
+    } as Response);
+
+    const rows = await fetchDailySales("2026-05-13");
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://bff.example/admin/dailySales?fecha=2026-05-13",
+      expect.objectContaining({ headers: { Authorization: "Bearer token-test" } }),
+    );
+    expect(rows.map((r) => r.id)).toEqual(["b1", "b2"]);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("fetchDailySales hace fallback a Supabase si BFF no responde", async () => {
+    getBackendApiBaseUrlMock.mockReturnValue("https://bff.example");
+    vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
+    rpcMock.mockResolvedValueOnce({
+      data: [{ id: "rpc-1", creadoEn: "2026-05-13T10:00:00.000Z" }],
+      error: null,
+    });
+
+    const rows = await fetchDailySales("2026-05-13");
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("rpc-1");
+  });
+
+  it("fetchDailySales lanza si BFF y Supabase no devuelven datos", async () => {
+    getBackendApiBaseUrlMock.mockReturnValue("");
+    rpcMock.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Could not find the function list_ventas_diarias_by_fecha", code: "PGRST202" },
+    });
+    fromMock.mockImplementation(() => ({
+      select: () => ({
+        eq: () => Promise.resolve({ data: null, error: { message: "db down" } }),
+      }),
+    }));
+
+    await expect(fetchDailySales("2026-05-13")).rejects.toThrow(
+      "No se pudieron cargar las ventas diarias",
+    );
   });
 
   it("fetchProductFinancials indexa resultados por productId", async () => {

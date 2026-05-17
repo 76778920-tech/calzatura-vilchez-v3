@@ -1,10 +1,86 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   buildDashboardChartSeries,
   computeDashboardFromFetchedData,
+  estimateOrderProfit,
+  getLast7Days,
+  isCompletedOrder,
   isTiendaFisicaSale,
+  todayISO,
+  tiendaFisicaSalesTotalForDate,
+  toDate,
+  toLocalISODate,
+  webOrdersTotalForDate,
 } from "@/domains/administradores/utils/adminDashboardMetrics";
-import type { DailySale, Order } from "@/types";
+import type { DailySale, Order, ProductFinancial } from "@/types";
+
+describe("adminDashboardMetrics helpers", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-16T12:00:00.000Z"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("todayISO devuelve fecha local YYYY-MM-DD", () => {
+    expect(todayISO()).toBe("2026-05-16");
+  });
+
+  it("toDate usa ahora cuando creadoEn es falsy", () => {
+    const d = toDate(undefined);
+    expect(toLocalISODate(d)).toBe("2026-05-16");
+  });
+
+  it("getLast7Days devuelve 7 días con iso y label capitalizado", () => {
+    const days = getLast7Days();
+    expect(days).toHaveLength(7);
+    expect(days[0].iso).toBe("2026-05-10");
+    expect(days[6].iso).toBe("2026-05-16");
+    expect(days[0].label.length).toBeGreaterThan(0);
+    expect(days[0].label).toMatch(/^[A-ZÁÉÍÓÚÑ]/);
+  });
+
+  it("isCompletedOrder acepta pagado, enviado y entregado", () => {
+    expect(isCompletedOrder({ estado: "pagado" } as Order)).toBe(true);
+    expect(isCompletedOrder({ estado: "enviado" } as Order)).toBe(true);
+    expect(isCompletedOrder({ estado: "entregado" } as Order)).toBe(true);
+    expect(isCompletedOrder({ estado: "pendiente" } as Order)).toBe(false);
+  });
+
+  it("estimateOrderProfit usa costo financiero o precio como fallback", () => {
+    const order = {
+      items: [
+        { quantity: 2, product: { id: "p1", precio: 100 } },
+        { quantity: 1, product: { id: "p2", precio: 50 } },
+      ],
+    } as Order;
+    const financials: Record<string, ProductFinancial> = {
+      p1: { productId: "p1", costoCompra: 60 } as ProductFinancial,
+    };
+    expect(estimateOrderProfit(order, financials)).toBe(2 * (100 - 60) + 1 * (50 - 50));
+  });
+
+  it("tiendaFisicaSalesTotalForDate ignora web y otras fechas", () => {
+    const sales = [
+      { fecha: "2026-05-16", total: 80, canal: "tienda" },
+      { fecha: "2026-05-16", total: 50, canal: "web" },
+      { fecha: "2026-05-16", total: 30, canal: "tienda" },
+      { fecha: "2026-05-15", total: 99, canal: "tienda" },
+    ] as DailySale[];
+    expect(tiendaFisicaSalesTotalForDate(sales, "2026-05-16")).toBe(110);
+  });
+
+  it("webOrdersTotalForDate solo suma pedidos completados del día", () => {
+    const orders = [
+      { estado: "entregado", creadoEn: "2026-05-16T08:00:00.000Z", total: 200 },
+      { estado: "pendiente", creadoEn: "2026-05-16T09:00:00.000Z", total: 999 },
+      { estado: "pagado", creadoEn: "2026-05-15T10:00:00.000Z", total: 50 },
+    ] as Order[];
+    expect(webOrdersTotalForDate(orders, "2026-05-16")).toBe(200);
+  });
+});
 
 describe("adminDashboardMetrics", () => {
   it("isTiendaFisicaSale excluye canal web", () => {

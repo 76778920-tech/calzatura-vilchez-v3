@@ -9,4 +9,13 @@ describe("maskEmailForDisplay", () => {
   it("devuelve texto genérico si no hay @", () => {
     expect(maskEmailForDisplay("invalid")).toBe("tu correo");
   });
+
+  it("devuelve texto genérico si falta dominio tras @", () => {
+    expect(maskEmailForDisplay("usuario@")).toBe("tu correo");
+    expect(maskEmailForDisplay("  @  ")).toBe("tu correo");
+  });
+
+  it("local corto deja un solo carácter visible", () => {
+    expect(maskEmailForDisplay("a@test.com")).toBe("a*@test.com");
+  });
 });

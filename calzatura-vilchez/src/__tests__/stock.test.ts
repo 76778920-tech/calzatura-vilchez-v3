@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { deriveTotalFromProduct, getAvailableSizes, getSizeStock, sumSizeStock } from "@/utils/stock";
+import {
+  deriveTotalFromProduct,
+  getAvailableSizes,
+  getSizeStock,
+  listSortedSizesWithPositiveQty,
+  sumSizeStock,
+} from "@/utils/stock";
 import type { Product } from "@/types";
 
 function product(partial: Partial<Product> & Pick<Product, "id">): Product {
@@ -13,6 +19,16 @@ function product(partial: Partial<Product> & Pick<Product, "id">): Product {
     ...partial,
   };
 }
+
+describe("listSortedSizesWithPositiveQty", () => {
+  it("filtra cero y ordena tallas numéricamente", () => {
+    expect(listSortedSizesWithPositiveQty({ "41": 1, "39": 2, "40": 0 })).toEqual(["39", "41"]);
+  });
+
+  it("objeto vacío devuelve array vacío", () => {
+    expect(listSortedSizesWithPositiveQty({})).toEqual([]);
+  });
+});
 
 describe("sumSizeStock", () => {
   it("suma cantidades por talla", () => {

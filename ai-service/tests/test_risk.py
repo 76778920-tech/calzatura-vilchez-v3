@@ -311,3 +311,19 @@ def test_compute_ire_proyectado_dias_altos_estable():
     preds = [make_pred(stock=500, consumo=0.5, nivel_riesgo="estable")]
     out = compute_ire_proyectado(preds, None, 5)
     assert out["score"] >= 0
+
+
+def test_compute_ire_proyectado_stock_cero_es_critico():
+    preds = [make_pred(stock=2, consumo=1.0, nivel_riesgo="estable")]
+    out = compute_ire_proyectado(preds, None, 5)
+    assert out["horizonte_dias"] == 5
+    assert out["detalle"]["productos_criticos"] >= 0
+
+
+def test_compute_ire_proyectado_dias_proyectados_atencion_y_vigilancia():
+    critico = [make_pred(stock=5, consumo=1.0, nivel_riesgo="estable")]
+    atencion = [make_pred(stock=12, consumo=1.0, nivel_riesgo="estable")]
+    vigilancia = [make_pred(stock=25, consumo=1.0, nivel_riesgo="estable")]
+    assert compute_ire_proyectado(critico, None, 10)["score"] >= 0
+    assert compute_ire_proyectado(atencion, None, 8)["score"] >= 0
+    assert compute_ire_proyectado(vigilancia, None, 15)["score"] >= 0
