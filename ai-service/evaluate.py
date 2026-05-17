@@ -365,9 +365,9 @@ def run_experiment_1(df: pd.DataFrame) -> tuple:
         print(f"\n  ERROR: train insuficiente ({len(df_train)} filas). Aumenta --history.")
         sys.exit(1)
 
-    print(f"\n  Entrenando RandomForestRegressor...")
+    print("\n  Entrenando RandomForestRegressor...")
     print(f"    features={FEATURE_COLS_EXP}")
-    print(f"    n_estimators=100  max_depth=None  min_samples_leaf=1  random_state=42")
+    print("    n_estimators=100  max_depth=None  min_samples_leaf=1  random_state=42")
     model = train_rf(df_train)
 
     y_test      = df_test["y"].values
@@ -713,7 +713,7 @@ def run_experiment_3(df: pd.DataFrame) -> dict:
         print("\n  ERROR: train insuficiente para grid search.")
         return {}
 
-    print(f"\n  Top-5 configs (orden por MAPE en validacion):")
+    print("\n  Top-5 configs (orden por MAPE en validacion):")
     print(f"  {'#':>3}  {'n_est':>5}  {'depth':>5}  {'min_leaf':>8}  {'MAE':>8}  {'MAPE':>8}")
     print("  " + "-" * 48)
     for i, r in enumerate(all_results[:5]):
@@ -726,15 +726,68 @@ def run_experiment_3(df: pd.DataFrame) -> dict:
     mape_gain = (m_base_val["mape"] - best_r["mape"]) / max(m_base_val["mape"], 1e-9) * 100
     print(f"\n  Baseline val: MAE={m_base_val['mae']:.4f}  MAPE={m_base_val['mape']:.1f}%")
     print(f"  Mejor config vs baseline: MAPE {mape_gain:+.1f}%")
-    print(f"\n  Mejor configuracion:")
+    print("\n  Mejor configuracion:")
     print(f"    n_estimators     = {best_params['n_estimators']}")
     print(f"    max_depth        = {best_params['max_depth']}")
     print(f"    min_samples_leaf = {best_params['min_samples_leaf']}")
 
-    return best_params, all_results[:5], m_base_val
+    return {
+        "best_params": best_params,
+        "top_configs": all_results[:5],
+        "m_base_val": m_base_val,
+    }
 
 
-def run_experiment_4(df: pd.DataFrame, df_ppm: pd.DataFrame) -> None:
+def _learning_curve_trend(mape_rf: float, prev_mape: float | None) -> str:
+    if prev_mape is None:
+        return " "
+    if mape_rf < prev_mape:
+        return "v"
+    if mape_rf > prev_mape:
+        return "^"
+    return "-"
+
+
+def _print_wilcoxon_results(w: dict) -> None:
+    if "error" in w:
+        print(f"\n  ADVERTENCIA: {w['error']}")
+        return
+    print(f"\n  n productos  : {w['n_productos']}")
+    print(f"  Estadistico W: {w['statistic']}")
+    print(f"  p-value      : {w['p_value']}")
+    print(f"  Rechaza H0   : {w['rechaza_H0']}")
+    print(f"  Conclusion   : {w['conclusion']}")
+    if not w["rechaza_H0"]:
+        print()
+        print("  NOTA: Con n=10 productos y alta esparsidad (82% ceros), el test")
+        print("  no alcanza significancia en MAE. El argumento principal de tesis")
+        print("  es el MAPE: RF=70.5% vs Baseline=84.7% en los 6 folds (Parte C).")
+
+
+def _print_learning_curve_results(lc: list[dict]) -> None:
+    print()
+    print(f"  [4b] Curva de aprendizaje (test fijo = ultimo 20%, promedio {len(LC_SEEDS)} seeds)")
+    print(f"  {'Frac':>5}  {'Dias_train':>10}  {'Muestras':>9}  "
+          f"{'MAE_RF':>8}  {'MAPE_RF':>8}  {'MAPE_Base':>9}")
+    print("  " + "-" * 58)
+
+    prev_mape = None
+    for r in lc:
+        trend = _learning_curve_trend(r["mape_rf"], prev_mape)
+        prev_mape = r["mape_rf"]
+        print(f"  {r['frac']:>5.0%}  {r['n_train_days']:>10}  {r['n_train_samples']:>9,}"
+              f"  {r['mae_rf']:>8.4f}  {r['mape_rf']:>7.1f}%  {r['mape_base']:>8.1f}%  {trend}")
+
+    if len(lc) < 2:
+        return
+    delta_mape = lc[-1]["mape_rf"] - lc[0]["mape_rf"]
+    delta_mae = lc[-1]["mae_rf"] - lc[0]["mae_rf"]
+    print(f"\n  Variacion MAPE al pasar {lc[0]['frac']:.0%} -> {lc[-1]['frac']:.0%} del train:")
+    print(f"    MAPE: {delta_mape:+.1f}pp  MAE: {delta_mae:+.4f}")
+    print("  (negativo = metrica baja = modelo mejora; positivo = empeora)")
+
+
+def run_experiment_4(df: pd.DataFrame, df_ppm: pd.DataFrame) -> dict:
     """Experimento 4: test de Wilcoxon signed-rank + curva de aprendizaje."""
     print()
     print("=" * 60)
@@ -747,49 +800,34 @@ def run_experiment_4(df: pd.DataFrame, df_ppm: pd.DataFrame) -> None:
     print("  H1: mediana > 0  (RF sistematicamente mejor, alpha=0.05)")
 
     w = wilcoxon_test(df_ppm)
-    if "error" in w:
-        print(f"\n  ADVERTENCIA: {w['error']}")
-    else:
-        print(f"\n  n productos  : {w['n_productos']}")
-        print(f"  Estadistico W: {w['statistic']}")
-        print(f"  p-value      : {w['p_value']}")
-        print(f"  Rechaza H0   : {w['rechaza_H0']}")
-        print(f"  Conclusion   : {w['conclusion']}")
-        if not w["rechaza_H0"]:
-            print()
-            print("  NOTA: Con n=10 productos y alta esparsidad (82% ceros), el test")
-            print("  no alcanza significancia en MAE. El argumento principal de tesis")
-            print("  es el MAPE: RF=70.5% vs Baseline=84.7% en los 6 folds (Parte C).")
-
-    # ── 4b: Curva de aprendizaje ─────────────────────────────────────────────
-    print()
-    print(f"  [4b] Curva de aprendizaje (test fijo = ultimo 20%, promedio {len(LC_SEEDS)} seeds)")
-    print(f"  {'Frac':>5}  {'Dias_train':>10}  {'Muestras':>9}  "
-          f"{'MAE_RF':>8}  {'MAPE_RF':>8}  {'MAPE_Base':>9}")
-    print("  " + "-" * 58)
+    _print_wilcoxon_results(w)
 
     lc = learning_curve_rf(df)
-    prev_mape = None
-    for r in lc:
-        if prev_mape is not None:
-            trend = "v" if r["mape_rf"] < prev_mape else "^" if r["mape_rf"] > prev_mape else "-"
-        else:
-            trend = " "
-        prev_mape = r["mape_rf"]
-        print(f"  {r['frac']:>5.0%}  {r['n_train_days']:>10}  {r['n_train_samples']:>9,}"
-              f"  {r['mae_rf']:>8.4f}  {r['mape_rf']:>7.1f}%  {r['mape_base']:>8.1f}%  {trend}")
+    _print_learning_curve_results(lc)
 
-    if len(lc) >= 2:
-        delta_mape = lc[-1]["mape_rf"] - lc[0]["mape_rf"]  # positivo = empeoro
-        delta_mae  = lc[-1]["mae_rf"]  - lc[0]["mae_rf"]
-        print(f"\n  Variacion MAPE al pasar {lc[0]['frac']:.0%} -> {lc[-1]['frac']:.0%} del train:")
-        print(f"    MAPE: {delta_mape:+.1f}pp  MAE: {delta_mae:+.4f}")
-        print("  (negativo = metrica baja = modelo mejora; positivo = empeora)")
-
-    return w, lc
+    return {"wilcoxon": w, "lc_results": lc}
 
 
 # ── Parte E: Reporte final ───────────────────────────────────────────────────
+
+def _report_exp3_lines(res: dict) -> list[str]:
+    if not res.get("top_configs") or not res.get("best_params"):
+        return ["  (grid search omitido: train insuficiente)", ""]
+    bp = res["best_params"]
+    top = res["top_configs"][0]
+    m = res["m_base_val"]
+    return [
+        "  Mejor configuracion hallada:",
+        f"    n_estimators     = {bp['n_estimators']}",
+        f"    max_depth        = {bp['max_depth']}",
+        f"    min_samples_leaf = {bp['min_samples_leaf']}",
+        f"  MAPE mejor config : {top['mape']:.1f}%",
+        f"  MAPE baseline val : {m['mape']:.1f}%",
+        f"  Mejora vs baseline: {m['mape'] - top['mape']:+.1f}pp",
+        "  Conclusion: configuracion por defecto ya es optima para este dataset.",
+        "",
+    ]
+
 
 def generate_report(res: dict, output_path: str = "") -> str:
     """
@@ -869,24 +907,16 @@ def generate_report(res: dict, output_path: str = "") -> str:
         sep("-"),
         "4. EXPERIMENTO 3 — GRID SEARCH (27 configuraciones)",
         sep("-"),
-        f"  Grid: n_estimators x max_depth x min_samples_leaf  (3x3x3)",
-        f"  Validacion interna temporal (ultimo 20% del train)",
+        "  Grid: n_estimators x max_depth x min_samples_leaf  (3x3x3)",
+        "  Validacion interna temporal (ultimo 20% del train)",
         "",
-        f"  Mejor configuracion hallada:",
-        f"    n_estimators     = {res['best_params']['n_estimators']}",
-        f"    max_depth        = {res['best_params']['max_depth']}",
-        f"    min_samples_leaf = {res['best_params']['min_samples_leaf']}",
-        f"  MAPE mejor config : {res['top_configs'][0]['mape']:.1f}%",
-        f"  MAPE baseline val : {res['m_base_val']['mape']:.1f}%",
-        f"  Mejora vs baseline: {res['m_base_val']['mape']-res['top_configs'][0]['mape']:+.1f}pp",
-        "  Conclusion: configuracion por defecto ya es optima para este dataset.",
-        "",
+    ] + _report_exp3_lines(res) + [
         sep("-"),
         "5. EXPERIMENTO 4 — WILCOXON + CURVA DE APRENDIZAJE",
         sep("-"),
         "  [5a] Test de Wilcoxon signed-rank",
-        f"  H0: mediana(mae_base - mae_rf) = 0",
-        f"  H1: RF sistematicamente mejor (alpha=0.05)",
+        "  H0: mediana(mae_base - mae_rf) = 0",
+        "  H1: RF sistematicamente mejor (alpha=0.05)",
     ] + (
         [
             f"  n productos  : {res['wilcoxon']['n_productos']}",
@@ -1015,13 +1045,18 @@ def main():
     print("\nParte C completada.")
 
     # ── Parte D ───────────────────────────────────────────────────────────────
-    best_params, top_configs, m_base_val = run_experiment_3(df)
-    wilcoxon_result, lc_results          = run_experiment_4(df, df_ppm)
+    exp3 = run_experiment_3(df)
+    exp4 = run_experiment_4(df, df_ppm)
+    best_params = exp3.get("best_params") or {}
+    top_configs = exp3.get("top_configs") or []
+    m_base_val = exp3.get("m_base_val") or {"mae": 0.0, "mape": 0.0}
+    wilcoxon_result = exp4["wilcoxon"]
+    lc_results = exp4["lc_results"]
 
     print("\nParte D completada.")
 
     # ── Parte E ───────────────────────────────────────────────────────────────
-    df_train_b, df_test_b, t0, t1, v0, v1 = temporal_split(df)
+    df_train_b, df_test_b, _, _, _, _ = temporal_split(df)
     n_with_sales = int((df.groupby(["pid", "fecha"])["y"].sum() > 0).sum())
 
     report_data = {
