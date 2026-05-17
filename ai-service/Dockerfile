@@ -5,8 +5,9 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt requirements.lock ./
+# Sonar: versiones resueltas en requirements.lock; solo wheels (sin ejecutar setup.py de terceros).
+RUN pip install --no-cache-dir --only-binary :all: -r requirements.lock
 
 COPY . .
 
