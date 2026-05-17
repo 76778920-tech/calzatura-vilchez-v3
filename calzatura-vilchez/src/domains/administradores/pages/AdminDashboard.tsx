@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Package, ShoppingBag, Users, TrendingUp, CircleDollarSign,
@@ -339,9 +339,10 @@ export default function AdminDashboard() {
   const [loadError, setLoadError] = useState(false);
   const [auditError, setAuditError] = useState(false);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const last7Days = useMemo(() => getLast7Days(), []);
+
   const loadDashboard = useCallback((options?: { showLoading?: boolean }) => {
     const today = todayISO();
-    const last7Days = getLast7Days();
     if (options?.showLoading) setLoading(true);
     setLoadError(false);
     void fetchRecentAudit(10).then(setAuditLog).catch(() => setAuditError(true));
@@ -374,7 +375,7 @@ export default function AdminDashboard() {
         toast.error("No se pudieron cargar los datos del dashboard. Verifica tu conexión.");
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [last7Days]);
 
   useEffect(() => {
     let cancelled = false;
