@@ -1,4 +1,4 @@
-name: Deploy — Firebase Hosting + Firestore
+name: Deploy — Firebase Hosting + Functions + Firestore
 
 on:
   push:
@@ -60,3 +60,17 @@ jobs:
           projectId: calzaturavilchez-ab17f
           channelId: live
           entryPoint: ./calzatura-vilchez
+
+      - name: Instalar dependencias de Cloud Functions
+        working-directory: calzatura-vilchez/functions
+        run: npm ci --ignore-scripts
+
+      - name: Deploy Cloud Functions
+        continue-on-error: true
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT" > "$GITHUB_WORKSPACE/firebase-sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$GITHUB_WORKSPACE/firebase-sa.json"
+          npx --yes firebase-tools@15.15.0 deploy --only functions --project calzaturavilchez-ab17f --non-interactive
+        working-directory: calzatura-vilchez
