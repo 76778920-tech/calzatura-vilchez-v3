@@ -10,6 +10,11 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import {
+  mockBffCreateProductVariantsAtomicOk,
+  mockBffRegistrarIngresoStock,
+  mockBffUpdateProductAtomicOk,
+} from "./helpers/mockAdminBff";
 
 // ─── Datos semilla ────────────────────────────────────────────────────────────
 
@@ -153,9 +158,8 @@ test.describe("admin productos → tallas y stock — edición + persistencia", 
     let rpcBody: Record<string, unknown> | null = null;
 
     // Handler LIFO: captura el RPC atómico antes de que llegue al fallback de setupMocks
-    await page.route("**/rest/v1/rpc/update_product_atomic*", async (route) => {
-      rpcBody = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
-      await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
+    await mockBffUpdateProductAtomicOk(page, (body) => {
+      rpcBody = body;
     });
 
     await openEditModal(page);
@@ -206,9 +210,7 @@ test.describe("admin productos → tallas y stock — edición + persistencia", 
       }
       await route.fallback();
     });
-    await page.route("**/rest/v1/rpc/update_product_atomic*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
-    });
+    await mockBffUpdateProductAtomicOk(page);
 
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
@@ -278,13 +280,7 @@ test.describe("admin productos → tallas y stock — edición + persistencia", 
     await page.route("**/rest/v1/productoFinanzas*", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
     });
-    await page.route("**/rest/v1/rpc/create_product_variants_atomic*", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ids: [NEW_ID] }),
-      });
-    });
+    await mockBffCreateProductVariantsAtomicOk(page, [NEW_ID]);
 
     await page.reload();
     await page.waitForLoadState("domcontentloaded");
@@ -337,13 +333,8 @@ test.describe("admin productos → tallas y stock — edición + persistencia", 
     await setupMocks(page);
 
     let rpcBody: Record<string, unknown> | null = null;
-    await page.route("**/rest/v1/rpc/registrar_ingreso_stock*", async (route) => {
-      rpcBody = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ok: true, cantidad: 4, tallaStock: { "40": 13, "41": 6 } }),
-      });
+    await mockBffRegistrarIngresoStock(page, (body) => {
+      rpcBody = body;
     });
 
     await page.getByRole("button", { name: /ingresar stock de zapato tallas e2e/i }).click();

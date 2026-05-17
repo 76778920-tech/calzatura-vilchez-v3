@@ -7,6 +7,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { mockBffUpdateOrderStatus } from "./helpers/mockAdminBff";
 
 // ─── Semilla ──────────────────────────────────────────────────────────────────
 
@@ -112,13 +113,8 @@ test.describe("admin pedidos → filtro, expansión y cambio de estado", () => {
     await expect(page.locator(".order-card")).toHaveCount(2, { timeout: 10_000 });
 
     let patchCalled = false;
-    await page.route("**/rest/v1/pedidos*", async (route) => {
-      if (route.request().method() === "PATCH") {
-        patchCalled = true;
-        await route.fulfill({ status: 204, body: "" });
-        return;
-      }
-      await route.fallback();
+    await mockBffUpdateOrderStatus(page, () => {
+      patchCalled = true;
     });
 
     // Cambiar estado del primer pedido (pendiente → pagado)

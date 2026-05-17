@@ -13,6 +13,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth, FAKE_ADMIN_UID, FAKE_ADMIN_EMAIL } from "./helpers/mockFirebaseAuth";
+import { mockBffCreateProductVariantsAtomicOk } from "./helpers/mockAdminBff";
 
 // ─── Datos de prueba ──────────────────────────────────────────────────────────
 
@@ -181,13 +182,7 @@ test.describe("admin → rastro de auditoría", () => {
     await setupAdminMocks(page, { auditoria: [] });
     await setupProductoCodigosMock(page);
 
-    await page.route("**/rest/v1/rpc/create_product_variants_atomic*", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ids: ["e2e-audit-new-1"] }),
-      });
-    });
+    await mockBffCreateProductVariantsAtomicOk(page, ["e2e-audit-new-1"]);
 
     // Interceptar INSERT a auditoria para capturar el payload (LIFO: prevalece sobre setupAdminMocks)
     await page.route("**/rest/v1/auditoria*", async (route) => {

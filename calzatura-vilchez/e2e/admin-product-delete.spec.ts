@@ -11,6 +11,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { mockBffDeleteProductAtomic } from "./helpers/mockAdminBff";
 
 // ─── Semilla ──────────────────────────────────────────────────────────────────
 
@@ -73,9 +74,8 @@ async function setupMocks(page: Page): Promise<Counters> {
     await route.fallback();
   });
 
-  await page.route("**/rest/v1/rpc/delete_product_atomic*", async (route) => {
+  await mockBffDeleteProductAtomic(page, () => {
     counters.deleteProductAtomicCalls += 1;
-    await route.fulfill({ status: 204, body: "" });
   });
 
   // logAudit lanza un INSERT a auditoria; el try/catch de logAudit absorbe errores,

@@ -11,6 +11,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { mockBffUpdateProductAtomicError } from "./helpers/mockAdminBff";
 
 const SEED_PRODUCT = {
   id: "e2e-guard-1",
@@ -102,13 +103,11 @@ test.describe("admin productos → guardrails comerciales de BD", () => {
 
     // Registrar handler DESPUÉS de setupMocks → mayor prioridad LIFO.
     // El RPC atómico devuelve el error del trigger como si fuera un error de BD.
-    await page.route("**/rest/v1/rpc/update_product_atomic*", async (route) => {
-      await route.fulfill({
-        status: 400,
-        contentType: "application/json",
-        body: postgrestTriggerError('cv_guard_producto_tipo: tipo "Zapatillas" no válido para categoría "bebe"'),
-      });
-    });
+    await mockBffUpdateProductAtomicError(
+      page,
+      400,
+      'cv_guard_producto_tipo: tipo "Zapatillas" no válido para categoría "bebe"',
+    );
 
     await openEditModal(page);
     await page.getByRole("button", { name: /actualizar/i }).click();
@@ -126,13 +125,11 @@ test.describe("admin productos → guardrails comerciales de BD", () => {
 
     // El trigger financiero ahora dispara dentro del RPC atómico.
     // Registrar DESPUÉS de setupMocks → mayor prioridad LIFO.
-    await page.route("**/rest/v1/rpc/update_product_atomic*", async (route) => {
-      await route.fulfill({
-        status: 400,
-        contentType: "application/json",
-        body: postgrestTriggerError("cv_guard_producto_finanzas: precio 150 fuera del rango comercial [75, 105]"),
-      });
-    });
+    await mockBffUpdateProductAtomicError(
+      page,
+      400,
+      "cv_guard_producto_finanzas: precio 150 fuera del rango comercial [75, 105]",
+    );
 
     await openEditModal(page);
     await page.getByRole("button", { name: /actualizar/i }).click();

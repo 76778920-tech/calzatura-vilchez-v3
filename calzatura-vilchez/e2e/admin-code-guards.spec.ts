@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { mockBffUpdateProductAtomicError } from "./helpers/mockAdminBff";
 
 function normalizeCode(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 40);
@@ -209,18 +210,14 @@ test.describe("admin productos → guardas de código único", () => {
     // Registrar el mock del RPC ANTES de setupProductMocks → menor prioridad LIFO,
     // pero el RPC no está en setupProductMocks, así que no hay conflicto.
     let rpcTriggered = false;
-    await page.route("**/rest/v1/rpc/update_product_atomic*", async (route) => {
-      rpcTriggered = true;
-      await route.fulfill({
-        status: 409,
-        contentType: "application/json",
-        body: JSON.stringify({
-          code: "23505",
-          message: "duplicate key value violates unique constraint",
-          details: "Key (codigo)=(E2E-CODE-UNIQ) already exists.",
-        }),
-      });
-    });
+    await mockBffUpdateProductAtomicError(
+      page,
+      409,
+      "duplicate key value violates unique constraint",
+      () => {
+        rpcTriggered = true;
+      },
+    );
 
     await setupProductMocks(page);
 

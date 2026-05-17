@@ -12,6 +12,8 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { todayISO } from "./helpers/dates";
+import { mockBffDailySales } from "./helpers/mockAdminBff";
 
 // ─── Datos semilla ────────────────────────────────────────────────────────────
 
@@ -49,14 +51,15 @@ const FINANCIAL = {
   actualizadoEn: "2026-05-02T00:00:00.000Z",
 };
 
-const SALE = {
+function buildSale() {
+  return {
   id: "sale-001",
   productId: "prod-001",
   codigo: "SB-001",
   nombre: "Zapatilla Running",
   color: "Negro",
   talla: "41",
-  fecha: "2026-05-02",
+  fecha: todayISO(),
   cantidad: 1,
   precioVenta: 116,
   total: 116,
@@ -70,7 +73,9 @@ const SALE = {
   motivoDevolucion: null,
   cliente: null,
   documentoNumero: null,
+  canal: "tienda",
 };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -113,7 +118,7 @@ async function setupBaseMocks(page: Page) {
       await route.fulfill({
         status: 201,
         contentType: "application/json",
-        body: JSON.stringify({ ...SALE, id: "sale-new-001" }),
+        body: JSON.stringify({ ...buildSale(), id: "sale-new-001" }),
       });
       return;
     }
@@ -145,8 +150,8 @@ async function mockReturnSaleRpc(page: Page): Promise<() => boolean> {
         status: 200,
         contentType: "application/json",
         body: JSON.stringify({
-          id: SALE.id,
-          productId: SALE.productId,
+          id: "sale-001",
+          productId: "prod-001",
           devuelto: true,
           motivoDevolucion: "Talla equivocada",
           devueltoEn: "2026-05-02T12:00:00.000Z",
@@ -233,6 +238,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // TC-SALE-003: devolución sin motivo no llama RPC
   // ──────────────────────────────────────────────────────────────────────────
   test("devolución sin motivo muestra error y no llama return_daily_sale_atomic (TC-SALE-003)", async ({ page }) => {
+    const sale = buildSale();
     await page.route("**/rest/v1/productos*", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCT]) });
     });
@@ -242,8 +248,9 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await page.route("**/rest/v1/productoFinanzas*", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
     });
+    await mockBffDailySales(page, [sale]);
     await page.route("**/rest/v1/ventasDiarias*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SALE]) });
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([sale]) });
     });
 
     const wasReturned = await mockReturnSaleRpc(page);
@@ -265,6 +272,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // TC-SALE-004: devolución con motivo llama restore_product_stock
   // ──────────────────────────────────────────────────────────────────────────
   test("devolución con motivo llama return_daily_sale_atomic (TC-SALE-004)", async ({ page }) => {
+    const sale = buildSale();
     await page.route("**/rest/v1/productos*", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCT]) });
     });
@@ -274,9 +282,10 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await page.route("**/rest/v1/productoFinanzas*", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
     });
+    await mockBffDailySales(page, [sale]);
     await page.route("**/rest/v1/ventasDiarias*", async (route) => {
       if (route.request().method() === "GET") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SALE]) });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([sale]) });
         return;
       }
       // PATCH (markSaleReturned)

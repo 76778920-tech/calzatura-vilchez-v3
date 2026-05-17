@@ -7,6 +7,10 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import {
+  mockBffCreateProductVariantsAtomicOk,
+  mockBffUpdateProductAtomicOk,
+} from "./helpers/mockAdminBff";
 
 // ─── Datos semilla ─────────────────────────────────────────────────────────────
 
@@ -100,9 +104,8 @@ test.describe("admin productos → campo campaña en payload", () => {
     await setupMocks(page);
 
     let rpcBody: Record<string, unknown> | null = null;
-    await page.route("**/rest/v1/rpc/update_product_atomic*", async (route) => {
-      rpcBody = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
-      await route.fulfill({ status: 200, contentType: "application/json", body: "null" });
+    await mockBffUpdateProductAtomicOk(page, (body) => {
+      rpcBody = body;
     });
 
     await page.locator(".admin-actions .edit-btn").first().click();
@@ -124,13 +127,8 @@ test.describe("admin productos → campo campaña en payload", () => {
     await setupMocks(page);
 
     let rpcBody: Record<string, unknown> | null = null;
-    await page.route("**/rest/v1/rpc/create_product_variants_atomic*", async (route) => {
-      rpcBody = JSON.parse(route.request().postData() ?? "{}") as Record<string, unknown>;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({ ids: ["e2e-camp-new-1"] }),
-      });
+    await mockBffCreateProductVariantsAtomicOk(page, ["e2e-camp-new-1"], (body) => {
+      rpcBody = body;
     });
 
     await page.getByRole("button", { name: /producto nuevo/i }).click();
@@ -162,6 +160,6 @@ test.describe("admin productos → campo campaña en payload", () => {
 
     expect(rpcBody).not.toBeNull();
     const variants = (rpcBody as unknown as { variants: Array<{ campana: string }> }).variants;
-    expect(variants[0].campana).toBe("cyber-wow");
+    expect(variants[0]?.campana).toBe("cyber-wow");
   });
 });
