@@ -29,8 +29,9 @@ describe("predictionDataQuality", () => {
   });
 
   it("fallback legacy sin data_sufficient", () => {
-    const { data_sufficient: _, ...legacy } = sufficientMeta;
-    expect(isPredictionDataSufficient(legacy as ModeloMeta)).toBe(true);
+    const legacy = { ...sufficientMeta } as ModeloMeta & { data_sufficient?: boolean };
+    delete legacy.data_sufficient;
+    expect(isPredictionDataSufficient(legacy)).toBe(true);
     expect(
       isPredictionDataSufficient({ ...legacy, model_type: "promedio_movil", n_samples: 10 } as ModeloMeta),
     ).toBe(false);
