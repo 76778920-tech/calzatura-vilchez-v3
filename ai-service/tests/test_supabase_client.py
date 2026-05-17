@@ -88,6 +88,32 @@ def test_save_ire_historial_fallback_payload_minimo(monkeypatch, status_code):
     }
 
 
+def test_query_lanza_si_http_error(monkeypatch):
+    def fake_get(url, headers, params, timeout):
+        return FakeResponse(500)
+
+    monkeypatch.setattr(supabase_client.requests, "get", fake_get)
+    with pytest.raises(RuntimeError, match="HTTP 500"):
+        supabase_client._query("ventasDiarias")
+
+
+def test_save_ire_historial_error_sin_fallback(monkeypatch):
+    def fake_post(url, headers, json, timeout):
+        return FakeResponse(500)
+
+    monkeypatch.setattr(supabase_client.requests, "post", fake_post)
+    with pytest.raises(RuntimeError, match="HTTP 500"):
+        supabase_client.save_ire_historial(make_ire())
+
+
+def test_save_campana_detectada_ok_sin_filas(monkeypatch):
+    def fake_post(url, headers, json, timeout):
+        return FakeResponse(201, [])
+
+    monkeypatch.setattr(supabase_client.requests, "post", fake_post)
+    assert supabase_client.save_campana_detectada({"nivel": "bajo"}) is None
+
+
 def test_fetch_ire_historial_solicita_campos_de_auditoria(monkeypatch):
     captured = {}
 

@@ -46,25 +46,41 @@ const xml = fs.readFileSync(xmlPath, "utf8");
 if (!xml.includes("<source>") || !xml.match(/<source>[^<]+<\/source>/)) {
   fail("coverage.xml sin <source> válido");
 }
-const sourceText = xml.match(/<source>([^<]*)<\/source>/)?.[1] ?? "";
+const sourceText = (xml.match(/<source>([^<]*)<\/source>/)?.[1] ?? "").replace(/\\/g, "/");
 if (sourceText === "." || sourceText.trim() === "") {
   fail('coverage.xml usa <source>.</source>; ejecuta fix_coverage_xml_for_sonar.py');
 }
+if (!sourceText.endsWith("/ai-service") && !sourceText.endsWith("\\ai-service")) {
+  fail(`<source> debe apuntar a ai-service/ (actual: ${sourceText})`);
+}
 
+/** Rutas en coverage.xml (relativas a ai-service/) y ruta Sonar (desde raíz del repo). */
 const requiredPy = [
-  "ai-service/models/revenue.py",
-  "ai-service/models/risk.py",
-  "ai-service/services/supabase_client.py",
+  { xmlRel: "models/revenue.py", sonarPath: "ai-service/models/revenue.py" },
+  { xmlRel: "models/risk.py", sonarPath: "ai-service/models/risk.py" },
+  { xmlRel: "services/supabase_client.py", sonarPath: "ai-service/services/supabase_client.py" },
 ];
-for (const fn of requiredPy) {
-  if (!xml.includes(`filename="${fn}"`)) {
-    fail(`coverage.xml sin ${fn}`);
+for (const { xmlRel, sonarPath } of requiredPy) {
+  if (!xml.includes(`filename="${xmlRel}"`)) {
+    fail(`coverage.xml sin filename="${xmlRel}" (${sonarPath})`);
   }
   const rate = xml.match(
-    new RegExp(`filename="${fn.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*line-rate="([0-9.]+)"`),
+    new RegExp(`filename="${xmlRel.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*line-rate="([0-9.]+)"`),
   )?.[1];
   if (!rate || Number(rate) < 0.99) {
-    fail(`${fn}: line-rate=${rate ?? "missing"} (esperado >= 0.99)`);
+    fail(`${sonarPath}: line-rate=${rate ?? "missing"} (esperado >= 0.99)`);
+  }
+}
+
+const supabaseBlock = xml.match(
+  /filename="services\/supabase_client\.py"[^>]*>[\s\S]*?<\/class>/,
+)?.[0];
+if (supabaseBlock) {
+  const misses = [...supabaseBlock.matchAll(/<line number="(\d+)" hits="0"/g)];
+  if (misses.length > 0) {
+    fail(
+      `supabase_client.py: ${misses.length} líneas sin cubrir en XML (p. ej. ${misses[0][1]})`,
+    );
   }
 }
 

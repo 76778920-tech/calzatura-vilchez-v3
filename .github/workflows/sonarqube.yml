@@ -82,7 +82,8 @@ jobs:
           test -f calzatura-vilchez/eslint-report.json
           test -f ai-service/bandit-report.json
           grep -q 'SF:calzatura-vilchez/src/' calzatura-vilchez/coverage/lcov.info
-          grep -q 'filename="ai-service/models/revenue.py"' ai-service/coverage.xml
+          grep -q 'filename="models/revenue.py"' ai-service/coverage.xml
+          grep -q 'filename="services/supabase_client.py"' ai-service/coverage.xml
           node scripts/validate-sonar-coverage-reports.mjs
 
       - name: Validar configuracion SonarQube
@@ -106,7 +107,8 @@ jobs:
           grep '^SF:' calzatura-vilchez/coverage/lcov.info | head -8
           echo "=== Cobertura XML: fuente y revenue ==="
           grep -m1 '<source>' ai-service/coverage.xml
-          grep 'filename="ai-service/models/revenue.py"' ai-service/coverage.xml | head -1 || true
+          grep 'filename="services/supabase_client.py"' ai-service/coverage.xml | head -1 || true
+          grep -A1 'filename="services/supabase_client.py"' ai-service/coverage.xml | head -3 || true
           echo "=== stock.ts en lcov (fragmento) ==="
           grep -A2 'SF:calzatura-vilchez/src/utils/stock.ts' calzatura-vilchez/coverage/lcov.info | head -6 || true
 
@@ -132,5 +134,6 @@ jobs:
           args: >
             "-Dsonar.qualitygate.wait=false"
             "-Dsonar.projectBaseDir=."
+            "-Dsonar.newCode.referenceBranch=main"
             "-Dsonar.javascript.lcov.reportPaths=calzatura-vilchez/coverage/lcov.info"
             "-Dsonar.python.coverage.reportPaths=ai-service/coverage.xml"
