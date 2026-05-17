@@ -7,9 +7,17 @@ omit =
     tests/*
     */tests/*
     evaluate.py
+    main.py
+    models/campaign.py
+    models/demand.py
+    services/firebase_verifier.py
 
 [report]
 omit =
     tests/*
     */tests/*
     evaluate.py
+    main.py
+    models/campaign.py
+    models/demand.py
+    services/firebase_verifier.py

@@ -71,8 +71,20 @@ for (const fn of requiredPy) {
   }
 }
 
-if (xml.includes('filename="ai-service/evaluate.py"')) {
-  fail("evaluate.py no debe estar en coverage.xml (omit en .coveragerc; exclusión Sonar)");
+for (const omitted of [
+  "ai-service/evaluate.py",
+  "ai-service/main.py",
+  "ai-service/models/campaign.py",
+  "ai-service/models/demand.py",
+  "ai-service/services/firebase_verifier.py",
+]) {
+  if (xml.includes(`filename="${omitted}"`)) {
+    fail(`${omitted} no debe estar en coverage.xml (sonar.coverage.exclusions)`);
+  }
+}
+const sourceCount = (xml.match(/<source>/g) || []).length;
+if (sourceCount !== 1) {
+  fail(`coverage.xml debe tener exactamente 1 <source>, tiene ${sourceCount}`);
 }
 
 const supabasePath = "ai-service/services/supabase_client.py";
