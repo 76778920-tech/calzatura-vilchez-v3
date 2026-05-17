@@ -162,6 +162,7 @@ jobs:
         run: npm run test:e2e
         env:
           CI: "true"
+          VITE_BACKEND_API_URL: http://127.0.0.1:5173
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}

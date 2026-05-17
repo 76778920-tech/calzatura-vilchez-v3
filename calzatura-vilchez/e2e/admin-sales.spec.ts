@@ -80,6 +80,8 @@ function buildSale() {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function setupBaseMocks(page: Page) {
+  await mockBffDailySales(page, []);
+
   await page.route("**/rest/v1/productos*", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCT]) });

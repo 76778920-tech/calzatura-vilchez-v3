@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { installDefaultAdminBffMocks } from "./mockAdminBff";
 
 const FIREBASE_PROJECT_ID = "calzaturavilchez-ab17f";
 export const FAKE_ADMIN_EMAIL = "76778920@continental.edu.pe";
@@ -117,4 +118,6 @@ export async function injectFakeAdminAuth(page: Page): Promise<void> {
     }
     await route.fallback();
   });
+
+  await installDefaultAdminBffMocks(page);
 }

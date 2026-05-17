@@ -32,6 +32,8 @@ export default defineConfig({
     // que admin.json (localStorage) sea leído en lugar del IndexedDB.
     env: {
       VITE_E2E: "true",
+      // BFF mockeado vía page.route; evita llamadas reales a Render en CI.
+      VITE_BACKEND_API_URL: "http://127.0.0.1:5173",
       // E2E mockea las rutas directas del servicio IA. Evita heredar el proxy
       // real desde GitHub Actions, porque eso salta los page.route("**/api/**").
       VITE_AI_ADMIN_PROXY_URL: "",
