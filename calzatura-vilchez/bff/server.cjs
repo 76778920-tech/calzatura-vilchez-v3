@@ -6,6 +6,7 @@ const fs = require("fs");
 const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
 const admin = require("firebase-admin");
+const { discountOrderStockRpc } = require("../functions/fnUtils");
 
 function loadAllowedOrigins() {
   const defaults = [
@@ -866,86 +867,6 @@ function resolveColorBucket(colorStock, talla, quantity, preferredColor, fallbac
   });
 }
 
-async function discountOrderItemStock(supabase, item) {
-  const productId = extractProductId(item);
-  const quantity = Number(item?.quantity || 0);
-  const talla = normalizeOrderTalla(item?.talla);
-  const color = normalizeOrderColor(item?.color);
-
-  if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
-    throw new Error("Producto invalido al descontar stock");
-  }
-
-  const product = await fetchProductOrThrow(supabase, productId);
-  const currentTotalStock = deriveTotalStock(product);
-  const currentSizeStock = getSizeStock(product, talla || undefined, color || undefined);
-
-  if (currentTotalStock < quantity || currentSizeStock < quantity) {
-    throw new Error("Stock insuficiente al descontar");
-  }
-
-  const updates = {};
-
-  const csDiscount = effectiveColorStock(product.colorStock);
-  if (csDiscount && talla) {
-    const colorStock = {
-      ...csDiscount,
-    };
-    const colorKey = resolveColorBucket(colorStock, talla, quantity, color || undefined, product.color || undefined);
-
-    if (!colorKey) {
-      throw new Error("No se encontro stock de color para descontar");
-    }
-
-    const tallaKey = findTallaKeyInMap(colorStock[colorKey], talla) || talla;
-    colorStock[colorKey] = {
-      ...colorStock[colorKey],
-      [tallaKey]: Math.max(0, cellQty(colorStock[colorKey][tallaKey]) - quantity),
-    };
-
-    updates.colorStock = colorStock;
-    updates.tallas = getAvailableSizes({ ...product, colorStock });
-    updates.stock = sumColorSizeStock(colorStock);
-  } else if (effectiveTallaStock(product.tallaStock) && talla) {
-    const baseTs = effectiveTallaStock(product.tallaStock);
-    const tallaKey = findTallaKeyInMap(baseTs, talla) || talla;
-    const tallaStock = {
-      ...baseTs,
-      [tallaKey]: Math.max(0, cellQty(baseTs[tallaKey]) - quantity),
-    };
-
-    updates.tallaStock = tallaStock;
-    updates.tallas = Object.keys(tallaStock)
-      .filter((size) => Number(tallaStock[size] || 0) > 0)
-      .sort((a, b) => Number(a) - Number(b));
-    updates.stock = sumSizeStock(tallaStock);
-  } else {
-    updates.stock = Math.max(0, Number(product.stock || 0) - quantity);
-  }
-
-  const { data, error } = await supabase
-    .from("productos")
-    .update(updates)
-    .eq("id", productId)
-    .eq("stock", currentTotalStock)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    throw new Error("No se pudo descontar stock");
-  }
-
-  if (!data) {
-    throw new Error("El stock cambio durante la operacion");
-  }
-}
-
-async function discountOrderStock(supabase, order) {
-  for (const item of order.items || []) {
-    await discountOrderItemStock(supabase, item);
-  }
-}
-
 const app = express();
 app.set("trust proxy", 1);
 app.use(applyCorsHeaders);
@@ -1151,7 +1072,7 @@ app.post("/createOrder", (req, res) => {
         if (metodoPago === "contraentrega") {
           try {
             const inserted = await fetchOrderOrThrow(supabase, orderId);
-            await discountOrderStock(supabase, inserted);
+            await discountOrderStockRpc(supabase, inserted);
             const stockMark = new Date().toISOString();
             await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
             await logAuditFn(
@@ -1209,7 +1130,7 @@ app.post("/updateOrderStatus", (req, res) => {
         patch.pagadoEn = new Date().toISOString();
         if (!order.stockDescontadoEn) {
           try {
-            await discountOrderStock(supabase, order);
+            await discountOrderStockRpc(supabase, order);
             patch.stockDescontadoEn = new Date().toISOString();
             await logAuditFn(
               supabase,
@@ -1583,7 +1504,7 @@ app.post("/stripeWebhook", async (req, res) => {
           if (order.estado !== "pagado") {
             let stockDescontadoEn = null;
             try {
-              await discountOrderStock(supabase, order);
+              await discountOrderStockRpc(supabase, order);
               stockDescontadoEn = new Date().toISOString();
             } catch (discountError) {
               console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
@@ -1655,7 +1576,7 @@ app.post("/confirmCodOrder", (req, res) => {
 
         assertStoredTotals(order);
         await assertOrderStockAvailability(supabase, order.items);
-        await discountOrderStock(supabase, order);
+        await discountOrderStockRpc(supabase, order);
         const stockMark = new Date().toISOString();
         await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
         await logAuditFn(

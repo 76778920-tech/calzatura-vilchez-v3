@@ -16,8 +16,9 @@ const {
   readIdempotencyKey, findOrderByIdempotency, idempotencyOrderJson,
   sumSizeStock, sumColorSizeStock, getAvailableSizes, deriveTotalStock, getSizeStock,
   sanitizeOrderProduct, extractItemFields, assertStoredTotals,
-  assertStockAndPrice, resolveColorBucket, findTallaKeyInMap, cellQty,
+  assertStockAndPrice,   resolveColorBucket, findTallaKeyInMap, cellQty,
   toFinitePrice, effectiveColorStock, effectiveTallaStock,
+  discountOrderStockRpc,
   resolveAiAdminUpstreamRequest, sendUpstreamToClient,
   aiAdminProxyErrorStatus, aiAdminProxyErrorMessage,
 } = require("./fnUtils");
@@ -274,83 +275,6 @@ async function updateOrder(supabase, orderId, patch) {
   }
 }
 
-async function discountOrderItemStock(supabase, item) {
-  const { productId, quantity, talla, color } = extractItemFields(item);
-
-  if (isInvalidOrderQty(productId, quantity)) {
-    throw new Error("Producto invalido al descontar stock");
-  }
-
-  const product = await fetchProductOrThrow(supabase, productId);
-  const currentTotalStock = deriveTotalStock(product);
-  const currentSizeStock = getSizeStock(product, orUndef(talla), orUndef(color));
-
-  if (currentTotalStock < quantity || currentSizeStock < quantity) {
-    throw new Error("Stock insuficiente al descontar");
-  }
-
-  const updates = {};
-
-  const csDiscount = effectiveColorStock(product.colorStock);
-  if (csDiscount && talla) {
-    const colorStock = {
-      ...csDiscount,
-    };
-    const colorKey = resolveColorBucket(colorStock, talla, quantity, orUndef(color), strOr(product.color));
-
-    if (!colorKey) {
-      throw new Error("No se encontro stock de color para descontar");
-    }
-
-    const tallaKey = findTallaKeyInMap(colorStock[colorKey], talla) || talla;
-    colorStock[colorKey] = {
-      ...colorStock[colorKey],
-      [tallaKey]: Math.max(0, cellQty(colorStock[colorKey][tallaKey]) - quantity),
-    };
-
-    updates.colorStock = colorStock;
-    updates.tallas = getAvailableSizes({ ...product, colorStock });
-    updates.stock = sumColorSizeStock(colorStock);
-  } else if (effectiveTallaStock(product.tallaStock) && talla) {
-    const baseTs = effectiveTallaStock(product.tallaStock);
-    const tallaKey = findTallaKeyInMap(baseTs, talla) || talla;
-    const tallaStock = {
-      ...baseTs,
-      [tallaKey]: Math.max(0, cellQty(baseTs[tallaKey]) - quantity),
-    };
-
-    updates.tallaStock = tallaStock;
-    updates.tallas = Object.keys(tallaStock)
-      .filter((size) => toN(tallaStock[size]) > 0)
-      .sort((a, b) => Number(a) - Number(b));
-    updates.stock = sumSizeStock(tallaStock);
-  } else {
-    updates.stock = Math.max(0, toN(product.stock) - quantity);
-  }
-
-  const { data, error } = await supabase
-    .from("productos")
-    .update(updates)
-    .eq("id", productId)
-    .eq("stock", currentTotalStock)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    throw new Error("No se pudo descontar stock");
-  }
-
-  if (!data) {
-    throw new Error("El stock cambio durante la operacion");
-  }
-}
-
-async function discountOrderStock(supabase, order) {
-  for (const item of arrOr(order.items)) {
-    await discountOrderItemStock(supabase, item);
-  }
-}
-
 async function respondIdempotentPendingOrder(supabase, uid, idempotencyKey, res) {
   if (!idempotencyKey) return false;
   const existing = await findOrderByIdempotency(supabase, uid, idempotencyKey);
@@ -368,7 +292,7 @@ function resolveOrderEnvio(draftEnvio, rawEnvio) {
 
 async function finalizeContraentregaOrder(supabase, orderId, decodedToken) {
   const inserted = await fetchOrderOrThrow(supabase, orderId);
-  await discountOrderStock(supabase, inserted);
+  await discountOrderStockRpc(supabase, inserted);
   const stockMark = new Date().toISOString();
   await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
   await logAuditFn({
@@ -494,7 +418,7 @@ exports.updateOrderStatus = onRequest(
           patch.pagadoEn = new Date().toISOString();
           if (!order.stockDescontadoEn) {
             try {
-              await discountOrderStock(supabase, order);
+              await discountOrderStockRpc(supabase, order);
               patch.stockDescontadoEn = new Date().toISOString();
               await logAuditFn({
                 supabase,
@@ -705,7 +629,7 @@ exports.stripeWebhook = onRequest(
           const order = await fetchOrderOrThrow(supabase, orderId);
 
           if (order.estado !== "pagado") {
-            await discountOrderStock(supabase, order);
+            await discountOrderStockRpc(supabase, order);
             await updateOrder(supabase, orderId, {
               estado: "pagado",
               stripeSessionId: session.id,
@@ -775,7 +699,7 @@ exports.confirmCodOrder = onRequest(
 
         assertStoredTotals(order);
         await assertOrderStockAvailability(supabase, order.items);
-        await discountOrderStock(supabase, order);
+        await discountOrderStockRpc(supabase, order);
         const stockMark = new Date().toISOString();
         await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
         await logAuditFn({

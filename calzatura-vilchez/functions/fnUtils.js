@@ -424,6 +424,51 @@ function assertStockAndPrice(price, totalStock, sizeStock, quantity) {
   }
 }
 
+function mapOrderStockRpcError(error) {
+  const msg = typeof error?.message === "string" ? error.message : "";
+  if (msg.includes("insufficient_stock") || msg.includes("insufficient_size_stock")) {
+    return new Error("Stock insuficiente al descontar");
+  }
+  if (msg.includes("no_color_stock")) {
+    return new Error("No se encontro stock de color para descontar");
+  }
+  if (msg.includes("product_not_found")) {
+    return new Error("Producto no encontrado al descontar stock");
+  }
+  if (msg.includes("invalid_order")) {
+    return new Error("Producto invalido al descontar stock");
+  }
+  return new Error("No se pudo descontar stock");
+}
+
+function buildOrderStockRpcItems(order) {
+  return arrOr(order?.items).map((item) => {
+    const { productId, quantity, talla, color } = extractItemFields(item);
+    return {
+      productId,
+      talla: talla || null,
+      color: color || null,
+      cantidad: quantity,
+    };
+  });
+}
+
+async function discountOrderStockRpc(supabase, order) {
+  const items = buildOrderStockRpcItems(order);
+  if (items.length === 0) {
+    throw new Error("Producto invalido al descontar stock");
+  }
+  for (const line of items) {
+    if (isInvalidOrderQty(line.productId, line.cantidad)) {
+      throw new Error("Producto invalido al descontar stock");
+    }
+  }
+  const { error } = await supabase.rpc("decrement_order_stock", { p_items: items });
+  if (error) {
+    throw mapOrderStockRpcError(error);
+  }
+}
+
 function resolveColorBucket(colorStock, talla, quantity, preferredColor, fallbackColor) {
   const t = String(talla || "").trim();
   if (!t || !colorStock) return null;
@@ -607,6 +652,9 @@ module.exports = {
   assertStoredTotals,
   assertStockAndPrice,
   resolveColorBucket,
+  buildOrderStockRpcItems,
+  discountOrderStockRpc,
+  mapOrderStockRpcError,
   findTallaKeyInMap,
   cellQty,
   parseQueryInt,
