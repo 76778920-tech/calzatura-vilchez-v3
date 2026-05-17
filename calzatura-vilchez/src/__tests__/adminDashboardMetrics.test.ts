@@ -42,6 +42,8 @@ describe("adminDashboardMetrics", () => {
 
     expect(stats.ingresosWeb).toBe(329);
     expect(stats.ingresosTienda).toBe(80);
+    expect(stats.ingresosTotales).toBe(409);
+    expect(stats.gananciasTotales).toBeGreaterThan(0);
     expect(stats.ventasHoyWeb).toBe(329);
     expect(stats.ventasHoyTienda).toBe(80);
     expect(chart.web[0]).toBe(329);

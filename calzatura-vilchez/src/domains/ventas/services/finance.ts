@@ -1,3 +1,5 @@
+import { getBackendApiBaseUrl } from "@/config/apiBackend";
+import { auth } from "@/firebase/config";
 import { supabase } from "@/supabase/client";
 import type { DailySale, ProductFinancial } from "@/types";
 
@@ -61,7 +63,55 @@ function sinceISO(days: number) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export async function fetchDailySales(date?: string): Promise<DailySale[]> {
+function sortDailySales(rows: DailySale[]) {
+  return [...rows].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+}
+
+async function fetchDailySalesViaBff(params: { fecha?: string; sinceDays?: number }): Promise<DailySale[] | null> {
+  const base = getBackendApiBaseUrl();
+  const user = auth.currentUser;
+  if (!base || !user) return null;
+
+  const qs = new URLSearchParams();
+  if (params.fecha) qs.set("fecha", params.fecha);
+  else qs.set("sinceDays", String(params.sinceDays ?? 90));
+
+  try {
+    const response = await fetch(`${base}/admin/dailySales?${qs.toString()}`, {
+      headers: { Authorization: `Bearer ${await user.getIdToken()}` },
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json().catch(() => ({}))) as { sales?: DailySale[] };
+    return Array.isArray(payload.sales) ? sortDailySales(payload.sales) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchDailySalesFromSupabase(date?: string): Promise<DailySale[] | null> {
+  if (date) {
+    const { data: rpcData, error: rpcError } = await supabase.rpc("list_ventas_diarias_by_fecha", {
+      p_fecha: date,
+    });
+    if (!rpcError && Array.isArray(rpcData)) {
+      return sortDailySales(rpcData as DailySale[]);
+    }
+    if (rpcError && !/list_ventas_diarias_by_fecha|PGRST202/i.test(rpcError.message ?? "")) {
+      throw rpcError;
+    }
+  } else {
+    const desde = sinceISO(90);
+    const { data: rpcData, error: rpcError } = await supabase.rpc("list_ventas_diarias_since", {
+      p_fecha_desde: desde,
+    });
+    if (!rpcError && Array.isArray(rpcData)) {
+      return sortDailySales(rpcData as DailySale[]);
+    }
+    if (rpcError && !/list_ventas_diarias_since|PGRST202/i.test(rpcError.message ?? "")) {
+      throw rpcError;
+    }
+  }
+
   let query = supabase.from(SALES_COL).select("*");
   if (date) {
     query = query.eq("fecha", date);
@@ -69,8 +119,19 @@ export async function fetchDailySales(date?: string): Promise<DailySale[]> {
     query = query.gte("fecha", sinceISO(90)).order("fecha", { ascending: false }).limit(500);
   }
   const { data, error } = await query;
-  if (error) throw error;
-  return (data as DailySale[]).sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+  if (error) return null;
+  return sortDailySales((data ?? []) as DailySale[]);
+}
+
+/** Ventas en tienda física: BFF (service role) primero; fallback Supabase RPC / SELECT. */
+export async function fetchDailySales(date?: string): Promise<DailySale[]> {
+  const fromBff = await fetchDailySalesViaBff(date ? { fecha: date } : { sinceDays: 90 });
+  if (fromBff) return fromBff;
+
+  const fromSupabase = await fetchDailySalesFromSupabase(date);
+  if (fromSupabase) return fromSupabase;
+
+  throw new Error("No se pudieron cargar las ventas diarias");
 }
 
 export async function addDailySale(data: Omit<DailySale, "id" | "creadoEn">): Promise<string> {

@@ -120,8 +120,6 @@ export function useAdminSalesPage(): AdminSalesPageModel {
         const items = itemsResult.value;
         const codes = codesResult.status === "fulfilled" ? codesResult.value : {};
         const financials = financialsResult.status === "fulfilled" ? financialsResult.value : {};
-        const daySales = daySalesResult.status === "fulfilled" ? daySalesResult.value : [];
-
         if (codesResult.status === "rejected") {
           toast.error("No se pudieron cargar los códigos de producto");
         }
@@ -138,7 +136,9 @@ export function useAdminSalesPage(): AdminSalesPageModel {
           finanzas: financials[item.id],
         }));
         setProducts(merged);
-        setSales(daySales);
+        if (daySalesResult.status === "fulfilled") {
+          setSales(daySalesResult.value);
+        }
       })
       .catch((err: unknown) => {
         toast.error(toastFromSalesError(err));

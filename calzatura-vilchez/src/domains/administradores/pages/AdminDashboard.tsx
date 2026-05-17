@@ -1,9 +1,9 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Package, ShoppingBag, Users, TrendingUp, CircleDollarSign,
-  AlertCircle, Factory, X, MapPin, Phone, Mail, ChevronRight,
-  BarChart2, Clock, Brain, Store, Globe,
+  AlertCircle, X, MapPin, Phone, Mail, ChevronRight,
+  BarChart2, Clock, Store, Globe,
 } from "lucide-react";
 import {
   computeDashboardFromFetchedData,
@@ -37,6 +37,31 @@ function greetingText() {
 
 function formatCurrency(n: number) {
   return `S/ ${n.toFixed(2)}`;
+}
+
+function formatChartAxis(n: number) {
+  if (n >= 1000) {
+    const k = n / 1000;
+    return `S/ ${Number.isInteger(k) ? k : k.toFixed(1)}k`;
+  }
+  return `S/ ${Math.round(n)}`;
+}
+
+function formatChartBarLabel(n: number) {
+  if (n <= 0) return "";
+  if (n >= 1000) return formatChartAxis(n);
+  return `S/ ${Math.round(n)}`;
+}
+
+function chartScaleMax(values: number[]): number {
+  const maxVal = Math.max(...values, 0);
+  if (maxVal <= 0) return 100;
+  const step = maxVal <= 80 ? 20 : maxVal <= 200 ? 50 : maxVal <= 600 ? 100 : maxVal <= 1500 ? 250 : 500;
+  return Math.ceil(maxVal / step) * step;
+}
+
+function buildYAxisTicks(max: number, segments = 4): number[] {
+  return Array.from({ length: segments + 1 }, (_, i) => (max / segments) * (segments - i));
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -177,50 +202,69 @@ function OrderDetailModal({ order, onClose }: Readonly<{ order: Order; onClose: 
 
 // ─── Bar Chart ──────────────────────────────────────────────────────────────
 
-function SalesSplitBarChart({
+function SalesBarChart({
   days,
-  webValues,
-  tiendaValues,
-}: Readonly<{ days: string[]; webValues: number[]; tiendaValues: number[] }>) {
-  const totals = days.map((_, i) => webValues[i] + tiendaValues[i]);
-  const max = Math.max(...totals, 1);
+  values,
+  variant,
+}: Readonly<{ days: string[]; values: number[]; variant: "web" | "tienda" }>) {
+  const total = values.reduce((sum, v) => sum + v, 0);
+  const scaleMax = chartScaleMax(values);
+  const yTicks = buildYAxisTicks(scaleMax);
+  const panelClass = variant === "web" ? "dash-bar-chart--web" : "dash-bar-chart--tienda";
+  const fillClass = variant === "web" ? "dash-bar-chart-fill-web" : "dash-bar-chart-fill-tienda";
+
   return (
-    <>
-      <div className="dash-chart-legend">
-        <span className="dash-chart-legend-item">
-          <span className="dash-chart-legend-swatch dash-chart-legend-web" aria-hidden="true" />
-          Tienda web (pedidos)
-        </span>
-        <span className="dash-chart-legend-item">
-          <span className="dash-chart-legend-swatch dash-chart-legend-tienda" aria-hidden="true" />
-          Tienda física (ventas)
-        </span>
+    <div className={`dash-bar-chart ${panelClass}`}>
+      <div className="dash-bar-chart-summary">
+        <span>Total 7 días</span>
+        <strong>{formatCurrency(total)}</strong>
       </div>
-      <div className="dash-chart-bars">
-        {days.map((label, i) => {
-          const web = webValues[i];
-          const tienda = tiendaValues[i];
-          const total = web + tienda;
-          const webPct = total > 0 ? (web / total) * 100 : 0;
-          const tiendaPct = total > 0 ? (tienda / total) * 100 : 0;
-          const barHeight = Math.max((total / max) * 100, total > 0 ? 4 : 0);
-          return (
-            <div key={label} className="dash-chart-col">
-              <span className="dash-chart-val">{total > 0 ? `S/${total.toFixed(0)}` : ""}</span>
-              <div className="dash-chart-track dash-chart-track-stack" style={{ height: `${barHeight}%` }}>
-                {tienda > 0 && (
-                  <div className="dash-chart-fill dash-chart-fill-tienda" style={{ height: `${tiendaPct}%` }} />
-                )}
-                {web > 0 && (
-                  <div className="dash-chart-fill dash-chart-fill-web" style={{ height: `${webPct}%` }} />
-                )}
-              </div>
-              <span className="dash-chart-label">{label}</span>
-            </div>
-          );
-        })}
+
+      <div className="dash-bar-chart-body">
+        <div className="dash-bar-chart-yaxis" aria-hidden="true">
+          {yTicks.map((tick) => (
+            <span key={tick}>{formatChartAxis(tick)}</span>
+          ))}
+        </div>
+
+        <div className="dash-bar-chart-plot">
+          <div className="dash-bar-chart-grid" aria-hidden="true">
+            {yTicks.map((tick) => (
+              <div key={tick} className="dash-bar-chart-grid-line" />
+            ))}
+          </div>
+
+          <div
+            className="dash-bar-chart-bars"
+            role="img"
+            aria-label={`Ventas por día, total ${formatCurrency(total)}`}
+          >
+            {days.map((label, i) => {
+              const amount = values[i];
+              const pct = scaleMax > 0 ? (amount / scaleMax) * 100 : 0;
+              const barHeight = amount > 0 ? Math.max(pct, 6) : 0;
+              const colClass = amount > 0 ? "dash-bar-chart-col dash-bar-chart-col--active" : "dash-bar-chart-col";
+              return (
+                <div key={`${label}-${i}`} className={colClass} title={`${label}: ${formatCurrency(amount)}`}>
+                  <span className="dash-bar-chart-val">{formatChartBarLabel(amount)}</span>
+                  <div className="dash-bar-chart-bar-area">
+                    <div
+                      className={`dash-bar-chart-fill ${fillClass}`}
+                      style={{ height: amount > 0 ? `${barHeight}%` : "0%" }}
+                    />
+                  </div>
+                  <span className="dash-bar-chart-day">{label}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {total === 0 && (
+            <p className="dash-bar-chart-empty">Sin ventas registradas en los últimos 7 días</p>
+          )}
+        </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -228,14 +272,15 @@ function ChannelSectionHeading({
   icon,
   title,
   subtitle,
-}: Readonly<{ icon: ReactNode; title: string; subtitle: string }>) {
+  titleId,
+}: Readonly<{ icon: ReactNode; title: string; subtitle: string; titleId?: string }>) {
   return (
     <div className="dash-channel-heading">
       <span className="dash-channel-heading-icon" aria-hidden="true">
         {icon}
       </span>
       <div>
-        <h2 className="dash-channel-title">{title}</h2>
+        <h2 id={titleId} className="dash-channel-title">{title}</h2>
         <p className="dash-channel-subtitle">{subtitle}</p>
       </div>
     </div>
@@ -278,6 +323,8 @@ export default function AdminDashboard() {
     usuarios: 0,
     ingresosWeb: 0,
     ingresosTienda: 0,
+    ingresosTotales: 0,
+    gananciasTotales: 0,
     ventasHoyWeb: 0,
     ventasHoyTienda: 0,
     gananciaHoyWeb: 0,
@@ -292,40 +339,55 @@ export default function AdminDashboard() {
   const [loadError, setLoadError] = useState(false);
   const [auditError, setAuditError] = useState(false);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
-
   const last7Days = getLast7Days();
 
-  useEffect(() => {
+  const loadDashboard = useCallback(() => {
     const today = todayISO();
+    setLoading(true);
+    setLoadError(false);
     void fetchRecentAudit(10).then(setAuditLog).catch(() => setAuditError(true));
 
-    Promise.all([
+    return Promise.all([
       fetchProducts(),
       fetchAllOrders(),
       fetchDailySales(),
       fetchProductFinancials(),
       fetchAllUsers(),
-    ]).then(([products, orders, sales, financials, users]) => {
-      const { stats, chart } = computeDashboardFromFetchedData(
-        today,
-        last7Days,
-        products,
-        orders,
-        sales,
-        financials,
-        users
-      );
-      setStats(stats);
-      setRecentOrders(orders.slice(0, 6));
-      setAllOrders(orders);
-      setChartWeb(chart.web);
-      setChartTienda(chart.tienda);
-    }).catch(() => {
-      setLoadError(true);
-      toast.error("No se pudieron cargar los datos del dashboard. Verifica tu conexión.");
-    }).finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    ])
+      .then(([products, orders, sales, financials, users]) => {
+        const { stats, chart } = computeDashboardFromFetchedData(
+          today,
+          last7Days,
+          products,
+          orders,
+          sales,
+          financials,
+          users,
+        );
+        setStats(stats);
+        setRecentOrders(orders.slice(0, 6));
+        setAllOrders(orders);
+        setChartWeb(chart.web);
+        setChartTienda(chart.tienda);
+      })
+      .catch(() => {
+        setLoadError(true);
+        toast.error("No se pudieron cargar los datos del dashboard. Verifica tu conexión.");
+      })
+      .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void loadDashboard();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadDashboard]);
 
   if (loading) {
     return (
@@ -411,8 +473,24 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* KPI row 1 */}
+      {/* KPI row 1 — ingresos/ganancias estáticos a la izquierda */}
       <div className="dash-kpi-grid">
+        <div className="dash-kpi-card dash-kpi-card-static dash-kpi-purple" aria-label={`Ingresos totales: ${formatCurrency(stats.ingresosTotales)}`}>
+          <div className="dash-kpi-icon"><CircleDollarSign size={22} /></div>
+          <div className="dash-kpi-body">
+            <p className="dash-kpi-label">Ingresos totales</p>
+            <p className="dash-kpi-value">{formatCurrency(stats.ingresosTotales)}</p>
+          </div>
+        </div>
+
+        <div className="dash-kpi-card dash-kpi-card-static dash-kpi-gold" aria-label={`Ganancias totales: ${formatCurrency(stats.gananciasTotales)}`}>
+          <div className="dash-kpi-icon"><TrendingUp size={22} /></div>
+          <div className="dash-kpi-body">
+            <p className="dash-kpi-label">Ganancias totales</p>
+            <p className="dash-kpi-value">{formatCurrency(stats.gananciasTotales)}</p>
+          </div>
+        </div>
+
         <button type="button" className="dash-kpi-card dash-kpi-blue" onClick={() => navigate(ADMIN_ROUTES.products)}>
           <div className="dash-kpi-icon"><Package size={22} /></div>
           <div className="dash-kpi-body">
@@ -431,15 +509,6 @@ export default function AdminDashboard() {
           <ChevronRight size={16} className="dash-kpi-arrow" />
         </button>
 
-        <button type="button" className="dash-kpi-card dash-kpi-purple" onClick={() => navigate(ADMIN_ROUTES.orders)}>
-          <div className="dash-kpi-icon"><TrendingUp size={22} /></div>
-          <div className="dash-kpi-body">
-            <p className="dash-kpi-label">Ingresos web</p>
-            <p className="dash-kpi-value">{formatCurrency(stats.ingresosWeb)}</p>
-          </div>
-          <ChevronRight size={16} className="dash-kpi-arrow" />
-        </button>
-
         <button type="button" className="dash-kpi-card dash-kpi-orange" onClick={() => navigate(ADMIN_ROUTES.users)}>
           <div className="dash-kpi-icon"><Users size={22} /></div>
           <div className="dash-kpi-body">
@@ -450,12 +519,15 @@ export default function AdminDashboard() {
         </button>
       </div>
 
-      <ChannelSectionHeading
-        icon={<Globe size={20} />}
-        title="Tienda web"
-        subtitle="Pedidos online completados (pagado, enviado o entregado)"
-      />
-      <div className="dash-channel-metrics">
+      <div className="dash-channels-row">
+        <section className="dash-card dash-channel-panel dash-channel-panel-web" aria-labelledby="dash-channel-web-title">
+          <ChannelSectionHeading
+            icon={<Globe size={20} />}
+            title="Tienda web"
+            subtitle="Pedidos online completados (pagado, enviado o entregado)"
+            titleId="dash-channel-web-title"
+          />
+          <div className="dash-channel-metrics">
         <div className="dash-today-card dash-today-web">
           <CircleDollarSign size={20} />
           <div>
@@ -482,15 +554,27 @@ export default function AdminDashboard() {
           </div>
           {stats.pendientes > 0 && <ChevronRight size={15} className="dash-kpi-arrow" />}
         </button>
-      </div>
+          </div>
+          <div className="dash-channel-chart">
+            <p className="dash-channel-chart-kicker">Actividad de ventas</p>
+            <h3 className="dash-channel-chart-title">Últimos 7 días — web</h3>
+            <SalesBarChart
+              days={last7Days.map((d) => d.label)}
+              values={chartWeb}
+              variant="web"
+            />
+          </div>
+        </section>
 
-      <ChannelSectionHeading
-        icon={<Store size={20} />}
-        title="Tienda física"
-        subtitle="Ventas registradas en Admin → Ventas"
-      />
-      <div className="dash-channel-metrics">
-        <button type="button" className="dash-kpi-card dash-kpi-gold dash-channel-kpi" onClick={() => navigate(ADMIN_ROUTES.sales)}>
+        <section className="dash-card dash-channel-panel dash-channel-panel-store" aria-labelledby="dash-channel-store-title">
+          <ChannelSectionHeading
+            icon={<Store size={20} />}
+            title="Tienda física"
+            subtitle="Ventas registradas en Admin → Ventas"
+            titleId="dash-channel-store-title"
+          />
+          <div className="dash-channel-metrics">
+            <button type="button" className="dash-kpi-card dash-kpi-gold dash-channel-kpi" onClick={() => navigate(ADMIN_ROUTES.sales)}>
           <div className="dash-kpi-icon"><Store size={22} /></div>
           <div className="dash-kpi-body">
             <p className="dash-kpi-label">Ingresos tienda física</p>
@@ -512,24 +596,17 @@ export default function AdminDashboard() {
             <p className="dash-today-value">{formatCurrency(stats.gananciaHoyTienda)}</p>
           </div>
         </div>
-      </div>
-
-      {/* Chart */}
-      <div className="dash-card dash-chart-card">
-        <div className="dash-card-header">
-          <div>
-            <p className="dash-card-kicker">Actividad de ventas</p>
-            <h2 className="dash-card-title">Últimos 7 días</h2>
           </div>
-          <Link to={ADMIN_ROUTES.sales} className="admin-link dash-card-link">
-            Ver ventas <ChevronRight size={14} />
-          </Link>
-        </div>
-        <SalesSplitBarChart
-          days={last7Days.map((d) => d.label)}
-          webValues={chartWeb}
-          tiendaValues={chartTienda}
-        />
+          <div className="dash-channel-chart">
+            <p className="dash-channel-chart-kicker">Actividad de ventas</p>
+            <h3 className="dash-channel-chart-title">Últimos 7 días — tienda física</h3>
+            <SalesBarChart
+              days={last7Days.map((d) => d.label)}
+              values={chartTienda}
+              variant="tienda"
+            />
+          </div>
+        </section>
       </div>
 
       {/* Orders + Status */}
@@ -606,54 +683,6 @@ export default function AdminDashboard() {
             <span>Total registrados</span>
             <strong>{allOrders.length} pedidos</strong>
           </div>
-        </div>
-      </div>
-
-      {/* Quick actions */}
-      <div className="dash-card">
-        <div className="dash-card-header">
-          <div>
-            <p className="dash-card-kicker">Acceso rápido</p>
-            <h2 className="dash-card-title">Gestión del Sistema</h2>
-          </div>
-        </div>
-        <div className="dash-actions-grid">
-          <Link to={ADMIN_ROUTES.products} className="dash-action-card dash-action-blue">
-            <div className="dash-action-icon"><Package size={26} /></div>
-            <p className="dash-action-title">Productos</p>
-            <p className="dash-action-desc">Gestionar catálogo, stock y precios</p>
-            <ChevronRight size={16} className="dash-action-arrow" />
-          </Link>
-          <Link to={ADMIN_ROUTES.orders} className="dash-action-card dash-action-green">
-            <div className="dash-action-icon"><ShoppingBag size={26} /></div>
-            <p className="dash-action-title">Pedidos</p>
-            <p className="dash-action-desc">Ver y actualizar estados de pedidos</p>
-            <ChevronRight size={16} className="dash-action-arrow" />
-          </Link>
-          <Link to={ADMIN_ROUTES.sales} className="dash-action-card dash-action-gold">
-            <div className="dash-action-icon"><CircleDollarSign size={26} /></div>
-            <p className="dash-action-title">Ventas</p>
-            <p className="dash-action-desc">Registrar ventas y consultar reportes</p>
-            <ChevronRight size={16} className="dash-action-arrow" />
-          </Link>
-          <Link to={ADMIN_ROUTES.users} className="dash-action-card dash-action-orange">
-            <div className="dash-action-icon"><Users size={26} /></div>
-            <p className="dash-action-title">Usuarios</p>
-            <p className="dash-action-desc">Administrar roles y perfiles</p>
-            <ChevronRight size={16} className="dash-action-arrow" />
-          </Link>
-          <Link to={ADMIN_ROUTES.manufacturers} className="dash-action-card dash-action-purple">
-            <div className="dash-action-icon"><Factory size={26} /></div>
-            <p className="dash-action-title">Fabricantes</p>
-            <p className="dash-action-desc">Gestionar proveedores y documentos</p>
-            <ChevronRight size={16} className="dash-action-arrow" />
-          </Link>
-          <Link to={ADMIN_ROUTES.predictions} className="dash-action-card dash-action-ai">
-            <div className="dash-action-icon"><Brain size={26} /></div>
-            <p className="dash-action-title">Predicciones IA</p>
-            <p className="dash-action-desc">Demanda y alertas de stock con IA</p>
-            <ChevronRight size={16} className="dash-action-arrow" />
-          </Link>
         </div>
       </div>
 

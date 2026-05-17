@@ -222,7 +222,7 @@ export type RegisterPendingSalesParams = {
   setValidatedDni: (d: string) => void;
   setPendingLines: Dispatch<SetStateAction<PendingSaleLine[]>>;
   setDocumentType: (t: SaleDocumentType) => void;
-  load: () => void;
+  load: () => void | Promise<void>;
 };
 
 export async function executeRegisterPendingSales(p: RegisterPendingSalesParams): Promise<void> {
@@ -266,7 +266,10 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     if (requiresCustomer && !saleCustomer) return;
 
     const salesPayload = buildDailySalePayload(pendingLines, products, date, documentType, docNumber, saleCustomer);
-    await registerDailySalesAtomic(salesPayload);
+    const saleIds = await registerDailySalesAtomic(salesPayload);
+    if (saleIds.length === 0) {
+      throw new Error("La venta no generó registros en el servidor");
+    }
 
     toast.success("Ventas registradas");
     renderRegisterSaleDocumentIfNeeded(
@@ -283,7 +286,7 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     setDocumentType("ninguno");
     setCustomer(EMPTY_SALE_CUSTOMER);
     setValidatedDni("");
-    load();
+    await load();
   } catch (err: unknown) {
     if (isDniLookupError(err)) {
       showDniLookupError(err);

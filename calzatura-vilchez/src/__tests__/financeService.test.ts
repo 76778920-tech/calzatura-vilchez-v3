@@ -5,6 +5,14 @@ const { fromMock, rpcMock } = vi.hoisted(() => ({
   rpcMock: vi.fn(),
 }));
 
+vi.mock("@/firebase/config", () => ({
+  auth: { currentUser: null },
+}));
+
+vi.mock("@/config/apiBackend", () => ({
+  getBackendApiBaseUrl: () => "",
+}));
+
 vi.mock("@/supabase/client", () => ({
   supabase: {
     from: fromMock,
@@ -29,6 +37,10 @@ describe("finance service", () => {
     vi.setSystemTime(new Date("2026-05-13T10:00:00.000Z"));
     fromMock.mockReset();
     rpcMock.mockReset();
+    rpcMock.mockResolvedValue({
+      data: null,
+      error: { message: "Could not find the function list_ventas_diarias_by_fecha", code: "PGRST202" },
+    });
   });
 
   afterEach(() => {
@@ -88,34 +100,30 @@ describe("finance service", () => {
   });
 
   it("fetchDailySales filtra por fecha y ordena por creadoEn descendente", async () => {
-    const eq = vi.fn().mockResolvedValue({
+    rpcMock.mockResolvedValueOnce({
       data: [
         { id: "old", creadoEn: "2026-05-13T09:00:00.000Z" },
         { id: "new", creadoEn: "2026-05-13T11:00:00.000Z" },
       ],
       error: null,
     });
-    const select = vi.fn().mockReturnValue({ eq });
-    fromMock.mockReturnValue({ select });
 
     const rows = await fetchDailySales("2026-05-13");
 
-    expect(eq).toHaveBeenCalledWith("fecha", "2026-05-13");
+    expect(rpcMock).toHaveBeenCalledWith("list_ventas_diarias_by_fecha", { p_fecha: "2026-05-13" });
     expect(rows.map((row) => row.id)).toEqual(["new", "old"]);
   });
 
   it("fetchDailySales sin fecha consulta los ultimos 90 dias", async () => {
-    const limit = vi.fn().mockResolvedValue({ data: [], error: null });
-    const order = vi.fn().mockReturnValue({ limit });
-    const gte = vi.fn().mockReturnValue({ order });
-    const select = vi.fn().mockReturnValue({ gte });
-    fromMock.mockReturnValue({ select });
+    rpcMock.mockResolvedValueOnce({
+      data: [{ id: "s1", creadoEn: "2026-05-13T10:00:00.000Z", fecha: "2026-05-13" }],
+      error: null,
+    });
 
-    await fetchDailySales();
+    const rows = await fetchDailySales();
 
-    expect(gte).toHaveBeenCalledWith("fecha", "2026-02-12");
-    expect(order).toHaveBeenCalledWith("fecha", { ascending: false });
-    expect(limit).toHaveBeenCalledWith(500);
+    expect(rpcMock).toHaveBeenCalledWith("list_ventas_diarias_since", { p_fecha_desde: "2026-02-12" });
+    expect(rows).toHaveLength(1);
   });
 
   it("addDailySale inserta canal tienda y devuelve id", async () => {

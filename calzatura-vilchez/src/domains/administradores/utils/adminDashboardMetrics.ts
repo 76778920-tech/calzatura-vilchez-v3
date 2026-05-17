@@ -70,6 +70,8 @@ export type DashboardStats = {
   usuarios: number;
   ingresosWeb: number;
   ingresosTienda: number;
+  ingresosTotales: number;
+  gananciasTotales: number;
   ventasHoyWeb: number;
   ventasHoyTienda: number;
   gananciaHoyWeb: number;
@@ -92,7 +94,13 @@ export function computeDashboardFromFetchedData(
   const tiendaSales = sales.filter(isTiendaFisicaSale);
 
   const ingresosWeb = completedOrders.reduce((acc, o) => acc + (o.total ?? 0), 0);
-  const ingresosTienda = tiendaSales.reduce((acc, s) => acc + s.total, 0);
+  const ingresosTienda = tiendaSales
+    .filter((s) => !s.devuelto)
+    .reduce((acc, s) => acc + s.total, 0);
+  const ingresosTotales = ingresosWeb + ingresosTienda;
+  const gananciasTotales =
+    tiendaSales.filter((s) => !s.devuelto).reduce((acc, s) => acc + s.ganancia, 0) +
+    completedOrders.reduce((acc, o) => acc + estimateOrderProfit(o, financials), 0);
   const pendientes = orders.filter((o) => o.estado === "pendiente").length;
 
   const ventasHoyTienda = tiendaFisicaSalesTotalForDate(sales, today);
@@ -116,6 +124,8 @@ export function computeDashboardFromFetchedData(
       usuarios: users.length,
       ingresosWeb,
       ingresosTienda,
+      ingresosTotales,
+      gananciasTotales,
       ventasHoyWeb,
       ventasHoyTienda,
       gananciaHoyWeb,

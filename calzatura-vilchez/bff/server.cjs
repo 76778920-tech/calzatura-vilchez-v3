@@ -1265,6 +1265,52 @@ function handleAdminRpcError(error) {
   throw error;
 }
 
+function sinceDateISO(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+app.get("/admin/dailySales", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "GET") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+
+      const fecha = typeof req.query.fecha === "string" ? req.query.fecha.trim() : "";
+      const sinceDays = Math.min(
+        365,
+        Math.max(1, Number.parseInt(String(req.query.sinceDays ?? "90"), 10) || 90),
+      );
+
+      let query = supabase.from("ventasDiarias").select("*");
+      if (fecha) {
+        query = query.eq("fecha", fecha);
+      } else {
+        query = query
+          .gte("fecha", sinceDateISO(sinceDays))
+          .order("fecha", { ascending: false })
+          .limit(500);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const sales = (data ?? []).sort((a, b) =>
+        String(b.creadoEn || "").localeCompare(String(a.creadoEn || "")),
+      );
+      return res.status(200).json({ sales });
+    } catch (error) {
+      console.error("admin/dailySales error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.post("/updateProductAtomic", (req, res) => {
   cors(req, res, async () => {
     if (req.method !== "POST") {
