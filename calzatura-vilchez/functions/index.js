@@ -351,107 +351,119 @@ async function discountOrderStock(supabase, order) {
   }
 }
 
+async function respondIdempotentPendingOrder(supabase, uid, idempotencyKey, res) {
+  if (!idempotencyKey) return false;
+  const existing = await findOrderByIdempotency(supabase, uid, idempotencyKey);
+  if (existing?.estado !== "pendiente") return false;
+  res.status(200).json(idempotencyOrderJson(existing, true));
+  return true;
+}
+
+function resolveOrderEnvio(draftEnvio, rawEnvio) {
+  if (typeof rawEnvio === "number" && Number.isFinite(rawEnvio) && rawEnvio >= 0) {
+    return Math.min(Math.round(rawEnvio * 100) / 100, DELIVERY_MAX_ENVIO_S);
+  }
+  return draftEnvio;
+}
+
+async function finalizeContraentregaOrder(supabase, orderId, decodedToken) {
+  const inserted = await fetchOrderOrThrow(supabase, orderId);
+  await discountOrderStock(supabase, inserted);
+  const stockMark = new Date().toISOString();
+  await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
+  await logAuditFn({
+    supabase,
+    accion: "descontar_stock_pedido",
+    entidad: "pedido",
+    entidadId: orderId,
+    entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
+    usuarioUid: decodedToken.uid,
+    usuarioEmail: strOr(decodedToken.email),
+    detalle: { source: "createOrder_cod", metodoPago: "contraentrega" },
+  });
+}
+
+async function handleCreateOrder(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Metodo no permitido" });
+  }
+
+  try {
+    const decodedToken = await verifyFirebaseUser(req);
+    const supabase = getSupabaseAdmin();
+    const { items, direccion, metodoPago, notas, envio: rawEnvio } = objOr(req.body);
+
+    if (!["stripe", "contraentrega"].includes(metodoPago)) {
+      return res.status(400).json({ error: "Metodo de pago invalido" });
+    }
+
+    const idempotencyKey = readIdempotencyKey(req);
+    if (await respondIdempotentPendingOrder(supabase, decodedToken.uid, idempotencyKey, res)) {
+      return;
+    }
+
+    const draft = await buildOrderDraft(supabase, items);
+    const envio = resolveOrderEnvio(draft.envio, rawEnvio);
+    const total = draft.subtotal + envio;
+    const creadoEn = new Date().toISOString();
+
+    const insertRow = {
+      userId: decodedToken.uid,
+      userEmail: strOr(decodedToken.email),
+      items: draft.items,
+      subtotal: draft.subtotal,
+      envio,
+      total,
+      estado: "pendiente",
+      direccion: normalizeAddress(direccion),
+      creadoEn,
+      metodoPago,
+      notas: normalizeOptionalText(notas, 600),
+    };
+    if (idempotencyKey) {
+      insertRow.idempotencyKey = idempotencyKey;
+    }
+
+    let { data, error } = await supabase.from("pedidos").insert(insertRow).select("id").single();
+
+    if (error?.code === "23505" && idempotencyKey) {
+      if (await respondIdempotentPendingOrder(supabase, decodedToken.uid, idempotencyKey, res)) {
+        return;
+      }
+    }
+
+    if (error || !data?.id) {
+      throw Object.assign(new Error("No se pudo crear el pedido"), { status: 500 });
+    }
+
+    const orderId = data.id;
+
+    if (metodoPago === "contraentrega") {
+      try {
+        await finalizeContraentregaOrder(supabase, orderId, decodedToken);
+      } catch (discountErr) {
+        await supabase.from("pedidos").delete().eq("id", orderId);
+        throw discountErr;
+      }
+    }
+
+    return res.status(200).json({
+      orderId,
+      subtotal: draft.subtotal,
+      envio,
+      total,
+      estado: "pendiente",
+    });
+  } catch (error) {
+    console.error("Create order error:", error);
+    return res.status(errorStatus(error)).json({ error: publicError(error) });
+  }
+}
+
 exports.createOrder = onRequest(
   { secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
-  async (req, res) => {
-    cors(req, res, async () => {
-      if (req.method !== "POST") {
-        return res.status(405).json({ error: "Metodo no permitido" });
-      }
-
-      try {
-        const decodedToken = await verifyFirebaseUser(req);
-        const supabase = getSupabaseAdmin();
-        const { items, direccion, metodoPago, notas, envio: rawEnvio } = objOr(req.body);
-
-        if (!["stripe", "contraentrega"].includes(metodoPago)) {
-          return res.status(400).json({ error: "Metodo de pago invalido" });
-        }
-
-        const normalizedAddress = normalizeAddress(direccion);
-        const normalizedNotes = normalizeOptionalText(notas, 600);
-        const idempotencyKey = readIdempotencyKey(req);
-        if (idempotencyKey) {
-          const existing = await findOrderByIdempotency(supabase, decodedToken.uid, idempotencyKey);
-          if (existing?.estado === "pendiente") {
-            return res.status(200).json(idempotencyOrderJson(existing, true));
-          }
-        }
-
-        const draft = await buildOrderDraft(supabase, items);
-        let envio = draft.envio;
-        if (typeof rawEnvio === "number" && Number.isFinite(rawEnvio) && rawEnvio >= 0) {
-          envio = Math.min(Math.round(rawEnvio * 100) / 100, DELIVERY_MAX_ENVIO_S);
-        }
-        const total = draft.subtotal + envio;
-        const creadoEn = new Date().toISOString();
-
-        const insertRow = {
-          userId: decodedToken.uid,
-          userEmail: strOr(decodedToken.email),
-          items: draft.items,
-          subtotal: draft.subtotal,
-          envio,
-          total,
-          estado: "pendiente",
-          direccion: normalizedAddress,
-          creadoEn,
-          metodoPago,
-          notas: normalizedNotes,
-        };
-        if (idempotencyKey) {
-          insertRow.idempotencyKey = idempotencyKey;
-        }
-
-        let { data, error } = await supabase.from("pedidos").insert(insertRow).select("id").single();
-
-        if (error?.code === "23505" && idempotencyKey) {
-          const existing = await findOrderByIdempotency(supabase, decodedToken.uid, idempotencyKey);
-          if (existing?.estado === "pendiente") {
-            return res.status(200).json(idempotencyOrderJson(existing, true));
-          }
-        }
-
-        if (error || !data?.id) {
-          throw Object.assign(new Error("No se pudo crear el pedido"), { status: 500 });
-        }
-
-        const orderId = data.id;
-
-        if (metodoPago === "contraentrega") {
-          try {
-            const inserted = await fetchOrderOrThrow(supabase, orderId);
-            await discountOrderStock(supabase, inserted);
-            const stockMark = new Date().toISOString();
-            await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
-            await logAuditFn({
-              supabase,
-              accion: "descontar_stock_pedido",
-              entidad: "pedido",
-              entidadId: orderId,
-              entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
-              usuarioUid: decodedToken.uid,
-              usuarioEmail: strOr(decodedToken.email),
-              detalle: { source: "createOrder_cod", metodoPago: "contraentrega" },
-            });
-          } catch (discountErr) {
-            await supabase.from("pedidos").delete().eq("id", orderId);
-            throw discountErr;
-          }
-        }
-
-        return res.status(200).json({
-          orderId,
-          subtotal: draft.subtotal,
-          envio,
-          total,
-          estado: "pendiente",
-        });
-      } catch (error) {
-        console.error("Create order error:", error);
-        return res.status(errorStatus(error)).json({ error: publicError(error) });
-      }
-    });
+  (req, res) => {
+    cors(req, res, () => handleCreateOrder(req, res));
   }
 );
 
@@ -525,137 +537,147 @@ exports.updateOrderStatus = onRequest(
   }
 );
 
+async function tryReturnReusedStripeSession(stripe, order, res) {
+  if (!order.stripeSessionId) return false;
+  try {
+    const existingSession = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+    const url = existingSession.url;
+    if (existingSession.status === "open" && typeof url === "string" && url.startsWith("https://")) {
+      res.status(200).json({ sessionId: existingSession.id, url, reused: true });
+      return true;
+    }
+  } catch (sessionErr) {
+    console.warn("Stripe session reuse skipped:", sessionErr?.message || sessionErr);
+  }
+  return false;
+}
+
+function buildStripeCheckoutLineItems(order) {
+  const lineItems = [];
+  for (const item of order.items) {
+    const quantity = toN(item?.quantity);
+    const price = toN(item?.product?.precio);
+    const name = strOr(item?.product?.nombre, "Producto");
+    const image = strOr(item?.product?.imagen);
+
+    if (!Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT || price <= 0) {
+      return { error: "Producto invalido en el pedido" };
+    }
+
+    lineItems.push({
+      price_data: {
+        currency: "pen",
+        product_data: { name, images: validStripeImage(image) },
+        unit_amount: toCents(price),
+      },
+      quantity,
+    });
+  }
+
+  const envio = toN(order.envio);
+  if (envio > 0) {
+    lineItems.push({
+      price_data: {
+        currency: "pen",
+        product_data: { name: "Costo de Envio" },
+        unit_amount: toCents(envio),
+      },
+      quantity: 1,
+    });
+  }
+
+  return { lineItems };
+}
+
+async function resolveStripeCheckoutUrl(stripe, session) {
+  let checkoutUrl = session.url;
+  if (!checkoutUrl && session.id) {
+    const retrieved = await stripe.checkout.sessions.retrieve(session.id);
+    checkoutUrl = retrieved.url;
+  }
+  return checkoutUrl;
+}
+
+async function handleCreateCheckoutSession(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Metodo no permitido" });
+  }
+
+  try {
+    const decodedToken = await verifyFirebaseUser(req);
+    const stripe = require("stripe")(STRIPE_SECRET.value());
+    const supabase = getSupabaseAdmin();
+    const { orderId } = objOr(req.body);
+
+    if (!orderId || typeof orderId !== "string") {
+      return res.status(400).json({ error: "Pedido invalido" });
+    }
+
+    const order = await fetchOrderOrThrow(supabase, orderId);
+
+    if (order.userId !== decodedToken.uid) {
+      return res.status(403).json({ error: "No puedes pagar este pedido" });
+    }
+    if (order.estado !== "pendiente" || order.metodoPago !== "stripe") {
+      return res.status(409).json({ error: "El pedido no esta disponible para pago" });
+    }
+    if (!hasValidOrderItems(order)) {
+      return res.status(400).json({ error: "Pedido sin productos validos" });
+    }
+
+    assertStoredTotals(order);
+    await assertOrderStockAvailability(supabase, order.items);
+
+    if (await tryReturnReusedStripeSession(stripe, order, res)) {
+      return;
+    }
+
+    const built = buildStripeCheckoutLineItems(order);
+    if (built.error) {
+      return res.status(400).json({ error: built.error });
+    }
+
+    const appUrl = strOr(process.env.APP_URL, "https://calzaturavilchez-ab17f.web.app");
+    const payerEmail = strOr(order.userEmail).trim();
+    const sessionPayload = {
+      payment_method_types: ["card"],
+      line_items: built.lineItems,
+      mode: "payment",
+      success_url: `${appUrl}/pedido-exitoso/${orderId}?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${appUrl}/checkout`,
+      metadata: { orderId, userId: decodedToken.uid },
+    };
+    if (payerEmail.includes("@")) {
+      sessionPayload.customer_email = payerEmail;
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionPayload);
+    await updateOrder(supabase, orderId, { stripeSessionId: session.id });
+
+    const checkoutUrl = await resolveStripeCheckoutUrl(stripe, session);
+    if (!checkoutUrl || typeof checkoutUrl !== "string" || !checkoutUrl.startsWith("https://")) {
+      console.error("Stripe checkout session sin URL", {
+        sessionId: session.id,
+        ui_mode: session.ui_mode,
+        status: session.status,
+      });
+      return res.status(500).json({
+        error:
+          "Stripe no devolvio el enlace de pago (session.url). Revisa la cuenta Stripe y los logs del servidor.",
+      });
+    }
+
+    return res.status(200).json({ sessionId: session.id, url: checkoutUrl });
+  } catch (error) {
+    console.error("Stripe error:", error);
+    return res.status(errorStatus(error)).json({ error: publicError(error) });
+  }
+}
+
 exports.createCheckoutSession = onRequest(
   { secrets: [STRIPE_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
-  async (req, res) => {
-    cors(req, res, async () => {
-      if (req.method !== "POST") {
-        return res.status(405).json({ error: "Metodo no permitido" });
-      }
-
-      try {
-        const decodedToken = await verifyFirebaseUser(req);
-        const stripe = require("stripe")(STRIPE_SECRET.value());
-        const supabase = getSupabaseAdmin();
-        const { orderId } = objOr(req.body);
-
-        if (!orderId || typeof orderId !== "string") {
-          return res.status(400).json({ error: "Pedido invalido" });
-        }
-
-        const order = await fetchOrderOrThrow(supabase, orderId);
-
-        if (order.userId !== decodedToken.uid) {
-          return res.status(403).json({ error: "No puedes pagar este pedido" });
-        }
-        if (order.estado !== "pendiente" || order.metodoPago !== "stripe") {
-          return res.status(409).json({ error: "El pedido no esta disponible para pago" });
-        }
-        if (!hasValidOrderItems(order)) {
-          return res.status(400).json({ error: "Pedido sin productos validos" });
-        }
-
-        assertStoredTotals(order);
-        await assertOrderStockAvailability(supabase, order.items);
-
-        if (order.stripeSessionId) {
-          try {
-            const existingSession = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
-            if (
-              existingSession.status === "open" &&
-              typeof existingSession.url === "string" &&
-              existingSession.url.startsWith("https://")
-            ) {
-              return res.status(200).json({
-                sessionId: existingSession.id,
-                url: existingSession.url,
-                reused: true,
-              });
-            }
-          } catch (sessionErr) {
-            console.warn("Stripe session reuse skipped:", sessionErr?.message || sessionErr);
-          }
-        }
-
-        const lineItems = [];
-
-        for (const item of order.items) {
-          const quantity = toN(item?.quantity);
-          const price = toN(item?.product?.precio);
-          const name = strOr(item?.product?.nombre, "Producto");
-          const image = strOr(item?.product?.imagen);
-
-          if (!Number.isInteger(quantity) || quantity <= 0 || quantity > ORDER_QTY_LIMIT || price <= 0) {
-            return res.status(400).json({ error: "Producto invalido en el pedido" });
-          }
-
-          lineItems.push({
-            price_data: {
-              currency: "pen",
-              product_data: {
-                name,
-                images: validStripeImage(image),
-              },
-              unit_amount: toCents(price),
-            },
-            quantity,
-          });
-        }
-
-        const envio = toN(order.envio);
-        if (envio > 0) {
-          lineItems.push({
-            price_data: {
-              currency: "pen",
-              product_data: { name: "Costo de Envio" },
-              unit_amount: toCents(envio),
-            },
-            quantity: 1,
-          });
-        }
-
-        const appUrl = strOr(process.env.APP_URL, "https://calzaturavilchez-ab17f.web.app");
-
-        const payerEmail = strOr(order.userEmail).trim();
-        const sessionPayload = {
-          payment_method_types: ["card"],
-          line_items: lineItems,
-          mode: "payment",
-          success_url: `${appUrl}/pedido-exitoso/${orderId}?session_id={CHECKOUT_SESSION_ID}`,
-          cancel_url: `${appUrl}/checkout`,
-          metadata: { orderId, userId: decodedToken.uid },
-        };
-        if (payerEmail.includes("@")) {
-          sessionPayload.customer_email = payerEmail;
-        }
-
-        const session = await stripe.checkout.sessions.create(sessionPayload);
-
-        await updateOrder(supabase, orderId, { stripeSessionId: session.id });
-
-        let checkoutUrl = session.url;
-        if (!checkoutUrl && session.id) {
-          const retrieved = await stripe.checkout.sessions.retrieve(session.id);
-          checkoutUrl = retrieved.url;
-        }
-        if (!checkoutUrl || typeof checkoutUrl !== "string" || !checkoutUrl.startsWith("https://")) {
-          console.error("Stripe checkout session sin URL", {
-            sessionId: session.id,
-            ui_mode: session.ui_mode,
-            status: session.status,
-          });
-          return res.status(500).json({
-            error:
-              "Stripe no devolvio el enlace de pago (session.url). Revisa la cuenta Stripe y los logs del servidor.",
-          });
-        }
-
-        return res.status(200).json({ sessionId: session.id, url: checkoutUrl });
-      } catch (error) {
-        console.error("Stripe error:", error);
-        return res.status(errorStatus(error)).json({ error: publicError(error) });
-      }
-    });
+  (req, res) => {
+    cors(req, res, () => handleCreateCheckoutSession(req, res));
   }
 );
 

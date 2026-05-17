@@ -54,10 +54,18 @@ function formatChartBarLabel(n: number) {
   return `S/ ${Math.round(n)}`;
 }
 
+function chartYAxisStep(maxVal: number): number {
+  if (maxVal <= 80) return 20;
+  if (maxVal <= 200) return 50;
+  if (maxVal <= 600) return 100;
+  if (maxVal <= 1500) return 250;
+  return 500;
+}
+
 function chartScaleMax(values: number[]): number {
   const maxVal = Math.max(...values, 0);
   if (maxVal <= 0) return 100;
-  const step = maxVal <= 80 ? 20 : maxVal <= 200 ? 50 : maxVal <= 600 ? 100 : maxVal <= 1500 ? 250 : 500;
+  const step = chartYAxisStep(maxVal);
   return Math.ceil(maxVal / step) * step;
 }
 

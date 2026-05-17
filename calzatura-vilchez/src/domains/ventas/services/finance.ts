@@ -88,30 +88,26 @@ async function fetchDailySalesViaBff(params: { fecha?: string; sinceDays?: numbe
   }
 }
 
-async function fetchDailySalesFromSupabase(date?: string): Promise<DailySale[] | null> {
+function isIgnorableDailySalesRpcError(message: string | undefined, rpcName: string): boolean {
+  return new RegExp(`${rpcName}|PGRST202`, "i").test(message ?? "");
+}
+
+async function fetchDailySalesRpc(date?: string): Promise<DailySale[] | null> {
   if (date) {
-    const { data: rpcData, error: rpcError } = await supabase.rpc("list_ventas_diarias_by_fecha", {
-      p_fecha: date,
-    });
-    if (!rpcError && Array.isArray(rpcData)) {
-      return sortDailySales(rpcData as DailySale[]);
-    }
-    if (rpcError && !/list_ventas_diarias_by_fecha|PGRST202/i.test(rpcError.message ?? "")) {
-      throw rpcError;
-    }
-  } else {
-    const desde = sinceISO(90);
-    const { data: rpcData, error: rpcError } = await supabase.rpc("list_ventas_diarias_since", {
-      p_fecha_desde: desde,
-    });
-    if (!rpcError && Array.isArray(rpcData)) {
-      return sortDailySales(rpcData as DailySale[]);
-    }
-    if (rpcError && !/list_ventas_diarias_since|PGRST202/i.test(rpcError.message ?? "")) {
-      throw rpcError;
-    }
+    const { data, error } = await supabase.rpc("list_ventas_diarias_by_fecha", { p_fecha: date });
+    if (!error && Array.isArray(data)) return sortDailySales(data as DailySale[]);
+    if (error && !isIgnorableDailySalesRpcError(error.message, "list_ventas_diarias_by_fecha")) throw error;
+    return null;
   }
 
+  const desde = sinceISO(90);
+  const { data, error } = await supabase.rpc("list_ventas_diarias_since", { p_fecha_desde: desde });
+  if (!error && Array.isArray(data)) return sortDailySales(data as DailySale[]);
+  if (error && !isIgnorableDailySalesRpcError(error.message, "list_ventas_diarias_since")) throw error;
+  return null;
+}
+
+async function fetchDailySalesTable(date?: string): Promise<DailySale[] | null> {
   let query = supabase.from(SALES_COL).select("*");
   if (date) {
     query = query.eq("fecha", date);
@@ -121,6 +117,12 @@ async function fetchDailySalesFromSupabase(date?: string): Promise<DailySale[] |
   const { data, error } = await query;
   if (error) return null;
   return sortDailySales((data ?? []) as DailySale[]);
+}
+
+async function fetchDailySalesFromSupabase(date?: string): Promise<DailySale[] | null> {
+  const fromRpc = await fetchDailySalesRpc(date);
+  if (fromRpc) return fromRpc;
+  return fetchDailySalesTable(date);
 }
 
 /** Ventas en tienda física: BFF (service role) primero; fallback Supabase RPC / SELECT. */

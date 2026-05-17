@@ -88,9 +88,7 @@ function RouteLayers(props: RouteLayersProps) {
   const groupRef = useRef<L.LayerGroup | null>(null);
 
   useEffect(() => {
-    if (!groupRef.current) {
-      groupRef.current = L.layerGroup().addTo(map);
-    }
+    groupRef.current ??= L.layerGroup().addTo(map);
     const group = groupRef.current;
     group.clearLayers();
 
