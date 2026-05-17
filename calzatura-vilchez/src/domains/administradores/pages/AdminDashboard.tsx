@@ -339,11 +339,10 @@ export default function AdminDashboard() {
   const [loadError, setLoadError] = useState(false);
   const [auditError, setAuditError] = useState(false);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
-  const last7Days = getLast7Days();
-
-  const loadDashboard = useCallback(() => {
+  const loadDashboard = useCallback((options?: { showLoading?: boolean }) => {
     const today = todayISO();
-    setLoading(true);
+    const last7Days = getLast7Days();
+    if (options?.showLoading) setLoading(true);
     setLoadError(false);
     void fetchRecentAudit(10).then(setAuditLog).catch(() => setAuditError(true));
 
@@ -378,12 +377,20 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    void loadDashboard();
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (!cancelled) void loadDashboard();
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [loadDashboard]);
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === "visible") void loadDashboard();
+      if (document.visibilityState === "visible") {
+        void loadDashboard({ showLoading: false });
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);

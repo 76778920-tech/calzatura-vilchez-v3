@@ -252,8 +252,9 @@ function DeliveryMapSection(
   } = props;
   const [mapMounted, setMapMounted] = useState(showDeliveryMap);
   useEffect(() => {
-    if (showDeliveryMap) setMapMounted(true);
-  }, [showDeliveryMap]);
+    if (!showDeliveryMap || mapMounted) return;
+    queueMicrotask(() => setMapMounted(true));
+  }, [showDeliveryMap, mapMounted]);
 
   if (!mapMounted) return null;
 
