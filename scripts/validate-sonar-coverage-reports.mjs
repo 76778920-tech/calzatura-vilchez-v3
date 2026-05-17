@@ -30,6 +30,7 @@ if (badSf.length > 0) {
 const requiredTs = [
   "src/utils/stock.ts",
   "src/domains/productos/utils/commercialRules.ts",
+  "src/domains/administradores/utils/adminDashboardMetrics.ts",
 ];
 for (const rel of requiredTs) {
   const sf = `SF:calzatura-vilchez/${rel}`;
