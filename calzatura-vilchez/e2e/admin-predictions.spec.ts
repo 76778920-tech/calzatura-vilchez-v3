@@ -56,6 +56,8 @@ const MOCK_COMBINED_RESPONSE = {
       campaign_values: ["nueva-temporada"],
       data_hash: "abc123def4567890",
       model_type: "random_forest",
+      data_sufficient: true,
+      ml_active: true,
     },
   },
   revenue: null,
@@ -249,7 +251,7 @@ test.describe("admin predicciones → cold start y carga exitosa", () => {
     await expect(page.locator(".ire-variable-tags span", { hasText: "Inicio escolar" })).toBeVisible();
   });
 
-  test("data_sufficient false oculta banner, IRE proyectado y proyecciones ML (TC-PRED-003)", async ({ page }) => {
+  test("data_sufficient false muestra banner operativo, oculta IRE proyectado y ML (TC-PRED-003)", async ({ page }) => {
     await setupAISuccess(page, MOCK_COMBINED_INSUFFICIENT);
     await goToPredictions(page);
 
@@ -257,6 +259,9 @@ test.describe("admin predicciones → cold start y carga exitosa", () => {
     await expect(page.getByText(/Pocos productos con ventas/i)).toBeVisible();
     await expect(page.getByText("IRE proyectado a")).toHaveCount(0);
     await expect(page.getByText("requiere más historial de ventas")).toBeVisible();
-    await expect(page.getByText("Zapatilla E2E Pred", { exact: true })).toBeVisible();
+
+    await page.getByRole("tab", { name: /Ventas/i }).click();
+    await expect(page.locator(".pred-product-name").getByText("Zapatilla E2E Pred", { exact: true })).toBeVisible();
+    await expect(page.locator(".pred-table").getByText("—").first()).toBeVisible();
   });
 });

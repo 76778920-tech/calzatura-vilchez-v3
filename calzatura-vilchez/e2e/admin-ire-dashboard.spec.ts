@@ -100,10 +100,27 @@ const MOCK_IRE_HISTORIAL = [
   { fecha: "2026-05-02", score: 18, nivel: "bajo", version: "1.1.0", dimensiones: { riesgo_stock: 15, riesgo_ingresos: 20, riesgo_demanda: 18 }, detalle: { total_con_historial: 4 } },
 ];
 
+const MOCK_MODELO_META_SUFFICIENT = {
+  n_samples: 90,
+  n_products: 1,
+  date_range_start: "2026-04-01",
+  date_range_end: "2026-05-01",
+  random_state: 42,
+  sklearn_version: "1.5.0",
+  feature_cols: ["lag_7", "lag_30"],
+  feature_importances: [] as { feature: string; importance: number }[],
+  feature_stats: {} as Record<string, { mean: number; std: number }>,
+  data_hash: "ire-e2e-hash",
+  model_type: "random_forest" as const,
+  data_sufficient: true,
+  ml_active: true,
+};
+
 function buildCombinedResponse(opts: {
   ire?: typeof MOCK_IRE_BAJO | null;
   ire_proyectado?: typeof MOCK_IRE_PROYECTADO | null;
   ire_historial?: typeof MOCK_IRE_HISTORIAL | null;
+  modelo_meta?: typeof MOCK_MODELO_META_SUFFICIENT | null;
 }) {
   return {
     demand: {
@@ -124,6 +141,11 @@ function buildCombinedResponse(opts: {
           alerta_stock: false,
           alta_demanda: false,
           sin_historial: false,
+          ventas_7_dias: 8,
+          ventas_30_dias: 30,
+          consumo_diario_7: 1.1,
+          consumo_diario_30: 1.0,
+          promedio_diario_historico: 1.0,
           feature_importance: [],
           ventas_semanales: [],
           revenue_projection: null,
@@ -134,6 +156,7 @@ function buildCombinedResponse(opts: {
       ],
       model_version: "rf-v2",
       generated_at: "2026-05-04T12:00:00Z",
+      modelo_meta: opts.modelo_meta === undefined ? MOCK_MODELO_META_SUFFICIENT : opts.modelo_meta,
     },
     revenue: null,
     ire: opts.ire ?? null,
@@ -307,10 +330,16 @@ test.describe("admin predicciones → tarjeta IRE y sparkline", () => {
     await setupAIMock(page, response);
     await goToPredictions(page);
 
-    // Esperar que la página cargue (tabla de predicciones)
-    await expect(page.getByText("Zapatilla IRE E2E")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole("heading", { name: /Inteligencia Artificial/i })).toBeVisible({
+      timeout: 20_000,
+    });
 
-    // La tarjeta hero del IRE no debe estar visible
+    // La tarjeta hero del IRE no debe estar visible cuando el API no envía `ire`
     await expect(page.locator(".ire-hero")).not.toBeVisible();
+    await expect(page.getByText("Índice de Riesgo Empresarial")).not.toBeVisible();
+
+    await expect(page.getByText(/Con historial:\s*1/i)).toBeVisible();
+    await page.getByRole("tab", { name: /Ventas/i }).click();
+    await expect(page.locator(".pred-product-name").getByText("Zapatilla IRE E2E", { exact: true })).toBeVisible();
   });
 });
