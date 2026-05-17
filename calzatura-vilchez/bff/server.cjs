@@ -1203,9 +1203,31 @@ app.post("/updateOrderStatus", (req, res) => {
         return res.status(400).json({ error: "Estado invalido" });
       }
 
+      const order = await fetchOrderOrThrow(supabase, orderId);
       const patch = { estado };
       if (estado === "pagado") {
         patch.pagadoEn = new Date().toISOString();
+        if (!order.stockDescontadoEn) {
+          try {
+            await discountOrderStock(supabase, order);
+            patch.stockDescontadoEn = new Date().toISOString();
+            await logAuditFn(
+              supabase,
+              "descontar_stock_pedido",
+              "pedido",
+              orderId,
+              `#${orderId.slice(-8).toUpperCase()}`,
+              decodedToken.uid,
+              decodedToken.email || "",
+              { source: "updateOrderStatus_pagado", metodoPago: order.metodoPago },
+            );
+          } catch (discountErr) {
+            console.error("updateOrderStatus stock discount:", discountErr?.message || discountErr);
+            return res.status(409).json({
+              error: "No se pudo descontar stock. Revisa inventario antes de marcar como pagado.",
+            });
+          }
+        }
       }
 
       await updateOrder(supabase, orderId, patch);
@@ -1224,6 +1246,142 @@ app.post("/updateOrderStatus", (req, res) => {
       return res.status(200).json({ orderId, estado });
     } catch (error) {
       console.error("Update order status error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+    });
+});
+
+function handleAdminRpcError(error) {
+  const msg = String(error?.message || error || "");
+  if (msg.includes("product_not_found")) {
+    throw Object.assign(new Error("Producto no encontrado"), { status: 404 });
+  }
+  if (msg.includes("function") && msg.includes("does not exist")) {
+    throw Object.assign(
+      new Error("Migraciones de Supabase pendientes (RPC de productos)."),
+      { status: 503 },
+    );
+  }
+  throw error;
+}
+
+app.post("/updateProductAtomic", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const { p_id, product, codigo, finanzas } = req.body || {};
+      if (!p_id || typeof p_id !== "string" || !product || !codigo || !finanzas) {
+        return res.status(400).json({ error: "Datos de producto incompletos" });
+      }
+      const { error } = await supabase.rpc("update_product_atomic", {
+        p_id,
+        product,
+        codigo,
+        finanzas,
+      });
+      if (error) handleAdminRpcError(error);
+      await logAuditFn(
+        supabase,
+        "editar",
+        "producto",
+        p_id,
+        product.nombre || p_id,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { source: "updateProductAtomic" },
+      );
+      return res.status(200).json({ ok: true, id: p_id });
+    } catch (error) {
+      console.error("updateProductAtomic error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/createProductVariantsAtomic", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const { variants } = req.body || {};
+      if (!Array.isArray(variants) || variants.length === 0) {
+        return res.status(400).json({ error: "Variantes invalidas" });
+      }
+      const { data, error } = await supabase.rpc("create_product_variants_atomic", { variants });
+      if (error) handleAdminRpcError(error);
+      const ids = (data?.ids ?? []) as string[];
+      return res.status(200).json({ ok: true, ids });
+    } catch (error) {
+      console.error("createProductVariantsAtomic error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/deleteProductAtomic", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const { p_id } = req.body || {};
+      if (!p_id || typeof p_id !== "string") {
+        return res.status(400).json({ error: "Producto invalido" });
+      }
+      const { error } = await supabase.rpc("delete_product_atomic", { p_id });
+      if (error) handleAdminRpcError(error);
+      return res.status(200).json({ ok: true, id: p_id });
+    } catch (error) {
+      console.error("deleteProductAtomic error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/registrarIngresoStock", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const {
+        p_product_id,
+        p_talla_stock,
+        p_costo_unitario,
+        p_proveedor,
+        p_observaciones,
+        p_registrado_por,
+      } = req.body || {};
+      if (!p_product_id || !p_talla_stock) {
+        return res.status(400).json({ error: "Datos de ingreso incompletos" });
+      }
+      const { data, error } = await supabase.rpc("registrar_ingreso_stock", {
+        p_product_id,
+        p_talla_stock,
+        p_costo_unitario: p_costo_unitario ?? null,
+        p_proveedor: p_proveedor || null,
+        p_observaciones: p_observaciones || null,
+        p_registrado_por: p_registrado_por || decodedToken.email || null,
+      });
+      if (error) handleAdminRpcError(error);
+      return res.status(200).json(data);
+    } catch (error) {
+      console.error("registrarIngresoStock error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });

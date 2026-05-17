@@ -476,9 +476,31 @@ exports.updateOrderStatus = onRequest(
           return res.status(400).json({ error: "Estado invalido" });
         }
 
+        const order = await fetchOrderOrThrow(supabase, orderId);
         const patch = { estado };
         if (estado === "pagado") {
           patch.pagadoEn = new Date().toISOString();
+          if (!order.stockDescontadoEn) {
+            try {
+              await discountOrderStock(supabase, order);
+              patch.stockDescontadoEn = new Date().toISOString();
+              await logAuditFn({
+                supabase,
+                accion: "descontar_stock_pedido",
+                entidad: "pedido",
+                entidadId: orderId,
+                entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
+                usuarioUid: decodedToken.uid,
+                usuarioEmail: strOr(decodedToken.email),
+                detalle: { source: "updateOrderStatus_pagado", metodoPago: order.metodoPago },
+              });
+            } catch (discountErr) {
+              console.error("updateOrderStatus stock discount:", discountErr?.message || discountErr);
+              return res.status(409).json({
+                error: "No se pudo descontar stock. Revisa inventario antes de marcar como pagado.",
+              });
+            }
+          }
         }
 
         await updateOrder(supabase, orderId, patch);

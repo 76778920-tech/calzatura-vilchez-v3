@@ -1,5 +1,6 @@
 import { supabase } from "@/supabase/client";
 import { logAudit } from "@/services/audit";
+import { postAdminBff } from "@/domains/productos/services/adminProductsBff";
 import type { Product } from "@/types";
 import { effectiveFamiliaKey, tallyFamilyGroupSizes } from "@/utils/productFamily";
 
@@ -113,11 +114,9 @@ export async function createProductVariantsAtomic(
     codigo,
     finanzas,
   }));
-  const { data, error } = await supabase.rpc("create_product_variants_atomic", {
+  const { ids } = await postAdminBff<{ ids: string[] }>("/createProductVariantsAtomic", {
     variants: payload,
   });
-  if (error) throw error;
-  const ids = (data as { ids: string[] }).ids;
   ids.forEach((id, i) => {
     void logAudit("crear", "producto", id, variants[i].product.nombre);
   });
@@ -150,21 +149,17 @@ export async function updateProductAtomic(
   codigo: string,
   finanzas: ProductEditFinancials
 ): Promise<void> {
-  const { error } = await supabase.rpc("update_product_atomic", {
+  await postAdminBff("/updateProductAtomic", {
     p_id: id,
     product,
     codigo,
     finanzas,
   });
-  if (error) throw error;
   void logAudit("editar", "producto", id, product.nombre, { campos: Object.keys(product) });
 }
 
 export async function deleteProductAtomic(id: string, nombre?: string): Promise<void> {
-  const { error } = await supabase.rpc("delete_product_atomic", {
-    p_id: id,
-  });
-  if (error) throw error;
+  await postAdminBff("/deleteProductAtomic", { p_id: id });
   void logAudit("eliminar", "producto", id, nombre ?? id);
 }
 
@@ -177,16 +172,17 @@ export async function registrarIngresoStock(
   observaciones?: string,
   registradoPor?: string,
 ): Promise<{ cantidad: number; tallaStock: Record<string, number> }> {
-  const { data, error } = await supabase.rpc("registrar_ingreso_stock", {
-    p_product_id:     productId,
-    p_talla_stock:    tallaStock,
-    p_costo_unitario: costoUnitario ?? null,
-    p_proveedor:      proveedor     || null,
-    p_observaciones:  observaciones || null,
-    p_registrado_por: registradoPor || null,
-  });
-  if (error) throw error;
-  const result = data as { ok: boolean; cantidad: number; tallaStock: Record<string, number> };
+  const result = await postAdminBff<{ ok: boolean; cantidad: number; tallaStock: Record<string, number> }>(
+    "/registrarIngresoStock",
+    {
+      p_product_id: productId,
+      p_talla_stock: tallaStock,
+      p_costo_unitario: costoUnitario ?? null,
+      p_proveedor: proveedor || null,
+      p_observaciones: observaciones || null,
+      p_registrado_por: registradoPor || null,
+    },
+  );
   void logAudit("editar", "producto", productId, productNombre, {
     accion: "ingreso_stock",
     cantidad: result.cantidad,

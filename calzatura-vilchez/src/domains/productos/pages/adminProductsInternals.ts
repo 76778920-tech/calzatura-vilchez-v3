@@ -515,7 +515,7 @@ export async function runAdminProductSaveFlow(ctx: AdminProductSaveFlowContext):
       toast.success(`${batch.variantCount} variante(s) creadas`);
     }
     closeModal();
-    load();
+    await load();
   } catch (err: unknown) {
     toast.error(toastFromSaveError(err));
   } finally {
