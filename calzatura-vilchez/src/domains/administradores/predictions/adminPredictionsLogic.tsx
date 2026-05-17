@@ -10,6 +10,7 @@ import {
   Zap,
 } from "lucide-react";
 import { motion, animate } from "framer-motion";
+import { assistantReplyWhenDemandUnavailable } from "./predictionDataQuality";
 
 export interface Prediction {
   productId: string;
@@ -41,6 +42,8 @@ export interface Prediction {
   nivel_riesgo: "critico" | "atencion" | "vigilancia" | "estable" | "sin_historial";
   alerta_stock: boolean;
   sin_historial: boolean;
+  /** true cuando el dataset global no alcanza para ML: la UI no debe mostrar proyecciones de demanda. */
+  demanda_ml_oculta?: boolean;
   talla_stock?: Record<string, number> | null;
   talla_residual?: boolean | null;
   stock_inicial_estimado?: number | null;
@@ -368,6 +371,12 @@ export function AnimatedKpi({
 
 export function isOverstocked(product: Prediction) {
   if (product.sin_historial || product.stock_actual <= 0 || product.consumo_estimado_diario <= 0) return false;
+  if (product.demanda_ml_oculta) {
+    return (
+      (product.dias_hasta_agotarse >= 120 && product.stock_actual >= 15) ||
+      (product.ventas_30_dias <= 6 && product.stock_actual >= 12)
+    );
+  }
   return (
     (product.dias_hasta_agotarse >= 120 && product.stock_actual >= 15) ||
     product.stock_actual >= Math.max(product.prediccion_unidades * 2.5, 25) ||
@@ -377,6 +386,9 @@ export function isOverstocked(product: Prediction) {
 
 export function isSlowMoving(product: Prediction) {
   if (product.sin_historial || product.stock_actual <= 0) return false;
+  if (product.demanda_ml_oculta) {
+    return product.consumo_estimado_diario <= 0.35 || product.ventas_30_dias <= 6;
+  }
   return (
     product.consumo_estimado_diario <= 0.35 ||
     (product.tendencia === "bajando" && product.stock_actual >= Math.max(product.prediccion_unidades * 1.5, 12)) ||
@@ -384,15 +396,22 @@ export function isSlowMoving(product: Prediction) {
   );
 }
 
-export function generarRecomendaciónes(predictions: Prediction[]): Recomendación[] {
+export function generarRecomendaciónes(
+  predictions: Prediction[],
+  options?: { demandMetricsAvailable?: boolean },
+): Recomendación[] {
   const recs: Recomendación[] = [];
+  const mlDemand = options?.demandMetricsAvailable !== false;
 
   for (const p of predictions.filter((item) => !item.sin_historial)) {
-    if (p.stock_actual === 0 && p.alta_demanda) {
+    const rotacionFuerte = mlDemand ? p.alta_demanda : p.ventas_30_dias >= 12 && p.consumo_estimado_diario >= 0.8;
+    if (p.stock_actual === 0 && rotacionFuerte) {
       recs.push({
         tipo: "urgente",
         titulo: "Producto estrella sin stock",
-        detalle: `"${p.nombre}" ya no tiene unidades y mantiene alta rotación.`,
+        detalle: mlDemand
+          ? `"${p.nombre}" ya no tiene unidades y mantiene alta rotación.`
+          : `"${p.nombre}" ya no tiene unidades y sigue vendiendo según el historial reciente.`,
         accion: "Repone hoy mismo o reserva nuevo ingreso con el proveedor.",
         producto: p.nombre,
         productId: p.productId,
@@ -404,7 +423,9 @@ export function generarRecomendaciónes(predictions: Prediction[]): Recomendaci�
       recs.push({
         tipo: "urgente",
         titulo: "Riesgo alto de agotarse",
-        detalle: `"${p.nombre}" tiene alta demanda y cobertura para solo ~${p.dias_hasta_agotarse} días.`,
+        detalle: mlDemand
+          ? `"${p.nombre}" tiene alta demanda y cobertura para solo ~${p.dias_hasta_agotarse} días.`
+          : `"${p.nombre}" tiene cobertura histórica para solo ~${p.dias_hasta_agotarse} días según ventas recientes.`,
         accion: "Prioriza este producto en el siguiente pedido.",
         producto: p.nombre,
         productId: p.productId,
@@ -424,7 +445,7 @@ export function generarRecomendaciónes(predictions: Prediction[]): Recomendaci�
       continue;
     }
 
-    if (p.alta_demanda && p.tendencia === "subiendo") {
+    if (mlDemand && p.alta_demanda && p.tendencia === "subiendo") {
       recs.push({
         tipo: "oportunidad",
         titulo: "Demanda en alza",
@@ -436,7 +457,12 @@ export function generarRecomendaciónes(predictions: Prediction[]): Recomendaci�
       continue;
     }
 
-    if (p.tendencia === "bajando" && p.stock_actual > p.prediccion_unidades * 2) {
+    if (
+      p.tendencia === "bajando"
+      && (mlDemand
+        ? p.prediccion_unidades > 0 && p.stock_actual > p.prediccion_unidades * 2
+        : p.stock_actual > Math.max(p.ventas_30_dias, 8))
+    ) {
       recs.push({
         tipo: "tranquilo",
         titulo: "No hace falta pedir más todavía",
@@ -552,7 +578,8 @@ export function buildAssistantContextV2(predictions: Prediction[]): AssistantCon
   const estables = withHistory.filter((p) => p.tendencia === "estable");
   const overstocked = withHistory.filter(isOverstocked);
   const slowMoving = withHistory.filter(isSlowMoving);
-  const recomendaciones = generarRecomendaciónes(predictions);
+  const demandMetricsAvailable = !predictions.some((p) => p.demanda_ml_oculta && !p.sin_historial);
+  const recomendaciones = generarRecomendaciónes(predictions, { demandMetricsAvailable });
 
   const topByRisk = [...withHistory]
     .filter((p) => p.stock_actual === 0 || p.alerta_stock || p.nivel_riesgo === "critico" || p.nivel_riesgo === "atencion")
@@ -620,9 +647,13 @@ function predictionDisplayLabel(product: Pick<Prediction, "nombre" | "codigo">):
   return `${product.nombre}${codigoSuffix}`;
 }
 
-export function buildProductDetailResponseV2(product: Prediction) {
+export function buildProductDetailResponseV2(
+  product: Prediction,
+  options?: { demandMetricsAvailable?: boolean; insufficientReason?: string },
+) {
   const label = predictionDisplayLabel(product);
   const coverage = productDetailCoverageDescrV2(product);
+  const demandOk = options?.demandMetricsAvailable !== false && !product.demanda_ml_oculta;
 
   if (product.sin_historial) {
     const categoriaStock = product.categoria ? ` dentro de la categoría ${product.categoria}` : "";
@@ -638,7 +669,7 @@ export function buildProductDetailResponseV2(product: Prediction) {
 
   const recommendation = productDetailRecommendationV2(product);
 
-  return [
+  const lines = [
     `Producto analizado: ${label}`,
     "",
     "Resumen ejecutivo:",
@@ -648,19 +679,36 @@ export function buildProductDetailResponseV2(product: Prediction) {
     `- Categoría: ${product.categoria || "Sin categoría"}`,
     `- Ventas últimos 7 días: ${formatUnits(product.ventas_7_dias)} unidades`,
     `- Ventas últimos 30 días: ${formatUnits(product.ventas_30_dias)} unidades`,
-    `- Consumo estimado diario: ${formatUnits(product.consumo_estimado_diario)} unidades`,
-    `- Proyección próxima semana: ${formatUnits(product.prediccion_semanal)} unidades`,
-    `- Proyección del horizonte actual: ${formatUnits(product.prediccion_unidades)} unidades`,
-    `- Tendencia: ${product.tendencia}`,
-    `- Nivel de riesgo: ${product.nivel_riesgo}`,
-    `- Confianza del cálculo: ${product.confianza}%`,
+    `- Ritmo histórico (promedio diario): ${formatUnits(Math.max(product.promedio_diario_historico, product.consumo_diario_30, 0))} unidades`,
+  ];
+
+  if (demandOk) {
+    lines.push(
+      `- Consumo estimado diario: ${formatUnits(product.consumo_estimado_diario)} unidades`,
+      `- Proyección próxima semana: ${formatUnits(product.prediccion_semanal)} unidades`,
+      `- Proyección del horizonte actual: ${formatUnits(product.prediccion_unidades)} unidades`,
+      `- Tendencia: ${product.tendencia}`,
+      `- Nivel de riesgo: ${product.nivel_riesgo}`,
+      `- Confianza del cálculo: ${product.confianza}%`,
+    );
+  } else {
+    const why = options?.insufficientReason?.trim() || "Datos insuficientes para el modelo de demanda.";
+    lines.push(
+      `- Proyecciones ML: no disponibles (${why})`,
+      `- Cobertura estimada (solo ventas históricas): ${coverage}`,
+    );
+  }
+
+  lines.push(
     "",
     "Interpretación:",
-    productDetailTrendInterpretV2(product.tendencia),
+    demandOk ? productDetailTrendInterpretV2(product.tendencia) : "Sin historial de entrenamiento suficiente a nivel negocio; usa ventas recientes y stock para decidir reposición.",
     "",
     "Recomendación:",
-    recommendation,
-  ].join("\n");
+    demandOk ? recommendation : "Registra más ventas en tienda y pedidos completados antes de basar compras en proyecciones automáticas.",
+  );
+
+  return lines.join("\n");
 }
 
 const ASSISTANT_V2_RISK_TERMS = [
@@ -808,11 +856,20 @@ export type AssistantV2Shared = {
   intentScores: AssistantIntentScoresV2;
   asksRevenue: boolean;
   mentionedProducts: Prediction[];
+  demandMetricsAvailable: boolean;
+  insufficientReason: string;
 };
+
+function assistantV2ProductDetailOptions(shared: AssistantV2Shared) {
+  return {
+    demandMetricsAvailable: shared.demandMetricsAvailable,
+    insufficientReason: shared.insufficientReason,
+  };
+}
 
 export function assistantV2TrySingleProduct(shared: AssistantV2Shared): string | null {
   if (shared.intentScores.product >= 3 && shared.mentionedProducts.length === 1) {
-    return buildProductDetailResponseV2(shared.mentionedProducts[0]);
+    return buildProductDetailResponseV2(shared.mentionedProducts[0], assistantV2ProductDetailOptions(shared));
   }
   return null;
 }
@@ -1157,6 +1214,14 @@ export function assistantV2TryTrend(shared: AssistantV2Shared): string | null {
     lines.push(`En ingresos, la tendencia general está ${assistantV2TrendText(revenueForecast.summary.tendencia)} y la proyección del horizonte actual (${revenueForecast.horizon_days} días) es ${formatCurrency(revenueForecast.summary.proximo_horizonte)}.`);
   }
 
+  if (!shared.demandMetricsAvailable) {
+    lines.push(
+      "",
+      "Nota:",
+      "Estas tendencias se calculan solo con ventas históricas (7 vs 30 días), no con proyecciones del modelo ML.",
+    );
+  }
+
   lines.push("", "Interpretación:", "En términos simples: la tendencia te ayuda a ver si conviene acelerar compras, mantenerte igual o ser más conservador.");
   return lines.join("\n");
 }
@@ -1174,13 +1239,17 @@ export function assistantV2TrySummary(shared: AssistantV2Shared): string | null 
     `- Productos sin stock: ${outOfStock.length}`,
     `- Riesgo crítico: ${criticos.length}`,
     `- En atención: ${atencion.length}`,
-    `- Alta demanda: ${highDemand.length}`,
-    `- Tendencia subiendo: ${subiendo.length}`,
-    `- Tendencia estable: ${estables.length}`,
-    `- Tendencia bajando: ${bajando.length}`,
+    ...(shared.demandMetricsAvailable
+      ? [
+          `- Alta demanda: ${highDemand.length}`,
+          `- Tendencia subiendo: ${subiendo.length}`,
+          `- Tendencia estable: ${estables.length}`,
+          `- Tendencia bajando: ${bajando.length}`,
+        ]
+      : ["- Proyecciones ML de demanda: no disponibles (datos históricos insuficientes)"]),
   ];
 
-  if (s) {
+  if (s && shared.demandMetricsAvailable) {
     lines.push(`- Proyección de ingresos horizonte actual (${revenueForecast?.horizon_days ?? 30} días): ${formatCurrency(s.proximo_horizonte)}`);
     lines.push(`- Variación estimada vs último horizonte: ${formatPercent(s.crecimiento_estimado_horizonte_pct)}`);
   }
@@ -1192,13 +1261,44 @@ export function assistantV2TrySummary(shared: AssistantV2Shared): string | null 
     lines.push("No veo alertas graves en este momento; el panorama general es bastante estable.");
   }
 
-  lines.push("", "Recomendación:", "Si quieres, después de este resumen puedes preguntarme por ingresos, riesgo, tendencias o por un producto específico y te lo explico con más detalle.");
+  const cierre = shared.demandMetricsAvailable
+    ? "Si quieres, después de este resumen puedes preguntarme por ingresos, riesgo, tendencias o por un producto específico y te lo explico con más detalle."
+    : "Cuando haya más ventas registradas, el panel activará proyecciones de demanda e ingresos del modelo.";
+  lines.push("", "Recomendación:", cierre);
   return lines.join("\n\n");
 }
 
 export function assistantV2TryMentionedProduct(shared: AssistantV2Shared): string | null {
   if (shared.mentionedProducts.length === 0) return null;
-  return buildProductDetailResponseV2(shared.mentionedProducts[0]);
+  return buildProductDetailResponseV2(shared.mentionedProducts[0], assistantV2ProductDetailOptions(shared));
+}
+
+export type GenerateAIResponseV2Options = {
+  demandMetricsAvailable?: boolean;
+  insufficientReason?: string;
+};
+
+function assistantV2BlocksDemandIntent(
+  msg: string,
+  forcedIntent: AssistantIntentV2,
+  intentScores: AssistantIntentScoresV2,
+  asksRevenue: boolean,
+): boolean {
+  if (forcedIntent === "revenue" || forcedIntent === "demand" || forcedIntent === "motor" || forcedIntent === "confidence") {
+    return true;
+  }
+  if (asksRevenue) return true;
+  if (intentScores.demand > 0 || intentScores.motor > 0 || intentScores.confidence > 0) return true;
+  if (countIntentMatches(msg, ASSISTANT_V2_DEMAND_TERMS) > 0) return true;
+  if (countIntentMatches(msg, ASSISTANT_V2_MOTOR_TERMS) > 0) return true;
+  if (countIntentMatches(msg, ASSISTANT_V2_CONFIDENCE_TERMS) > 0) return true;
+  if (
+    countIntentMatches(msg, ASSISTANT_V2_RECOMMENDATION_TERMS) > 0
+    && countIntentMatches(msg, ASSISTANT_V2_DEMAND_TERMS) > 0
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export function generateAIResponseV2(
@@ -1206,20 +1306,39 @@ export function generateAIResponseV2(
   predictions: Prediction[],
   revenueForecast: RevenueForecast | null,
   context: AssistantContextV2,
+  options?: GenerateAIResponseV2Options,
 ): string {
   const msg = normalizeChatTextV2(message);
   const forcedIntent = detectQuickPromptIntentV2(msg);
   const mentionedProducts = findMentionedProductsV2(message, predictions).slice(0, 3);
   const intentScores = buildAssistantIntentScoresV2(msg, forcedIntent, mentionedProducts.length);
   const asksRevenue = computeAssistantV2AsksRevenue(msg, intentScores);
+  const demandMetricsAvailable = options?.demandMetricsAvailable !== false;
+
+  if (!demandMetricsAvailable) {
+    const lower = msg.toLowerCase();
+    const asksWhyNoPredictions =
+      lower.includes("por que") && (lower.includes("predicc") || lower.includes("proyecc") || lower.includes("modelo"));
+    const asksMissingData =
+      lower.includes("datos") && (lower.includes("falt") || lower.includes("registr") || lower.includes("activar"));
+    if (asksWhyNoPredictions || asksMissingData) {
+      return assistantReplyWhenDemandUnavailable(options?.insufficientReason ?? "");
+    }
+    if (assistantV2BlocksDemandIntent(msg, forcedIntent, intentScores, asksRevenue)) {
+      return assistantReplyWhenDemandUnavailable(options?.insufficientReason ?? "");
+    }
+  }
+
   const shared: AssistantV2Shared = {
     msg,
     predictions,
-    revenueForecast,
+    revenueForecast: demandMetricsAvailable ? revenueForecast : null,
     context,
     intentScores,
-    asksRevenue,
+    asksRevenue: demandMetricsAvailable && asksRevenue,
     mentionedProducts,
+    demandMetricsAvailable,
+    insufficientReason: options?.insufficientReason ?? "",
   };
 
   return (
@@ -1326,9 +1445,22 @@ export function FeatureImportanceChart({ importances }: { importances: FeatureIm
   );
 }
 
-export function DemandAccuracyChart({ predictions }: { predictions: Prediction[] }) {
+export function DemandAccuracyChart({
+  predictions,
+  demandMetricsAvailable = true,
+}: {
+  predictions: Prediction[];
+  demandMetricsAvailable?: boolean;
+}) {
+  if (!demandMetricsAvailable) {
+    return (
+      <p className="pred-sub">
+        Gráfico de precisión ML disponible cuando haya datos suficientes para entrenar el modelo de demanda.
+      </p>
+    );
+  }
   const rows = predictions
-    .filter(p => !p.sin_historial && p.ventas_30_dias > 0)
+    .filter((p) => !p.sin_historial && !p.demanda_ml_oculta && p.ventas_30_dias > 0)
     .sort((a, b) => b.ventas_30_dias - a.ventas_30_dias)
     .slice(0, 12);
 
@@ -1687,7 +1819,14 @@ export function RiskAlertCard({ prediction }: { prediction: Prediction }) {
   );
 }
 
-export function exportPredictionsCSV(predictions: Prediction[], horizon: HorizonOption) {
+export function exportPredictionsCSV(
+  predictions: Prediction[],
+  horizon: HorizonOption,
+  options?: { includeDemandProjections?: boolean },
+): boolean {
+  if (options?.includeDemandProjections === false) {
+    return false;
+  }
   const headers = [
     "Código", "Nombre", "Categoría", "Stock actual",
     `Proyección (${horizon} días)`, "Por día", "Por semana",
@@ -1695,19 +1834,22 @@ export function exportPredictionsCSV(predictions: Prediction[], horizon: Horizon
   ];
   const rows = predictions
     .filter((p) => !p.sin_historial)
-    .map((p) => [
-      p.codigo,
-      p.nombre,
-      p.categoria,
-      p.stock_actual,
-      p.prediccion_unidades,
-      p.prediccion_diaria,
-      p.prediccion_semanal,
-      p.dias_hasta_agotarse >= 999 ? "Indefinido" : p.dias_hasta_agotarse,
-      p.tendencia,
-      p.nivel_riesgo,
-      p.confianza,
-    ]);
+    .map((p) => {
+      const hideDemand = p.demanda_ml_oculta === true;
+      return [
+        p.codigo,
+        p.nombre,
+        p.categoria,
+        p.stock_actual,
+        hideDemand ? "N/D" : p.prediccion_unidades,
+        hideDemand ? "N/D" : p.prediccion_diaria,
+        hideDemand ? "N/D" : p.prediccion_semanal,
+        p.dias_hasta_agotarse >= 999 ? "Indefinido" : p.dias_hasta_agotarse,
+        hideDemand ? "N/D" : p.tendencia,
+        hideDemand ? "N/D" : p.nivel_riesgo,
+        hideDemand ? "N/D" : p.confianza,
+      ];
+    });
   const csv = [headers, ...rows]
     .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
     .join("\n");
@@ -1720,6 +1862,7 @@ export function exportPredictionsCSV(predictions: Prediction[], horizon: Horizon
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+  return true;
 }
 
 export function mapPredictionsForViewDataset(predictions: Prediction[], alertDays: number): Prediction[] {
@@ -1796,6 +1939,7 @@ export type ResumenEjecutivoArgs = {
   promedioCobertura: number;
   alertDays: number;
   productoMotor: Prediction | null;
+  demandMetricsAvailable: boolean;
 };
 
 export type ResumenEjecutivoCtx = ResumenEjecutivoArgs & {
@@ -1828,7 +1972,13 @@ export function buildResumenEjecutivoCtx(args: ResumenEjecutivoArgs): ResumenEje
 }
 
 export function resumenEjecutivoTitular(ctx: ResumenEjecutivoCtx): string {
-  const { revenueSummary, negocioDebil, growth, enRiesgo, inventarioPesado } = ctx;
+  const { revenueSummary, negocioDebil, growth, enRiesgo, inventarioPesado, demandMetricsAvailable } = ctx;
+  if (!demandMetricsAvailable) {
+    if (enRiesgo > 0) {
+      return "Hay alertas de inventario según ventas históricas; las proyecciones del modelo aún no están activas.";
+    }
+    return "Registra más ventas en tienda y pedidos completados para activar proyecciones de demanda e ingresos.";
+  }
   if (revenueSummary && negocioDebil) {
     return "El negocio muestra señales de enfríamiento y stock acumulado; no conviene leer este escenario como una operación sana.";
   }
@@ -1851,7 +2001,10 @@ export function resumenEjecutivoTitular(ctx: ResumenEjecutivoCtx): string {
 }
 
 export function resumenEjecutivoDetalle(ctx: ResumenEjecutivoCtx): string {
-  const { revenueSummary, horizon, tendencia, confianza } = ctx;
+  const { revenueSummary, horizon, tendencia, confianza, demandMetricsAvailable } = ctx;
+  if (!demandMetricsAvailable) {
+    return "Las proyecciones de demanda e ingresos del modelo no están activas. Puedes revisar stock, ventas históricas, alertas e IRE.";
+  }
   if (!revenueSummary) {
     return "Todavía no hay una proyección financiera disponible, pero ya se puede revisar el estado del inventario y la demanda.";
   }
@@ -1859,7 +2012,10 @@ export function resumenEjecutivoDetalle(ctx: ResumenEjecutivoCtx): string {
 }
 
 export function resumenLecturaFinanciera(ctx: ResumenEjecutivoCtx): string {
-  const { revenueSummary, negocioDebil, growth } = ctx;
+  const { revenueSummary, negocioDebil, growth, demandMetricsAvailable } = ctx;
+  if (!demandMetricsAvailable) {
+    return "La proyección financiera del modelo está desactivada hasta acumular más historial de ventas y pedidos completados.";
+  }
   if (!revenueSummary) {
     return "Aún no se cuenta con una lectura financiera consolidada para este horizonte.";
   }
@@ -1887,7 +2043,13 @@ export function resumenLecturaInventario(ctx: ResumenEjecutivoCtx): string {
 }
 
 export function resumenLecturaPortafolio(ctx: ResumenEjecutivoCtx): string {
-  const { productoMotor, conHistorial } = ctx;
+  const { productoMotor, conHistorial, demandMetricsAvailable } = ctx;
+  if (!demandMetricsAvailable) {
+    if (conHistorial > 0) {
+      return `Hay ${conHistorial} productos con historial de ventas; el producto motor del modelo se mostrará cuando haya datos suficientes.`;
+    }
+    return "Aún no hay historial suficiente para identificar productos motores con el modelo.";
+  }
   if (productoMotor) {
     return `${productoMotor.nombre} lidera la rotación actual con un consumo estimado de ${formatUnits(productoMotor.consumo_estimado_diario)} unidades por día.`;
   }
@@ -2479,16 +2641,20 @@ export function IreProyectadoDeltaBadge({ projectedScore, actualScore }: { proje
 export function FinanzasRiesgoPanel({
   predictionsForView,
   revenueSummary,
+  demandMetricsAvailable = true,
 }: {
   predictionsForView: Prediction[];
   revenueSummary: RevenueSummary | null | undefined;
+  demandMetricsAvailable?: boolean;
 }) {
   const sobrestock = predictionsForView.filter(
     (p) => !p.sin_historial && p.dias_hasta_agotarse >= 60 && p.stock_actual > 5,
   );
   const capitalInmovilizado = sobrestock.reduce((s, p) => s + p.stock_actual * p.precio, 0);
   const enDescenso = predictionsForView.filter((p) => !p.sin_historial && p.tendencia === "bajando");
-  const ingresosEnRiesgo = enDescenso.reduce((s, p) => s + p.consumo_estimado_diario * 30 * p.precio, 0);
+  const ingresosEnRiesgo = demandMetricsAvailable
+    ? enDescenso.reduce((s, p) => s + p.consumo_estimado_diario * 30 * p.precio, 0)
+    : enDescenso.reduce((s, p) => s + (p.ventas_30_dias / 30) * p.precio * 30, 0);
   const diarioProyect = revenueSummary?.promedio_diario_proyectado ?? 0;
   const semanas = [1, 2, 3, 4].map((w) => ({
     label: `Semana ${w}`,
@@ -2499,7 +2665,11 @@ export function FinanzasRiesgoPanel({
   return (
     <div className="fin-risk-panel">
       <div className="fin-risk-header">
-        <p className="pred-sub">Diagnóstico financiero · basado en predicciones</p>
+        <p className="pred-sub">
+          {demandMetricsAvailable
+            ? "Diagnóstico financiero · basado en predicciones"
+            : "Diagnóstico operativo · stock e historial (sin proyección ML)"}
+        </p>
         <h3 className="fin-risk-title">Riesgo Financiero</h3>
       </div>
 
@@ -2515,13 +2685,20 @@ export function FinanzasRiesgoPanel({
           <span className="fin-risk-kpi-label">Ingresos en riesgo</span>
           <span className="fin-risk-kpi-val">{formatCurrency(ingresosEnRiesgo)}</span>
           <span className="fin-risk-kpi-sub">
-            {enDescenso.length} producto{enDescenso.length !== 1 ? "s" : ""} con demanda bajando — proyección 30 d
+            {enDescenso.length} producto{enDescenso.length !== 1 ? "s" : ""}{" "}
+            {demandMetricsAvailable
+              ? "con demanda bajando — proyección 30 d"
+              : "con ventas recientes en descenso (lectura histórica)"}
           </span>
         </div>
         <div className="fin-risk-kpi fin-risk-kpi-info">
           <span className="fin-risk-kpi-label">Flujo est. / semana</span>
-          <span className="fin-risk-kpi-val">{formatCurrency(diarioProyect * 7)}</span>
-          <span className="fin-risk-kpi-sub">Basado en promedio diario del modelo</span>
+          <span className="fin-risk-kpi-val">
+            {demandMetricsAvailable ? formatCurrency(diarioProyect * 7) : "N/D"}
+          </span>
+          <span className="fin-risk-kpi-sub">
+            {demandMetricsAvailable ? "Basado en promedio diario del modelo" : "Activo cuando haya datos ML"}
+          </span>
         </div>
       </div>
 
@@ -2559,7 +2736,7 @@ export function FinanzasRiesgoPanel({
         </div>
       )}
 
-      {revenueSummary && (
+      {revenueSummary && demandMetricsAvailable && (
         <div className="fin-risk-section">
           <div className="ranking-section-title">
             <TrendingUp size={14} /> Flujo de caja proyectado — próximas 4 semanas
@@ -2626,9 +2803,15 @@ export function rankingRecomendacionTexto(
       nivel: "advertencia",
     };
   }
-  if (p.tendencia === "bajando" && p.stock_actual > 20) {
+  if (!p.demanda_ml_oculta && p.tendencia === "bajando" && p.stock_actual > 20) {
     return {
       texto: "Demanda en descenso con inventario alto. Reduce precio ahora antes de que el stock siga acumulando.",
+      nivel: "advertencia",
+    };
+  }
+  if (p.demanda_ml_oculta && p.tendencia === "bajando" && p.stock_actual > 20 && p.dias_hasta_agotarse >= 45) {
+    return {
+      texto: "Ventas recientes en descenso con inventario alto. Evalúa promoción antes de reponer.",
       nivel: "advertencia",
     };
   }

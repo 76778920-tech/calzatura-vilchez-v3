@@ -16,7 +16,7 @@ import {
 import { motion } from "framer-motion";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import type { AdminPredictionsModelState } from "./useAdminPredictionsModel";
-import { shouldMaskPredictionMetrics } from "./predictionDataQuality";
+import { isDemandMetricHidden } from "./predictionDataQuality";
 import type { LearningStatsUmbrales } from "./adminPredictionsLogic";
 import {
   AnimatedKpi,
@@ -40,7 +40,6 @@ import {
   TendenciaCell,
   TipoIcon,
   WeeklyChart,
-  exportPredictionsCSV,
   formatConfidenceLabel,
   formatCurrency,
   formatPercent,
@@ -69,6 +68,7 @@ export function PredictionsResumenTabPanel(props: AdminPredictionsModelState) {
     changeTab,
     recomendaciones,
     tallaResidual,
+    predictionDataSufficient,
   } = props;
   return (
         <motion.div
@@ -181,7 +181,9 @@ export function PredictionsResumenTabPanel(props: AdminPredictionsModelState) {
         <motion.article className="pred-summary-card" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.045, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.01 }}>
           <p className="pred-summary-label">Ingreso esperado</p>
           <strong className="pred-summary-number">
-            {revenueSummary ? formatCurrency(revenueSummary.proximo_horizonte) : "Pendiente"}
+            {predictionDataSufficient && revenueSummary
+              ? formatCurrency(revenueSummary.proximo_horizonte)
+              : "N/D"}
           </strong>
           <p className="pred-summary-copy">{resumenEjecutivo.lecturaFinanciera}</p>
         </motion.article>
@@ -221,8 +223,10 @@ export function PredictionsResumenTabPanel(props: AdminPredictionsModelState) {
           <TrendingUp size={20} />
           <div>
             <p className="pred-kpi-label">Alta demanda</p>
-            <p className="pred-kpi-value">{altaDemanda}</p>
-            <p className="pred-kpi-sub">productos con rotación fuerte</p>
+            <p className="pred-kpi-value">{predictionDataSufficient ? altaDemanda : "—"}</p>
+            <p className="pred-kpi-sub">
+              {predictionDataSufficient ? "productos con rotación fuerte" : "requiere más historial de ventas"}
+            </p>
           </div>
         </motion.div>
         <motion.div className="pred-kpi-card" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.315, ease: "easeOut" } }} whileHover={{ y: -8, scale: 1.015 }}>
@@ -287,7 +291,9 @@ export function PredictionsResumenTabPanel(props: AdminPredictionsModelState) {
               <p className="dash-card-kicker">Lo que debes hacer ahora</p>
               <h2 className="dash-card-title">Recomendaciones automáticas priorizadas</h2>
               <p className="pred-sub" style={{ marginTop: "0.35rem" }}>
-                Generadas por reglas de decisión sobre stock, demanda, tendencia y horizonte de agotamiento para apoyar compras, reposición y control de sobrestock.
+                {predictionDataSufficient
+                  ? "Generadas por reglas de decisión sobre stock, demanda, tendencia y horizonte de agotamiento para apoyar compras, reposición y control de sobrestock."
+                  : "Generadas con stock y ventas históricas (sin proyección ML) para reposición y control de inventario."}
               </p>
             </div>
           </div>
@@ -311,7 +317,9 @@ export function PredictionsResumenTabPanel(props: AdminPredictionsModelState) {
               <CheckCircle size={28} className="pred-trend-up" />
               <p className="pred-empty-title">No hay acciones urgentes</p>
               <p className="pred-empty-copy">
-                El panel no detecta decisiones de reposición inmediatas para este horizonte. Conviene seguir comparando lo proyectado con lo real.
+                {predictionDataSufficient
+                  ? "El panel no detecta decisiones de reposición inmediatas para este horizonte. Conviene seguir comparando lo proyectado con lo real."
+                  : "No hay acciones urgentes según stock y ventas recientes. Cuando el modelo ML esté activo, las recomendaciones incluirán proyecciones de demanda."}
               </p>
             </div>
           )}
@@ -325,12 +333,12 @@ export function PredictionsResumenTabPanel(props: AdminPredictionsModelState) {
                 <p className="pred-summary-kicker">Situación del inventario</p>
                 <p className="pred-reading-text">{resumenEjecutivo.lecturaInventario}</p>
               </div>
-              {revenueSummary && (
-                <div>
+              {predictionDataSufficient && revenueSummary ? (
+                <motion.div>
                   <p className="pred-summary-kicker">Proyección financiera</p>
                   <p className="pred-reading-text">{resumenEjecutivo.lecturaFinanciera}</p>
-                </div>
-              )}
+                </motion.div>
+              ) : null}
               <div>
                 <p className="pred-summary-kicker">Qué hacer ahora</p>
                 <p className="pred-reading-text">{resumenEjecutivo.recomendacion}</p>
@@ -424,6 +432,8 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
     setSearch,
     porOrden,
     predictionDataSufficient,
+    canExportPredictionsCsv,
+    exportPredictionsCsv,
   } = props;
   return (
         <motion.div
@@ -487,7 +497,9 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
               <p className="dash-card-kicker">Estado del inventario</p>
               <h2 className="dash-card-title">Cómo está cada producto</h2>
               <p className="pred-section-note">
-                La proyección ({horizon} días) y el umbral de alerta ({alertDays} días) se configuran en la parte superior del panel.
+                {predictionDataSufficient
+                  ? `La proyección (${horizon} días) y el umbral de alerta (${alertDays} días) se configuran en la parte superior del panel.`
+                  : `Sin proyección ML activa: se muestran stock, cobertura por ventas históricas y alertas (umbral ${alertDays} días).`}
               </p>
             </div>
             <div className="pred-table-controls">
@@ -504,8 +516,13 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
               <button
                 type="button"
                 className="pred-export-btn"
-                onClick={() => exportPredictionsCSV(porOrden, horizon)}
-                title="Descargar tabla como CSV (compatible con Excel)"
+                disabled={!canExportPredictionsCsv}
+                onClick={() => exportPredictionsCsv()}
+                title={
+                  canExportPredictionsCsv
+                    ? "Descargar tabla como CSV (compatible con Excel)"
+                    : "CSV deshabilitado: datos insuficientes para exportar proyecciones de demanda"
+                }
               >
                 <Download size={14} />
                 CSV
@@ -556,7 +573,7 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
                         <td>
                           {prediction.sin_historial ? (
                             <span className="pred-sub">-</span>
-                          ) : shouldMaskPredictionMetrics(predictionDataSufficient, prediction) ? (
+                          ) : isDemandMetricHidden(prediction) ? (
                             <span className="pred-sub" title="Datos históricos insuficientes">—</span>
                           ) : (
                             <>
@@ -568,7 +585,7 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
                         <td>
                           {prediction.sin_historial ? (
                             <span className="pred-sub">-</span>
-                          ) : shouldMaskPredictionMetrics(predictionDataSufficient, prediction) ? (
+                          ) : isDemandMetricHidden(prediction) ? (
                             <span className="pred-sub" title="Datos históricos insuficientes">—</span>
                           ) : (
                             <>
@@ -596,7 +613,7 @@ export function PredictionsVentasTabPanel(props: AdminPredictionsModelState) {
                         <td>
                           {prediction.sin_historial ? (
                             <span className="pred-sub">-</span>
-                          ) : shouldMaskPredictionMetrics(predictionDataSufficient, prediction) ? (
+                          ) : isDemandMetricHidden(prediction) ? (
                             <span className="pred-sub">Datos insuficientes</span>
                           ) : (
                             <div className="pred-cell-stack">
@@ -639,6 +656,8 @@ export function PredictionsFinanzasTabPanel(props: AdminPredictionsModelState) {
     resumenEjecutivo,
     refreshPredictions,
     predictionsForView,
+    predictionDataSufficient,
+    predictionInsufficientReason,
   } = props;
   return (
         <motion.div
@@ -751,7 +770,11 @@ export function PredictionsFinanzasTabPanel(props: AdminPredictionsModelState) {
             <div className="pred-error-card">
               <CircleDollarSign size={32} />
               <h3>Proyección financiera no disponible</h3>
-              <p>No hay datos de ingresos para este horizonte. El servicio de IA podría estar actualizándose o falta historial suficiente.</p>
+              <p>
+                {!predictionDataSufficient
+                  ? predictionInsufficientReason
+                  : "No hay datos de ingresos para este horizonte. El servicio de IA podría estar actualizándose o falta historial suficiente."}
+              </p>
               <button type="button" className="btn btn-primary" onClick={() => {
           refreshPredictions().catch(() => undefined);
         }}>
@@ -761,14 +784,18 @@ export function PredictionsFinanzasTabPanel(props: AdminPredictionsModelState) {
           )}
 
           {/* ── Riesgo Financiero ─────────────────────────── */}
-          <FinanzasRiesgoPanel predictionsForView={predictionsForView} revenueSummary={revenueSummary} />
+          <FinanzasRiesgoPanel
+            predictionsForView={predictionsForView}
+            revenueSummary={revenueSummary}
+            demandMetricsAvailable={predictionDataSufficient}
+          />
         </motion.div>
   );
 }
 
 export function PredictionsRankingTabPanelWrapper(props: AdminPredictionsModelState) {
   const {
-    predictions,
+    predictionsForView,
     rankingPeriod,
     setRankingPeriod,
     abcData,
@@ -776,7 +803,7 @@ export function PredictionsRankingTabPanelWrapper(props: AdminPredictionsModelSt
   } = props;
   return (
         <PredictionsRankingTabPanel
-          predictions={predictions}
+          predictions={predictionsForView}
           rankingPeriod={rankingPeriod}
           setRankingPeriod={setRankingPeriod}
           abcData={abcData}
@@ -793,6 +820,7 @@ export function PredictionsModeloTabPanel(props: AdminPredictionsModelState) {
     modelMetricsFetched,
     modelMetricsLoading,
     modelMetrics,
+    predictionDataSufficient,
   } = props;
   return (
         <motion.div
@@ -811,6 +839,9 @@ export function PredictionsModeloTabPanel(props: AdminPredictionsModelState) {
                     <Brain size={20} /> Modelo IA — Detalles técnicos
                   </h2>
                 </div>
+                {!predictionDataSufficient && (
+                  <span className="pred-estado-badge alerta">Datos insuficientes para ML</span>
+                )}
               </div>
               <div className="pred-model-panel">
                 <div className="pred-model-meta-grid">
@@ -859,7 +890,7 @@ export function PredictionsModeloTabPanel(props: AdminPredictionsModelState) {
                     </div>
                   </div>
                 )}
-                {modeloMeta.feature_importances.length > 0 && (
+                {predictionDataSufficient && modeloMeta.feature_importances.length > 0 && (
                   <div className="pred-model-section">
                     <h3 className="pred-model-section-title">Importancia de variables (Feature Importance)</h3>
                     <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
@@ -873,7 +904,10 @@ export function PredictionsModeloTabPanel(props: AdminPredictionsModelState) {
                   <p className="pred-sub" style={{ marginBottom: "0.75rem" }}>
                     Compara las unidades vendidas realmente en los últimos 30 días con la estimación diaria del modelo escalada al mismo período. Esta lectura muestra si la predicción se acerca al comportamiento real observado. El MAPE mide el error porcentual medio absoluto.
                   </p>
-                  <DemandAccuracyChart predictions={predictionsForView} />
+                  <DemandAccuracyChart
+                    predictions={predictionsForView}
+                    demandMetricsAvailable={predictionDataSufficient}
+                  />
                 </div>
 
                 {Object.keys(modeloMeta.feature_stats).length > 0 && (
@@ -980,6 +1014,7 @@ export function PredictionsAsistenteTabPanel(props: AdminPredictionsModelState) 
     handleSend,
     aiLoading,
     chatEndRef,
+    predictionDataSufficient,
   } = props;
   return (
         <motion.div
@@ -997,19 +1032,27 @@ export function PredictionsAsistenteTabPanel(props: AdminPredictionsModelState) 
                   <Brain size={22} /> Inteligencia artificial guiada por el panel
                 </h2>
                 <p className="pred-ai-lead">
-                  Consulta inventario, ingresos y prioridades sin salir de esta vista. El asistente toma solo los datos de demanda, riesgo y finanzas que ya ves cargados aquí.
+                  {predictionDataSufficient
+                    ? "Consulta inventario, ingresos y prioridades sin salir de esta vista. El asistente usa los datos de demanda, riesgo y finanzas cargados en este panel."
+                    : "Consulta stock, alertas e historial de ventas. Las proyecciones ML de demanda e ingresos están desactivadas hasta acumular más datos."}
                 </p>
                 <div className="pred-ai-flags">
                   <span className="pred-ai-flag">Sin búsqueda web</span>
                   <span className="pred-ai-flag">Horizonte activo: {horizon} días</span>
-                  <span className="pred-ai-flag">Respuestas para gerencia y operaciones</span>
+                  <span className="pred-ai-flag">
+                    {predictionDataSufficient ? "Incluye proyecciones ML" : "Solo datos operativos"}
+                  </span>
                 </div>
               </div>
               <div className="pred-ai-stats">
                 <motion.article className="pred-ai-stat" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.02, rotateX: -2 }}>
                   <span className="pred-ai-stat-label">Horizonte activo</span>
                   <strong className="pred-ai-stat-value">{horizon} días</strong>
-                  <span className="pred-ai-stat-copy">La lectura financiera y de riesgo se ajusta a este tramo.</span>
+                  <span className="pred-ai-stat-copy">
+                    {predictionDataSufficient
+                      ? "La lectura financiera y de riesgo se ajusta a este tramo."
+                      : "Riesgo por cobertura histórica; sin proyección financiera ML."}
+                  </span>
                 </motion.article>
                 <motion.article className="pred-ai-stat" initial={{ opacity: 0, y: 20, scale: 0.985 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { duration: 0.34, delay: 0.045, ease: "easeOut" } }} whileHover={{ y: -10, scale: 1.02, rotateX: -2 }}>
                   <span className="pred-ai-stat-label">Atajos listos</span>
@@ -1041,8 +1084,9 @@ export function PredictionsAsistenteTabPanel(props: AdminPredictionsModelState) 
                 </span>
               </div>
               <p className="pred-ai-card-note">
-                Puedes pedir una explicación para gerencia, un resumen con cifras exactas para contabilidad o una lectura ejecutiva para junta directiva.
-                Las respuestas se generan a partir de los datos de predicción e inventario cargados en este panel.
+                {predictionDataSufficient
+                  ? "Puedes pedir una explicación para gerencia, un resumen con cifras para contabilidad o una lectura para junta directiva, basados en predicción e inventario."
+                  : "Pregunta por alertas de stock, productos sin historial o qué datos registrar. No se citarán proyecciones ML hasta que el modelo esté activo."}
               </p>
               <div className="pred-ai-question-board">
                 <p className="pred-ai-question-kicker">También puedes preguntar</p>
@@ -1106,7 +1150,9 @@ export function PredictionsAsistenteTabPanel(props: AdminPredictionsModelState) 
                   <strong className="pred-empty-chat-title">Todo listo para consultar</strong>
                   <p>
                     Toca un atajo de abajo para una respuesta al instante, escribe tu propia pregunta o usa el micrófono.
-                    Inventario, ingresos y prioridades salen de lo que ya ves en las otras pestañas.
+                    {predictionDataSufficient
+                      ? " Inventario, ingresos y prioridades salen de lo que ya ves en las otras pestañas."
+                      : " Prioriza stock e historial; las proyecciones ML están pausadas."}
                   </p>
                 </div>
               </div>
@@ -1117,7 +1163,11 @@ export function PredictionsAsistenteTabPanel(props: AdminPredictionsModelState) 
               quickActions={assistantQuickActions}
               onSend={handleSend}
               isLoading={aiLoading}
-              placeholder="Pregunta por inventario, ingresos o predicciones de este panel…"
+              placeholder={
+                predictionDataSufficient
+                  ? "Pregunta por inventario, ingresos o predicciones de este panel…"
+                  : "Pregunta por stock, alertas o qué datos faltan para activar el modelo…"
+              }
             />
             </section>
           </div>

@@ -22,6 +22,7 @@ import {
   sortPredictionsByAdminPriority,
   TAB_SEQUENCE,
   generateAIResponseV2,
+  exportPredictionsCSV,
   type AlertOption,
   type CampanaActiveResponse,
   type ChatMessage,
@@ -39,8 +40,11 @@ import {
   type WeekPoint,
 } from "./adminPredictionsLogic";
 import {
-  isPredictionDataSufficient,
-  predictionInsufficientMessage,
+  applyPredictionsDemandPolicy,
+  buildPredictionDemandPolicy,
+  canExportDemandProjections,
+  filterAssistantQuickActionsWhenInsufficient,
+  type PredictionDemandPolicy,
 } from "./predictionDataQuality";
 
 type CombinedPredictionsPayload = {
@@ -281,12 +285,24 @@ export function useAdminPredictionsModel() {
     await load(horizon, history);
   }, [horizon, history, load]);
 
-  const predictionsForView = useMemo(
-    () => mapPredictionsForViewDataset(predictions, alertDays),
-    [predictions, alertDays],
+  const predictionDemandPolicy = useMemo(
+    (): PredictionDemandPolicy => buildPredictionDemandPolicy(modeloMeta),
+    [modeloMeta],
   );
 
-  const recomendaciones = useMemo(() => generarRecomendaciónes(predictionsForView), [predictionsForView]);
+  const predictionDataSufficient = predictionDemandPolicy.demandMetricsAvailable;
+
+  const predictionInsufficientReason = predictionDemandPolicy.insufficientReason;
+
+  const predictionsForView = useMemo(() => {
+    const withPolicy = applyPredictionsDemandPolicy(predictions, predictionDataSufficient);
+    return mapPredictionsForViewDataset(withPolicy, alertDays);
+  }, [predictions, alertDays, predictionDataSufficient]);
+
+  const recomendaciones = useMemo(
+    () => generarRecomendaciónes(predictionsForView, { demandMetricsAvailable: predictionDataSufficient }),
+    [predictionsForView, predictionDataSufficient],
+  );
 
   const riskAlerts = useMemo(() => selectTopRiskAlertsForPanel(predictionsForView), [predictionsForView]);
 
@@ -295,10 +311,10 @@ export function useAdminPredictionsModel() {
     [predictionsForView, search],
   );
 
-  const normalizedRevenueForecast = useMemo(
-    () => normalizeRevenueForecastForHorizon(revenueForecast),
-    [revenueForecast],
-  );
+  const normalizedRevenueForecast = useMemo(() => {
+    if (!predictionDataSufficient) return null;
+    return normalizeRevenueForecastForHorizon(revenueForecast);
+  }, [revenueForecast, predictionDataSufficient]);
 
   const revenueSummary = normalizedRevenueForecast?.summary ?? null;
 
@@ -316,20 +332,10 @@ export function useAdminPredictionsModel() {
     promedioCobertura,
   } = useMemo(() => computePredictionCountKpis(predictionsForView), [predictionsForView]);
 
-  const productoMotor = useMemo(
-    () => selectProductoMotorPrediction(predictionsForView),
-    [predictionsForView],
-  );
-
-  const predictionDataSufficient = useMemo(
-    () => isPredictionDataSufficient(modeloMeta),
-    [modeloMeta],
-  );
-
-  const predictionInsufficientReason = useMemo(
-    () => predictionInsufficientMessage(modeloMeta),
-    [modeloMeta],
-  );
+  const productoMotor = useMemo(() => {
+    if (!predictionDataSufficient) return null;
+    return selectProductoMotorPrediction(predictionsForView);
+  }, [predictionsForView, predictionDataSufficient]);
 
   const resumenEjecutivo = useMemo(
     () =>
@@ -345,6 +351,7 @@ export function useAdminPredictionsModel() {
         promedioCobertura,
         alertDays,
         productoMotor,
+        demandMetricsAvailable: predictionDataSufficient,
       }),
     [
       alertDays,
@@ -375,15 +382,24 @@ export function useAdminPredictionsModel() {
       const userMsg: ChatMessage = { role: "user", content: trimmed };
       setMessages((prev) => [...prev, userMsg]);
       setAiLoading(true);
-      const reply = generateAIResponseV2(trimmed, predictionsForView, normalizedRevenueForecast, assistantContext);
+      const reply = generateAIResponseV2(trimmed, predictionsForView, normalizedRevenueForecast, assistantContext, {
+        demandMetricsAvailable: predictionDataSufficient,
+        insufficientReason: predictionInsufficientReason,
+      });
       setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
       setAiLoading(false);
     },
-    [assistantContext, normalizedRevenueForecast, predictionsForView],
+    [
+      assistantContext,
+      normalizedRevenueForecast,
+      predictionsForView,
+      predictionDataSufficient,
+      predictionInsufficientReason,
+    ],
   );
 
-  const assistantQuickActions = useMemo<PromptPanelQuickAction[]>(
-    () => [
+  const assistantQuickActions = useMemo<PromptPanelQuickAction[]>(() => {
+    const full: PromptPanelQuickAction[] = [
       { label: "Resumen gerencia", prompt: "Dame un resumen ejecutivo para gerencia con las cifras clave del panel." },
       { label: "¿Qué reponer?", prompt: "¿Qué producto debo reponer primero según riesgo y demanda?" },
       { label: "Ingresos vs. periodo", prompt: "Compara el próximo horizonte proyectado con el último período real de ingresos." },
@@ -393,9 +409,16 @@ export function useAdminPredictionsModel() {
       { label: "Confianza del modelo", prompt: "Explícame qué tan confiable es la proyección y por qué." },
       { label: "Producto motor", prompt: "¿Cuál es el producto motor y cómo lo defenderías?" },
       { label: "Sin historial", prompt: "¿Qué productos siguen sin historial suficiente y qué implica?" },
-    ],
-    [],
-  );
+    ];
+    return filterAssistantQuickActionsWhenInsufficient(full, predictionDemandPolicy);
+  }, [predictionDemandPolicy]);
+
+  const canExportPredictionsCsv = canExportDemandProjections(predictionDemandPolicy);
+
+  const exportPredictionsCsv = useCallback(() => {
+    if (!canExportPredictionsCsv) return;
+    exportPredictionsCSV(porOrden, horizon, { includeDemandProjections: true });
+  }, [canExportPredictionsCsv, porOrden, horizon]);
 
   const assistantQuestionIdeas = useMemo(
     () => [
@@ -417,7 +440,7 @@ export function useAdminPredictionsModel() {
     revenueForecast,
     revenueLoading,
     ireData,
-    ireProyectado,
+    ireProyectado: predictionDataSufficient ? ireProyectado : null,
     ireHistorial,
     modeloMeta,
     modelMetrics,
@@ -485,6 +508,9 @@ export function useAdminPredictionsModel() {
     assistantQuestionIdeas,
     predictionDataSufficient,
     predictionInsufficientReason,
+    predictionDemandPolicy,
+    canExportPredictionsCsv,
+    exportPredictionsCsv,
   };
 }
 

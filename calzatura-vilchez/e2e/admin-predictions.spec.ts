@@ -136,6 +136,20 @@ const MOCK_COMBINED_RESPONSE = {
   warnings: [],
 };
 
+const MOCK_COMBINED_INSUFFICIENT = {
+  ...MOCK_COMBINED_RESPONSE,
+  demand: {
+    ...MOCK_COMBINED_RESPONSE.demand,
+    modelo_meta: {
+      ...MOCK_COMBINED_RESPONSE.demand.modelo_meta,
+      data_sufficient: false,
+      ml_active: false,
+      insufficient_reason: "Pocos productos con ventas para entrenar el modelo.",
+      n_samples: 12,
+    },
+  },
+};
+
 // ─── Setup helpers ────────────────────────────────────────────────────────────
 
 /** Mockea la ruta del servicio IA para que devuelva un AbortError (timeout). */
@@ -158,12 +172,12 @@ async function setupAITimeout(page: Page) {
 }
 
 /** Mockea la ruta del servicio IA para que devuelva datos válidos. */
-async function setupAISuccess(page: Page) {
+async function setupAISuccess(page: Page, payload: typeof MOCK_COMBINED_RESPONSE = MOCK_COMBINED_RESPONSE) {
   await page.route("**/api/predict/**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(MOCK_COMBINED_RESPONSE),
+      body: JSON.stringify(payload),
     });
   });
 
@@ -233,5 +247,16 @@ test.describe("admin predicciones → cold start y carga exitosa", () => {
     await expect(page.getByText("Temporadas y campañas incorporadas")).toBeVisible();
     await expect(page.getByText("Campaña: nueva-temporada")).toBeVisible();
     await expect(page.locator(".ire-variable-tags span", { hasText: "Inicio escolar" })).toBeVisible();
+  });
+
+  test("data_sufficient false oculta banner, IRE proyectado y proyecciones ML (TC-PRED-003)", async ({ page }) => {
+    await setupAISuccess(page, MOCK_COMBINED_INSUFFICIENT);
+    await goToPredictions(page);
+
+    await expect(page.getByText(/Datos insuficientes para predicciones fiables/i)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Pocos productos con ventas/i)).toBeVisible();
+    await expect(page.getByText("IRE proyectado a")).toHaveCount(0);
+    await expect(page.getByText("requiere más historial de ventas")).toBeVisible();
+    await expect(page.getByText("Zapatilla E2E Pred", { exact: true })).toBeVisible();
   });
 });

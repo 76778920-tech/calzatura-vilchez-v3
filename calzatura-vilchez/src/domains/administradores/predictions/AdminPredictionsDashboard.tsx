@@ -47,8 +47,8 @@ export function AdminPredictionsDashboard(props: Readonly<AdminPredictionsModelS
             <strong>Datos insuficientes para predicciones fiables</strong>
             <p style={{ margin: "0.35rem 0 0" }}>{predictionInsufficientReason}</p>
             <p className="pred-sub" style={{ margin: "0.5rem 0 0" }}>
-              Las cifras de demanda proyectada no se muestran hasta tener más ventas en tienda y pedidos completados.
-              El stock, historial y el IRE siguen visibles.
+              Las cifras de demanda proyectada y el IRE a futuro no se muestran hasta tener más ventas en tienda y pedidos completados.
+              El stock, historial, alertas operativas y el IRE actual siguen visibles.
             </p>
           </div>
         </div>
