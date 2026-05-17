@@ -29,7 +29,7 @@ describe("adminDashboardMetrics helpers", () => {
   });
 
   it("toDate usa ahora cuando creadoEn es falsy", () => {
-    const d = toDate(undefined);
+    const d = toDate("");
     expect(toLocalISODate(d)).toBe("2026-05-16");
   });
 
