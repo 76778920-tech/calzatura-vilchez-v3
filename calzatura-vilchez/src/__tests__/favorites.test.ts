@@ -76,8 +76,11 @@ describe("favorites service", () => {
       expect.objectContaining({ method: "POST" })
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://bff.example/favorites?productId=product-1",
-      expect.objectContaining({ method: "DELETE" })
+      "https://bff.example/favorites",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ productId: "product-1", action: "remove" }),
+      })
     );
   });
 });

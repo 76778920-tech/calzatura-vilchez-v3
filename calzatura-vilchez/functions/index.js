@@ -761,9 +761,14 @@ async function favoritesHandleGet(supabase, userId, productId, res) {
   return favoritesGetAll(supabase, userId, res);
 }
 
-async function favoritesHandlePost(supabase, userId, productId, res) {
+async function favoritesHandlePost(supabase, userId, productId, res, body) {
   if (!isNonEmptyString(productId, 120)) {
     return res.status(400).json({ error: "Producto invalido" });
+  }
+
+  const action = typeof body?.action === "string" ? body.action.trim().toLowerCase() : "";
+  if (action === "remove" || body?.remove === true) {
+    return favoritesHandleDelete(supabase, userId, productId, res);
   }
 
   const { data: existing, error: readError } = await supabase
@@ -820,6 +825,10 @@ exports.favorites = onRequest(
         const userId = decodedToken.uid;
         const rawProductId = req.method === "GET" ? req.query.productId : req.body?.productId;
         const productId = trimStr(rawProductId);
+
+        if (req.method === "POST") {
+          return favoritesHandlePost(supabase, userId, productId, res, req.body);
+        }
 
         const handler = FAVORITES_HANDLERS[req.method];
         if (!handler) return res.status(405).json({ error: "Metodo no permitido" });

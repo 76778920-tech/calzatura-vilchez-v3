@@ -114,13 +114,14 @@ export async function removeFavoriteProduct(userId: string, productId: string): 
     throw new Error("VITE_BACKEND_API_URL no configurada (favoritos)");
   }
   const idToken = await auth.currentUser!.getIdToken();
-  const response = await fetch(
-    `${base}/favorites?productId=${encodeURIComponent(productId)}`,
-    {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${idToken}` },
-    }
-  );
+  const response = await fetch(`${base}/favorites`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ productId, action: "remove" }),
+  });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(payload.error || "No se pudo eliminar favorito");

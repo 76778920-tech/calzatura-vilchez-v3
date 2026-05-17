@@ -31,7 +31,7 @@ function applyCorsHeaders(req, res, next) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
     }
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,PATCH,OPTIONS");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key");
     res.setHeader("Access-Control-Max-Age", "86400");
   }
@@ -49,6 +49,7 @@ const cors = require("cors")({
     }
     callback(new Error("Origen no permitido"));
   },
+  methods: ["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key"],
 });
 
@@ -1633,9 +1634,14 @@ async function favoritesHandleGet(supabase, userId, productId, res) {
   return favoritesGetAll(supabase, userId, res);
 }
 
-async function favoritesHandlePost(supabase, userId, productId, res) {
+async function favoritesHandlePost(supabase, userId, productId, res, body) {
   if (!isNonEmptyString(productId, 120)) {
     return res.status(400).json({ error: "Producto invalido" });
+  }
+
+  const action = typeof body?.action === "string" ? body.action.trim().toLowerCase() : "";
+  if (action === "remove" || body?.remove === true) {
+    return favoritesHandleDelete(supabase, userId, productId, res);
   }
 
   const { data: existing, error: readError } = await supabase
@@ -1672,38 +1678,41 @@ async function favoritesHandleDelete(supabase, userId, productId, res) {
   return res.status(200).json({ success: true });
 }
 
-app.all("/favorites", (req, res) => {
-    cors(req, res, async () => {
-      if (req.method === "OPTIONS") {
-        return res.status(204).send("");
+function favoritesRouter(req, res) {
+  cors(req, res, async () => {
+    if (req.method === "OPTIONS") {
+      return res.status(204).send("");
+    }
+
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      const userId = decodedToken.uid;
+      const rawProductId = req.method === "GET" ? req.query.productId : req.body?.productId;
+      const productId = typeof rawProductId === "string" ? rawProductId.trim() : "";
+
+      if (req.method === "GET") {
+        return favoritesHandleGet(supabase, userId, productId, res);
       }
 
-      try {
-        const decodedToken = await verifyFirebaseUser(req);
-        const supabase = getSupabaseAdmin();
-        const userId = decodedToken.uid;
-        const rawProductId = req.method === "GET" ? req.query.productId : req.body?.productId;
-        const productId = typeof rawProductId === "string" ? rawProductId.trim() : "";
-
-        if (req.method === "GET") {
-          return favoritesHandleGet(supabase, userId, productId, res);
-        }
-
-        if (req.method === "POST") {
-          return favoritesHandlePost(supabase, userId, productId, res);
-        }
-
-        if (req.method === "DELETE") {
-          return favoritesHandleDelete(supabase, userId, productId, res);
-        }
-
-        return res.status(405).json({ error: "Metodo no permitido" });
-      } catch (error) {
-        console.error("Favorites error:", error);
-        return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+      if (req.method === "POST") {
+        return favoritesHandlePost(supabase, userId, productId, res, req.body);
       }
-    });
-});
+
+      if (req.method === "DELETE") {
+        return favoritesHandleDelete(supabase, userId, productId, res);
+      }
+
+      return res.status(405).json({ error: "Metodo no permitido" });
+    } catch (error) {
+      console.error("Favorites error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+}
+
+app.all("/favorites", favoritesRouter);
+app.all("/favoritos", favoritesRouter);
 
 const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
 
