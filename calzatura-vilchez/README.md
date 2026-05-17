@@ -62,7 +62,7 @@ En este entorno de Windows, si el build falla con `spawn EPERM` por el binario n
 ## Deploy Firebase
 
 ```bash
-firebase.cmd deploy --only hosting,firestore:rules
+firebase.cmd deploy --only hosting
 ```
 
 ## Desarrollo local

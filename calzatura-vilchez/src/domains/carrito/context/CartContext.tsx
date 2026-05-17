@@ -3,8 +3,6 @@ import type { ReactNode } from "react";
 import type { CartItem, Product } from "@/types";
 import { getSizeStock } from "@/utils/stock";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
-import { db } from "@/firebase/config";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
 type CartContextType = Readonly<{
   items: CartItem[];
@@ -40,9 +38,19 @@ const CART_STORAGE_KEY = "calzatura_cart";
 const ENVIO = 0;
 
 function cartStorageKey(userUid?: string | null) {
-  return import.meta.env.VITE_E2E === "true" && userUid
-    ? `${CART_STORAGE_KEY}:${userUid}`
-    : CART_STORAGE_KEY;
+  if (userUid) {
+    return `${CART_STORAGE_KEY}:${userUid}`;
+  }
+  return CART_STORAGE_KEY;
+}
+
+function readCartFromStorage(key: string): CartItem[] {
+  try {
+    const stored = localStorage.getItem(key);
+    return stored ? (JSON.parse(stored) as CartItem[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 export function CartProvider({ children }: CartProviderProps) {
@@ -56,67 +64,32 @@ export function CartProvider({ children }: CartProviderProps) {
     userUidRef.current = userUid;
   }, [userUid]);
 
-  // Firestore para usuarios autenticados, localStorage para invitados
   useEffect(() => {
-    if (!userUid) {
-      queueMicrotask(() => {
-        try {
-          const stored = localStorage.getItem(cartStorageKey());
-          setItems(stored ? (JSON.parse(stored) as CartItem[]) : []);
-        } catch {
-          setItems([]);
-        }
-      });
-      return;
-    }
+    queueMicrotask(() => {
+      if (!userUid) {
+        setItems(readCartFromStorage(cartStorageKey()));
+        return;
+      }
 
-    if (import.meta.env.VITE_E2E === "true") {
-      queueMicrotask(() => {
-        try {
-          const stored = localStorage.getItem(cartStorageKey(userUid));
-          setItems(stored ? (JSON.parse(stored) as CartItem[]) : []);
-        } catch {
-          setItems([]);
-        }
-      });
-      return;
-    }
+      const userKey = cartStorageKey(userUid);
+      const userItems = readCartFromStorage(userKey);
+      if (userItems.length > 0) {
+        setItems(userItems);
+        return;
+      }
 
-    const cartRef = doc(db, "carts", userUid);
-    const unsubscribe = onSnapshot(
-      cartRef,
-      (snap) => {
-        if (snap.exists()) {
-          setItems((snap.data().items as CartItem[]) ?? []);
-        } else {
-          // Primera sesión: migrar carrito de invitado si existe
-          const stored = localStorage.getItem(CART_STORAGE_KEY);
-          const localItems: CartItem[] = stored ? (JSON.parse(stored) as CartItem[]) : [];
-          setItems(localItems);
-          if (localItems.length > 0) {
-            void setDoc(cartRef, { items: localItems }).catch(console.error);
-            localStorage.removeItem(CART_STORAGE_KEY);
-          }
-        }
-      },
-      (error) => console.error("[CartContext] Firestore error:", error)
-    );
-
-    return () => unsubscribe();
+      const guestItems = readCartFromStorage(CART_STORAGE_KEY);
+      setItems(guestItems);
+      if (guestItems.length > 0) {
+        localStorage.setItem(userKey, JSON.stringify(guestItems));
+        localStorage.removeItem(CART_STORAGE_KEY);
+      }
+    });
   }, [userUid]);
 
   const persistItems = useCallback((newItems: CartItem[]) => {
-    if (userUidRef.current) {
-      if (import.meta.env.VITE_E2E === "true") {
-        localStorage.setItem(cartStorageKey(userUidRef.current), JSON.stringify(newItems));
-        return;
-      }
-      void setDoc(doc(db, "carts", userUidRef.current), { items: newItems }).catch(
-        (e) => console.error("[CartContext] persist error:", e)
-      );
-    } else {
-      localStorage.setItem(cartStorageKey(), JSON.stringify(newItems));
-    }
+    const uid = userUidRef.current;
+    localStorage.setItem(cartStorageKey(uid), JSON.stringify(newItems));
   }, []);
 
   const addItem = useCallback(

@@ -4,7 +4,6 @@ import {
   indexedDBLocalPersistence,
   initializeAuth,
 } from "firebase/auth";
-import { initializeFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY            as string,
@@ -22,10 +21,6 @@ export const auth = initializeAuth(app, {
   persistence: import.meta.env.VITE_E2E === "true"
     ? [browserLocalPersistence]
     : [indexedDBLocalPersistence, browserLocalPersistence],
-});
-/** Long-polling evita cortes del canal Listen en redes/proxies/antivirus que bufferizan mal WebChannel. */
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
 });
 
 export default app;

@@ -1,5 +1,5 @@
-import { collection, deleteDoc, doc, getDoc, getDocs, serverTimestamp, setDoc, writeBatch } from "firebase/firestore";
-import { auth, db } from "@/firebase/config";
+import { auth } from "@/firebase/config";
+import { getBackendApiBaseUrl } from "@/config/apiBackend";
 
 const E2E_FAVORITES_PREFIX = "e2e_favorites:";
 
@@ -7,10 +7,6 @@ function assertCurrentUser(userId: string) {
   if (auth.currentUser?.uid !== userId) {
     throw new Error("No puedes consultar favoritos de otra cuenta");
   }
-}
-
-function favoriteRef(userId: string, productId: string) {
-  return doc(db, "usuarios", userId, "favoritos", productId);
 }
 
 function e2eFavoriteKey(userId: string) {
@@ -32,13 +28,50 @@ function writeE2EFavorites(userId: string, productIds: string[]) {
   globalThis.localStorage.setItem(e2eFavoriteKey(userId), JSON.stringify([...new Set(productIds)]));
 }
 
+async function favoritesRequest(
+  method: "GET" | "POST" | "DELETE",
+  productId?: string
+): Promise<Response> {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("Debes iniciar sesion");
+  }
+
+  const base = getBackendApiBaseUrl();
+  if (!base) {
+    throw new Error("VITE_BACKEND_API_URL no configurada (favoritos)");
+  }
+
+  const idToken = await user.getIdToken();
+  const url =
+    method === "GET" && productId
+      ? `${base}/favorites?productId=${encodeURIComponent(productId)}`
+      : `${base}/favorites`;
+
+  return fetch(url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      ...(method === "POST" ? { "Content-Type": "application/json" } : {}),
+    },
+    ...(method === "POST" && productId ? { body: JSON.stringify({ productId }) } : {}),
+  });
+}
+
 export async function fetchFavoriteProductIds(userId: string): Promise<string[]> {
   assertCurrentUser(userId);
   if (import.meta.env.VITE_E2E === "true") {
     return readE2EFavorites(userId);
   }
-  const snapshot = await getDocs(collection(db, "usuarios", userId, "favoritos"));
-  return snapshot.docs.map((favorite) => favorite.id);
+
+  const response = await favoritesRequest("GET");
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "No se pudieron cargar favoritos");
+  }
+  return Array.isArray(payload.productIds)
+    ? payload.productIds.filter((id: unknown): id is string => typeof id === "string")
+    : [];
 }
 
 export async function isProductFavorite(userId: string, productId: string): Promise<boolean> {
@@ -46,8 +79,13 @@ export async function isProductFavorite(userId: string, productId: string): Prom
   if (import.meta.env.VITE_E2E === "true") {
     return readE2EFavorites(userId).includes(productId);
   }
-  const snapshot = await getDoc(favoriteRef(userId, productId));
-  return snapshot.exists();
+
+  const response = await favoritesRequest("GET", productId);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "No se pudo consultar favorito");
+  }
+  return Boolean(payload.isFavorite);
 }
 
 export async function addFavoriteProduct(userId: string, productId: string): Promise<void> {
@@ -56,10 +94,12 @@ export async function addFavoriteProduct(userId: string, productId: string): Pro
     writeE2EFavorites(userId, [...readE2EFavorites(userId), productId]);
     return;
   }
-  await setDoc(favoriteRef(userId, productId), {
-    productId,
-    creadoEn: serverTimestamp(),
-  });
+
+  const response = await favoritesRequest("POST", productId);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "No se pudo guardar favorito");
+  }
 }
 
 export async function removeFavoriteProduct(userId: string, productId: string): Promise<void> {
@@ -68,7 +108,23 @@ export async function removeFavoriteProduct(userId: string, productId: string): 
     writeE2EFavorites(userId, readE2EFavorites(userId).filter((id) => id !== productId));
     return;
   }
-  await deleteDoc(favoriteRef(userId, productId));
+
+  const base = getBackendApiBaseUrl();
+  if (!base) {
+    throw new Error("VITE_BACKEND_API_URL no configurada (favoritos)");
+  }
+  const idToken = await auth.currentUser!.getIdToken();
+  const response = await fetch(
+    `${base}/favorites?productId=${encodeURIComponent(productId)}`,
+    {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${idToken}` },
+    }
+  );
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "No se pudo eliminar favorito");
+  }
 }
 
 export async function toggleFavoriteProduct(
@@ -89,8 +145,18 @@ export async function clearFavoriteProductsByUser(userId: string): Promise<void>
     writeE2EFavorites(userId, []);
     return;
   }
-  const snapshot = await getDocs(collection(db, "usuarios", userId, "favoritos"));
-  const batch = writeBatch(db);
-  snapshot.docs.forEach((favorite) => batch.delete(favorite.ref));
-  await batch.commit();
+
+  const base = getBackendApiBaseUrl();
+  if (!base) {
+    throw new Error("VITE_BACKEND_API_URL no configurada (favoritos)");
+  }
+  const idToken = await auth.currentUser!.getIdToken();
+  const response = await fetch(`${base}/favorites`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "No se pudieron eliminar favoritos");
+  }
 }

@@ -1,8 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { collection, onSnapshot } from "firebase/firestore";
 import toast from "react-hot-toast";
-import { db } from "@/firebase/config";
 import { fetchFavoriteProductIds, toggleFavoriteProduct } from "@/domains/clientes/services/favorites";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 
@@ -27,8 +25,6 @@ export function FavoritesProvider({ children }: FavoritesProviderProps) {
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  // Ref para leer el estado más reciente dentro del callback toggle
-  // sin que toggle deba recrearse cada vez que favoriteIds cambia.
   const favoriteIdsRef = useRef(favoriteIds);
   useEffect(() => { favoriteIdsRef.current = favoriteIds; }, [favoriteIds]);
 
@@ -41,44 +37,26 @@ export function FavoritesProvider({ children }: FavoritesProviderProps) {
       return;
     }
 
-    if (import.meta.env.VITE_E2E === "true") {
-      queueMicrotask(() => setLoading(true));
-      let active = true;
-      fetchFavoriteProductIds(user.uid)
-        .then((ids) => {
-          if (!active) return;
-          setFavoriteIds(new Set(ids));
-          setLoading(false);
-        })
-        .catch((error) => {
-          console.error("[FavoritesContext] E2E favorites error:", error);
-          if (active) setLoading(false);
-        });
-      return () => {
-        active = false;
-      };
-    }
-
+    let active = true;
     queueMicrotask(() => setLoading(true));
-    const col = collection(db, "usuarios", user.uid, "favoritos");
 
-    const unsubscribe = onSnapshot(
-      col,
-      { includeMetadataChanges: false },
-      (snapshot) => {
-        setFavoriteIds(new Set(snapshot.docs.map((doc) => doc.id)));
+    fetchFavoriteProductIds(user.uid)
+      .then((ids) => {
+        if (!active) return;
+        setFavoriteIds(new Set(ids));
         setLoading(false);
-      },
-      (error) => {
-        console.error("[FavoritesContext] Firestore error:", error);
-        setLoading(false);
-        if ((error as { code?: string }).code !== "permission-denied") {
+      })
+      .catch((error) => {
+        console.error("[FavoritesContext] favorites error:", error);
+        if (active) {
+          setLoading(false);
           toast.error("Error al cargar favoritos. Intenta recargar la página.");
         }
-      },
-    );
+      });
 
-    return unsubscribe;
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   const toggle = useCallback(async (productId: string) => {
@@ -87,7 +65,6 @@ export function FavoritesProvider({ children }: FavoritesProviderProps) {
     const isCurrentlyFavorite = favoriteIdsRef.current.has(productId);
     const nextValue = !isCurrentlyFavorite;
 
-    // Actualización optimista inmediata
     setFavoriteIds((prev) => {
       const next = new Set(prev);
       if (nextValue) { next.add(productId); } else { next.delete(productId); }
@@ -98,7 +75,6 @@ export function FavoritesProvider({ children }: FavoritesProviderProps) {
       await toggleFavoriteProduct(user.uid, productId, nextValue);
       toast.success(nextValue ? "Agregado a favoritos" : "Quitado de favoritos");
     } catch {
-      // Revertir si falla Firestore
       setFavoriteIds((prev) => {
         const next = new Set(prev);
         if (isCurrentlyFavorite) { next.add(productId); } else { next.delete(productId); }

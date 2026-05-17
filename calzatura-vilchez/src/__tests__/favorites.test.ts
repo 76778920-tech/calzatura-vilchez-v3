@@ -6,75 +6,78 @@ import {
   removeFavoriteProduct,
 } from "@/domains/clientes/services/favorites";
 
-const firestoreMocks = vi.hoisted(() => ({
-  collection: vi.fn((...path: unknown[]) => ({ kind: "collection", path })),
-  deleteDoc: vi.fn().mockResolvedValue(undefined),
-  doc: vi.fn((...path: unknown[]) => ({ kind: "doc", path })),
-  getDoc: vi.fn(),
-  getDocs: vi.fn(),
-  serverTimestamp: vi.fn(() => "server-time"),
-  setDoc: vi.fn().mockResolvedValue(undefined),
-  writeBatch: vi.fn(),
+const { fetchMock, getIdTokenMock } = vi.hoisted(() => ({
+  fetchMock: vi.fn(),
+  getIdTokenMock: vi.fn().mockResolvedValue("token-1"),
 }));
 
 vi.mock("@/firebase/config", () => ({
   auth: {
     currentUser: {
       uid: "user-1",
+      getIdToken: getIdTokenMock,
     },
   },
-  db: { kind: "firestore" },
 }));
 
-vi.mock("firebase/firestore", () => firestoreMocks);
+vi.mock("@/config/apiBackend", () => ({
+  getBackendApiBaseUrl: () => "https://bff.example",
+}));
+
+vi.stubGlobal("fetch", fetchMock);
 
 afterEach(() => {
   vi.clearAllMocks();
 });
 
 describe("favorites service", () => {
-  it("consulta solo favoritos de la cuenta autenticada", async () => {
-    firestoreMocks.getDocs.mockResolvedValue({
-      docs: [{ id: "product-1" }, { id: "product-2" }],
+  it("consulta favoritos via BFF", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ productIds: ["product-1", "product-2"] }),
     });
 
     await expect(fetchFavoriteProductIds("user-1")).resolves.toEqual(["product-1", "product-2"]);
-    expect(firestoreMocks.collection).toHaveBeenCalledWith(
-      { kind: "firestore" },
-      "usuarios",
-      "user-1",
-      "favoritos"
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://bff.example/favorites",
+      expect.objectContaining({
+        method: "GET",
+        headers: expect.objectContaining({ Authorization: "Bearer token-1" }),
+      })
     );
   });
 
   it("bloquea consultas con un userId diferente al usuario actual", async () => {
     await expect(fetchFavoriteProductIds("user-2")).rejects.toThrow("otra cuenta");
-    expect(firestoreMocks.getDocs).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("devuelve el estado favorito por producto", async () => {
-    firestoreMocks.getDoc.mockResolvedValue({ exists: () => true });
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ isFavorite: true }),
+    });
 
     await expect(isProductFavorite("user-1", "product-1")).resolves.toBe(true);
-    expect(firestoreMocks.doc).toHaveBeenCalledWith(
-      { kind: "firestore" },
-      "usuarios",
-      "user-1",
-      "favoritos",
-      "product-1"
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://bff.example/favorites?productId=product-1",
+      expect.any(Object)
     );
   });
 
-  it("agrega y elimina favoritos en la subcoleccion privada del usuario", async () => {
+  it("agrega y elimina favoritos via BFF", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ success: true }) });
+
     await addFavoriteProduct("user-1", "product-1");
     await removeFavoriteProduct("user-1", "product-1");
 
-    expect(firestoreMocks.setDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "doc" }),
-      { productId: "product-1", creadoEn: "server-time" }
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://bff.example/favorites",
+      expect.objectContaining({ method: "POST" })
     );
-    expect(firestoreMocks.deleteDoc).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "doc" })
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://bff.example/favorites?productId=product-1",
+      expect.objectContaining({ method: "DELETE" })
     );
   });
 });
