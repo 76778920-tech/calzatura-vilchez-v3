@@ -6,8 +6,10 @@ relative_files = True
 omit =
     tests/*
     */tests/*
+    evaluate.py
 
 [report]
 omit =
     tests/*
     */tests/*
+    evaluate.py

@@ -9,7 +9,6 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const lcovPath = path.join(repoRoot, "calzatura-vilchez", "coverage", "lcov.info");
 const xmlPath = path.join(repoRoot, "ai-service", "coverage.xml");
-const genericPath = path.join(repoRoot, "ai-service", "coverage-sonar-generic.xml");
 
 function fail(msg) {
   console.error(`validate-sonar-coverage-reports: ${msg}`);
@@ -18,7 +17,6 @@ function fail(msg) {
 
 if (!fs.existsSync(lcovPath)) fail(`no existe ${lcovPath}`);
 if (!fs.existsSync(xmlPath)) fail(`no existe ${xmlPath}`);
-if (!fs.existsSync(genericPath)) fail(`no existe ${genericPath}`);
 
 const lcov = fs.readFileSync(lcovPath, "utf8");
 const badSf = lcov
@@ -45,7 +43,6 @@ for (const rel of requiredTs) {
 }
 
 const xml = fs.readFileSync(xmlPath, "utf8");
-const generic = fs.readFileSync(genericPath, "utf8");
 if (!xml.includes("<source>") || !xml.match(/<source>[^<]+<\/source>/)) {
   fail("coverage.xml sin <source> válido");
 }
@@ -53,11 +50,8 @@ const sourceText = (xml.match(/<source>([^<]*)<\/source>/)?.[1] ?? "").replace(/
 if (sourceText === "." || sourceText.trim() === "") {
   fail('coverage.xml usa <source>.</source>; ejecuta fix_coverage_xml_for_sonar.py');
 }
-if (!sourceText.endsWith("calzatura-vilchez-v3") && !sourceText.includes("Cazatura Vilchez V3")) {
-  // En CI termina en .../calzatura-vilchez-v3; local puede variar — solo exigir que no sea ai-service aislado.
-  if (sourceText.endsWith("/ai-service")) {
-    fail(`<source> debe ser la raíz del monorepo, no ai-service (actual: ${sourceText})`);
-  }
+if (sourceText.endsWith("/ai-service")) {
+  fail(`<source> debe ser la raíz del monorepo, no ai-service (actual: ${sourceText})`);
 }
 
 const requiredPy = [
@@ -77,6 +71,10 @@ for (const fn of requiredPy) {
   }
 }
 
+if (xml.includes('filename="ai-service/evaluate.py"')) {
+  fail("evaluate.py no debe estar en coverage.xml (omit en .coveragerc; exclusión Sonar)");
+}
+
 const supabasePath = "ai-service/services/supabase_client.py";
 const supabaseBlock = xml.match(
   new RegExp(
@@ -92,17 +90,4 @@ if (supabaseBlock) {
   }
 }
 
-if (!generic.includes(`path="${supabasePath}"`)) {
-  fail(`coverage-sonar-generic.xml sin path="${supabasePath}"`);
-}
-const supabaseFileBlock = generic.match(
-  new RegExp(
-    `<file path="${supabasePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[\\s\\S]*?</file>`,
-  ),
-)?.[0];
-const genericUncovered = supabaseFileBlock?.match(/covered="false"/g);
-if (genericUncovered?.length) {
-  fail(`supabase_client en generic: ${genericUncovered.length} líneas covered=false`);
-}
-
-console.log("validate-sonar-coverage-reports: LCOV, coverage.xml y generic listos para SonarCloud");
+console.log("validate-sonar-coverage-reports: LCOV y coverage.xml listos para SonarCloud");

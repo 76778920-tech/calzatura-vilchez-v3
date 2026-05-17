@@ -68,9 +68,7 @@ jobs:
 
       - name: Ajustar coverage.xml a rutas monorepo Sonar
         working-directory: ai-service
-        run: |
-          python scripts/fix_coverage_xml_for_sonar.py
-          python scripts/generate_sonar_generic_coverage.py
+        run: python scripts/fix_coverage_xml_for_sonar.py
 
       - name: Generar informe Bandit (JSON para SonarQube)
         working-directory: ai-service
@@ -81,13 +79,11 @@ jobs:
         run: |
           test -f calzatura-vilchez/coverage/lcov.info
           test -f ai-service/coverage.xml
-          test -f ai-service/coverage-sonar-generic.xml
           test -f calzatura-vilchez/eslint-report.json
           test -f ai-service/bandit-report.json
           grep -q 'SF:calzatura-vilchez/src/' calzatura-vilchez/coverage/lcov.info
           grep -q 'filename="ai-service/models/revenue.py"' ai-service/coverage.xml
           grep -q 'filename="ai-service/services/supabase_client.py"' ai-service/coverage.xml
-          grep -q 'path="ai-service/services/supabase_client.py"' ai-service/coverage-sonar-generic.xml
           node scripts/validate-sonar-coverage-reports.mjs
 
       - name: Validar configuracion SonarQube
@@ -112,7 +108,6 @@ jobs:
           echo "=== Cobertura XML: fuente y revenue ==="
           grep -m1 '<source>' ai-service/coverage.xml
           grep 'filename="ai-service/services/supabase_client.py"' ai-service/coverage.xml | head -1 || true
-          grep -c 'covered="true"' ai-service/coverage-sonar-generic.xml | head -1 || true
           echo "=== stock.ts en lcov (fragmento) ==="
           grep -A2 'SF:calzatura-vilchez/src/utils/stock.ts' calzatura-vilchez/coverage/lcov.info | head -6 || true
 
@@ -141,4 +136,3 @@ jobs:
             "-Dsonar.newCode.referenceBranch=main"
             "-Dsonar.javascript.lcov.reportPaths=calzatura-vilchez/coverage/lcov.info"
             "-Dsonar.python.coverage.reportPaths=ai-service/coverage.xml"
-            "-Dsonar.coverageReportPaths=ai-service/coverage-sonar-generic.xml"
