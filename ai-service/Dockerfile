@@ -6,8 +6,8 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 COPY requirements.txt requirements.lock ./
-# Sonar: versiones resueltas en requirements.lock; solo wheels (sin ejecutar setup.py de terceros).
-RUN pip install --no-cache-dir --only-binary :all: -r requirements.lock
+COPY scripts/docker_install_locked_deps.sh scripts/
+RUN sh scripts/docker_install_locked_deps.sh
 
 COPY . .
 

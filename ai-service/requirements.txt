@@ -1,4 +1,6 @@
-# Versiones directas; tránsitivas en requirements.lock (regenerar: pip-compile requirements.txt -o requirements.lock --strip-extras)
+# Directas aquí; tránsitivas en requirements.lock. Tras cambiar versiones:
+#   pip-compile requirements.txt -o requirements.lock --strip-extras
+#   python scripts/generate_docker_install_script.py
 fastapi==0.115.6
 httpx==0.28.1
 uvicorn[standard]==0.32.1
