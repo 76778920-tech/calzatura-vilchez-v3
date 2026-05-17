@@ -1,6 +1,5 @@
 import { auth } from "@/firebase/config";
 import { supabase } from "@/supabase/client";
-import { logAudit } from "@/services/audit";
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
 import type { Order, OrderStatus, CartItem, Address } from "@/types";
 
@@ -13,6 +12,8 @@ export async function createOrder(data: {
   notas?: string;
   /** Envío en soles; el servidor valida y limita el máximo. */
   envio?: number;
+  /** UUID por intento de checkout; evita pedidos duplicados en reintentos o doble clic. */
+  idempotencyKey?: string;
 }): Promise<string> {
   const user = auth.currentUser;
   if (!user) {
@@ -27,12 +28,16 @@ export async function createOrder(data: {
   const idToken = await user.getIdToken();
   let response: Response;
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    };
+    if (data.idempotencyKey) {
+      headers["Idempotency-Key"] = data.idempotencyKey;
+    }
     response = await fetch(`${base}/createOrder`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${idToken}`,
-      },
+      headers,
       body: JSON.stringify(data),
     });
   } catch {
@@ -77,9 +82,35 @@ export async function fetchOrderById(id: string): Promise<Order | null> {
 }
 
 export async function updateOrderStatus(id: string, estado: OrderStatus): Promise<void> {
-  const { error } = await supabase.from(COL).update({ estado }).eq("id", id);
-  if (error) throw error;
-  void logAudit("cambiar_estado", "pedido", id, `#${id.slice(-8).toUpperCase()}`, { estado });
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("Debes iniciar sesion para actualizar pedidos");
+  }
+
+  const base = getBackendApiBaseUrl();
+  if (!base) {
+    throw new Error("VITE_BACKEND_API_URL no configurada (actualizacion de pedidos)");
+  }
+
+  const idToken = await user.getIdToken();
+  let response: Response;
+  try {
+    response = await fetch(`${base}/updateOrderStatus`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ orderId: id, estado }),
+    });
+  } catch {
+    throw new Error("No se pudo conectar con el servidor de pedidos. Intenta otra vez en unos segundos.");
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(typeof payload.error === "string" ? payload.error : "No se pudo actualizar el estado");
+  }
 }
 
 export async function updateOrderStripeSession(

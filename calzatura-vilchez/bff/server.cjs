@@ -31,7 +31,7 @@ function applyCorsHeaders(req, res, next) {
       res.setHeader("Vary", "Origin");
     }
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key");
     res.setHeader("Access-Control-Max-Age", "86400");
   }
   if (req.method === "OPTIONS") {
@@ -48,7 +48,14 @@ const cors = require("cors")({
     }
     callback(new Error("Origen no permitido"));
   },
+  allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key"],
 });
+
+const {
+  readIdempotencyKey,
+  findOrderByIdempotency,
+  idempotencyOrderJson,
+} = require("../functions/fnUtils");
 
 function loadFirebaseServiceAccount() {
   const filePath = process.env.FIREBASE_SERVICE_ACCOUNT_FILE;
@@ -145,6 +152,19 @@ async function assertAdminRole(supabase, uid) {
   }
   throw Object.assign(new Error("Solo administradores pueden consultar el servicio de IA"), { status: 403 });
 }
+
+async function assertStaffRole(supabase, uid) {
+  const { data, error } = await supabase.from("usuarios").select("rol").eq("uid", uid).maybeSingle();
+  if (error) {
+    throw Object.assign(new Error("No se pudo verificar el rol"), { status: 500 });
+  }
+  if (data?.rol === "admin" || data?.rol === "trabajador") {
+    return;
+  }
+  throw Object.assign(new Error("Sin permisos para gestionar pedidos"), { status: 403 });
+}
+
+const ORDER_STATUSES = new Set(["pendiente", "pagado", "enviado", "entregado", "cancelado"]);
 
 function toCents(amount) {
   return Math.round(Number(amount || 0) * 100);
@@ -804,9 +824,12 @@ async function fetchOrderOrThrow(supabase, orderId) {
 }
 
 async function updateOrder(supabase, orderId, patch) {
-  const { error } = await supabase.from("pedidos").update(patch).eq("id", orderId);
+  const { data, error } = await supabase.from("pedidos").update(patch).eq("id", orderId).select("id").maybeSingle();
   if (error) {
     throw Object.assign(new Error("No se pudo actualizar el pedido"), { status: 500 });
+  }
+  if (!data?.id) {
+    throw Object.assign(new Error("Pedido no encontrado"), { status: 404 });
   }
 }
 
@@ -1077,6 +1100,14 @@ app.post("/createOrder", (req, res) => {
 
         const normalizedAddress = normalizeAddress(direccion);
         const normalizedNotes = normalizeOptionalText(notas, 600);
+        const idempotencyKey = readIdempotencyKey(req);
+        if (idempotencyKey) {
+          const existing = await findOrderByIdempotency(supabase, decodedToken.uid, idempotencyKey);
+          if (existing?.estado === "pendiente") {
+            return res.status(200).json(idempotencyOrderJson(existing, true));
+          }
+        }
+
         const draft = await buildOrderDraft(supabase, items);
         let envio = draft.envio;
         if (typeof rawEnvio === "number" && Number.isFinite(rawEnvio) && rawEnvio >= 0) {
@@ -1085,23 +1116,31 @@ app.post("/createOrder", (req, res) => {
         const total = draft.subtotal + envio;
         const creadoEn = new Date().toISOString();
 
-        const { data, error } = await supabase
-          .from("pedidos")
-          .insert({
-            userId: decodedToken.uid,
-            userEmail: decodedToken.email || "",
-            items: draft.items,
-            subtotal: draft.subtotal,
-            envio,
-            total,
-            estado: "pendiente",
-            direccion: normalizedAddress,
-            creadoEn,
-            metodoPago,
-            notas: normalizedNotes || "",
-          })
-          .select("id")
-          .single();
+        const insertRow = {
+          userId: decodedToken.uid,
+          userEmail: decodedToken.email || "",
+          items: draft.items,
+          subtotal: draft.subtotal,
+          envio,
+          total,
+          estado: "pendiente",
+          direccion: normalizedAddress,
+          creadoEn,
+          metodoPago,
+          notas: normalizedNotes || "",
+        };
+        if (idempotencyKey) {
+          insertRow.idempotencyKey = idempotencyKey;
+        }
+
+        let { data, error } = await supabase.from("pedidos").insert(insertRow).select("id").single();
+
+        if (error?.code === "23505" && idempotencyKey) {
+          const existing = await findOrderByIdempotency(supabase, decodedToken.uid, idempotencyKey);
+          if (existing?.estado === "pendiente") {
+            return res.status(200).json(idempotencyOrderJson(existing, true));
+          }
+        }
 
         if (error || !data?.id) {
           throw Object.assign(new Error("No se pudo crear el pedido"), { status: 500 });
@@ -1145,6 +1184,51 @@ app.post("/createOrder", (req, res) => {
     });
 });
 
+app.post("/updateOrderStatus", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+
+      const { orderId, estado } = req.body || {};
+      if (!orderId || typeof orderId !== "string") {
+        return res.status(400).json({ error: "Pedido invalido" });
+      }
+      if (!ORDER_STATUSES.has(estado)) {
+        return res.status(400).json({ error: "Estado invalido" });
+      }
+
+      const patch = { estado };
+      if (estado === "pagado") {
+        patch.pagadoEn = new Date().toISOString();
+      }
+
+      await updateOrder(supabase, orderId, patch);
+
+      await logAuditFn(
+        supabase,
+        "cambiar_estado",
+        "pedido",
+        orderId,
+        `#${orderId.slice(-8).toUpperCase()}`,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { estado, source: "updateOrderStatus" },
+      );
+
+      return res.status(200).json({ orderId, estado });
+    } catch (error) {
+      console.error("Update order status error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.post("/createCheckoutSession", (req, res) => {
     cors(req, res, async () => {
       if (req.method !== "POST") {
@@ -1174,6 +1258,21 @@ app.post("/createCheckoutSession", (req, res) => {
         }
 
         assertStoredTotals(order);
+
+        if (order.stripeSessionId) {
+          try {
+            const existingSession = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+            if (existingSession.status === "open" && typeof existingSession.url === "string" && existingSession.url.startsWith("https://")) {
+              return res.status(200).json({
+                sessionId: existingSession.id,
+                url: existingSession.url,
+                reused: true,
+              });
+            }
+          } catch (sessionErr) {
+            console.warn("Stripe session reuse skipped:", sessionErr?.message || sessionErr);
+          }
+        }
 
         const lineItems = [];
 

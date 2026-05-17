@@ -13,6 +13,7 @@ const {
   isNonEmptyString, isValidLoginEmail, isValidLoginPassword,
   isInvalidOrderQty, hasValidOrderItems, toCents, validStripeImage, publicError,
   normalizeOptionalText, normalizeAddress,
+  readIdempotencyKey, findOrderByIdempotency, idempotencyOrderJson,
   sumSizeStock, sumColorSizeStock, getAvailableSizes, deriveTotalStock, getSizeStock,
   sanitizeOrderProduct, extractItemFields, assertStoredTotals,
   assertStockAndPrice, resolveColorBucket, findTallaKeyInMap, cellQty,
@@ -91,6 +92,19 @@ async function assertAdminRole(supabase, uid) {
   }
   throw Object.assign(new Error("Solo administradores pueden consultar el servicio de IA"), { status: 403 });
 }
+
+async function assertStaffRole(supabase, uid) {
+  const { data, error } = await supabase.from("usuarios").select("rol").eq("uid", uid).maybeSingle();
+  if (error) {
+    throw Object.assign(new Error("No se pudo verificar el rol"), { status: 500 });
+  }
+  if (data?.rol === "admin" || data?.rol === "trabajador") {
+    return;
+  }
+  throw Object.assign(new Error("Sin permisos para gestionar pedidos"), { status: 403 });
+}
+
+const ORDER_STATUSES = new Set(["pendiente", "pagado", "enviado", "entregado", "cancelado"]);
 
 // Inserta en la tabla auditoria desde el contexto de Cloud Functions.
 // No lanza: un fallo de auditoría nunca interrumpe la operación principal.
@@ -251,9 +265,12 @@ async function fetchOrderOrThrow(supabase, orderId) {
 }
 
 async function updateOrder(supabase, orderId, patch) {
-  const { error } = await supabase.from("pedidos").update(patch).eq("id", orderId);
+  const { data, error } = await supabase.from("pedidos").update(patch).eq("id", orderId).select("id").maybeSingle();
   if (error) {
     throw Object.assign(new Error("No se pudo actualizar el pedido"), { status: 500 });
+  }
+  if (!data?.id) {
+    throw Object.assign(new Error("Pedido no encontrado"), { status: 404 });
   }
 }
 
@@ -353,6 +370,14 @@ exports.createOrder = onRequest(
 
         const normalizedAddress = normalizeAddress(direccion);
         const normalizedNotes = normalizeOptionalText(notas, 600);
+        const idempotencyKey = readIdempotencyKey(req);
+        if (idempotencyKey) {
+          const existing = await findOrderByIdempotency(supabase, decodedToken.uid, idempotencyKey);
+          if (existing?.estado === "pendiente") {
+            return res.status(200).json(idempotencyOrderJson(existing, true));
+          }
+        }
+
         const draft = await buildOrderDraft(supabase, items);
         let envio = draft.envio;
         if (typeof rawEnvio === "number" && Number.isFinite(rawEnvio) && rawEnvio >= 0) {
@@ -361,23 +386,31 @@ exports.createOrder = onRequest(
         const total = draft.subtotal + envio;
         const creadoEn = new Date().toISOString();
 
-        const { data, error } = await supabase
-          .from("pedidos")
-          .insert({
-            userId: decodedToken.uid,
-            userEmail: strOr(decodedToken.email),
-            items: draft.items,
-            subtotal: draft.subtotal,
-            envio,
-            total,
-            estado: "pendiente",
-            direccion: normalizedAddress,
-            creadoEn,
-            metodoPago,
-            notas: normalizedNotes,
-          })
-          .select("id")
-          .single();
+        const insertRow = {
+          userId: decodedToken.uid,
+          userEmail: strOr(decodedToken.email),
+          items: draft.items,
+          subtotal: draft.subtotal,
+          envio,
+          total,
+          estado: "pendiente",
+          direccion: normalizedAddress,
+          creadoEn,
+          metodoPago,
+          notas: normalizedNotes,
+        };
+        if (idempotencyKey) {
+          insertRow.idempotencyKey = idempotencyKey;
+        }
+
+        let { data, error } = await supabase.from("pedidos").insert(insertRow).select("id").single();
+
+        if (error?.code === "23505" && idempotencyKey) {
+          const existing = await findOrderByIdempotency(supabase, decodedToken.uid, idempotencyKey);
+          if (existing?.estado === "pendiente") {
+            return res.status(200).json(idempotencyOrderJson(existing, true));
+          }
+        }
 
         if (error || !data?.id) {
           throw Object.assign(new Error("No se pudo crear el pedido"), { status: 500 });
@@ -422,6 +455,54 @@ exports.createOrder = onRequest(
   }
 );
 
+exports.updateOrderStatus = onRequest(
+  { secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
+  async (req, res) => {
+    cors(req, res, async () => {
+      if (req.method !== "POST") {
+        return res.status(405).json({ error: "Metodo no permitido" });
+      }
+
+      try {
+        const decodedToken = await verifyFirebaseUser(req);
+        const supabase = getSupabaseAdmin();
+        await assertStaffRole(supabase, decodedToken.uid);
+
+        const { orderId, estado } = objOr(req.body);
+        if (!orderId || typeof orderId !== "string") {
+          return res.status(400).json({ error: "Pedido invalido" });
+        }
+        if (!ORDER_STATUSES.has(estado)) {
+          return res.status(400).json({ error: "Estado invalido" });
+        }
+
+        const patch = { estado };
+        if (estado === "pagado") {
+          patch.pagadoEn = new Date().toISOString();
+        }
+
+        await updateOrder(supabase, orderId, patch);
+
+        await logAuditFn({
+          supabase,
+          accion: "cambiar_estado",
+          entidad: "pedido",
+          entidadId: orderId,
+          entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
+          usuarioUid: decodedToken.uid,
+          usuarioEmail: strOr(decodedToken.email),
+          detalle: { estado, source: "updateOrderStatus" },
+        });
+
+        return res.status(200).json({ orderId, estado });
+      } catch (error) {
+        console.error("Update order status error:", error);
+        return res.status(errorStatus(error)).json({ error: publicError(error) });
+      }
+    });
+  }
+);
+
 exports.createCheckoutSession = onRequest(
   { secrets: [STRIPE_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
   async (req, res) => {
@@ -454,6 +535,25 @@ exports.createCheckoutSession = onRequest(
 
         assertStoredTotals(order);
         await assertOrderStockAvailability(supabase, order.items);
+
+        if (order.stripeSessionId) {
+          try {
+            const existingSession = await stripe.checkout.sessions.retrieve(order.stripeSessionId);
+            if (
+              existingSession.status === "open" &&
+              typeof existingSession.url === "string" &&
+              existingSession.url.startsWith("https://")
+            ) {
+              return res.status(200).json({
+                sessionId: existingSession.id,
+                url: existingSession.url,
+                reused: true,
+              });
+            }
+          } catch (sessionErr) {
+            console.warn("Stripe session reuse skipped:", sessionErr?.message || sessionErr);
+          }
+        }
 
         const lineItems = [];
 

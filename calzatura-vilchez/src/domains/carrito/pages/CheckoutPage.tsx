@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ShoppingBag, CreditCard, Truck, ChevronRight } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
@@ -84,6 +84,16 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<"direccion" | "pago">("direccion");
   const [loading, setLoading] = useState(false);
   const [metodoPago, setMetodoPago] = useState<"stripe" | "contraentrega">("stripe");
+  const submittingRef = useRef(false);
+  const idempotencyKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (step === "pago") {
+      idempotencyKeyRef.current ??= crypto.randomUUID();
+    } else {
+      idempotencyKeyRef.current = null;
+    }
+  }, [step]);
 
   const [direccion, setDireccion] = useState<Address>({
     nombre: userProfile?.nombre?.split(" ")[0] ?? "",
@@ -171,11 +181,15 @@ export default function CheckoutPage() {
   };
 
   const handlePlaceOrder = async () => {
+    if (submittingRef.current || loading) return;
     if (metodoPago === "stripe" && !STRIPE_PK.trim()) {
       toast.error("El pago con tarjeta no está configurado (falta VITE_STRIPE_PUBLIC_KEY). Usa contra entrega o contacta a la tienda.");
       return;
     }
+    submittingRef.current = true;
     setLoading(true);
+    const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID();
+    idempotencyKeyRef.current = idempotencyKey;
     try {
       const checkoutItems = await resolveCheckoutItems(items);
       const orderId = await createOrder({
@@ -184,6 +198,7 @@ export default function CheckoutPage() {
         metodoPago,
         notas: "",
         envio: geo.envioMonto,
+        idempotencyKey,
       });
 
       if (metodoPago === "stripe" && STRIPE_PK) {
@@ -195,7 +210,7 @@ export default function CheckoutPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error desconocido";
       toast.error("Error al procesar el pedido: " + message);
-    } finally {
+      submittingRef.current = false;
       setLoading(false);
     }
   };

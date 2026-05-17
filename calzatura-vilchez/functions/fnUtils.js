@@ -108,6 +108,43 @@ function normalizeOptionalText(value, max) {
   return value.trim();
 }
 
+const IDEMPOTENCY_KEY_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function readIdempotencyKey(req) {
+  const header = trimStr(req.headers?.["idempotency-key"]);
+  const bodyKey = trimStr(objOr(req.body).idempotencyKey);
+  const raw = header || bodyKey;
+  if (!raw || raw.length > 64 || !IDEMPOTENCY_KEY_RE.test(raw)) return null;
+  return raw;
+}
+
+async function findOrderByIdempotency(supabase, userId, idempotencyKey) {
+  if (!idempotencyKey) return null;
+  const { data, error } = await supabase
+    .from("pedidos")
+    .select("id, subtotal, envio, total, estado")
+    .eq("idempotencyKey", idempotencyKey)
+    .eq("userId", userId)
+    .maybeSingle();
+  if (error) {
+    console.error("idempotency lookup:", error.message);
+    return null;
+  }
+  return data;
+}
+
+function idempotencyOrderJson(orderRow, reused = false) {
+  return {
+    orderId: orderRow.id,
+    subtotal: toN(orderRow.subtotal),
+    envio: toN(orderRow.envio),
+    total: toN(orderRow.total),
+    estado: strOr(orderRow.estado, "pendiente"),
+    ...(reused ? { reused: true } : {}),
+  };
+}
+
 function normalizeAddress(address) {
   if (!address || typeof address !== "object" || Array.isArray(address)) {
     throw Object.assign(new Error("Direccion invalida"), { status: 400 });
@@ -550,6 +587,9 @@ module.exports = {
   publicError,
   normalizeTextField,
   normalizeOptionalText,
+  readIdempotencyKey,
+  findOrderByIdempotency,
+  idempotencyOrderJson,
   normalizeAddress,
   sumSizeStock,
   sumColorSizeStock,

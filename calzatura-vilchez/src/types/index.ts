@@ -137,6 +137,7 @@ export interface Order {
   stripeSessionId?: string;
   metodoPago: string;
   notas?: string;
+  idempotencyKey?: string;
 }
 
 export interface UserProfile {

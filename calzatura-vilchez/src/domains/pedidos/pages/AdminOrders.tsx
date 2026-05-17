@@ -44,11 +44,20 @@ export default function AdminOrders() {
     try {
       await updateOrderStatus(orderId, estado);
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, estado } : o))
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                estado,
+                ...(estado === "pagado" ? { pagadoEn: new Date().toISOString() } : {}),
+              }
+            : o,
+        ),
       );
       toast.success("Estado actualizado");
-    } catch {
-      toast.error("Error al actualizar estado");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error al actualizar estado";
+      toast.error(message);
     }
   };
 
