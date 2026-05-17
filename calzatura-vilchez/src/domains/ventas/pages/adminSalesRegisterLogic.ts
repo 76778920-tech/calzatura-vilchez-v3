@@ -5,7 +5,11 @@ import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services
 import type { SaleCustomer, SaleDocumentType } from "@/types";
 import { closeSaleDocumentWindow, openSaleDocumentWindow, renderSaleDocument, type SaleDocumentLine } from "@/utils/saleDocument";
 import type { PendingSaleLine, SaleProduct } from "./adminSalesTypes";
-import { unknownClientErrorHttpStatus, unknownClientErrorMessage } from "@/utils/unknownClientError";
+import {
+  dniLookupErrorToast,
+  isDniLookupError,
+  salesOperationErrorToast,
+} from "@/domains/ventas/utils/salesErrorMessages";
 
 export const EMPTY_SALE_CUSTOMER: SaleCustomer = { dni: "", nombres: "", apellidos: "" };
 
@@ -45,43 +49,13 @@ function makeDocumentNumber(type: Exclude<SaleDocumentType, "ninguno">, date: st
 }
 
 export function showDniLookupError(err: unknown) {
-  const msg = err instanceof Error ? err.message : "";
-  if (msg === "DNI_LOOKUP_NOT_CONFIGURED") {
-    toast.error("La busqueda por DNI aun no tiene API configurada");
-  } else if (msg === "DNI_NOT_FOUND") {
-    toast.error("No se encontraron datos para este DNI");
-  } else {
-    toast.error("No se pudo consultar el DNI");
-  }
+  toast.error(dniLookupErrorToast(err));
 }
 
-export function isDniLookupError(err: unknown) {
-  const msg = err instanceof Error ? err.message : "";
-  return ["DNI_INVALID", "DNI_LOOKUP_NOT_CONFIGURED", "DNI_NOT_FOUND", "DNI_LOOKUP_FAILED"].includes(msg);
-}
+export { isDniLookupError } from "@/domains/ventas/utils/salesErrorMessages";
 
 export function toastFromSalesError(err: unknown): string {
-  const msg = unknownClientErrorMessage(err);
-  const code = typeof err === "object" && err && "code" in err ? String((err as { code?: unknown }).code) : "";
-  const status = unknownClientErrorHttpStatus(err);
-  const lower = `${msg} ${code}`.toLowerCase();
-  if (
-    lower.includes("insufficient_stock") ||
-    lower.includes("insufficient_size_stock") ||
-    lower.includes("stock insuficiente")
-  ) {
-    return "Stock insuficiente. Actualiza la lista y vuelve a intentarlo.";
-  }
-  if (code === "42501" || lower.includes("row-level security")) {
-    return "Sin permisos para realizar esta operación.";
-  }
-  if (status === 401 || code === "401" || lower.includes("401") || lower.includes("unauthorized") || lower.includes("jwt")) {
-    return "Sesión sin autorización para realizar esta operación.";
-  }
-  if (code === "PGRST202" || lower.includes("could not find the function")) {
-    return "Operación no disponible en la base de datos. Aplica las migraciones pendientes.";
-  }
-  return `Error: ${msg || "no se pudo completar la operación"}`;
+  return salesOperationErrorToast(err);
 }
 
 type AddSaleLineValidation = {
