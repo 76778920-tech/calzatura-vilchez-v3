@@ -65,23 +65,13 @@ jobs:
         with:
           ref: ${{ needs.gate.outputs.head_sha }}
 
-      # No usar `test -n "$FIREBASE_SERVICE_ACCOUNT"`: el JSON multilínea rompe bash ("too many arguments").
-      - name: Falta FIREBASE_SERVICE_ACCOUNT
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT == '' }}
-        run: |
-          echo "::error::Falta FIREBASE_SERVICE_ACCOUNT en GitHub → Settings → Secrets → Actions."
-          echo "Firebase Console → Configuración del proyecto → Cuentas de servicio → Generar clave privada → pegar el JSON completo."
-          exit 1
-
-      - name: Faltan secrets VITE (Supabase o Firebase)
-        if: ${{ secrets.VITE_SUPABASE_URL == '' || secrets.VITE_FIREBASE_API_KEY == '' }}
-        run: |
-          echo "::error::Faltan VITE_SUPABASE_URL o VITE_FIREBASE_API_KEY en GitHub Secrets."
-          exit 1
-
-      - name: Secrets Firebase presentes
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
-        run: echo "Secrets Firebase OK — build y deploy."
+      # GitHub no permite `secrets` en `if:` de pasos; el JSON Firebase rompe `test -n` en bash.
+      - name: Verificar secrets Firebase
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+        run: node scripts/verify-deploy-firebase-secrets.mjs
 
       - name: Configurar Node.js 20
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -141,20 +131,29 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - name: Aviso — sin deploy hook de Render
-        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL == '' }}
+      - name: Comprobar hook Render
+        id: render_hook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          echo "::warning::RENDER_DEPLOY_HOOK_URL no configurado — se omite redeploy del AI Service."
-          echo "Render → servicio IA → Settings → Deploy Hook → copiar URL → GitHub Secrets."
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::RENDER_DEPLOY_HOOK_URL no configurado — se omite redeploy del AI Service."
+            echo "Render → servicio IA → Settings → Deploy Hook → copiar URL → GitHub Secrets."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Disparar deploy hook
-        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+        if: steps.render_hook.outputs.ready == 'true'
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
           echo "Deploy hook enviado."
 
       - name: Esperar health del servicio IA (cold start)
-        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
+        if: steps.render_hook.outputs.ready == 'true'
         env:
           AI_BASE: ${{ secrets.VITE_AI_SERVICE_URL || 'https://calzatura-vilchez-v3.onrender.com' }}
         run: |
