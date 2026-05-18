@@ -65,17 +65,23 @@ jobs:
         with:
           ref: ${{ needs.gate.outputs.head_sha }}
 
-      - name: Verificar secrets Firebase
-        env:
-          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
-        shell: bash
+      # No usar `test -n "$FIREBASE_SERVICE_ACCOUNT"`: el JSON multilínea rompe bash ("too many arguments").
+      - name: Falta FIREBASE_SERVICE_ACCOUNT
+        if: secrets.FIREBASE_SERVICE_ACCOUNT == ''
         run: |
-          set -euo pipefail
-          test -n "$FIREBASE_SERVICE_ACCOUNT" || (echo "::error::Falta FIREBASE_SERVICE_ACCOUNT" && exit 1)
-          test -n "$VITE_SUPABASE_URL" || (echo "::error::Falta VITE_SUPABASE_URL" && exit 1)
-          test -n "$VITE_FIREBASE_API_KEY" || (echo "::error::Falta VITE_FIREBASE_API_KEY" && exit 1)
+          echo "::error::Falta FIREBASE_SERVICE_ACCOUNT en GitHub → Settings → Secrets → Actions."
+          echo "Firebase Console → Configuración del proyecto → Cuentas de servicio → Generar clave privada → pegar el JSON completo."
+          exit 1
+
+      - name: Faltan secrets VITE (Supabase o Firebase)
+        if: secrets.VITE_SUPABASE_URL == '' || secrets.VITE_FIREBASE_API_KEY == ''
+        run: |
+          echo "::error::Faltan VITE_SUPABASE_URL o VITE_FIREBASE_API_KEY en GitHub Secrets."
+          exit 1
+
+      - name: Secrets Firebase presentes
+        if: secrets.FIREBASE_SERVICE_ACCOUNT != ''
+        run: echo "Secrets Firebase OK — build y deploy."
 
       - name: Configurar Node.js 20
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -135,22 +141,20 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - name: Verificar secret Render
-        env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-        shell: bash
+      - name: Aviso — sin deploy hook de Render
+        if: secrets.RENDER_DEPLOY_HOOK_URL == ''
         run: |
-          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
-            echo "::warning::Falta RENDER_DEPLOY_HOOK_URL — crea el secret en GitHub (Render → Deploy Hook). Job omitido."
-            exit 1
-          fi
+          echo "::warning::RENDER_DEPLOY_HOOK_URL no configurado — se omite redeploy del AI Service."
+          echo "Render → servicio IA → Settings → Deploy Hook → copiar URL → GitHub Secrets."
 
       - name: Disparar deploy hook
+        if: secrets.RENDER_DEPLOY_HOOK_URL != ''
         run: |
           curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
           echo "Deploy hook enviado."
 
       - name: Esperar health del servicio IA (cold start)
+        if: secrets.RENDER_DEPLOY_HOOK_URL != ''
         env:
           AI_BASE: ${{ secrets.VITE_AI_SERVICE_URL || 'https://calzatura-vilchez-v3.onrender.com' }}
         run: |

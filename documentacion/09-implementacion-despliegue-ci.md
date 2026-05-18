@@ -198,7 +198,15 @@ No hay deploy en `pull_request`. El workflow antiguo `Deploy — Firebase Hostin
 | `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | CI Integration + IA |
 | `SONAR_TOKEN` | SonarQube (opcional; skip si falta) |
 
-Sin `RENDER_DEPLOY_HOOK_URL` el job **Render — AI Service** falla con aviso; el workflow sigue en success si **Firebase Hosting** terminó bien (`continue-on-error` en Render). Con el secret configurado, Render despliega vía hook y valida `GET /api/health`.
+Sin `RENDER_DEPLOY_HOOK_URL` el job **Render — AI Service** muestra **warning** y omite el hook (no bloquea el workflow). **Firebase Hosting** sí requiere `FIREBASE_SERVICE_ACCOUNT` y los `VITE_*` mínimos; sin ellos el deploy falla.
+
+### 7.2.1 Errores frecuentes en Actions
+
+| Mensaje | Causa | Qué hacer |
+|---------|--------|-----------|
+| `Falta FIREBASE_SERVICE_ACCOUNT` | Secret no creado en GitHub | Settings → Secrets → Actions → New secret. Valor = JSON completo de la cuenta de servicio (una clave, no solo el PEM). |
+| `test: too many arguments` (antiguo) | Script bash con JSON en `env` | Corregido en el workflow: la presencia del secret se valida con `if: secrets.*` sin exportar el JSON al shell. |
+| `RENDER_DEPLOY_HOOK_URL no configurado` | Warning, no error | Opcional para redeploy automático de IA. Copiar Deploy Hook de Render si quieres que cada push a `main` actualice el servicio. |
 
 ### 7.3 Despliegue manual de emergencia
 
