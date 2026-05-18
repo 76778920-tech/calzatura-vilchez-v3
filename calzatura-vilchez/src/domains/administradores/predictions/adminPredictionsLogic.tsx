@@ -11,7 +11,23 @@ import {
 } from "lucide-react";
 import { motion, animate } from "framer-motion";
 import { assistantReplyWhenDemandUnavailable } from "./predictionDataQuality";
-import { IRE_NIVEL_LABELS, type Prediction } from "./adminPredictionsTypes";
+import {
+  IRE_NIVEL_LABELS,
+  type CampanaActiveResponse,
+  type CampanaDetectada,
+  type FeatureImportance,
+  type HorizonOption,
+  type IreHistorialPoint,
+  type ModeloMeta,
+  type Prediction,
+  type PredictionTab,
+  type RankingPeriod,
+  type Recomendación,
+  type RevenueForecast,
+  type RevenuePoint,
+  type RevenueSummary,
+  type WeekPoint,
+} from "./adminPredictionsTypes";
 
 export * from "./adminPredictionsTypes";
 
