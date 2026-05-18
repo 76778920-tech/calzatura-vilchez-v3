@@ -215,6 +215,8 @@ jobs:
         run: npm run test:e2e
         env:
           CI: "true"
+          VITE_E2E: "true"
+          VITE_ORS_API_KEY: ""
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://ci-placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ci_placeholder' }}
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY || 'pk_test_ci_placeholder' }}

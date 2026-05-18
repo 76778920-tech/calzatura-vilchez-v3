@@ -91,22 +91,9 @@ export async function mockSupabasePublicProductos(
   page: Page,
   catalog: Array<Record<string, unknown>>,
 ): Promise<void> {
-  const byId = new Map(catalog.map((p) => [String(p.id), p]));
-
   await page.route("**/rest/v1/productos*", async (route) => {
     if (route.request().method() !== "GET") {
       await route.fallback();
-      return;
-    }
-
-    const url = route.request().url();
-    const matched = catalog.filter((p) => url.includes(String(p.id)));
-    if (matched.length > 0) {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(matched),
-      });
       return;
     }
 
@@ -202,16 +189,45 @@ export async function mockClientFirebaseAuth(page: Page, user: E2EClientUser): P
   });
 
   await page.route("**/rest/v1/usuarios*", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    const profile = {
+      uid: user.uid,
+      nombre: user.name,
+      email: user.email,
+      rol: "cliente",
+      creadoEn: "2026-01-01T00:00:00.000Z",
+    };
+    const url = route.request().url();
+    const accept = route.request().headers().accept ?? "";
+    const wantsObject = accept.includes("application/vnd.pgrst.object+json");
+    const filtered = url.includes(`uid=eq.${user.uid}`);
+
+    if (filtered && wantsObject) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(profile),
+      });
+      return;
+    }
+
+    if (filtered) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([profile]),
+      });
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({
-        uid: user.uid,
-        nombre: user.name,
-        email: user.email,
-        rol: "cliente",
-        creadoEn: "2026-01-01T00:00:00.000Z",
-      }),
+      body: JSON.stringify([profile]),
     });
   });
 }

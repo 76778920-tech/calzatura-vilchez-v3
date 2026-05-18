@@ -359,6 +359,7 @@ export function useAdminPredictionsModel() {
       conHistorial,
       enRiesgo,
       horizon,
+      predictionDataSufficient,
       productoMotor,
       promedioCobertura,
       revenueSummary,

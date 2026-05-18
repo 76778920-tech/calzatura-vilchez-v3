@@ -51,7 +51,11 @@ if (await isPortInUse(E2E_PORT)) {
   await new Promise((r) => setTimeout(r, 800));
 }
 
-const env = { ...process.env };
+const env = {
+  ...process.env,
+  // Mismo valor que playwright.config webServer.env (evita servidor reutilizado sin E2E).
+  VITE_E2E: "true",
+};
 delete env.NO_COLOR;
 delete env.FORCE_COLOR;
 

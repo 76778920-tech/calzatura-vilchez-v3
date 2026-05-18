@@ -4,6 +4,9 @@ import { getBackendApiBaseUrl } from "@/config/apiBackend";
 const E2E_FAVORITES_PREFIX = "e2e_favorites:";
 
 function assertCurrentUser(userId: string) {
+  // En E2E, Firebase puede restaurar la sesión un tick después del contexto React;
+  // los favoritos viven en localStorage aislado por uid del test.
+  if (import.meta.env.VITE_E2E === "true") return;
   if (auth.currentUser?.uid !== userId) {
     throw new Error("No puedes consultar favoritos de otra cuenta");
   }

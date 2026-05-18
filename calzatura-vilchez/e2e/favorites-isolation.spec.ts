@@ -35,6 +35,8 @@ const USER_B: E2EClientUser = {
   name: "Cliente B",
 };
 
+const E2E_FAVORITES_KEY_A = `e2e_favorites:${USER_A.uid}`;
+
 async function newClientPage(browser: Browser, baseURL: string, user: E2EClientUser) {
   const origin = new URL(baseURL).origin;
   const context = await browser.newContext({ storageState: storageStateForUser(origin, user) });
@@ -53,8 +55,6 @@ test.describe("favoritos privados por cuenta (BFF)", () => {
 
     const clientA = await newClientPage(browser, url, USER_A);
     sessions.push(clientA.context);
-    const clientB = await newClientPage(browser, url, USER_B);
-    sessions.push(clientB.context);
 
     try {
       await clientA.page.goto("/productos");
@@ -65,9 +65,25 @@ test.describe("favoritos privados por cuenta (BFF)", () => {
         .click();
       await expect(clientA.page.getByText(/agregado a favoritos/i)).toBeVisible({ timeout: 8_000 });
 
-      await clientA.page.goto("/favoritos");
-      await expect(clientA.page.getByText(FAVORITE_PRODUCT.nombre)).toBeVisible({ timeout: 15_000 });
+      await clientA.page.waitForFunction(
+        ([key, productId]) => {
+          try {
+            const raw = localStorage.getItem(key);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) && parsed.includes(productId);
+          } catch {
+            return false;
+          }
+        },
+        [E2E_FAVORITES_KEY_A, FAVORITE_PRODUCT.id],
+        { timeout: 10_000 },
+      );
 
+      await clientA.page.goto("/favoritos", { waitUntil: "networkidle" });
+      await expect(clientA.page.getByText(FAVORITE_PRODUCT.nombre)).toBeVisible({ timeout: 20_000 });
+
+      const clientB = await newClientPage(browser, url, USER_B);
+      sessions.push(clientB.context);
       await clientB.page.goto("/favoritos");
       await expect(clientB.page.getByRole("heading", { name: /aún no tienes favoritos/i })).toBeVisible({ timeout: 15_000 });
       await expect(clientB.page.getByText(FAVORITE_PRODUCT.nombre)).toHaveCount(0);
