@@ -10,6 +10,41 @@ on:
         description: Commit en main a desplegar
         required: true
         type: string
+    secrets:
+      FIREBASE_SERVICE_ACCOUNT:
+        required: true
+      VITE_SUPABASE_URL:
+        required: true
+      VITE_FIREBASE_API_KEY:
+        required: true
+      VITE_FIREBASE_AUTH_DOMAIN:
+        required: false
+      VITE_FIREBASE_PROJECT_ID:
+        required: false
+      VITE_FIREBASE_MESSAGING_SENDER_ID:
+        required: false
+      VITE_FIREBASE_APP_ID:
+        required: false
+      VITE_SUPABASE_ANON_KEY:
+        required: false
+      VITE_STRIPE_PUBLIC_KEY:
+        required: false
+      VITE_CLOUDINARY_CLOUD_NAME:
+        required: false
+      VITE_CLOUDINARY_UPLOAD_PRESET:
+        required: false
+      VITE_DNI_LOOKUP_URL:
+        required: false
+      VITE_AI_SERVICE_URL:
+        required: false
+      VITE_AI_ADMIN_PROXY_URL:
+        required: false
+      VITE_BACKEND_API_URL:
+        required: false
+      VITE_ORS_API_KEY:
+        required: false
+      RENDER_DEPLOY_HOOK_URL:
+        required: false
   workflow_dispatch:
 
 env:
@@ -55,7 +90,7 @@ jobs:
       - name: Exigir CI + CI Integration en success (solo tras workflow_call)
         if: github.event_name == 'workflow_call'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
           REQUIRED_WORKFLOWS: ${{ env.CI_WORKFLOW_NAME }}|${{ env.CI_INTEGRATION_NAME }}
         run: node scripts/github-verify-workflows-for-sha.mjs
@@ -121,7 +156,7 @@ jobs:
       - name: Deploy a Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@e2eda2e106cfa35cdbcf4ac9ddaf6c4756df2c8c # v0
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          repoToken: ${{ github.token }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: calzaturavilchez-ab17f
           channelId: live

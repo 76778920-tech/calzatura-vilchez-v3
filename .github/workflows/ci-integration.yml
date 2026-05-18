@@ -240,4 +240,21 @@ jobs:
     uses: ./.github/workflows/deploy-production.yml
     with:
       head_sha: ${{ github.sha }}
-    secrets: inherit
+    secrets:
+      FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+      VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+      VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+      VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+      VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
+      VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
+      VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
+      VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
+      VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
+      VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
+      VITE_ORS_API_KEY: ${{ secrets.VITE_ORS_API_KEY }}
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
