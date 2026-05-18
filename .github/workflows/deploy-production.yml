@@ -67,20 +67,20 @@ jobs:
 
       # No usar `test -n "$FIREBASE_SERVICE_ACCOUNT"`: el JSON multilínea rompe bash ("too many arguments").
       - name: Falta FIREBASE_SERVICE_ACCOUNT
-        if: secrets.FIREBASE_SERVICE_ACCOUNT == ''
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT == '' }}
         run: |
           echo "::error::Falta FIREBASE_SERVICE_ACCOUNT en GitHub → Settings → Secrets → Actions."
           echo "Firebase Console → Configuración del proyecto → Cuentas de servicio → Generar clave privada → pegar el JSON completo."
           exit 1
 
       - name: Faltan secrets VITE (Supabase o Firebase)
-        if: secrets.VITE_SUPABASE_URL == '' || secrets.VITE_FIREBASE_API_KEY == ''
+        if: ${{ secrets.VITE_SUPABASE_URL == '' || secrets.VITE_FIREBASE_API_KEY == '' }}
         run: |
           echo "::error::Faltan VITE_SUPABASE_URL o VITE_FIREBASE_API_KEY en GitHub Secrets."
           exit 1
 
       - name: Secrets Firebase presentes
-        if: secrets.FIREBASE_SERVICE_ACCOUNT != ''
+        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT != '' }}
         run: echo "Secrets Firebase OK — build y deploy."
 
       - name: Configurar Node.js 20
@@ -142,19 +142,19 @@ jobs:
     continue-on-error: true
     steps:
       - name: Aviso — sin deploy hook de Render
-        if: secrets.RENDER_DEPLOY_HOOK_URL == ''
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL == '' }}
         run: |
           echo "::warning::RENDER_DEPLOY_HOOK_URL no configurado — se omite redeploy del AI Service."
           echo "Render → servicio IA → Settings → Deploy Hook → copiar URL → GitHub Secrets."
 
       - name: Disparar deploy hook
-        if: secrets.RENDER_DEPLOY_HOOK_URL != ''
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
         run: |
           curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
           echo "Deploy hook enviado."
 
       - name: Esperar health del servicio IA (cold start)
-        if: secrets.RENDER_DEPLOY_HOOK_URL != ''
+        if: ${{ secrets.RENDER_DEPLOY_HOOK_URL != '' }}
         env:
           AI_BASE: ${{ secrets.VITE_AI_SERVICE_URL || 'https://calzatura-vilchez-v3.onrender.com' }}
         run: |
