@@ -59,10 +59,12 @@ jobs:
     name: Firebase Hosting
     needs: gate
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: calzatura-vilchez
     steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ needs.gate.outputs.head_sha }}
+
       - name: Verificar secrets Firebase
         shell: bash
         run: |
@@ -70,11 +72,6 @@ jobs:
           test -n "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" || (echo "::error::Falta FIREBASE_SERVICE_ACCOUNT" && exit 1)
           test -n "${{ secrets.VITE_SUPABASE_URL }}" || (echo "::error::Falta VITE_SUPABASE_URL" && exit 1)
           test -n "${{ secrets.VITE_FIREBASE_API_KEY }}" || (echo "::error::Falta VITE_FIREBASE_API_KEY" && exit 1)
-
-      - name: Clonar repositorio
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          ref: ${{ needs.gate.outputs.head_sha }}
 
       - name: Configurar Node.js 20
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -84,9 +81,11 @@ jobs:
           cache-dependency-path: calzatura-vilchez/package-lock.json
 
       - name: Instalar dependencias
+        working-directory: calzatura-vilchez
         run: npm ci --ignore-scripts
 
       - name: Compilar (Vite)
+        working-directory: calzatura-vilchez
         run: npm run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
