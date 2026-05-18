@@ -24,7 +24,8 @@ class Env {
     return 'https://calzatura-vilchez-bff.onrender.com';
   }
 
-  /// Misma URL que `VITE_DNI_LOOKUP_URL` en la web (`/api/lookup-dni` en Vercel).
+  /// Debe ser la misma URL que el secret `VITE_DNI_LOOKUP_URL` (GitHub / web).
+  /// Proyecto Vercel con tokens DNI (LATINFO, PERUAPI, etc.), no calzatura-vilchez-v3.
   static String get dniLookupUrl {
     final fromEnv =
         dotenv.env['DNI_LOOKUP_URL']?.trim() ??

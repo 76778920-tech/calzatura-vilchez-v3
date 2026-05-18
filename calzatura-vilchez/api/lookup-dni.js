@@ -15,6 +15,7 @@ const allowedOrigins = new Set([
   "https://calzaturavilchez-ab17f.web.app",
   "https://calzaturavilchez-ab17f.firebaseapp.com",
   "https://project-rif8c.vercel.app",
+  "https://project-nfb8c.vercel.app",
   "https://calzatura-vilchez-v3.vercel.app",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
