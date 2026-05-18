@@ -48,7 +48,7 @@ if (!xml.includes("<source>") || !xml.match(/<source>[^<]+<\/source>/)) {
 }
 const sourceText = (xml.match(/<source>([^<]*)<\/source>/)?.[1] ?? "").replace(/\\/g, "/");
 if (sourceText === "." || sourceText.trim() === "") {
-  fail('coverage.xml usa <source>.</source>; ejecuta fix_coverage_xml_for_sonar.py');
+  fail('coverage.xml usa <source>.</source>; ejecuta fix-ai-service-coverage-xml-for-sonar.py');
 }
 if (sourceText.endsWith("/ai-service")) {
   fail(`<source> debe ser la raíz del monorepo, no ai-service (actual: ${sourceText})`);

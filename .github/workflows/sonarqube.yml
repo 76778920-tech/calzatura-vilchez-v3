@@ -67,8 +67,7 @@ jobs:
         run: python -m pytest --cov=. --cov-config=.coveragerc --cov-report=xml:coverage.xml
 
       - name: Ajustar coverage.xml a rutas monorepo Sonar
-        working-directory: ai-service
-        run: python scripts/fix_coverage_xml_for_sonar.py
+        run: python scripts/fix-ai-service-coverage-xml-for-sonar.py
 
       - name: Generar informe Bandit (JSON para SonarQube)
         working-directory: ai-service
