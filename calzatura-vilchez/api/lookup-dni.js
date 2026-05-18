@@ -67,7 +67,7 @@ function rateLimitKey(ip, req) {
   return `${scope}:${ip}`;
 }
 
-function isRateLimited(ip, req) {
+function isRateLimitedInMemory(ip, req) {
   const key = rateLimitKey(ip, req);
   const max = isMobileAppRequest(req) ? RATE_LIMIT_MAX_MOBILE : RATE_LIMIT_MAX_WEB;
   const now = Date.now();
@@ -78,6 +78,46 @@ function isRateLimited(ip, req) {
   }
   bucket.count += 1;
   return bucket.count > max;
+}
+
+/** Cupo global entre réplicas Vercel si UPSTASH_REDIS_REST_URL + TOKEN están definidos. */
+async function isRateLimitedUpstash(ip, req) {
+  const baseUrl = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (!baseUrl || !token) return null;
+
+  const key = rateLimitKey(ip, req);
+  const max = isMobileAppRequest(req) ? RATE_LIMIT_MAX_MOBILE : RATE_LIMIT_MAX_WEB;
+  const windowSec = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
+  const bucket = `dni:rl:${key}:${Math.floor(Date.now() / RATE_LIMIT_WINDOW_MS)}`;
+  const headers = { Authorization: `Bearer ${token}` };
+
+  try {
+    const incrRes = await fetch(`${baseUrl}/incr/${encodeURIComponent(bucket)}`, {
+      headers,
+      signal: AbortSignal.timeout(2500),
+    });
+    if (!incrRes.ok) return null;
+    const incrJson = await incrRes.json();
+    const count = Number(incrJson.result);
+    if (!Number.isFinite(count)) return null;
+    if (count === 1) {
+      await fetch(
+        `${baseUrl}/expire/${encodeURIComponent(bucket)}/${windowSec}`,
+        { headers, signal: AbortSignal.timeout(2500) }
+      );
+    }
+    return count > max;
+  } catch (err) {
+    console.warn("[lookup-dni] Upstash rate limit fallback:", err?.message || err);
+    return null;
+  }
+}
+
+async function isRateLimited(ip, req) {
+  const distributed = await isRateLimitedUpstash(ip, req);
+  if (distributed !== null) return distributed;
+  return isRateLimitedInMemory(ip, req);
 }
 
 function setCorsHeaders(req, res) {
@@ -323,7 +363,7 @@ export default async function handler(req, res) {
   const origin = req.headers.origin;
 
   const clientIp = getClientIp(req);
-  if (isRateLimited(clientIp, req)) {
+  if (await isRateLimited(clientIp, req)) {
     return res.status(429).json({ error: "Demasiadas solicitudes. Intenta nuevamente." });
   }
 

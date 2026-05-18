@@ -94,7 +94,7 @@ El flujo COD confirmaba el pedido en frontend sin verificar precios ni stock rea
 
 Corrección:
 
-- Se agregó la Cloud Function `confirmCodOrder` que verifica token Firebase, re-fetcha precios y stock reales desde Firestore, valida que `subtotal` y `total` coincidan (tolerancia ±0.01), y solo entonces actualiza el estado a `confirmado`.
+- **Histórico:** `confirmCodOrder` en Cloud Functions (retirado en BFF; stock COD en `POST /createOrder`). Estado de pedido pagado en Supabase: **`pagado`** (no `confirmado`).
 - El frontend llama obligatoriamente a esta función antes de navegar a la página de éxito.
 
 ### S1 - Instrumentación de debug con telemetría externa
@@ -121,7 +121,7 @@ El frontend crea documentos en `pedidos` directamente con totales calculados en 
 
 Estado actual:
 
-- Stripe: mitigado completamente — `createCheckoutSession` recalcula totales desde Firestore y rechaza con 409 si no coinciden.
+- Stripe: mitigado — BFF `createCheckoutSession` recalcula totales desde Supabase y rechaza con 409 si no coinciden.
 - Contra entrega: mitigado — `confirmCodOrder` valida server-side antes de confirmar el pedido.
 - Riesgo residual: el documento en `pedidos` se crea con datos del cliente antes de la validación. Si la validación falla, queda un registro `pendiente` con datos potencialmente incorrectos (no avanza, pero genera ruido de datos).
 

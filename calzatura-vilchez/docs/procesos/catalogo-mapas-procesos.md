@@ -2,6 +2,8 @@
 
 Este documento contiene 30 procesos principales del sistema Calzatura Vilchez. Cada proceso puede ser representado en Bizagi Modeler como un diagrama BPMN. En la carpeta `docs/procesos/bpmn` se incluyen archivos `.bpmn` generados como base para importacion o reconstruccion en Bizagi.
 
+> **Sincronización 2026-05:** catálogo, usuarios, pedidos y finanzas persisten en **Supabase (PostgreSQL)** con **RLS**. El **BFF** (`bff/server.cjs` en Render) centraliza pedidos, Stripe, favoritos y lecturas admin. Los archivos `.bpmn` antiguos pueden decir *Firestore*; **PR-01 a PR-15** de este catálogo describen el flujo vigente con Supabase/BFF.
+
 ## Leyenda
 
 | Campo | Descripción |
@@ -20,14 +22,14 @@ Este documento contiene 30 procesos principales del sistema Calzatura Vilchez. C
 | Objetivo | Permitir la exploracion pública de productos disponibles. |
 | Entradas | URL del sitio, preferencias de navegación. |
 | Salidas | Lista de productos visibles. |
-| Sistemas | React, Firestore, Firebase Hosting. |
+| Sistemas | React, Supabase (RLS catálogo activos), Firebase Hosting. |
 
 Pasos:
 
 1. Usuario ingresa al sitio web.
 2. Sistema carga página de inicio.
 3. Usuario accede al catálogo.
-4. Sistema consulta productos publicados.
+4. Sistema consulta productos activos en Supabase.
 5. Sistema muestra productos disponibles.
 6. Usuario navega categorías o productos.
 
@@ -39,7 +41,7 @@ Pasos:
 | Objetivo | Crear una cuenta de usuario para acceder a funciones privadas. |
 | Entradas | DNI, nombres, apellidos, correo, contraseña. |
 | Salidas | Usuario autenticado y perfil guardado. |
-| Sistemas | React, Firebase Auth, Firestore, API DNI. |
+| Sistemas | React, Firebase Auth, Supabase (`usuarios`), API DNI (Vercel). |
 
 Pasos:
 
@@ -49,7 +51,7 @@ Pasos:
 4. Sistema consulta API DNI si corresponde.
 5. Usuario confirma credenciales.
 6. Firebase Auth crea cuenta.
-7. Firestore guarda perfil con rol usuario.
+7. Supabase guarda perfil con rol usuario.
 
 ## PR-03: Inicio De Sesión
 
@@ -59,14 +61,14 @@ Pasos:
 | Objetivo | Autenticar al usuario y cargar su perfil. |
 | Entradas | Correo y contraseña. |
 | Salidas | Sesión activa y acceso segun rol. |
-| Sistemas | React, Firebase Auth, Firestore. |
+| Sistemas | React, Firebase Auth, Supabase (`usuarios`). |
 
 Pasos:
 
 1. Usuario abre login.
 2. Usuario ingresa credenciales.
 3. Firebase Auth valida credenciales.
-4. Sistema consulta perfil en Firestore.
+4. Sistema consulta perfil en Supabase.
 5. Sistema determina rol y permisos.
 6. Usuario es redirigido al área correspondiente.
 
@@ -97,7 +99,7 @@ Pasos:
 | Objetivo | Mantener datos de contacto y direcciones del cliente. |
 | Entradas | Teléfono, dirección, ciudad, distrito, referencia. |
 | Salidas | Perfil actualizado. |
-| Sistemas | React, Firestore Rules, Firestore. |
+| Sistemas | React, Supabase RLS, BFF (`/users/me` según operación). |
 
 Pasos:
 
@@ -105,8 +107,8 @@ Pasos:
 2. Sistema carga datos actuales.
 3. Cliente actualiza teléfono o direcciones.
 4. Sistema valida formato de teléfono y dirección.
-5. Firestore Rules validan propiedad del documento.
-6. Firestore guarda cambios.
+5. RLS valida que el usuario solo modifique su fila.
+6. Supabase guarda cambios.
 
 ## PR-06: Busqueda Y Filtrado De Productos
 
@@ -116,7 +118,7 @@ Pasos:
 | Objetivo | Encontrar productos por categoría, marca, precio o texto. |
 | Entradas | Texto de busqueda, categoría, marca, precio maximo. |
 | Salidas | Productos filtrados. |
-| Sistemas | React, Firestore. |
+| Sistemas | React, Supabase (catálogo activos). |
 
 Pasos:
 
@@ -135,13 +137,13 @@ Pasos:
 | Objetivo | Consultar información completa del producto. |
 | Entradas | ID del producto. |
 | Salidas | Detalle, imágenes, tallas, colores y stock. |
-| Sistemas | React, Firestore, Cloudinary. |
+| Sistemas | React, Supabase, Cloudinary. |
 
 Pasos:
 
 1. Usuario selecciona producto.
 2. Sistema obtiene ID desde la ruta.
-3. Sistema consulta documento de producto.
+3. Sistema consulta fila de producto en Supabase.
 4. Sistema muestra imágenes y descripción.
 5. Sistema calcula tallas y colores disponibles.
 6. Usuario revisa disponibilidad.
@@ -154,14 +156,14 @@ Pasos:
 | Objetivo | Guardar productos de interes en favoritos. |
 | Entradas | ID de usuario, ID de producto. |
 | Salidas | Favorito agregado o eliminado. |
-| Sistemas | React, Firestore subcolecciones, Firestore Rules. |
+| Sistemas | React, BFF (favoritos; RLS sin acceso anon directo). |
 
 Pasos:
 
 1. Cliente presiona boton de favorito.
 2. Sistema verifica sesión activa.
 3. Sistema determina estado actual.
-4. Firestore crea o elimina favorito.
+4. BFF crea o elimina favorito en Supabase.
 5. Interfaz actualiza indicador visual.
 6. Cliente consulta lista de favoritos.
 
@@ -211,7 +213,7 @@ Pasos:
 | Objetivo | Registrar dirección, envío, método de pago y confirmar pedido. |
 | Entradas | Items, dirección, método de pago, notas. |
 | Salidas | Pedido pendiente creado. |
-| Sistemas | React, Firestore, Firebase Auth. |
+| Sistemas | React, BFF (Render), Supabase, Firebase Auth. |
 
 Pasos:
 
@@ -221,26 +223,25 @@ Pasos:
 4. Cliente selecciona método de pago.
 5. Sistema calcula subtotal, envío y total.
 6. Cliente confirma pedido.
-7. Firestore registra pedido pendiente.
+7. BFF `POST /createOrder` persiste pedido en Supabase (`estado: pendiente`).
 
-## PR-12: Creación De Pedido En Firestore
+## PR-12: Creación De Pedido (Supabase)
 
 | Campo | Detalle |
 |---|---|
 | Actor principal | Cliente |
 | Objetivo | Persistir pedido con información comercial y dirección. |
-| Entradas | Usuario, items, dirección, total, método de pago. |
-| Salidas | Documento en colección `pedidos`. |
-| Sistemas | Firestore, Firestore Rules. |
+| Entradas | Usuario, items, dirección, total, método de pago, `Idempotency-Key` opcional. |
+| Salidas | Fila en tabla `pedidos`. |
+| Sistemas | BFF, Supabase, Firebase Auth. |
 
 Pasos:
 
-1. Frontend prepara payload de pedido.
-2. Sistema agrega estado pendiente.
-3. Firestore Rules validan propietario y campos.
-4. Firestore crea documento.
-5. Sistema recibe ID de pedido.
-6. Usuario es redirigido segun método de pago.
+1. Frontend envía items y dirección al BFF (no escribe directo en BD).
+2. BFF recalcula precios y stock desde Supabase.
+3. BFF inserta pedido `pendiente` (y descuenta stock si es contra entrega).
+4. BFF devuelve `orderId`.
+5. Usuario es redirigido según método de pago (Stripe o éxito COD).
 
 ## PR-13: Pago Con Stripe
 
@@ -248,19 +249,18 @@ Pasos:
 |---|---|
 | Actor principal | Cliente |
 | Objetivo | Procesar pago online con tarjeta. |
-| Entradas | ID de pedido, token Firebase, items. |
-| Salidas | Sesión de checkout Stripe. |
-| Sistemas | React, Firebase Functions, Stripe, Firestore. |
+| Entradas | ID de pedido, token Firebase. |
+| Salidas | Sesión de checkout Stripe (`url`). |
+| Sistemas | React, BFF, Stripe. |
 
 Pasos:
 
 1. Cliente confirma pago con Stripe.
-2. Frontend envía ID de pedido a Cloud Function.
-3. Function valida token Firebase.
-4. Function consulta pedido y productos.
-5. Function recalcula precios y stock.
-6. Stripe crea sesión de pago.
-7. Frontend redirige a Stripe.
+2. Frontend llama BFF `POST /createCheckoutSession` con `orderId`.
+3. BFF valida token Firebase y pedido `pendiente`.
+4. BFF recalcula totales desde Supabase.
+5. Stripe crea sesión de pago.
+6. Frontend redirige a `session.url`.
 
 ## PR-14: Confirmación De Pago Por Webhook
 
@@ -269,17 +269,17 @@ Pasos:
 | Actor principal | Stripe |
 | Objetivo | Confirmar pago y actualizar pedido. |
 | Entradas | Evento `checkout.session.completed`. |
-| Salidas | Pedido pagado y stock descontado. |
-| Sistemas | Stripe Webhook, Firebase Functions, Firestore. |
+| Salidas | Pedido con `estado: pagado` y stock descontado. |
+| Sistemas | Stripe Webhook, BFF (`/stripeWebhook`), Supabase. |
 
 Pasos:
 
-1. Stripe envía evento al webhook.
-2. Function valida firma del evento.
-3. Function obtiene ID de pedido.
-4. Function consulta pedido.
-5. Function descuenta stock en transacción.
-6. Function actualiza estado a pagado.
+1. Stripe envía evento al webhook del BFF.
+2. BFF valida firma del evento.
+3. BFF obtiene ID de pedido de la sesión.
+4. BFF consulta pedido en Supabase.
+5. BFF descuenta stock (RPC) si aplica.
+6. BFF actualiza `estado` a **`pagado`** y `pagadoEn`.
 
 ## PR-15: Pedido Contraentrega
 
@@ -289,16 +289,16 @@ Pasos:
 | Objetivo | Registrar pedido con pago al recibir. |
 | Entradas | Items, dirección, total, método contraentrega. |
 | Salidas | Pedido pendiente para gestión administrativa. |
-| Sistemas | React, Firestore. |
+| Sistemas | React, BFF, Supabase. |
 
 Pasos:
 
 1. Cliente selecciona contraentrega.
 2. Sistema valida dirección e items.
-3. Firestore registra pedido pendiente.
+3. BFF `createOrder` registra pedido `pendiente` y descuenta stock en la misma transacción.
 4. Sistema muestra confirmación.
-5. Administrador revisa pedido.
-6. Administrador actualiza estado operativo.
+5. Administrador revisa pedido (panel admin vía BFF).
+6. Administrador actualiza estado operativo (`pagado`, `enviado`, etc.).
 
 ## PR-16: Historial Y Seguimiento De Pedido
 

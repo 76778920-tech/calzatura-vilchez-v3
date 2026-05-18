@@ -29,9 +29,9 @@ El sistema Calzatura Vilchez gestiona datos personales (nombre, DNI, dirección,
 
 ### 2.3 Gestión de secretos (F-01)
 
-- **Regla obligatoria:** ninguna clave, token o anon key va hardcodeada en el código fuente. Usar exclusivamente variables de entorno (`VITE_*` para frontend, variables de Railway/Render para backend).
+- **Regla obligatoria:** ninguna clave, token o anon key va hardcodeada en el código fuente. Usar exclusivamente variables de entorno (`VITE_*` para frontend, variables de Render/Supabase para backend).
 - **Almacenamiento local:** `.env.local` en la máquina del desarrollador (archivo ignorado por `.gitignore`).
-- **Almacenamiento en producción:** Firebase Hosting → variables de entorno en `firebase.json`; Railway → panel de variables de entorno.
+- **Almacenamiento en producción:** Firebase Hosting → secrets en GitHub Actions; servicio IA → panel de variables en Render; Supabase → dashboard del proyecto.
 - **Rotación:** cada 6 meses o inmediatamente ante sospecha de fuga.
 - **Prohibido:** subir `serviceAccountKey.json`, `SUPABASE_SERVICE_KEY`, `AI_SERVICE_BEARER_TOKEN` a cualquier repositorio o sistema de chat.
 
@@ -57,7 +57,7 @@ Todo cambio al sistema que afecte la base de datos, la lógica de negocio o la s
 2. Ejecutar en entorno local / Supabase branch (nunca directo a producción sin respaldo)
 3. Verificar con SELECT de validación que los datos y constraints son correctos
 4. Commitear en Git (mensaje de commit descriptivo)
-5. Aplicar en producción vía Supabase Dashboard > SQL Editor o CLI
+5. Aplicar en producción con `npm run db:push` desde `calzatura-vilchez/` (no SQL suelto en dashboard sin archivo en `migrations/`)
 6. Registrar en la tabla de historial de este documento (sección 9)
 ```
 
@@ -67,9 +67,9 @@ Todo cambio al sistema que afecte la base de datos, la lógica de negocio o la s
 1. Cambiar código en ai-service/
 2. Probar localmente: uvicorn main:app --reload
 3. Verificar /api/health y /api/predict/combined responden correctamente
-4. Commitear y pushear a GitHub
-5. Railway detecta el push y redespliega automáticamente
-6. Verificar logs de Railway que startup completa sin errores
+4. Commitear y pushear a main en GitHub
+5. CI + CI Integration en success → Deploy Producción dispara hook de Render (Auto-Deploy en Render debe estar Off)
+6. Verificar logs en Render y smoke GET /api/health
 ```
 
 ### 3.4 Verificacion real de `ireHistorial` en Supabase
@@ -93,7 +93,7 @@ La primera corrida valida lectura de columnas extendidas: `version`, `definicion
 |-----|----------|----------|
 | Owner Supabase | DDL, billing, RLS | 76778920@continental.edu.pe |
 | Owner Firebase | Hosting, Auth, Cloud Functions | 76778920@continental.edu.pe |
-| Owner Railway | Deploy ai-service | 76778920@continental.edu.pe |
+| Owner Render | Deploy ai-service (hook GitHub Actions) | 76778920@continental.edu.pe |
 | Desarrollador | Git push, migraciones, redeploy | 76778920@continental.edu.pe |
 
 ---
@@ -105,7 +105,7 @@ La primera corrida valida lectura de columnas extendidas: `version`, `definicion
 | Supabase Dashboard | Errores API, uso DB, RLS denials | Semanal |
 | Firebase Console | Auth anomalías, errores de hosting | Semanal |
 | Stripe Dashboard | Pagos fallidos, disputas | Diario |
-| Railway Logs | Cold-start, errores Python, timeouts | Ante reporte de usuario |
+| Render Logs (ai-service) | Cold-start, errores Python, timeouts | Ante reporte de usuario |
 | Tabla `auditoria` | Acciones inusuales (eliminar masivo, rol cambiado) | Mensual |
 
 ### 5.1 Consulta rápida de auditoría

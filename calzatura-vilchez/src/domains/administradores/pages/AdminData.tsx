@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { read, utils, writeFile } from "xlsx";
+import { downloadXlsx, readXlsxFirstSheet } from "@/domains/administradores/utils/spreadsheet";
 import { AlertTriangle, CheckCircle, Download, FileSpreadsheet, Loader, Trash2, Upload } from "lucide-react";
 import toast from "react-hot-toast";
 import { supabase } from "@/supabase/client";
@@ -478,17 +478,15 @@ async function exportCollection(config: CollectionConfig): Promise<void> {
   ]);
   const rows = (docs ?? []).map((d) => config.exportTransform(d as Row, extra));
   if (rows.length === 0) throw new Error("La colección está vacía");
-  const ws = utils.json_to_sheet(rows);
-  const wb = utils.book_new();
-  utils.book_append_sheet(wb, ws, config.label);
-  writeFile(wb, `${config.id}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  await downloadXlsx(
+    `${config.id}_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    config.label,
+    rows,
+  );
 }
 
-function downloadTemplate(config: CollectionConfig): void {
-  const ws = utils.json_to_sheet([config.templateExample]);
-  const wb = utils.book_new();
-  utils.book_append_sheet(wb, ws, "Plantilla");
-  writeFile(wb, `plantilla_${config.id}.xlsx`);
+async function downloadTemplate(config: CollectionConfig): Promise<void> {
+  await downloadXlsx(`plantilla_${config.id}.xlsx`, "Plantilla", [config.templateExample]);
 }
 
 async function importRows(
@@ -765,9 +763,7 @@ function downloadScenario(sc: ScenarioCfg): void {
       destacado: false,
     };
   });
-  const wbP = utils.book_new();
-  utils.book_append_sheet(wbP, utils.json_to_sheet(productRows), "Productos");
-  writeFile(wbP, `productos_${sc.key}.xlsx`);
+  void downloadXlsx(`productos_${sc.key}.xlsx`, "Productos", productRows);
 
   const financeRows = BASE_PRODUCTS.map((p) => {
     const precio = sc.priceDiscount > 0
@@ -786,9 +782,7 @@ function downloadScenario(sc: ScenarioCfg): void {
     };
   });
   setTimeout(() => {
-    const wbF = utils.book_new();
-    utils.book_append_sheet(wbF, utils.json_to_sheet(financeRows), "Finanzas");
-    writeFile(wbF, `finanzas_${sc.key}.xlsx`);
+    void downloadXlsx(`finanzas_${sc.key}.xlsx`, "Finanzas", financeRows);
   }, 250);
 
   setTimeout(() => {
@@ -840,9 +834,7 @@ function downloadScenario(sc: ScenarioCfg): void {
       });
     }
 
-    const wbV = utils.book_new();
-    utils.book_append_sheet(wbV, utils.json_to_sheet(salesRows), "Ventas Diarias");
-    writeFile(wbV, `ventas_${sc.key}.xlsx`);
+    void downloadXlsx(`ventas_${sc.key}.xlsx`, "Ventas Diarias", salesRows);
   }, 600);
 }
 
@@ -935,9 +927,7 @@ export default function AdminData() {
     try {
       const context = createImportContext(file.name);
       const buffer = await file.arrayBuffer();
-      const wb = read(buffer);
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = utils.sheet_to_json<Row>(ws);
+      const rows = (await readXlsxFirstSheet(buffer)) as Row[];
 
       if (rows.length === 0) {
         toast.error("El archivo está vacío");

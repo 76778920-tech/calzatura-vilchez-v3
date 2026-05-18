@@ -1,3 +1,6 @@
+// LEGADO: datos de negocio (pedidos, productos) viven en Supabase. Estas reglas aplican
+// solo a colecciones Firebase aun en uso (perfiles/auth auxiliares). No desplegar
+// como capa principal de pedidos; ver documentacion/09-implementacion-despliegue-ci.md.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {

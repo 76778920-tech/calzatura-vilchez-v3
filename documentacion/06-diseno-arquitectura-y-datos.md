@@ -56,7 +56,7 @@ flowchart TB
 
 ## 3. Modelo de datos (Supabase)
 
-### 3.1 Tablas principales (derivado de 27 migraciones)
+### 3.1 Tablas principales (derivado de 41 migraciones en `calzatura-vilchez/supabase/migrations/`)
 
 | Tabla | Propósito |
 |-------|-----------|

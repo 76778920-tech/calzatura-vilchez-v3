@@ -45,9 +45,18 @@ export const ADMIN_ROUTES = {
   data: "/admin/datos",
 } as const;
 
+/** Panel operativo tienda (rol trabajador). */
+export const STAFF_ROUTES = {
+  root: "/staff/*",
+  home: "/staff",
+  orders: "/staff/pedidos",
+  sales: "/staff/ventas",
+} as const;
+
 export const ROUTE_GROUPS = {
   publico: PUBLIC_ROUTES,
   informacion: INFO_ROUTES,
   clientes: CLIENT_ROUTES,
   administradores: ADMIN_ROUTES,
+  trabajadores: STAFF_ROUTES,
 } as const;

@@ -19,17 +19,23 @@
 Cazatura Vilchez V3/
   estado_del_arte.md             # Corpus Q1 (20 artículos)
   documentacion/                 # Paquete documental ISO / tesis
+  scripts/
+    validate-supabase-migrations.mjs
+    github-verify-workflows-for-sha.mjs
+    clean-local-residual.mjs
   .github/workflows/
     ci.yml                       # CI con mocks — corre en todo push/PR
     ci-integration.yml           # CI con secrets reales — solo rama main
+    deploy-production.yml        # Firebase Hosting + Render IA (tras CI Integration)
+    sonarqube.yml                # Análisis SonarQube (no bloquea deploy)
   docker-compose.yml             # 3 servicios: frontend, ai-service, firebase-emulator
-  railway.toml                   # Config de despliegue Railway (raíz)
+  railway.toml                   # Legado Railway (producción IA usa Render)
   calzatura-vilchez/             # SPA React + migraciones Supabase
     src/
       domains/                   # 10 dominios (trabajadores/ presente pero sin implementar)
       hooks/                     # Hooks Supabase Realtime (productos, pedidos, favoritos)
       utils/                     # 12 utilidades reutilizables
-    supabase/migrations/         # 27 migraciones SQL con prefijo YYYYMMDDHHMMSS
+    supabase/migrations/         # 41 migraciones SQL (prefijo YYYYMMDDHHMMSS; validadas en CI)
     e2e/                         # 27 specs Playwright
     tdd/                         # Módulo PHP/Laravel del curso de construcción de SW (legado académico, no forma parte del sistema en producción)
   ai-service/                    # Microservicio IA Python/FastAPI
@@ -37,7 +43,7 @@ Cazatura Vilchez V3/
     services/                    # supabase_client.py, firebase_verifier.py, firebase_client.py
     tests/                       # 7 suites pytest
     scripts/                     # verify_ire_historial_schema.py (validación de esquema BD)
-    railway.toml                 # Config de despliegue Railway (ai-service)
+    railway.toml                 # Legado Railway (no usar; IA en Render)
     requirements.txt             # Dependencias de producción
     requirements-dev.txt         # Dependencias de desarrollo y pruebas (pytest)
   firebase-emulator/             # Emulador Firebase Auth para E2E local
@@ -59,11 +65,15 @@ Firebase: configuración en `src/firebase/config.ts` (claves públicas de client
 ## 4. Migraciones de base de datos
 
 - Ubicación: `calzatura-vilchez/supabase/migrations/`.
-- Total: **27 migraciones** con prefijo `YYYYMMDDHHMMSS_*.sql`.
-- Procedimiento de aplicación: Supabase CLI `db push` o SQL Editor.
+- Total: **41 migraciones** con prefijo `YYYYMMDDHHMMSS_*.sql` (validación: `node scripts/validate-supabase-migrations.mjs`).
+- Procedimiento de aplicación: `npm run db:push` desde `calzatura-vilchez/` (preferido). Evitar SQL suelto en el dashboard sin archivo en `migrations/`.
+- Verificación local/remota: `npx supabase migration list` (columnas Local y Remote deben coincidir).
 - **Checklist pre-producción:** duplicados códigos resueltos antes de índice único.
+- Runbook detallado: `calzatura-vilchez/supabase/README.md`.
 
-### 4.1 Listado completo de migraciones
+### 4.1 Listado de migraciones (extracto; total 41)
+
+Fuente de verdad: carpeta `calzatura-vilchez/supabase/migrations/` y `node scripts/validate-supabase-migrations.mjs`.
 
 | Archivo | Propósito |
 |---------|-----------|
@@ -94,6 +104,30 @@ Firebase: configuración en `src/firebase/config.ts` (claves públicas de client
 | `20260508130000_campaign_data_model_v2.sql` | Modelo de datos v2 para campañas (productos, métricas, feedback) |
 | `20260508140000_add_focus_fields_to_campanas.sql` | Campos de foco (productos prioritarios) en campañas |
 | `20260508150000_add_impacto_soles_to_campana_productos.sql` | Campo `impacto_soles` en productos de campaña |
+| `20260514010000_create_movimientos_stock.sql` | Tabla `movimientosStock` (ingresos/ajustes) |
+| `20260514020000_update_create_variants_atomic_with_movement.sql` | Variantes atómicas + movimiento de stock |
+| `20260514030000_create_registrar_ingreso_stock_rpc.sql` | RPC `registrar_ingreso_stock` |
+| `20260514040000_update_product_atomic_with_movement.sql` | `update_product_atomic` con movimientos |
+| `20260514120000_bootstrap_movimientos_stock_existing.sql` | Bootstrap histórico de movimientos |
+| `20260514140000_pedidos_stock_descontado_cod.sql` | Flag `stockDescontado` en pedidos |
+| `20260515110000_fix_admin_product_rpc_rls.sql` | RLS/permisos RPC admin productos |
+| `20260515123000_admin_products_atomic_hardening.sql` | Endurecimiento RPC productos |
+| `20260515133000_admin_sales_atomic_hardening.sql` | Endurecimiento RPC ventas/pedidos |
+| `20260515150000_productos_activo_colorstock.sql` | Columnas `activo`, `colorStock` |
+| `20260516115900_pedidos_idempotency_key.sql` | `idempotencyKey` único en `pedidos` (anti-doble pedido) |
+| `20260516120000_order_stock_atomic_rpc.sql` | RPC descuento stock al confirmar pedido |
+| `20260516130000_order_stock_restore_rpc.sql` | RPC restauración stock + `stockRestauradoEn` |
+| `20260516140000_ventas_diarias_read_grants.sql` | Grants lectura `ventasDiarias` |
+
+### 4.2 Historial divergente (remoto vs repo)
+
+Si `db push` muestra *Remote migration versions not found in local*:
+
+1. Ejecutar el `supabase migration repair --status reverted …` que sugiera el CLI (huérfanas del dashboard).
+2. Si el esquema ya existe pero el timestamp del repo es otro: `migration repair --status applied` con los timestamps **del archivo local**.
+3. `npm run db:push` para aplicar solo lo pendiente.
+
+No usar `db pull` para “arreglar” prod salvo que quieras traer SQL generado al repo a propósito.
 
 ## 5. Scripts NPM relevantes
 
@@ -105,13 +139,14 @@ Firebase: configuración en `src/firebase/config.ts` (claves públicas de client
 
 ## 6. Integración continua (CI)
 
-### 6.1 Estado — GitHub Actions (2 workflows activos)
+### 6.1 Estado — GitHub Actions (workflows activos)
 
 | Archivo | Disparadores | Jobs | Propósito |
 |---------|--------------|------|-----------|
 | `.github/workflows/ci.yml` | `push` y `pull_request` a cualquier rama | validar migraciones · lint + test + build / E2E | Validación rápida — mocks de red |
 | `.github/workflows/ci-integration.yml` | `push` a `main` + `workflow_dispatch` | validar migraciones · quality · ai-service · e2e | Integración con secrets reales — solo en `main` |
 | `.github/workflows/deploy-production.yml` | tras **CI Integration** success en `main` + `workflow_dispatch` | gate (CI+Integration) · Firebase Hosting · Render IA + smoke | **Único** pipeline de deploy a producción |
+| `.github/workflows/sonarqube.yml` | `push` / `pull_request` | análisis Sonar | Calidad de código (independiente del deploy) |
 
 #### ci-integration.yml — detalle de jobs
 
@@ -126,6 +161,18 @@ Evidencia: pestaña **Actions** del repositorio remoto; filas detalladas con **d
 ### 6.2 Tabla de automatización y **dos respaldos** mínimos
 
 **Archivo maestro:** `cuadros-excel/CU-T08-automatizacion-respaldos.csv` (incluye filas CI + calidad local + E2E + migraciones + lint).
+
+### 6.3 SonarQube (calidad estática, no bloquea deploy)
+
+| Aspecto | Detalle |
+|---------|---------|
+| Workflow | `.github/workflows/sonarqube.yml` |
+| Disparadores | `push` / `pull_request` en `main` + `workflow_dispatch` |
+| Secret | `SONAR_TOKEN` (si falta, el job hace skip) |
+| Config | `sonar-project.properties` en raíz |
+| Relación con deploy | **Independiente** — un fallo en Sonar no impide Firebase ni Render |
+
+Tras cada push a `main`, revisar **Actions → SonarQube Analysis** (objetivo: `success`). Dashboard: SonarCloud / instancia configurada en `SONAR_HOST_URL`.
 
 ## 7. Despliegue a producción (completo)
 
@@ -151,7 +198,7 @@ No hay deploy en `pull_request`. El workflow antiguo `Deploy — Firebase Hostin
 | `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | CI Integration + IA |
 | `SONAR_TOKEN` | SonarQube (opcional; skip si falta) |
 
-Sin `RENDER_DEPLOY_HOOK_URL` el job de deploy **falla** (no se omite).
+Sin `RENDER_DEPLOY_HOOK_URL` el job **Render — AI Service** falla con aviso; el workflow sigue en success si **Firebase Hosting** terminó bien (`continue-on-error` en Render). Con el secret configurado, Render despliega vía hook y valida `GET /api/health`.
 
 ### 7.3 Despliegue manual de emergencia
 
@@ -162,13 +209,19 @@ GitHub → Actions → **Deploy — Producción (Firebase + Render)** → **Run 
 - Migraciones: validadas en CI; aplicar en remoto con `npm run db:push` desde `calzatura-vilchez/`.
 - Proyecto dev/staging/prod separados recomendados.
 
-### 7.5 Servicio IA (Render)
+### 7.5 Servicio IA (Render — producción)
 
-- URL: `https://calzatura-vilchez-v3.onrender.com`
-- Start: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- Health: `GET /api/health` (el deploy espera hasta ~12 min por cold start)
-- Env en Render: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `FIREBASE_PROJECT_ID`, `SUPERADMIN_EMAILS`, `AI_SERVICE_BEARER_TOKEN`
-- Plantilla local: `ai-service/.env.example`
+| Aspecto | Valor |
+|---------|--------|
+| Plataforma | **Render** (Auto-Deploy **Off**; deploy vía hook de GitHub Actions) |
+| URL | `https://calzatura-vilchez-v3.onrender.com` |
+| Root directory | `ai-service` |
+| Start command | `uvicorn main:app --host 0.0.0.0 --port $PORT` |
+| Health | `GET /api/health` (smoke en deploy; hasta ~12 min cold start) |
+| Env | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `FIREBASE_PROJECT_ID`, `SUPERADMIN_EMAILS`, `AI_SERVICE_BEARER_TOKEN` |
+| Plantilla local | `ai-service/.env.example` |
+
+**Railway (legado):** `railway.toml` en raíz y `ai-service/railway.toml` se conservan solo como referencia histórica; **no** desplegar IA ahí en producción actual.
 
 ### 7.6 Limpieza de artefactos locales
 
@@ -178,7 +231,7 @@ node scripts/clean-local-residual.mjs
 
 Elimina `n/` (restos Firebase), `calzatura-vilchez-mobile/android/build/` y coverage XML sueltos en `ai-service/`.
 
-### 7.4 Firebase Emulator (entorno local / E2E)
+### 7.7 Firebase Emulator (entorno local / E2E)
 
 - Servicio: `firebase-emulator/` — imagen Docker propia con `firebase-emulator/Dockerfile`
 - Emula: Firebase Auth (puerto 9099) y Cloud Functions (puerto 5001)
@@ -191,3 +244,4 @@ Elimina `n/` (restos Firebase), `calzatura-vilchez-mobile/android/build/` y cove
 |---------|-------|-------------|
 | 1.0 | 2026-05-01 | Versión inicial. |
 | 1.1 | 2026-05-02 | CI GitHub Actions documentado; CU-T08 actualizado con jobs reales. |
+| 1.2 | 2026-05-18 | Deploy unificado (Firebase + Render); 41 migraciones; `RENDER_DEPLOY_HOOK_URL`; SonarQube documentado; Railway legado. |

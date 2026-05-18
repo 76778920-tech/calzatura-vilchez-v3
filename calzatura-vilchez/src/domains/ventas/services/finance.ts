@@ -1,6 +1,7 @@
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
 import { auth } from "@/firebase/config";
 import { supabase } from "@/supabase/client";
+import { bffFetch } from "@/utils/bffClient";
 import type { DailySale, ProductFinancial } from "@/types";
 
 const FINANCIAL_COL = "productoFinanzas";
@@ -32,9 +33,8 @@ export function calculatePriceRange(
 }
 
 export async function fetchProductFinancials(): Promise<Record<string, ProductFinancial>> {
-  const { data, error } = await supabase.from(FINANCIAL_COL).select("*");
-  if (error) throw error;
-  return (data ?? []).reduce<Record<string, ProductFinancial>>((acc, item) => {
+  const { rows } = await bffFetch<{ rows: ProductFinancial[] }>("/admin/productFinanzas");
+  return (rows ?? []).reduce<Record<string, ProductFinancial>>((acc, item) => {
     acc[item.productId] = item as ProductFinancial;
     return acc;
   }, {});

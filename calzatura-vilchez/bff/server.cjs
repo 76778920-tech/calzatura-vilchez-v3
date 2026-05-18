@@ -1550,58 +1550,247 @@ app.post("/stripeWebhook", async (req, res) => {
 });
 
 app.post("/confirmCodOrder", (req, res) => {
-    cors(req, res, async () => {
-      if (req.method !== "POST") {
-        return res.status(405).json({ error: "Metodo no permitido" });
-      }
-
-      try {
-        const decodedToken = await verifyFirebaseUser(req);
-        const supabase = getSupabaseAdmin();
-        const { orderId } = req.body || {};
-
-        if (!orderId || typeof orderId !== "string") {
-          return res.status(400).json({ error: "Pedido invalido" });
-        }
-
-        const order = await fetchOrderOrThrow(supabase, orderId);
-
-        if (order.userId !== decodedToken.uid) {
-          return res.status(403).json({ error: "No puedes confirmar este pedido" });
-        }
-        if (order.estado !== "pendiente" || order.metodoPago !== "contraentrega") {
-          return res.status(409).json({ error: "El pedido no esta disponible para confirmar" });
-        }
-        if (!Array.isArray(order.items) || order.items.length === 0 || order.items.length > ORDER_ITEM_LIMIT) {
-          return res.status(400).json({ error: "Pedido sin productos validos" });
-        }
-
-        if (order.stockDescontadoEn) {
-          return res.status(200).json({ success: true, alreadyProcessed: true });
-        }
-
-        assertStoredTotals(order);
-        await assertOrderStockAvailability(supabase, order.items);
-        await discountOrderStockRpc(supabase, order);
-        const stockMark = new Date().toISOString();
-        await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
-        await logAuditFn(
-          supabase,
-          "descontar_stock_pedido",
-          "pedido",
-          orderId,
-          `#${orderId.slice(-8).toUpperCase()}`,
-          decodedToken.uid,
-          order.userEmail || "",
-          { source: "confirmCodOrder", metodoPago: "contraentrega" },
-        );
-
-        return res.status(200).json({ success: true });
-      } catch (error) {
-        console.error("COD confirm error:", error);
-        return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
-      }
+  cors(req, res, () => {
+    return res.status(410).json({
+      error:
+        "confirmCodOrder esta retirado. El stock contra entrega se descuenta en POST /createOrder.",
     });
+  });
+});
+
+app.get("/myOrders", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      const { data, error } = await supabase
+        .from("pedidos")
+        .select("*")
+        .eq("userId", decodedToken.uid)
+        .order("creadoEn", { ascending: false });
+      if (error) throw error;
+      return res.status(200).json({ orders: data ?? [] });
+    } catch (error) {
+      console.error("myOrders error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/orders/:orderId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      const orderId = String(req.params.orderId || "").trim();
+      if (!orderId) {
+        return res.status(400).json({ error: "Pedido invalido" });
+      }
+      const order = await fetchOrderOrThrow(supabase, orderId);
+      if (order.userId !== decodedToken.uid) {
+        await assertStaffRole(supabase, decodedToken.uid);
+      }
+      return res.status(200).json({ order });
+    } catch (error) {
+      console.error("orders/:orderId error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/orders", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const { data, error } = await supabase
+        .from("pedidos")
+        .select("*")
+        .order("creadoEn", { ascending: false });
+      if (error) throw error;
+      return res.status(200).json({ orders: data ?? [] });
+    } catch (error) {
+      console.error("admin/orders error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/users", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const { data, error } = await supabase.from("usuarios").select("*");
+      if (error) throw error;
+      return res.status(200).json({ users: data ?? [] });
+    } catch (error) {
+      console.error("admin/users error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/productFinanzas", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const { data, error } = await supabase.from("productoFinanzas").select("*");
+      if (error) throw error;
+      return res.status(200).json({ rows: data ?? [] });
+    } catch (error) {
+      console.error("admin/productFinanzas error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/products", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const { data, error } = await supabase.from("productos").select("*").order("nombre");
+      if (error) throw error;
+      return res.status(200).json({ products: data ?? [] });
+    } catch (error) {
+      console.error("admin/products error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/products/:productId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const productId = String(req.params.productId || "").trim();
+      if (!productId) {
+        return res.status(400).json({ error: "Producto invalido" });
+      }
+      const { data, error } = await supabase.from("productos").select("*").eq("id", productId).maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        return res.status(404).json({ error: "Producto no encontrado" });
+      }
+      return res.status(200).json({ product: data });
+    } catch (error) {
+      console.error("admin/products/:id error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/users/me", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("*")
+        .eq("uid", decodedToken.uid)
+        .maybeSingle();
+      if (error) throw error;
+      return res.status(200).json({ profile: data ?? null });
+    } catch (error) {
+      console.error("users/me GET error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.put("/users/me", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      const profile = req.body?.profile;
+      if (!profile || typeof profile !== "object" || profile.uid !== decodedToken.uid) {
+        return res.status(400).json({ error: "Perfil invalido" });
+      }
+      const { error } = await supabase.from("usuarios").upsert(profile, { onConflict: "uid" });
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("users/me PUT error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.patch("/users/me", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      const patch = req.body || {};
+      const allowed = {};
+      if (typeof patch.telefono === "string" || patch.telefono === null) {
+        allowed.telefono = patch.telefono;
+      }
+      if (Array.isArray(patch.direcciones)) {
+        allowed.direcciones = patch.direcciones;
+      }
+      if (Object.keys(allowed).length === 0) {
+        return res.status(400).json({ error: "Sin campos para actualizar" });
+      }
+      const { error } = await supabase.from("usuarios").update(allowed).eq("uid", decodedToken.uid);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("users/me PATCH error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.patch("/admin/users/:uid/role", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const uid = String(req.params.uid || "").trim();
+      const { rol } = req.body || {};
+      if (!uid || typeof rol !== "string") {
+        return res.status(400).json({ error: "Datos invalidos" });
+      }
+      const { error } = await supabase.from("usuarios").update({ rol }).eq("uid", uid);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("admin/users role error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.delete("/admin/users/:uid", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const uid = String(req.params.uid || "").trim();
+      if (!uid) {
+        return res.status(400).json({ error: "Usuario invalido" });
+      }
+      const { error } = await supabase.from("usuarios").delete().eq("uid", uid);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("admin/users DELETE error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
 });
 
 async function favoritesGetOne(supabase, userId, productId, res) {

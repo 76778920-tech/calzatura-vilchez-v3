@@ -5,7 +5,6 @@ import {
   fetchPublicProductById,
   fetchPublicProductsByIds,
   fetchProductFamilyGroupCounts,
-  fetchProducts,
 } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 
@@ -158,24 +157,4 @@ describe("visibilidad tienda pública (activo)", () => {
     expect(counts.fam).toBe(2);
   });
 
-  it("fetchProducts (admin) no filtra por activo", async () => {
-    const record = {
-      eqCalls: [] as [string, unknown][],
-      selectArg: undefined as string | undefined,
-      inCalls: [] as [string, unknown[]][],
-      maybeSinglePayload: { data: null, error: null },
-      selectChainPayload: {
-        data: [
-          { id: "1", activo: false },
-          { id: "2", activo: true },
-        ],
-        error: null,
-      },
-    };
-    vi.mocked(supabase.from).mockImplementation(() => createProductosQueryMock(record));
-
-    const all = await fetchProducts();
-    expect(record.eqCalls).toEqual([]);
-    expect(all).toHaveLength(2);
-  });
 });

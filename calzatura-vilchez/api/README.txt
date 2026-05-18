@@ -12,4 +12,9 @@ Login proxy en Vercel (gratis, serverless)
    VITE_AUTH_PROXY_LOGIN_URL=https://<tu-proyecto>.vercel.app/api/auth-login
    (Sigue usando VITE_BACKEND_API_URL para pedidos/Stripe si ese BFF está en otro sitio.)
 
-Nota: el rate limit por IP en serverless es best-effort (cada instancia tiene su memoria). Para pedidos/Stripe sigue haciendo falta el BFF completo (Render/Oracle) o otro host.
+Consulta DNI (lookup-dni.js):
+  Variables en Vercel (al menos una): LATINFO_API_KEY, CONSULTAS_PERU_TOKEN, PERUAPI_TOKEN,
+  API_INTI_TOKEN, APIPERU_DEV_TOKEN. Sin token válido → registro manual (operativo).
+  Rate limit: 4 req/IP/30min web; 25 móvil (header X-Calzatura-Client). Best-effort en serverless.
+
+Nota: el rate limit por IP en serverless es best-effort (cada instancia tiene su memoria). Para pedidos/Stripe sigue haciendo falta el BFF completo (Render) o otro host.

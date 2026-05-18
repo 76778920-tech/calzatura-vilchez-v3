@@ -161,10 +161,16 @@ def test_compute_ire_critico():
 1. Crear pedido en Supabase con `estado = 'pendiente'`.
 2. Llamar a Cloud Function para crear sesión de Stripe (modo test).
 3. Simular el webhook `checkout.session.completed` de Stripe con el ID de sesión.
-4. Verificar que el pedido en Supabase cambió a `estado = 'confirmado'`.
+4. Verificar que el pedido en Supabase cambió a `estado = 'pagado'`.
 5. Verificar que el stock de los productos del pedido decrementó.
 
-**Resultado esperado:** Pedido confirmado, stock decrementado, sin errores en Cloud Function.
+**Resultado esperado:** Pedido en estado `pagado`, stock decrementado, sin errores en el BFF.
+
+### TC-CHK-STRIPE-01 — Checkout Stripe (E2E mock en CI)
+
+**Automatizado:** `e2e/checkout-stripe.spec.ts` — mock de `createOrder` y `createCheckoutSession`, assert redirect a dominio Stripe.
+
+**Manual (tarjeta test):** Usar claves Stripe test en BFF; tarjeta `4242…`; verificar webhook y `pagado` en Supabase.
 
 ---
 

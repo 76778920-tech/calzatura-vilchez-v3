@@ -1,16 +1,21 @@
+import { auth } from "@/firebase/config";
 import { supabase } from "@/supabase/client";
 import { logAudit } from "@/services/audit";
 import { postAdminBff } from "@/domains/productos/services/adminProductsBff";
+import { bffFetch } from "@/utils/bffClient";
 import type { Product } from "@/types";
 import { effectiveFamiliaKey, tallyFamilyGroupSizes } from "@/utils/productFamily";
 
 const COL = "productos";
 const CODE_COL = "productoCodigos";
 
+/** Panel admin/staff: lista completa vía BFF (incluye inactivos). Catálogo público: `fetchPublicProducts`. */
 export async function fetchProducts(): Promise<Product[]> {
-  const { data, error } = await supabase.from(COL).select("*");
-  if (error) throw error;
-  return data as Product[];
+  if (auth.currentUser) {
+    const { products } = await bffFetch<{ products: Product[] }>("/admin/products");
+    return products;
+  }
+  return fetchPublicProducts();
 }
 
 /** Solo productos visibles en tienda (activo = true). Usar en catálogo público. */
@@ -21,9 +26,15 @@ export async function fetchPublicProducts(): Promise<Product[]> {
 }
 
 export async function fetchProductById(id: string): Promise<Product | null> {
-  const { data, error } = await supabase.from(COL).select("*").eq("id", id).single();
-  if (error) return null;
-  return data as Product;
+  if (auth.currentUser) {
+    try {
+      const { product } = await bffFetch<{ product: Product }>(`/admin/products/${encodeURIComponent(id)}`);
+      return product;
+    } catch {
+      return null;
+    }
+  }
+  return fetchPublicProductById(id);
 }
 
 /** Ficha en tienda pública: solo existe si el producto está visible (`activo`). */

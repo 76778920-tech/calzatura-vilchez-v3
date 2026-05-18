@@ -122,7 +122,7 @@
 11. El cliente ingresa los datos de su tarjeta en el formulario de Stripe.
 12. Stripe procesa el pago y redirige al cliente a `/pedido-exitoso?session_id=...`.
 13. El webhook de Stripe notifica a Firebase Cloud Functions que el pago fue exitoso.
-14. La Cloud Function actualiza el pedido en Supabase: estado = "confirmado", decrementa el stock de los productos en la tabla `productos`.
+14. El BFF actualiza el pedido en Supabase: estado = `pagado`, decrementa el stock vía RPC.
 15. El sistema muestra la página de confirmación con el número de pedido.
 
 **Flujos alternativos:**

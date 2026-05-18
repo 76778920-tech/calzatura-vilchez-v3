@@ -1,6 +1,6 @@
 import type { UserRole } from "@/types";
 import { isAdminRole } from "../security/accessControl";
-import { ADMIN_ROUTES, PUBLIC_ROUTES } from "./paths";
+import { ADMIN_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "./paths";
 
 function hasAsciiControlChars(path: string): boolean {
   for (let i = 0; i < path.length; i++) {
@@ -23,6 +23,10 @@ export function isAdminPath(path: string) {
   return path === ADMIN_ROUTES.dashboard || path.startsWith(`${ADMIN_ROUTES.dashboard}/`);
 }
 
+export function isStaffPath(path: string) {
+  return path === STAFF_ROUTES.home || path.startsWith(`${STAFF_ROUTES.home}/`);
+}
+
 export function getPostLoginRedirect({
   redirect,
   role,
@@ -38,6 +42,12 @@ export function getPostLoginRedirect({
     return safeRedirect && isAdminPath(safeRedirect)
       ? safeRedirect
       : ADMIN_ROUTES.dashboard;
+  }
+
+  if (role === "trabajador") {
+    return safeRedirect && isStaffPath(safeRedirect)
+      ? safeRedirect
+      : STAFF_ROUTES.home;
   }
 
   if (safeRedirect && !isAdminPath(safeRedirect)) {

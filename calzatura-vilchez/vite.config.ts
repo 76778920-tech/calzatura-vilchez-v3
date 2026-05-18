@@ -74,8 +74,8 @@ export default defineConfig({
             return 'three'
           }
 
-          if (id.includes('/xlsx/')) {
-            return 'xlsx'
+          if (id.includes('/exceljs/')) {
+            return 'exceljs'
           }
 
           if (id.includes('/firebase/')) {

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fromMock, rpcMock, getBackendApiBaseUrlMock, getIdTokenMock, authState } = vi.hoisted(() => ({
+const { fromMock, rpcMock, bffFetchMock, getBackendApiBaseUrlMock, getIdTokenMock, authState } = vi.hoisted(() => ({
   fromMock: vi.fn(),
   rpcMock: vi.fn(),
+  bffFetchMock: vi.fn(),
   getBackendApiBaseUrlMock: vi.fn(() => ""),
   getIdTokenMock: vi.fn(),
   authState: { user: null as null | { getIdToken: () => Promise<string> } },
@@ -27,6 +28,10 @@ vi.mock("@/supabase/client", () => ({
   },
 }));
 
+vi.mock("@/utils/bffClient", () => ({
+  bffFetch: bffFetchMock,
+}));
+
 import {
   addDailySale,
   calculatePriceRange,
@@ -47,7 +52,9 @@ describe("finance service", () => {
     vi.setSystemTime(new Date("2026-05-13T10:00:00.000Z"));
     fromMock.mockReset();
     rpcMock.mockReset();
+    bffFetchMock.mockReset();
     getBackendApiBaseUrlMock.mockReturnValue("");
+    authState.user = { getIdToken: getIdTokenMock.mockResolvedValue("token") };
     authState.user = null;
     getIdTokenMock.mockReset();
     getIdTokenMock.mockResolvedValue("token-test");
@@ -144,21 +151,18 @@ describe("finance service", () => {
   });
 
   it("fetchProductFinancials indexa resultados por productId", async () => {
-    const select = vi.fn().mockResolvedValue({
-      data: [
+    bffFetchMock.mockResolvedValue({
+      rows: [
         { productId: "p1", costoCompra: 80 },
         { productId: "p2", costoCompra: 120 },
       ],
-      error: null,
     });
-    fromMock.mockReturnValue({ select });
 
     await expect(fetchProductFinancials()).resolves.toEqual({
       p1: { productId: "p1", costoCompra: 80 },
       p2: { productId: "p2", costoCompra: 120 },
     });
-    expect(fromMock).toHaveBeenCalledWith("productoFinanzas");
-    expect(select).toHaveBeenCalledWith("*");
+    expect(bffFetchMock).toHaveBeenCalledWith("/admin/productFinanzas");
   });
 
   it("upsertProductFinancial guarda fecha de actualizacion", async () => {

@@ -30,7 +30,7 @@ El sistema se implementa como un microservicio FastAPI desplegado en Render.com,
 | Fuente | Tabla Supabase | Variables extraídas |
 |---|---|---|
 | Ventas presenciales | `ventasDiarias` | productId, cantidad, fecha, precio, devolucion |
-| Pedidos online confirmados | `pedidos` | productos (jsonb array), createdAt, estado |
+| Pedidos online pagados | `pedidos` | productos (jsonb array), createdAt, estado |
 | Catálogo de productos | `productos` | id, nombre, precio, stock, categoria, marca, destacado |
 | Códigos internos | `productoCodigos` | productId, codigo |
 
@@ -43,7 +43,7 @@ El servicio IA unifica las dos fuentes de ventas (ventas diarias + pedidos compl
 for cada venta en ventasDiarias (no devuelta):
     series[productId][fecha] += cantidad
 
-for cada pedido en pedidos (estado='confirmado'):
+for cada pedido en pedidos (estado='pagado'):
     for cada item en pedido.productos:
         series[item.productId][pedido.fecha] += item.cantidad
 

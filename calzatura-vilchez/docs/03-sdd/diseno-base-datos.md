@@ -71,7 +71,7 @@ CREATE POLICY "productos_insert_admin" ON productos
 | `userId` | text | NOT NULL, FK → Firebase UID | UID del cliente en Firebase Auth |
 | `productos` | jsonb | NOT NULL | Array de ítems: [{productId, nombre, talla, color, cantidad, precio}] |
 | `total` | numeric(10,2) | NOT NULL | Monto total del pedido en S/ |
-| `estado` | text | NOT NULL, CHECK IN ('pendiente','confirmado','en_proceso','enviado','entregado','cancelado') | Estado actual del pedido |
+| `estado` | text | NOT NULL, CHECK IN ('pendiente','pagado','enviado','entregado','cancelado') | Estado actual del pedido |
 | `metodoPago` | text | NOT NULL, CHECK IN ('stripe','contraentrega') | Método de pago |
 | `direccionEnvio` | jsonb | NOT NULL | {nombre, calle, ciudad, departamento, cp, telefono} |
 | `notas` | text | | Notas del cliente para el pedido |

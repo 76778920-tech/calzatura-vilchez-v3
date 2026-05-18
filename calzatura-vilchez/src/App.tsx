@@ -11,7 +11,7 @@ function ScrollToTop() {
 }
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
-import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "./routes/paths";
+import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "./routes/paths";
 import { CATALOG_SHELF } from "./routes/catalogRouting";
 import { AreaRoute, AuthenticatedRoute, PageLoader } from "./routes/RouteGuards";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
@@ -27,6 +27,9 @@ const AdminUsers = lazy(() => import("@/domains/usuarios/pages/AdminUsers"));
 const AdminManufacturers = lazy(() => import("@/domains/fabricantes/pages/AdminManufacturers"));
 const AdminPredictions = lazy(() => import("@/domains/administradores/pages/AdminPredictions"));
 const AdminData = lazy(() => import("@/domains/administradores/pages/AdminData"));
+
+const StaffLayout = lazy(() => import("@/domains/trabajadores/components/StaffLayout"));
+const StaffHomePage = lazy(() => import("@/domains/trabajadores/pages/StaffHomePage"));
 
 const HomePage = lazy(() => import("@/domains/publico/pages/HomePage"));
 const ProductsPage = lazy(() => import("@/domains/productos/pages/ProductsPage"));
@@ -134,6 +137,14 @@ export default function App() {
       />
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          <Route
+            path={STAFF_ROUTES.root}
+            element={<AreaRoute area="trabajadores"><StaffLayout /></AreaRoute>}
+          >
+            <Route index element={<StaffHomePage />} />
+            <Route path="pedidos" element={<AdminOrders />} />
+            <Route path="ventas" element={<AdminSales />} />
+          </Route>
           <Route
             path={ADMIN_ROUTES.root}
             element={<AreaRoute area="administradores"><AdminLayout /></AreaRoute>}

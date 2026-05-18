@@ -438,7 +438,7 @@ Las políticas RLS de Supabase garantizan automáticamente que solo se retornan 
 ### 4.1 Stripe Webhook
 **Endpoint:** Firebase Cloud Function (URL configurada en Stripe Dashboard)  
 **Evento:** `checkout.session.completed`  
-**Procesamiento:** La Cloud Function verifica la firma del webhook de Stripe, actualiza el pedido en Supabase a estado "confirmado" y decrementa el stock de los productos.
+**Procesamiento:** El BFF verifica la firma del webhook de Stripe, actualiza el pedido en Supabase a estado `pagado` y decrementa el stock de los productos.
 
 ```json
 // Payload del evento de Stripe (referencia)

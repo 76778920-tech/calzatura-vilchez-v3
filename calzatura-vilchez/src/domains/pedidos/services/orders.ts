@@ -1,9 +1,7 @@
 import { auth } from "@/firebase/config";
-import { supabase } from "@/supabase/client";
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
+import { bffFetch } from "@/utils/bffClient";
 import type { Order, OrderStatus, CartItem, Address } from "@/types";
-
-const COL = "pedidos";
 
 export async function createOrder(data: {
   items: CartItem[];
@@ -57,28 +55,26 @@ export async function createOrder(data: {
 }
 
 export async function fetchOrdersByUser(userId: string): Promise<Order[]> {
-  const { data, error } = await supabase
-    .from(COL)
-    .select("*")
-    .eq("userId", userId)
-    .order("creadoEn", { ascending: false });
-  if (error) throw error;
-  return data as Order[];
+  const user = auth.currentUser;
+  if (!user || user.uid !== userId) {
+    throw new Error("No autorizado para consultar estos pedidos");
+  }
+  const { orders } = await bffFetch<{ orders: Order[] }>("/myOrders");
+  return orders;
 }
 
 export async function fetchAllOrders(): Promise<Order[]> {
-  const { data, error } = await supabase
-    .from(COL)
-    .select("*")
-    .order("creadoEn", { ascending: false });
-  if (error) throw error;
-  return data as Order[];
+  const { orders } = await bffFetch<{ orders: Order[] }>("/admin/orders");
+  return orders;
 }
 
 export async function fetchOrderById(id: string): Promise<Order | null> {
-  const { data, error } = await supabase.from(COL).select("*").eq("id", id).single();
-  if (error) return null;
-  return data as Order;
+  try {
+    const { order } = await bffFetch<{ order: Order }>(`/orders/${encodeURIComponent(id)}`);
+    return order;
+  } catch {
+    return null;
+  }
 }
 
 export async function updateOrderStatus(id: string, estado: OrderStatus): Promise<void> {
@@ -111,13 +107,4 @@ export async function updateOrderStatus(id: string, estado: OrderStatus): Promis
   if (!response.ok) {
     throw new Error(typeof payload.error === "string" ? payload.error : "No se pudo actualizar el estado");
   }
-}
-
-export async function updateOrderStripeSession(
-  id: string,
-  stripeSessionId: string,
-  estado: OrderStatus = "pagado"
-): Promise<void> {
-  const { error } = await supabase.from(COL).update({ stripeSessionId, estado }).eq("id", id);
-  if (error) throw error;
 }

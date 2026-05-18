@@ -1,39 +1,59 @@
-import { supabase } from "@/supabase/client";
+import { auth } from "@/firebase/config";
+import { bffFetch } from "@/utils/bffClient";
 import { logAudit } from "@/services/audit";
 import type { UserProfile, UserRole } from "@/types";
 
 export async function saveUserProfile(user: UserProfile): Promise<void> {
-  const { error } = await supabase.from("usuarios").upsert(user, { onConflict: "uid" });
-  if (error) throw error;
+  const current = auth.currentUser;
+  if (!current || current.uid !== user.uid) {
+    throw new Error("No autorizado para guardar este perfil");
+  }
+  await bffFetch("/users/me", {
+    method: "PUT",
+    body: JSON.stringify({ profile: user }),
+  });
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const { data, error } = await supabase.from("usuarios").select("*").eq("uid", uid).maybeSingle();
-  if (error) return null;
-  return data as UserProfile;
+  const current = auth.currentUser;
+  if (!current || current.uid !== uid) {
+    return null;
+  }
+  try {
+    const { profile } = await bffFetch<{ profile: UserProfile | null }>("/users/me");
+    return profile;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchAllUsers(): Promise<UserProfile[]> {
-  const { data, error } = await supabase.from("usuarios").select("*");
-  if (error) throw error;
-  return data as UserProfile[];
+  const { users } = await bffFetch<{ users: UserProfile[] }>("/admin/users");
+  return users;
 }
 
 export async function updateUserProfile(
   uid: string,
-  data: Partial<Pick<UserProfile, "telefono" | "direcciones">>
+  data: Partial<Pick<UserProfile, "telefono" | "direcciones">>,
 ): Promise<void> {
-  const { error } = await supabase.from("usuarios").update(data).eq("uid", uid);
-  if (error) throw error;
+  const current = auth.currentUser;
+  if (!current || current.uid !== uid) {
+    throw new Error("No autorizado");
+  }
+  await bffFetch("/users/me", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function updateUserRole(uid: string, rol: UserRole): Promise<void> {
-  const { error } = await supabase.from("usuarios").update({ rol }).eq("uid", uid);
-  if (error) throw error;
+  await bffFetch(`/admin/users/${encodeURIComponent(uid)}/role`, {
+    method: "PATCH",
+    body: JSON.stringify({ rol }),
+  });
   void logAudit("cambiar_estado", "usuario", uid, uid, { rol });
 }
 
 export async function deleteUserProfile(uid: string): Promise<void> {
-  const { error } = await supabase.from("usuarios").delete().eq("uid", uid);
-  if (error) throw error;
+  await bffFetch(`/admin/users/${encodeURIComponent(uid)}`, { method: "DELETE" });
 }

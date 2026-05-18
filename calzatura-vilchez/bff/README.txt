@@ -5,7 +5,19 @@ Rutas (igual que antes en Firebase):
   POST /createOrder
   POST /createCheckoutSession
   POST /stripeWebhook
-  POST /confirmCodOrder
+  POST /confirmCodOrder     (410 — retirado; stock COD en createOrder)
+  GET  /myOrders
+  GET  /orders/:orderId
+  GET  /admin/orders
+  GET  /admin/users
+  GET  /admin/productFinanzas
+  GET  /admin/products
+  GET  /admin/products/:productId
+  GET  /users/me
+  PUT  /users/me
+  PATCH /users/me
+  PATCH /admin/users/:uid/role
+  DELETE /admin/users/:uid
   ALL  /favorites
   ALL  /aiAdminProxy
   GET  /delivery/geocode   (Nominatim; sin ORS geocoding)

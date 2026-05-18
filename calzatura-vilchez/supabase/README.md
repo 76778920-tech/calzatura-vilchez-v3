@@ -20,7 +20,20 @@ Orden recomendado para activar sincronizacion web/movil:
 npm run db:push
 ```
 
-Si Supabase responde que hay versiones remotas ausentes localmente, primero resolver el historial con `supabase migration repair` y/o `supabase db pull`; no forzar nuevas migraciones encima de un historial divergente.
+Si Supabase responde que hay versiones remotas ausentes localmente:
+
+```bash
+# 1) Quitar del historial migraciones aplicadas en dashboard con timestamp que no está en el repo
+npx supabase migration repair --status reverted <timestamps_que_indique_el_cli>
+
+# 2) Si el SQL del repo ya está en la BD pero con otro timestamp en historial:
+npx supabase migration repair --status applied <timestamps_de_archivos_locales>
+
+# 3) Aplicar lo pendiente
+npm run db:push
+```
+
+Comprobar: `npx supabase migration list` (columnas Local y Remote alineadas). No usar `db pull` en prod salvo decisión explícita de versionar SQL generado.
 
 2. Verificar que las tres tablas del admin de productos estan en la publicacion Realtime:
 

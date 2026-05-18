@@ -157,7 +157,7 @@ El usuario autenticado puede consultar y actualizar: nombre, teléfono, y hasta 
 El usuario puede guardar y quitar productos de su lista de favoritos. Los favoritos se almacenan en la tabla `favoritos` de Supabase (vía BFF `/favorites`) y son visibles en la sección de perfil.
 
 **RF-10 — Historial de pedidos del cliente**
-El cliente puede consultar el historial de todos sus pedidos con: fecha, productos, talla/color, monto total y estado actual (pendiente, confirmado, en proceso, enviado, entregado, cancelado).
+El cliente puede consultar el historial de todos sus pedidos con: fecha, productos, talla/color, monto total y estado actual (pendiente, pagado, enviado, entregado, cancelado).
 
 ### 3.3 Módulo de carrito y checkout
 
@@ -211,7 +211,7 @@ El sistema genera nota de venta o guía de remisión en formato imprimible (HTML
 El administrador puede marcar una venta como devuelta. El sistema revierte el descuento de stock y registra la devolución en el campo `devolucion` de la tabla `ventasDiarias`.
 
 **RF-24 — Administración de pedidos**
-El administrador visualiza todos los pedidos en una tabla con filtros por estado y fecha. Puede cambiar el estado de cada pedido (pendiente → confirmado → en proceso → enviado → entregado / cancelado).
+El administrador visualiza todos los pedidos en una tabla con filtros por estado y fecha. Puede cambiar el estado de cada pedido (pendiente → pagado → enviado → entregado / cancelado).
 
 ### 3.6 Módulo administrativo — Fabricantes y usuarios
 

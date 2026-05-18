@@ -22,7 +22,7 @@ export const AREA_ALLOWED_ROLES: Record<AccessArea, UserRole[] | "public"> = {
   administradores: ["admin"],
   trabajadores: ["trabajador", "admin"],
   fabricantes: ["admin"],
-  ventas: ["admin"],
+  ventas: ["admin", "trabajador"],
   usuarios: ["admin"],
 };
 

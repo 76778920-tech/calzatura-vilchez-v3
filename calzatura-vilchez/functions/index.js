@@ -676,57 +676,11 @@ exports.stripeWebhook = onRequest(
 exports.confirmCodOrder = onRequest(
   { secrets: [SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
   async (req, res) => {
-    cors(req, res, async () => {
-      if (req.method !== "POST") {
-        return res.status(405).json({ error: "Metodo no permitido" });
-      }
-
-      try {
-        const decodedToken = await verifyFirebaseUser(req);
-        const supabase = getSupabaseAdmin();
-        const { orderId } = objOr(req.body);
-
-        if (!orderId || typeof orderId !== "string") {
-          return res.status(400).json({ error: "Pedido invalido" });
-        }
-
-        const order = await fetchOrderOrThrow(supabase, orderId);
-
-        if (order.userId !== decodedToken.uid) {
-          return res.status(403).json({ error: "No puedes confirmar este pedido" });
-        }
-        if (order.estado !== "pendiente" || order.metodoPago !== "contraentrega") {
-          return res.status(409).json({ error: "El pedido no esta disponible para confirmar" });
-        }
-        if (!hasValidOrderItems(order)) {
-          return res.status(400).json({ error: "Pedido sin productos validos" });
-        }
-
-        if (order.stockDescontadoEn) {
-          return res.status(200).json({ success: true, alreadyProcessed: true });
-        }
-
-        assertStoredTotals(order);
-        await assertOrderStockAvailability(supabase, order.items);
-        await discountOrderStockRpc(supabase, order);
-        const stockMark = new Date().toISOString();
-        await updateOrder(supabase, orderId, { stockDescontadoEn: stockMark });
-        await logAuditFn({
-          supabase,
-          accion: "descontar_stock_pedido",
-          entidad: "pedido",
-          entidadId: orderId,
-          entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
-          usuarioUid: decodedToken.uid,
-          usuarioEmail: order.userEmail ?? null,
-          detalle: { source: "confirmCodOrder", metodoPago: "contraentrega" },
-        });
-
-        return res.status(200).json({ success: true });
-      } catch (error) {
-        console.error("COD confirm error:", error);
-        return res.status(errorStatus(error)).json({ error: publicError(error) });
-      }
+    cors(req, res, () => {
+      return res.status(410).json({
+        error:
+          "confirmCodOrder retirado. Use POST /createOrder en el BFF (stock COD en el mismo request).",
+      });
     });
   }
 );
