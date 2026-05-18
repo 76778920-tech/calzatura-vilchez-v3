@@ -31,50 +31,68 @@ def _set_repo_source(root: ET.Element, repo_source: str) -> None:
 
 def _normalize_filename(fn: str) -> str:
     norm = fn.replace("\\", "/").strip()
-    if not norm.startswith("ai-service/"):
-        norm = f"ai-service/{norm}"
-    return norm
+    if norm.startswith("ai-service/"):
+        return norm
+    return f"ai-service/{norm}"
 
 
-def _process_class(cls: ET.Element) -> bool:
-    """Normaliza filename; devuelve True si la clase debe omitirse del XML."""
+def _should_omit_class(cls: ET.Element) -> bool:
     fn = cls.get("filename")
     if not fn:
         return False
-    norm = _normalize_filename(fn)
-    if norm in OMIT_COVERAGE_FILENAMES:
-        return True
-    cls.set("filename", norm)
-    return False
+    return _normalize_filename(fn) in OMIT_COVERAGE_FILENAMES
 
 
-def _strip_excluded_classes(root: ET.Element) -> int:
-    removed = 0
-    for package in root.iter("package"):
-        classes_el = package.find("classes")
-        if classes_el is None:
-            continue
-        for cls in classes_el.findall("class")[:]:
-            if _process_class(cls):
-                classes_el.remove(cls)
-                removed += 1
+def _apply_filename(cls: ET.Element) -> None:
+    fn = cls.get("filename")
+    if fn:
+        cls.set("filename", _normalize_filename(fn))
+
+
+def _omit_classes(classes_el: ET.Element) -> int:
+    to_remove = [cls for cls in classes_el.findall("class") if _should_omit_class(cls)]
+    for cls in to_remove:
+        classes_el.remove(cls)
+    return len(to_remove)
+
+
+def _normalize_remaining(classes_el: ET.Element) -> None:
+    for cls in classes_el.findall("class"):
+        _apply_filename(cls)
+
+
+def _strip_package(package: ET.Element) -> int:
+    classes_el = package.find("classes")
+    if classes_el is None:
+        return 0
+    removed = _omit_classes(classes_el)
+    _normalize_remaining(classes_el)
     return removed
 
 
-def main() -> None:
+def _strip_excluded_classes(root: ET.Element) -> int:
+    return sum(_strip_package(pkg) for pkg in root.iter("package"))
+
+
+def _coverage_path() -> Path:
     ai_service_dir = Path(__file__).resolve().parent.parent
-    repo_root = ai_service_dir.parent
-    path = ai_service_dir / "coverage.xml"
+    return ai_service_dir / "coverage.xml"
+
+
+def _repo_source() -> str:
+    ai_service_dir = Path(__file__).resolve().parent.parent
+    return str(ai_service_dir.parent).replace("\\", "/")
+
+
+def main() -> None:
+    path = _coverage_path()
     if not path.is_file():
         raise SystemExit(f"fix_coverage_xml_for_sonar: no existe {path}")
 
     tree = ET.parse(path)
     root = tree.getroot()
-    repo_source = str(repo_root).replace("\\", "/")
-
-    _set_repo_source(root, repo_source)
+    _set_repo_source(root, _repo_source())
     removed = _strip_excluded_classes(root)
-
     tree.write(path, encoding="utf-8", xml_declaration=True)
     print(
         f"fix_coverage_xml_for_sonar: 1 source, rutas ai-service/, "
