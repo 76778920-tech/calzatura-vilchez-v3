@@ -9,7 +9,10 @@ COPY requirements.txt requirements.lock ./
 COPY scripts/docker_install_locked_deps.sh scripts/
 RUN sh scripts/docker_install_locked_deps.sh
 
-COPY . .
+# Solo código de la app (evita docker:S6470 — no copiar .env, tests, etc.)
+COPY main.py ./
+COPY models/ ./models/
+COPY services/ ./services/
 
 RUN useradd --create-home --shell /bin/sh appuser
 USER appuser
