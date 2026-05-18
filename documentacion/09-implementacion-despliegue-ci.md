@@ -109,8 +109,9 @@ Firebase: configuración en `src/firebase/config.ts` (claves públicas de client
 
 | Archivo | Disparadores | Jobs | Propósito |
 |---------|--------------|------|-----------|
-| `.github/workflows/ci.yml` | `push` y `pull_request` a cualquier rama | lint + test + build (mocks) / E2E Playwright | Validación rápida en toda rama — usa variables públicas y mocks de red |
-| `.github/workflows/ci-integration.yml` | `push` a `main` + `workflow_dispatch` | quality · ai-service · e2e (3 jobs paralelos con secrets reales) | Integración completa contra servicios reales — solo se ejecuta al integrar a main |
+| `.github/workflows/ci.yml` | `push` y `pull_request` a cualquier rama | validar migraciones · lint + test + build / E2E | Validación rápida — mocks de red |
+| `.github/workflows/ci-integration.yml` | `push` a `main` + `workflow_dispatch` | validar migraciones · quality · ai-service · e2e | Integración con secrets reales — solo en `main` |
+| `.github/workflows/deploy-production.yml` | tras **CI Integration** success en `main` + `workflow_dispatch` | gate (CI+Integration) · Firebase Hosting · Render IA + smoke | **Único** pipeline de deploy a producción |
 
 #### ci-integration.yml — detalle de jobs
 
@@ -126,26 +127,56 @@ Evidencia: pestaña **Actions** del repositorio remoto; filas detalladas con **d
 
 **Archivo maestro:** `cuadros-excel/CU-T08-automatizacion-respaldos.csv` (incluye filas CI + calidad local + E2E + migraciones + lint).
 
-## 7. Despliegue
+## 7. Despliegue a producción (completo)
 
-### 7.1 Frontend
+### 7.1 Flujo automático en `main`
 
-- Build: `npm run build` → artefacto estático.  
-- Hosting: Firebase Hosting u otro; documentar **proyecto** y **pasos** en anexo operativo.
+```text
+push main → CI (tests + migraciones)     ─┐
+         → CI Integration (secrets reales) ─┤ ambos deben ser success
+         → Deploy Producción (gate)       ← solo si Integration terminó OK
+              ├─ Firebase Hosting + smoke https://calzaturavilchez-ab17f.web.app
+              └─ Render deploy hook + smoke /api/health
+```
 
-### 7.2 Supabase
+No hay deploy en `pull_request`. El workflow antiguo `Deploy — Firebase Hosting` en paralelo al CI fue sustituido por `Deploy — Producción`.
 
-- Proyecto dev/staging/prod separados recomendados.  
-- Rotación de claves: procedimiento en `10-operacion-y-seguridad.md`.
+### 7.2 Secrets obligatorios en GitHub (Actions)
 
-### 7.3 Servicio IA
+| Secret | Uso |
+|--------|-----|
+| `FIREBASE_SERVICE_ACCOUNT` | Deploy Firebase Hosting |
+| `RENDER_DEPLOY_HOOK_URL` | Deploy hook del servicio IA en Render (Settings → Deploy Hook) |
+| `VITE_*` (Firebase, Supabase, Stripe, Cloudinary, DNI, IA, BFF, ORS) | Build Vite en deploy |
+| `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | CI Integration + IA |
+| `SONAR_TOKEN` | SonarQube (opcional; skip si falta) |
 
-- Plataforma: **Render** (plan gratuito) — URL: `https://calzatura-vilchez-v3.onrender.com`
-- CD en GitHub: workflow `Deploy — AI Service (Render)` tras CI verde; secret `RENDER_DEPLOY_HOOK_URL` (Render → Settings → Deploy Hook).
-- Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT` (ver `ai-service/railway.toml`)
-- Healthcheck: `GET /api/health` — timeout 300 s
-- Variables de entorno requeridas en Render: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `FIREBASE_PROJECT_ID`, `SUPERADMIN_EMAILS`, `AI_SERVICE_BEARER_TOKEN`
-- **Cold start:** el plan gratuito suspende el servicio tras 15 min de inactividad. El primer request del día puede tardar 50-70 s (carga de pandas, scikit-learn, scipy). El frontend tiene un timeout de 90 s para cubrirlo.
+Sin `RENDER_DEPLOY_HOOK_URL` el job de deploy **falla** (no se omite).
+
+### 7.3 Despliegue manual de emergencia
+
+GitHub → Actions → **Deploy — Producción (Firebase + Render)** → **Run workflow** (usa el commit actual de `main`; no exige re-verificar CI).
+
+### 7.4 Supabase
+
+- Migraciones: validadas en CI; aplicar en remoto con `npm run db:push` desde `calzatura-vilchez/`.
+- Proyecto dev/staging/prod separados recomendados.
+
+### 7.5 Servicio IA (Render)
+
+- URL: `https://calzatura-vilchez-v3.onrender.com`
+- Start: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+- Health: `GET /api/health` (el deploy espera hasta ~12 min por cold start)
+- Env en Render: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `FIREBASE_PROJECT_ID`, `SUPERADMIN_EMAILS`, `AI_SERVICE_BEARER_TOKEN`
+- Plantilla local: `ai-service/.env.example`
+
+### 7.6 Limpieza de artefactos locales
+
+```bash
+node scripts/clean-local-residual.mjs
+```
+
+Elimina `n/` (restos Firebase), `calzatura-vilchez-mobile/android/build/` y coverage XML sueltos en `ai-service/`.
 
 ### 7.4 Firebase Emulator (entorno local / E2E)
 

@@ -1,5 +1,15 @@
 # Supabase runbook
 
+## Migraciones en CI
+
+Cada push/PR ejecuta `node scripts/validate-supabase-migrations.mjs` (workflow CI):
+
+- Nombres `YYYYMMDDHHMMSS_descripcion.sql` únicos (un archivo por timestamp).
+- Orden cronológico estricto.
+- Sin SQL destructivo global (`DROP DATABASE`, `DROP SCHEMA public`).
+
+Si renombras una migración ya aplicada en remoto, usa `supabase migration repair` antes de `db push` (ver [docs](https://supabase.com/docs/guides/cli/managing-environments)).
+
 ## Admin productos y Realtime
 
 Orden recomendado para activar sincronizacion web/movil:

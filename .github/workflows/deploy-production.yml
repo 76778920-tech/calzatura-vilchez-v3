@@ -1,0 +1,152 @@
+name: Deploy — Producción (Firebase + Render)
+
+# Solo despliega si CI + CI Integration pasaron en el mismo commit (main).
+# Disparo manual (workflow_dispatch) omite la doble verificación de workflows.
+
+on:
+  workflow_run:
+    workflows:
+      - CI Integration — Calzatura Vilchez (main only, secrets reales)
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  CI_WORKFLOW_NAME: CI — Sistema Web con IA para Predicción de Riesgo Empresarial — Calzatura Vilchez
+  CI_INTEGRATION_NAME: CI Integration — Calzatura Vilchez (main only, secrets reales)
+
+jobs:
+  gate:
+    name: Verificar CI completo
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+    outputs:
+      head_sha: ${{ steps.sha.outputs.head_sha }}
+    steps:
+      - name: Resolver SHA del despliegue
+        id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "head_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "head_sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Exigir CI + CI Integration en success (solo tras push)
+        if: github.event_name != 'workflow_dispatch'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
+          REQUIRED_WORKFLOWS: ${{ env.CI_WORKFLOW_NAME }}|${{ env.CI_INTEGRATION_NAME }}
+        run: node scripts/github-verify-workflows-for-sha.mjs
+
+      - name: Verificar secrets obligatorios de producción
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          check() { if [ -z "${1:-}" ]; then echo "::error::Falta secret $2"; missing=1; fi; }
+          check "${{ secrets.FIREBASE_SERVICE_ACCOUNT }}" "FIREBASE_SERVICE_ACCOUNT"
+          check "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" "RENDER_DEPLOY_HOOK_URL"
+          check "${{ secrets.VITE_SUPABASE_URL }}" "VITE_SUPABASE_URL"
+          check "${{ secrets.VITE_SUPABASE_ANON_KEY }}" "VITE_SUPABASE_ANON_KEY"
+          check "${{ secrets.VITE_FIREBASE_API_KEY }}" "VITE_FIREBASE_API_KEY"
+          [ "$missing" -eq 0 ] || exit 1
+          echo "Secrets de deploy presentes."
+
+  firebase-hosting:
+    name: Firebase Hosting
+    needs: gate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: calzatura-vilchez
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ needs.gate.outputs.head_sha }}
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: calzatura-vilchez/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci --ignore-scripts
+
+      - name: Compilar (Vite)
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+          VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
+          VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
+          VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
+          VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
+          VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
+          VITE_ORS_API_KEY: ${{ secrets.VITE_ORS_API_KEY }}
+
+      - name: Deploy a Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@e2eda2e106cfa35cdbcf4ac9ddaf6c4756df2c8c # v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: calzaturavilchez-ab17f
+          channelId: live
+          entryPoint: ./calzatura-vilchez
+
+      - name: Smoke — web en producción
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS -o /dev/null -w "%{http_code}" "https://calzaturavilchez-ab17f.web.app" | grep -qE '^200|301|302'; then
+              echo "Firebase Hosting responde."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Hosting no respondió tras deploy"
+          exit 1
+
+  render-ai-service:
+    name: Render — AI Service
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar deploy hook
+        run: |
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+          echo "Deploy hook enviado."
+
+      - name: Esperar health del servicio IA (cold start)
+        env:
+          AI_BASE: ${{ secrets.VITE_AI_SERVICE_URL || 'https://calzatura-vilchez-v3.onrender.com' }}
+        run: |
+          base="${AI_BASE%/}"
+          url="${base}/api/health"
+          echo "Comprobando $url (hasta 12 min por cold start)..."
+          for i in $(seq 1 48); do
+            if curl -fsS "$url" >/dev/null 2>&1; then
+              echo "AI Service OK en intento $i"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::AI Service no respondió en /api/health"
+          exit 1
