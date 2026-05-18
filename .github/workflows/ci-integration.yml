@@ -234,6 +234,9 @@ jobs:
     name: Deploy — Producción (Firebase + Render)
     needs: [quality, ai-service, ai-service-docker, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      actions: read
     uses: ./.github/workflows/deploy-production.yml
     with:
       head_sha: ${{ github.sha }}

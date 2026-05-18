@@ -29,11 +29,15 @@ jobs:
     steps:
       - name: Resolver SHA del despliegue
         id: sha
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_SHA: ${{ github.sha }}
+          CALL_HEAD_SHA: ${{ inputs.head_sha }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "head_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "head_sha=$DISPATCH_SHA" >> "$GITHUB_OUTPUT"
           else
-            echo "head_sha=${{ inputs.head_sha }}" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$CALL_HEAD_SHA" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Clonar repositorio
@@ -44,7 +48,9 @@ jobs:
           fetch-depth: 0
 
       - name: Exigir commit en main
-        run: bash scripts/verify-deploy-checkout-sha.sh "${{ steps.sha.outputs.head_sha }}"
+        env:
+          DEPLOY_SHA: ${{ steps.sha.outputs.head_sha }}
+        run: bash scripts/verify-deploy-checkout-sha.sh "$DEPLOY_SHA"
 
       - name: Exigir CI + CI Integration en success (solo tras workflow_call)
         if: github.event_name == 'workflow_call'
@@ -55,7 +61,9 @@ jobs:
         run: node scripts/github-verify-workflows-for-sha.mjs
 
       - name: Verificar workflows listos para deploy
-        run: echo "Gate OK — SHA ${{ steps.sha.outputs.head_sha }}"
+        env:
+          DEPLOY_SHA: ${{ steps.sha.outputs.head_sha }}
+        run: echo "Gate OK — SHA $DEPLOY_SHA"
 
   firebase-hosting:
     name: Firebase Hosting
