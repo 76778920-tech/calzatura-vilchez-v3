@@ -85,7 +85,10 @@ function toastRoleUpdateFailure(err: unknown) {
   const code = record && "code" in record ? String(record.code) : "";
   const status = record && "status" in record ? Number((record as { status?: unknown }).status) : 0;
   const lowerMsg = `${msg} ${code}`.toLowerCase();
-  const isPermissionError = code === "42501" || lowerMsg.includes("row-level security");
+  const isPermissionError =
+    code === "42501" ||
+    lowerMsg.includes("row-level security") ||
+    lowerMsg.includes("sin permisos");
   if (isPermissionError) {
     toast.error("Sin permisos para realizar esta operación.");
   } else if (status === 401 || code === "401" || lowerMsg.includes("unauthorized") || lowerMsg.includes("jwt")) {

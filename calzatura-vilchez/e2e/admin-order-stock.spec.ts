@@ -4,6 +4,8 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { mirrorAdminOrders } from "./helpers/mirrorAdminDataRoutes";
+import { mockBffUpdateOrderStatus } from "./helpers/mockAdminBff";
 
 const ORDER_PENDIENTE = {
   id: "e2e-ord-stock-pendiente",
@@ -32,21 +34,8 @@ const ORDER_PENDIENTE = {
 };
 
 async function setupOrderMocks(page: Page) {
-  await page.route("**/rest/v1/pedidos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([ORDER_PENDIENTE]),
-      });
-      return;
-    }
-    if (route.request().method() === "PATCH") {
-      await route.fulfill({ status: 204, body: "" });
-      return;
-    }
-    await route.fallback();
-  });
+  await mirrorAdminOrders(page, [ORDER_PENDIENTE]);
+  await mockBffUpdateOrderStatus(page);
 
   await page.route("**/rest/v1/auditoria*", async (route) => {
     await route.fulfill({ status: 201, body: "" });

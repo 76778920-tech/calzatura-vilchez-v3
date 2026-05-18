@@ -13,6 +13,12 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth, FAKE_ADMIN_UID, FAKE_ADMIN_EMAIL } from "./helpers/mockFirebaseAuth";
+import {
+  mirrorAdminOrders,
+  mirrorAdminProductFinanzas,
+  mirrorAdminProducts,
+  mirrorAdminVentasDiarias,
+} from "./helpers/mirrorAdminDataRoutes";
 import { mockBffCreateProductVariantsAtomicOk } from "./helpers/mockAdminBff";
 
 // ─── Datos de prueba ──────────────────────────────────────────────────────────
@@ -78,29 +84,10 @@ async function setupAdminMocks(
   const auditoria = opts.auditoria ?? [];
   const productos = opts.productos ?? [MOCK_PRODUCT];
 
-  await page.route("**/rest/v1/productos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(productos),
-      });
-      return;
-    }
-    if (route.request().method() === "POST" || route.request().method() === "PATCH") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify([MOCK_PRODUCT]),
-      });
-      return;
-    }
-    if (route.request().method() === "DELETE") {
-      await route.fulfill({ status: 204, body: "" });
-      return;
-    }
-    await route.fallback();
-  });
+  await mirrorAdminProducts(page, productos);
+  await mirrorAdminOrders(page, []);
+  await mirrorAdminVentasDiarias(page, []);
+  await mirrorAdminProductFinanzas(page, []);
 
   await page.route("**/rest/v1/auditoria*", async (route) => {
     if (route.request().method() === "GET") {
@@ -123,21 +110,6 @@ async function setupAdminMocks(
     await route.fallback();
   });
 
-  await page.route("**/rest/v1/pedidos*", async (route) => {
-    if (route.request().method() !== "GET") {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-
-  await page.route("**/rest/v1/ventasDiarias*", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
 }
 
 /** Códigos de producto (GET) para que la tabla admin cargue sin llamadas reales. */

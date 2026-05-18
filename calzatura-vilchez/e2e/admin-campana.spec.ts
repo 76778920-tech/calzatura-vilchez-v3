@@ -11,6 +11,7 @@ import {
   mockBffCreateProductVariantsAtomicOk,
   mockBffUpdateProductAtomicOk,
 } from "./helpers/mockAdminBff";
+import { mirrorAdminProductListSetup } from "./helpers/mirrorAdminDataRoutes";
 
 // ─── Datos semilla ─────────────────────────────────────────────────────────────
 
@@ -56,30 +57,10 @@ const SEED_FINANCIAL = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function setupMocks(page: Page) {
-  await page.route("**/rest/v1/productos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SEED_PRODUCT]) });
-      return;
-    }
-    await route.fallback();
+  await mirrorAdminProductListSetup(page, [SEED_PRODUCT], {
+    codigos: [SEED_CODE],
+    finanzas: [SEED_FINANCIAL],
   });
-  await page.route("**/rest/v1/productoCodigos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SEED_CODE]) });
-      return;
-    }
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SEED_FINANCIAL]) });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.reload();
-  await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("table tbody tr", { timeout: 10_000 });
 }
 
 // Selecciona el campo Campaña dentro del modal (único en el formulario).

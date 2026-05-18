@@ -8,6 +8,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_ADMIN_EMAIL, FAKE_ADMIN_UID, injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { mirrorAdminOrders, mirrorAdminUserRolePatch, mirrorAdminUsers } from "./helpers/mirrorAdminDataRoutes";
 
 // ─── Semilla ──────────────────────────────────────────────────────────────────
 
@@ -63,52 +64,44 @@ async function setupUserMocks(
   const ordersStatus = opts.ordersStatus ?? 200;
   const usersStatus = opts.usersStatus ?? 200;
 
-  await page.route("**/rest/v1/usuarios*", async (route) => {
-    const method = route.request().method();
-    if (method === "GET") {
-      if (usersStatus !== 200) {
+  if (usersStatus !== 200) {
+    await page.route(/\/admin\/users\/?(\?.*)?$/i, async (route) => {
+      if (route.request().method() === "GET") {
         await route.fulfill({
           status: usersStatus,
           contentType: "application/json",
-          body: JSON.stringify({ code: "42501", message: "row-level security policy" }),
+          body: JSON.stringify({ error: "row-level security policy" }),
         });
         return;
       }
-      const url = route.request().url();
-      if (url.includes("uid=eq.")) {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([MOCK_ADMIN]) });
-        return;
-      }
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(ALL_USERS) });
-      return;
-    }
-    if (method === "PATCH") {
-      if (patchStatus === 403) {
-        await route.fulfill({
-          status: 403,
-          contentType: "application/json",
-          body: JSON.stringify({ code: "42501", message: "new row violates row-level security policy" }),
-        });
-        return;
-      }
-      await route.fulfill({ status: 204, body: "" });
-      return;
-    }
-    await route.fallback();
-  });
+      await route.fallback();
+    });
+  } else {
+    await mirrorAdminUsers(page, ALL_USERS);
+  }
 
-  await page.route("**/rest/v1/pedidos*", async (route) => {
-    if (route.request().method() !== "GET") { await route.fallback(); return; }
-    if (ordersStatus !== 200) {
-      await route.fulfill({
-        status: ordersStatus,
-        contentType: "application/json",
-        body: JSON.stringify({ code: "42501", message: "row-level security policy" }),
-      });
-      return;
-    }
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
+  await mirrorAdminUserRolePatch(
+    page,
+    patchStatus === 403
+      ? { status: 403, error: "new row violates row-level security policy" }
+      : { status: 200 },
+  );
+
+  if (ordersStatus !== 200) {
+    await page.route(/\/admin\/orders\/?(\?.*)?$/i, async (route) => {
+      if (route.request().method() === "GET") {
+        await route.fulfill({
+          status: ordersStatus,
+          contentType: "application/json",
+          body: JSON.stringify({ error: "row-level security policy" }),
+        });
+        return;
+      }
+      await route.fallback();
+    });
+  } else {
+    await mirrorAdminOrders(page, []);
+  }
 
   await page.route("**/rest/v1/auditoria*", async (route) => {
     await route.fulfill({ status: 201, body: "" });

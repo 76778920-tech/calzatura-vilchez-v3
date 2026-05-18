@@ -10,6 +10,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { DEFAULT_ADMIN_PROFILE, mirrorUsersMe } from "./helpers/mirrorAdminDataRoutes";
 
 test.describe("perfil usuario → guardar cambios", () => {
   test.beforeEach(async ({ page }) => {
@@ -32,10 +33,14 @@ test.describe("perfil usuario → guardar cambios", () => {
   // ---------------------------------------------------------------------------
   test("guarda teléfono válido y muestra toast de éxito", async ({ page }) => {
     let patchCalled = false;
-    await page.route("**/rest/v1/usuarios*", async (route) => {
+    await page.route(/\/users\/me\/?(\?.*)?$/i, async (route) => {
       if (route.request().method() === "PATCH") {
         patchCalled = true;
-        await route.fulfill({ status: 204, body: "" });
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({ ok: true }),
+        });
         return;
       }
       await route.fallback();
@@ -53,7 +58,7 @@ test.describe("perfil usuario → guardar cambios", () => {
   // ---------------------------------------------------------------------------
   test("rechaza teléfono de menos de 9 dígitos sin llamar a la API", async ({ page }) => {
     let patchCalled = false;
-    await page.route("**/rest/v1/usuarios*", async (route) => {
+    await page.route(/\/users\/me\/?(\?.*)?$/i, async (route) => {
       if (route.request().method() === "PATCH") patchCalled = true;
       await route.fallback();
     });
@@ -70,7 +75,7 @@ test.describe("perfil usuario → guardar cambios", () => {
   // ---------------------------------------------------------------------------
   test("rechaza teléfono que no empieza con 9 sin llamar a la API", async ({ page }) => {
     let patchCalled = false;
-    await page.route("**/rest/v1/usuarios*", async (route) => {
+    await page.route(/\/users\/me\/?(\?.*)?$/i, async (route) => {
       if (route.request().method() === "PATCH") patchCalled = true;
       await route.fallback();
     });
@@ -86,19 +91,9 @@ test.describe("perfil usuario → guardar cambios", () => {
   // Test 4: error RLS de Supabase → toast legible sin mencionar RLS / código SQL
   // ---------------------------------------------------------------------------
   test("muestra error de permisos si Supabase responde con RLS 42501", async ({ page }) => {
-    await page.route("**/rest/v1/usuarios*", async (route) => {
-      if (route.request().method() === "PATCH") {
-        await route.fulfill({
-          status: 403,
-          contentType: "application/json",
-          body: JSON.stringify({
-            code: "42501",
-            message: "new row violates row-level security policy for table \"usuarios\"",
-          }),
-        });
-        return;
-      }
-      await route.fallback();
+    await mirrorUsersMe(page, DEFAULT_ADMIN_PROFILE, {
+      patchStatus: 403,
+      patchError: "Sin permisos para realizar esta operación.",
     });
 
     await page.locator("input[type='tel']").fill("912345678");
@@ -113,10 +108,9 @@ test.describe("perfil usuario → guardar cambios", () => {
   // Test 5: servidor no responde → timeout de 10 s → toast legible
   // ---------------------------------------------------------------------------
   test("muestra error de timeout si el servidor no responde en 10 s", async ({ page }) => {
-    await page.route("**/rest/v1/usuarios*", async (route) => {
+    await page.route(/\/users\/me\/?(\?.*)?$/i, async (route) => {
       if (route.request().method() === "PATCH") {
-        // No llamamos fulfill/fallback/abort → la petición queda colgada.
-        // handleSave tiene un Promise.race con timeout de 10 s que dispara primero.
+        // No fulfill: handleSave hace race con timeout de 10 s.
         return;
       }
       await route.fallback();

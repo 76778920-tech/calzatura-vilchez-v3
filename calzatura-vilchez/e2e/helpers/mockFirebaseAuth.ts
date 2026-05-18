@@ -1,9 +1,11 @@
 import type { Page } from "@playwright/test";
+import { FAKE_ADMIN_EMAIL, FAKE_ADMIN_UID } from "./e2eAuthConstants";
 import { installDefaultAdminBffMocks } from "./mockAdminBff";
+import { installDefaultAdminDataMirrors } from "./mirrorAdminDataRoutes";
+
+export { FAKE_ADMIN_EMAIL, FAKE_ADMIN_UID } from "./e2eAuthConstants";
 
 const FIREBASE_PROJECT_ID = "calzaturavilchez-ab17f";
-export const FAKE_ADMIN_EMAIL = "76778920@continental.edu.pe";
-export const FAKE_ADMIN_UID = "e2e-admin-uid-001";
 
 function b64url(data: string): string {
   return Buffer.from(data, "utf8")
@@ -99,25 +101,6 @@ export async function injectFakeAdminAuth(page: Page): Promise<void> {
     });
   });
 
-  // getUserProfile llama a Supabase usuarios. isSuperAdminEmail da acceso aunque
-  // falle, pero moquear evita latencia de red en CI.
-  await page.route("**/rest/v1/usuarios*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          uid: FAKE_ADMIN_UID,
-          nombre: "Admin E2E",
-          email: FAKE_ADMIN_EMAIL,
-          rol: "admin",
-          creadoEn: "2024-01-01T00:00:00.000Z",
-        }),
-      });
-      return;
-    }
-    await route.fallback();
-  });
-
   await installDefaultAdminBffMocks(page);
+  await installDefaultAdminDataMirrors(page);
 }

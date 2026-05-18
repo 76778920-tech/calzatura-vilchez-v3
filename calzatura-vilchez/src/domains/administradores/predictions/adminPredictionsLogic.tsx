@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { motion, animate } from "framer-motion";
 import { assistantReplyWhenDemandUnavailable } from "./predictionDataQuality";
-import type { Prediction } from "./adminPredictionsTypes";
+import { IRE_NIVEL_LABELS, type Prediction } from "./adminPredictionsTypes";
 
 export * from "./adminPredictionsTypes";
 

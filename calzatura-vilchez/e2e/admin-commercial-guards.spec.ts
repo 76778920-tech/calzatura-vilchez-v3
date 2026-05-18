@@ -12,6 +12,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 import { mockBffUpdateProductAtomicError } from "./helpers/mockAdminBff";
+import { mirrorAdminProductListSetup } from "./helpers/mirrorAdminDataRoutes";
 
 const SEED_PRODUCT = {
   id: "e2e-guard-1",
@@ -35,30 +36,7 @@ const SEED_PRODUCT = {
 };
 
 async function setupMocks(page: Page) {
-  await page.route("**/rest/v1/productos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SEED_PRODUCT]) });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route("**/rest/v1/productoCodigos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
-      return;
-    }
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.reload();
-  await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("table tbody tr", { timeout: 10_000 });
+  await mirrorAdminProductListSetup(page, [SEED_PRODUCT]);
 }
 
 async function openEditModal(page: Page) {

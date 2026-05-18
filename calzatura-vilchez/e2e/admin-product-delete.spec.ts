@@ -12,6 +12,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 import { mockBffDeleteProductAtomic } from "./helpers/mockAdminBff";
+import {
+  mirrorAdminProductCodigos,
+  mirrorAdminProductFinanzas,
+} from "./helpers/mirrorAdminDataRoutes";
 
 // ─── Semilla ──────────────────────────────────────────────────────────────────
 
@@ -46,33 +50,21 @@ interface Counters {
 async function setupMocks(page: Page): Promise<Counters> {
   const counters: Counters = { deleteProductAtomicCalls: 0 };
 
-  await page.route("**/rest/v1/productos*", async (route) => {
-    const method = route.request().method();
-    if (method === "GET") {
-      const body = counters.deleteProductAtomicCalls > 0 ? "[]" : JSON.stringify([PRODUCT]);
-      await route.fulfill({ status: 200, contentType: "application/json", body });
+  await page.route(/\/admin\/products\/?(\?.*)?$/i, async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
       return;
     }
-    await route.fallback();
+    const products = counters.deleteProductAtomicCalls > 0 ? [] : [PRODUCT];
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ products }),
+    });
   });
 
-  await page.route("**/rest/v1/productoCodigos*", async (route) => {
-    const method = route.request().method();
-    if (method === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
-  });
-
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    const method = route.request().method();
-    if (method === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
-  });
+  await mirrorAdminProductCodigos(page, []);
+  await mirrorAdminProductFinanzas(page, []);
 
   await mockBffDeleteProductAtomic(page, () => {
     counters.deleteProductAtomicCalls += 1;

@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { mirrorUsersMe } from "./mirrorAdminDataRoutes";
 
 export const E2E_FIREBASE_PROJECT_ID = "calzaturavilchez-ab17f";
 export const E2E_FIREBASE_API_KEY = "AIzaSyBAnVUP4M6wujGs-x8EytdGabkIP7EJkwo";
@@ -86,6 +87,21 @@ export function storageStateForUser(
   };
 }
 
+function clientProfile(user: E2EClientUser) {
+  return {
+    uid: user.uid,
+    nombre: user.name,
+    email: user.email,
+    rol: "cliente" as const,
+    creadoEn: "2026-01-01T00:00:00.000Z",
+  };
+}
+
+/** Perfil cliente vía BFF (`AuthContext` → `/users/me`). Sin esto, rutas `clientes` redirigen a `/`. */
+export async function mockClientUsersMe(page: Page, user: E2EClientUser): Promise<void> {
+  await mirrorUsersMe(page, clientProfile(user));
+}
+
 /** Mock GET productos (catálogo y `fetchPublicProductsByIds` con filtro `id=in.(...)`). */
 export async function mockSupabasePublicProductos(
   page: Page,
@@ -97,10 +113,23 @@ export async function mockSupabasePublicProductos(
       return;
     }
 
+    const url = route.request().url();
+    let rows = catalog;
+    const inMatch = url.match(/id=in\.\(([^)]+)\)/);
+    if (inMatch) {
+      const ids = decodeURIComponent(inMatch[1])
+        .split(",")
+        .map((s) => s.trim().replaceAll('"', ""));
+      rows = catalog.filter((p) => ids.includes(String(p.id ?? "")));
+    }
+    if (/activo=eq\.true/i.test(url)) {
+      rows = rows.filter((p) => p.activo !== false);
+    }
+
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify(catalog),
+      body: JSON.stringify(rows),
     });
   });
 }
@@ -154,6 +183,8 @@ export async function mockBffCheckoutDelivery(page: Page): Promise<void> {
 }
 
 export async function mockClientFirebaseAuth(page: Page, user: E2EClientUser): Promise<void> {
+  await mockClientUsersMe(page, user);
+
   await page.route("**/identitytoolkit.googleapis.com/**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -307,10 +338,8 @@ export async function mockBffFavoritesForUser(page: Page): Promise<{
     await route.fulfill({ status: 405, headers: corsHeaders(), body: JSON.stringify({ error: "Metodo no permitido" }) });
   };
 
-  const matchFavorites = (url: URL) =>
-    /\/favorites\/?$/i.test(url.pathname) || /\/favoritos\/?$/i.test(url.pathname);
-
-  await page.route(matchFavorites, handle);
+  await page.route(/\/favorites(\?.*)?$/i, handle);
+  await page.route(/\/favoritos(\?.*)?$/i, handle);
 
   return { favoriteIds };
 }

@@ -46,7 +46,7 @@ async function newClientPage(browser: Browser, baseURL: string, user: E2EClientU
   return { context, page };
 }
 
-test.describe("favoritos privados por cuenta (BFF)", () => {
+test.describe("favoritos privados por cuenta", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
   test("cliente A marca favorito y cliente B no lo ve (TC-FAV-001)", async ({ browser, baseURL }) => {
@@ -79,13 +79,15 @@ test.describe("favoritos privados por cuenta (BFF)", () => {
         { timeout: 10_000 },
       );
 
-      await clientA.page.goto("/favoritos", { waitUntil: "networkidle" });
+      await clientA.page.goto("/favoritos");
       await expect(clientA.page.getByText(FAVORITE_PRODUCT.nombre)).toBeVisible({ timeout: 20_000 });
 
       const clientB = await newClientPage(browser, url, USER_B);
       sessions.push(clientB.context);
       await clientB.page.goto("/favoritos");
-      await expect(clientB.page.getByRole("heading", { name: /aún no tienes favoritos/i })).toBeVisible({ timeout: 15_000 });
+      await expect(clientB.page.getByRole("heading", { name: /aún no tienes favoritos/i })).toBeVisible({
+        timeout: 15_000,
+      });
       await expect(clientB.page.getByText(FAVORITE_PRODUCT.nombre)).toHaveCount(0);
     } finally {
       await Promise.all(sessions.map((context) => context.close()));

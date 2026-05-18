@@ -8,6 +8,7 @@
  * TC-PRED-002: Respuesta exitosa → tabla de predicciones renderizada con al menos 1 fila.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { installAdminAIMocks } from "./helpers/mockAdminAI";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 
 // ─── Respuesta mínima del endpoint /api/predict/combined ──────────────────────
@@ -154,52 +155,12 @@ const MOCK_COMBINED_INSUFFICIENT = {
 
 // ─── Setup helpers ────────────────────────────────────────────────────────────
 
-/** Mockea la ruta del servicio IA para que devuelva un AbortError (timeout). */
 async function setupAITimeout(page: Page) {
-  // Una ruta que nunca responde provoca el AbortError del controller interno (45 s).
-  // Para no esperar 45 s en tests, hacemos que la ruta cuelgue y luego Playwright
-  // la cancela cuando finaliza el test, pero aquí simulamos el abort rechazando
-  // la petición con un network error equivalente.
-  await page.route("**/api/predict/**", async (route) => {
-    await route.abort("timedout");
-  });
-
-  await page.route("**/api/cache/**", async (route) => {
-    await route.fulfill({ status: 200, body: "{}" });
-  });
-
-  await page.route("**/api/ire/historial**", async (route) => {
-    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ historial: [], days: 60 }) });
-  });
+  await installAdminAIMocks(page, { predictTimeout: true, ireHistorial: [] });
 }
 
-/** Mockea la ruta del servicio IA para que devuelva datos válidos. */
 async function setupAISuccess(page: Page, payload: typeof MOCK_COMBINED_RESPONSE = MOCK_COMBINED_RESPONSE) {
-  await page.route("**/api/predict/**", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(payload),
-    });
-  });
-
-  await page.route("**/api/cache/**", async (route) => {
-    await route.fulfill({ status: 200, body: "{}" });
-  });
-
-  await page.route("**/api/ire/historial**", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        days: 60,
-        historial: [
-          { fecha: "2026-05-05", score: 37, nivel: "moderado", version: "1.1.0", detalle: { total_con_historial: 1 } },
-          { fecha: "2026-05-06", score: 38, nivel: "moderado", version: "1.1.0", detalle: { total_con_historial: 1 } },
-        ],
-      }),
-    });
-  });
+  await installAdminAIMocks(page, { combined: payload });
 }
 
 async function goToPredictions(page: Page) {
@@ -243,8 +204,12 @@ test.describe("admin predicciones → cold start y carga exitosa", () => {
     await expect(page.getByText("Recomendaciones automáticas priorizadas")).toBeVisible();
     await expect(page.getByText("Prioriza este producto en el siguiente pedido.")).toBeVisible();
     await page.getByRole("tab", { name: /Detalle IRE/i }).click();
-    await expect(page.getByText("Variables del riesgo empresarial")).toBeVisible();
-    await expect(page.getByText("IRE = riesgo_stock * 0.40")).toBeVisible();
+    await expect(page.locator(".ire-variable-title", { hasText: "Variables del riesgo empresarial" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.locator(".ire-formula", { hasText: /IRE = riesgo_stock \* 0\.40/ })).toBeVisible({
+      timeout: 10_000,
+    });
     await page.getByRole("tab", { name: /Modelo IA/i }).click();
     await expect(page.getByText("Temporadas y campañas incorporadas")).toBeVisible();
     await expect(page.getByText("Campaña: nueva-temporada")).toBeVisible();

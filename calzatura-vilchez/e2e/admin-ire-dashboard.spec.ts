@@ -12,6 +12,7 @@
  * incluyan el bloque `ire` y `ire_proyectado`. Se usa injectFakeAdminAuth.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { installAdminAIMocks } from "./helpers/mockAdminAI";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 
 // ─── Datos de prueba ──────────────────────────────────────────────────────────
@@ -166,26 +167,7 @@ function buildCombinedResponse(opts: {
 }
 
 async function setupAIMock(page: Page, response: object) {
-  await page.route("**/api/predict/**", async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(response),
-    });
-  });
-
-  await page.route("**/api/cache/**", async (route) => {
-    await route.fulfill({ status: 200, body: "{}" });
-  });
-
-  await page.route("**/api/ire/historial**", async (route) => {
-    const historial = (response as { ire_historial?: unknown[] }).ire_historial ?? [];
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ days: 60, historial }),
-    });
-  });
+  await installAdminAIMocks(page, { combined: response });
 }
 
 async function goToPredictions(page: Page) {
@@ -260,9 +242,11 @@ test.describe("admin predicciones → tarjeta IRE y sparkline", () => {
     await expect(page.locator(".ire-hero")).toBeVisible({ timeout: 20_000 });
     await page.getByRole("tab", { name: /Detalle IRE/i }).click();
 
-    await expect(page.getByText("Historial del riesgo empresarial")).toBeVisible();
-    await expect(page.getByText("Último registro")).toBeVisible();
-    await expect(page.getByText("2026-05-02 · 18/100")).toBeVisible();
+    await expect(page.locator(".dash-card-title", { hasText: "Historial del riesgo empresarial" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(page.getByText("Último registro")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("2026-05-02 · 18/100")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole("cell", { name: "2026-05-02" })).toBeVisible();
     await expect(page.getByRole("cell", { name: "v1.1.0" }).first()).toBeVisible();
   });

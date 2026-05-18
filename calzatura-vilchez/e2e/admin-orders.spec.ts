@@ -8,6 +8,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 import { mockBffUpdateOrderStatus } from "./helpers/mockAdminBff";
+import { mirrorAdminOrders } from "./helpers/mirrorAdminDataRoutes";
 
 // ─── Semilla ──────────────────────────────────────────────────────────────────
 
@@ -35,18 +36,7 @@ const ORDER_PAGADO = {
 // ─── Setup helper ─────────────────────────────────────────────────────────────
 
 async function setupOrderMocks(page: Page, orders: unknown[] = [ORDER_PENDIENTE, ORDER_PAGADO]) {
-  await page.route("**/rest/v1/pedidos*", async (route) => {
-    const method = route.request().method();
-    if (method === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(orders) });
-      return;
-    }
-    if (method === "PATCH") {
-      await route.fulfill({ status: 204, body: "" });
-      return;
-    }
-    await route.fallback();
-  });
+  await mirrorAdminOrders(page, orders);
 
   await page.route("**/rest/v1/auditoria*", async (route) => {
     await route.fulfill({ status: 201, body: "" });

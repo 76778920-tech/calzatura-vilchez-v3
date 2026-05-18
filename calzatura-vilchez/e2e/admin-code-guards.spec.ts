@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 import { mockBffUpdateProductAtomicError } from "./helpers/mockAdminBff";
+import { mirrorAdminProductListSetup } from "./helpers/mirrorAdminDataRoutes";
 
 function normalizeCode(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 40);
@@ -62,47 +63,10 @@ const SEED_CODE = "CV-SEED-1";
  * Para POST, este handler llama fallback() y el test lo intercepta.
  */
 async function setupProductMocks(page: Page) {
-  await page.route("**/rest/v1/productos*", async (route) => {
-    const method = route.request().method();
-    if (method === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([SEED_PRODUCT]),
-      });
-      return;
-    }
-    if (method === "PATCH" || method === "POST" || method === "DELETE") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
+  await mirrorAdminProductListSetup(page, [SEED_PRODUCT], {
+    codigos: [{ productoId: SEED_PRODUCT.id, codigo: SEED_CODE }],
+    finanzas: [],
   });
-  await page.route("**/rest/v1/productoCodigos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([{ productoId: SEED_PRODUCT.id, codigo: SEED_CODE }]),
-      });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    const method = route.request().method();
-    if (method === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
-      return;
-    }
-    if (method === "PATCH" || method === "POST" || method === "DELETE") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.reload();
-  await page.waitForLoadState("domcontentloaded");
   await page.waitForSelector(".admin-code-badge", { timeout: 10_000 });
 }
 

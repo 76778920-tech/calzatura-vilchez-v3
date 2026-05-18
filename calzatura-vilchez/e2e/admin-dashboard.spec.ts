@@ -5,6 +5,13 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_ADMIN_EMAIL, FAKE_ADMIN_UID, injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import {
+  mirrorAdminOrders,
+  mirrorAdminProductFinanzas,
+  mirrorAdminProducts,
+  mirrorAdminUsers,
+  mirrorAdminVentasDiarias,
+} from "./helpers/mirrorAdminDataRoutes";
 
 const MOCK_PRODUCT = {
   id: "e2e-prod-1",
@@ -92,81 +99,17 @@ async function setupDashboardSupabaseMocks(
   const users = opts.users ?? [MOCK_ADMIN_USER, MOCK_EXTRA_USER];
   const auditoria = opts.auditoria ?? [];
 
-  const productosBody = JSON.stringify(products);
   const auditoriaStatus = opts.auditoriaStatus ?? 200;
   const auditoriaBody =
     auditoriaStatus >= 400 ? "{}" : JSON.stringify(auditoria);
 
   if (!opts.skipProductos) {
-    await page.route("**/rest/v1/productos*", async (route) => {
-      if (route.request().method() !== "GET") {
-        await route.fallback();
-        return;
-      }
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: productosBody,
-      });
-    });
+    await mirrorAdminProducts(page, products);
   }
-
-  await page.route("**/rest/v1/pedidos*", async (route) => {
-    if (route.request().method() !== "GET") {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(orders),
-    });
-  });
-
-  await page.route("**/rest/v1/ventasDiarias*", async (route) => {
-    if (route.request().method() !== "GET") {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(ventasDiarias),
-    });
-  });
-
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    if (route.request().method() !== "GET") {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(productoFinanzas),
-    });
-  });
-
-  await page.route("**/rest/v1/usuarios*", async (route) => {
-    if (route.request().method() !== "GET") {
-      await route.fallback();
-      return;
-    }
-    const url = route.request().url();
-    if (url.includes("uid=eq.")) {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([MOCK_ADMIN_USER]),
-      });
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify(users),
-    });
-  });
+  await mirrorAdminOrders(page, orders);
+  await mirrorAdminVentasDiarias(page, ventasDiarias);
+  await mirrorAdminProductFinanzas(page, productoFinanzas);
+  await mirrorAdminUsers(page, users);
 
   await page.route("**/rest/v1/auditoria*", async (route) => {
     if (route.request().method() !== "GET") {
@@ -194,16 +137,20 @@ test.describe("admin dashboard → KPIs, auditoría y errores", () => {
 
   test("fallo en productos: error, toast y Reintentar; al reintentar carga el dashboard (TC-DASH-001)", async ({ page }) => {
     let productosFallan = true;
-    await page.route("**/rest/v1/productos*", async (route) => {
+    await page.route(/\/admin\/products\/?(\?.*)?$/i, async (route) => {
       if (route.request().method() !== "GET") {
         await route.fallback();
         return;
       }
       if (productosFallan) {
-        await route.fulfill({ status: 500, contentType: "application/json", body: "{}" });
+        await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "fail" }) });
         return;
       }
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ products: [] }),
+      });
     });
     await setupDashboardSupabaseMocks(page, { skipProductos: true });
 

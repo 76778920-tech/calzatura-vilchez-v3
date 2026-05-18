@@ -11,6 +11,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 import {
+  mirrorAdminProductCodigos,
+  mirrorAdminProductFinanzas,
+  mirrorAdminProductListSetup,
+  mirrorAdminProductsListResolver,
+} from "./helpers/mirrorAdminDataRoutes";
+import {
   mockBffCreateProductVariantsAtomicOk,
   mockBffRegistrarIngresoStock,
   mockBffUpdateProductAtomicOk,
@@ -62,30 +68,10 @@ const SEED_FINANCIAL = {
 // ─── Helpers de red ───────────────────────────────────────────────────────────
 
 async function setupMocks(page: Page, products: typeof SEED_PRODUCT[] = [SEED_PRODUCT]) {
-  await page.route("**/rest/v1/productos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(products) });
-      return;
-    }
-    await route.fallback();
+  await mirrorAdminProductListSetup(page, products, {
+    codigos: [SEED_CODE],
+    finanzas: [SEED_FINANCIAL],
   });
-  await page.route("**/rest/v1/productoCodigos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SEED_CODE]) });
-      return;
-    }
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SEED_FINANCIAL]) });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.reload();
-  await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("table tbody tr", { timeout: 10_000 });
 }
 
 // <label> en AdminProducts no usa htmlFor, así que getByLabel no funciona.
@@ -182,34 +168,10 @@ test.describe("admin productos → tallas y stock — edición + persistencia", 
   // ──────────────────────────────────────────────────────────────────────────────
   test("stock editado persiste al listar y al re-abrir el modal (editar→listar→detalle)", async ({ page }) => {
     const updatedProduct = { ...SEED_PRODUCT, stock: 20, tallaStock: { "40": 15, "41": 5 }, tallas: ["40", "41"] };
-    let getCount = 0;
 
-    await page.route("**/rest/v1/productos*", async (route) => {
-      if (route.request().method() === "GET") {
-        getCount++;
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify(getCount === 1 ? [SEED_PRODUCT] : [updatedProduct]),
-        });
-        return;
-      }
-      await route.fallback();
-    });
-    await page.route("**/rest/v1/productoCodigos*", async (route) => {
-      if (route.request().method() === "GET") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SEED_CODE]) });
-        return;
-      }
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    });
-    await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-      if (route.request().method() === "GET") {
-        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([SEED_FINANCIAL]) });
-        return;
-      }
-      await route.fallback();
-    });
+    await mirrorAdminProductsListResolver(page, (n) => (n === 1 ? [SEED_PRODUCT] : [updatedProduct]));
+    await mirrorAdminProductCodigos(page, [SEED_CODE]);
+    await mirrorAdminProductFinanzas(page, [SEED_FINANCIAL]);
     await mockBffUpdateProductAtomicOk(page);
 
     await page.reload();
@@ -261,25 +223,9 @@ test.describe("admin productos → tallas y stock — edición + persistencia", 
       descuento: null,
     };
 
-    let getCount = 0;
-    await page.route("**/rest/v1/productos*", async (route) => {
-      if (route.request().method() === "GET") {
-        getCount++;
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify(getCount === 1 ? [] : [newProduct]),
-        });
-        return;
-      }
-      await route.fallback();
-    });
-    await page.route("**/rest/v1/productoCodigos*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    });
-    await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    });
+    await mirrorAdminProductsListResolver(page, (n) => (n === 1 ? [] : [newProduct]));
+    await mirrorAdminProductCodigos(page, []);
+    await mirrorAdminProductFinanzas(page, []);
     await mockBffCreateProductVariantsAtomicOk(page, [NEW_ID]);
 
     await page.reload();

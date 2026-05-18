@@ -14,6 +14,12 @@ import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 import { todayISO } from "./helpers/dates";
 import { mockBffDailySales } from "./helpers/mockAdminBff";
+import {
+  mirrorAdminProductCodigos,
+  mirrorAdminProductFinanzas,
+  mirrorAdminProducts,
+  mirrorAdminVentasDiarias,
+} from "./helpers/mirrorAdminDataRoutes";
 
 // ─── Datos semilla ────────────────────────────────────────────────────────────
 
@@ -81,34 +87,9 @@ function buildSale() {
 
 async function setupBaseMocks(page: Page) {
   await mockBffDailySales(page, []);
-
-  await page.route("**/rest/v1/productos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCT]) });
-      return;
-    }
-    await route.fallback();
-  });
-
-  await page.route("**/rest/v1/productoCodigos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify([{ productoId: "prod-001", codigo: "SB-001" }]),
-      });
-      return;
-    }
-    await route.fallback();
-  });
-
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([FINANCIAL]) });
-      return;
-    }
-    await route.fallback();
-  });
+  await mirrorAdminProducts(page, [PRODUCT]);
+  await mirrorAdminProductCodigos(page, [{ productoId: "prod-001", codigo: "SB-001" }]);
+  await mirrorAdminProductFinanzas(page, [FINANCIAL]);
 
   await page.route("**/rest/v1/ventasDiarias*", async (route) => {
     if (route.request().method() === "GET") {
@@ -241,15 +222,9 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // ──────────────────────────────────────────────────────────────────────────
   test("devolución sin motivo muestra error y no llama return_daily_sale_atomic (TC-SALE-003)", async ({ page }) => {
     const sale = buildSale();
-    await page.route("**/rest/v1/productos*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCT]) });
-    });
-    await page.route("**/rest/v1/productoCodigos*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    });
-    await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    });
+    await mirrorAdminProducts(page, [PRODUCT]);
+    await mirrorAdminProductCodigos(page, []);
+    await mirrorAdminProductFinanzas(page, []);
     await mockBffDailySales(page, [sale]);
     await page.route("**/rest/v1/ventasDiarias*", async (route) => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([sale]) });
@@ -275,15 +250,9 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // ──────────────────────────────────────────────────────────────────────────
   test("devolución con motivo llama return_daily_sale_atomic (TC-SALE-004)", async ({ page }) => {
     const sale = buildSale();
-    await page.route("**/rest/v1/productos*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([PRODUCT]) });
-    });
-    await page.route("**/rest/v1/productoCodigos*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    });
-    await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    });
+    await mirrorAdminProducts(page, [PRODUCT]);
+    await mirrorAdminProductCodigos(page, []);
+    await mirrorAdminProductFinanzas(page, []);
     await mockBffDailySales(page, [sale]);
     await page.route("**/rest/v1/ventasDiarias*", async (route) => {
       if (route.request().method() === "GET") {

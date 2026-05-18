@@ -5,6 +5,7 @@
 import { expect, test, type Browser } from "@playwright/test";
 import {
   E2EClientUser,
+  mockBffCheckoutDelivery,
   mockClientFirebaseAuth,
   mockSupabasePublicProductos,
   storageStateForUser,
@@ -46,6 +47,7 @@ const CART_ITEMS = [
 async function setupStripeCheckoutMocks(page: import("@playwright/test").Page) {
   await mockClientFirebaseAuth(page, CHECKOUT_USER);
   await mockSupabasePublicProductos(page, [CHECKOUT_PRODUCT]);
+  await mockBffCheckoutDelivery(page);
 
   const matchCreateOrder = (url: URL) => /\/createOrder\/?$/i.test(url.pathname);
   await page.route(matchCreateOrder, async (route) => {
@@ -88,7 +90,23 @@ test.describe("Checkout Stripe (mock BFF)", () => {
     await setupStripeCheckoutMocks(page);
 
     await page.goto("/checkout");
-    await page.getByRole("button", { name: /confirmar pedido/i }).click();
+    await expect(page.locator("main.checkout-page")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(CHECKOUT_PRODUCT.nombre)).toBeVisible({ timeout: 10_000 });
+
+    await page.locator("#checkout-nombre").fill("Ana");
+    await page.locator("#checkout-apellido").fill("García");
+    await page.locator("#checkout-direccion").fill("Av. Benavides 123");
+    await page.locator("#checkout-ciudad").fill("Lima");
+    await page.locator("#checkout-distrito").fill("Miraflores");
+    await page.locator("#checkout-telefono").fill("999 888 777");
+
+    await expect(page.locator(".checkout-delivery-suggest-btn").first()).toBeVisible({ timeout: 15_000 });
+    await page.locator(".checkout-delivery-suggest-btn").first().click();
+
+    await page.getByRole("button", { name: /Continuar al Pago/i }).click();
+    await expect(page.getByText(/Método de Pago/i)).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole("button", { name: /Confirmar Pedido/i }).click();
 
     await page.waitForURL(/checkout\.stripe\.com/, { timeout: 15_000 });
     await expect(page).toHaveURL(/checkout\.stripe\.com/);

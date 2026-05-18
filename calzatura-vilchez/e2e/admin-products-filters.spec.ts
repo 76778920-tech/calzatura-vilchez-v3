@@ -11,6 +11,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { mirrorAdminProductListSetup } from "./helpers/mirrorAdminDataRoutes";
 
 // ─── Datos semilla ────────────────────────────────────────────────────────────
 
@@ -44,30 +45,7 @@ const PRODUCT_BEBE   = makeProduct("p-bebe-1",   { nombre: "Sandalia Bebe",    c
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 async function setupMocks(page: Page, products: ReturnType<typeof makeProduct>[]) {
-  await page.route("**/rest/v1/productos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(products) });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route("**/rest/v1/productoCodigos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
-      return;
-    }
-    await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-  });
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([]) });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.reload();
-  await page.waitForLoadState("domcontentloaded");
-  await page.waitForSelector("table tbody tr", { timeout: 10_000 });
+  await mirrorAdminProductListSetup(page, products);
 }
 
 // ─── Selectores de filtro ─────────────────────────────────────────────────────

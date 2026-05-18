@@ -1,13 +1,18 @@
 import { auth } from "@/firebase/config";
+import type { User } from "firebase/auth";
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
 
 const E2E_FAVORITES_PREFIX = "e2e_favorites:";
 
 function assertCurrentUser(userId: string) {
-  // En E2E, Firebase puede restaurar la sesión un tick después del contexto React;
-  // los favoritos viven en localStorage aislado por uid del test.
-  if (import.meta.env.VITE_E2E === "true") return;
-  if (auth.currentUser?.uid !== userId) {
+  const currentUid = auth.currentUser?.uid;
+  if (import.meta.env.VITE_E2E === "true") {
+    if (currentUid && currentUid !== userId) {
+      throw new Error("No puedes consultar favoritos de otra cuenta");
+    }
+    return;
+  }
+  if (currentUid !== userId) {
     throw new Error("No puedes consultar favoritos de otra cuenta");
   }
 }
@@ -31,14 +36,26 @@ function writeE2EFavorites(userId: string, productIds: string[]) {
   globalThis.localStorage.setItem(e2eFavoriteKey(userId), JSON.stringify([...new Set(productIds)]));
 }
 
+async function resolveAuthUser(): Promise<User> {
+  if (auth.currentUser) return auth.currentUser;
+  if (import.meta.env.VITE_E2E !== "true") {
+    throw new Error("Debes iniciar sesion");
+  }
+  const deadline = Date.now() + 5_000;
+  while (!auth.currentUser && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  if (!auth.currentUser) {
+    throw new Error("Debes iniciar sesion");
+  }
+  return auth.currentUser;
+}
+
 async function favoritesRequest(
   method: "GET" | "POST" | "DELETE",
   productId?: string
 ): Promise<Response> {
-  const user = auth.currentUser;
-  if (!user) {
-    throw new Error("Debes iniciar sesion");
-  }
+  const user = await resolveAuthUser();
 
   const base = getBackendApiBaseUrl();
   if (!base) {
@@ -116,7 +133,8 @@ export async function removeFavoriteProduct(userId: string, productId: string): 
   if (!base) {
     throw new Error("VITE_BACKEND_API_URL no configurada (favoritos)");
   }
-  const idToken = await auth.currentUser!.getIdToken();
+  const user = await resolveAuthUser();
+  const idToken = await user.getIdToken();
   const response = await fetch(`${base}/favorites`, {
     method: "POST",
     headers: {
@@ -154,7 +172,8 @@ export async function clearFavoriteProductsByUser(userId: string): Promise<void>
   if (!base) {
     throw new Error("VITE_BACKEND_API_URL no configurada (favoritos)");
   }
-  const idToken = await auth.currentUser!.getIdToken();
+  const user = await resolveAuthUser();
+  const idToken = await user.getIdToken();
   const response = await fetch(`${base}/favorites`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${idToken}` },

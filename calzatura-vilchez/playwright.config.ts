@@ -34,6 +34,8 @@ export default defineConfig({
       VITE_E2E: "true",
       // BFF mockeado vía page.route; evita llamadas reales a Render en CI.
       VITE_BACKEND_API_URL: "http://127.0.0.1:5173",
+      // IA: mismo origen que Vite para que page.route intercepte /api/*
+      VITE_AI_SERVICE_URL: "http://127.0.0.1:5173",
       // Sin ORS en E2E: checkout no exige confirmar mapa (deliveryPricingActive=false).
       VITE_ORS_API_KEY: "",
       // E2E mockea las rutas directas del servicio IA. Evita heredar el proxy
