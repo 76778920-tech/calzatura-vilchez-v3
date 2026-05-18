@@ -141,6 +141,7 @@ Evidencia: pestaña **Actions** del repositorio remoto; filas detalladas con **d
 ### 7.3 Servicio IA
 
 - Plataforma: **Render** (plan gratuito) — URL: `https://calzatura-vilchez-v3.onrender.com`
+- CD en GitHub: workflow `Deploy — AI Service (Render)` tras CI verde; secret `RENDER_DEPLOY_HOOK_URL` (Render → Settings → Deploy Hook).
 - Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT` (ver `ai-service/railway.toml`)
 - Healthcheck: `GET /api/health` — timeout 300 s
 - Variables de entorno requeridas en Render: `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `FIREBASE_PROJECT_ID`, `SUPERADMIN_EMAILS`, `AI_SERVICE_BEARER_TOKEN`

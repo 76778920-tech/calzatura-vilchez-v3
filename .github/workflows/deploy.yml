@@ -1,9 +1,15 @@
 name: Deploy — Firebase Hosting
 
 on:
-  push:
+  workflow_run:
+    workflows:
+      - CI — Sistema Web con IA para Predicción de Riesgo Empresarial — Calzatura Vilchez
+    types: [completed]
     branches: [main]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -12,8 +18,9 @@ jobs:
   deploy:
     name: Build + Deploy a Firebase
     runs-on: ubuntu-latest
-    # Solo si el CI principal pasa — evita deploy con tests rotos.
-    # Para activar esta dependencia, habilita "Required status checks" en GitHub Branch Protection.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
 
     defaults:
       run:
@@ -22,6 +29,8 @@ jobs:
     steps:
       - name: Clonar repositorio
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Configurar Node.js 20
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5

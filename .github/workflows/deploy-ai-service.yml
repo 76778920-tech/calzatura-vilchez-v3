@@ -1,0 +1,32 @@
+name: Deploy — AI Service (Render)
+
+on:
+  workflow_run:
+    workflows:
+      - CI — Sistema Web con IA para Predicción de Riesgo Empresarial — Calzatura Vilchez
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-render:
+    name: Trigger Render deploy hook
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Desplegar servicio IA en Render
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::warning::RENDER_DEPLOY_HOOK_URL no configurado. En Render → Service → Settings → Deploy Hook, copia la URL y créala como secret en GitHub."
+            exit 0
+          fi
+          curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL"
+          echo "Deploy hook de Render enviado correctamente."

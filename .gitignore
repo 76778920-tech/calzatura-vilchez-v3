@@ -36,6 +36,8 @@ lib-cov
 # Coverage directory used by tools like istanbul
 coverage
 coverage.xml
+ai-service/coverage*.xml
+ai-service/coverage_raw.xml
 eslint-report.json
 bandit-report.json
 .coverage
@@ -104,8 +106,12 @@ tdd/vendor/
 **/tdd/vendor/
 **/.phpunit.cache/
 
-# Firebase starter output not used by this app
+# Firebase starter output not used by this app (no commitear; borrar local si aparece)
 n/
+
+# Artefactos locales de planes / builds móvil
+docs/*.xlsx
+calzatura-vilchez-mobile/android/build/
 
 # Local screenshots and manual verification artifacts
 emulator-home-check.png
