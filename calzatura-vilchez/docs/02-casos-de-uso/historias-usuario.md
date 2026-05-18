@@ -146,7 +146,7 @@ Las historias de usuario se organizan por épica funcional y cada una incluye cr
 **Criterios de aceptación:**
 - **Given** que tengo sesión iniciada
 - **When** hago clic en el ícono de corazón en un producto
-- **Then** el producto se guarda en mi lista de favoritos (Firestore)
+- **Then** el producto se guarda en mi lista de favoritos (BFF `/favorites` → Supabase)
 - **And** el ícono de corazón cambia a rojo para indicar que está guardado
 - **And** puedo ver todos mis favoritos en mi perfil en `/profile/favorites`
 - **And** puedo quitar un producto de favoritos haciendo clic nuevamente en el ícono

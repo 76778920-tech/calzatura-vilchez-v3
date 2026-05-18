@@ -27,7 +27,8 @@
 
 | Servicio | Propósito | URL de registro |
 |---|---|---|
-| Firebase | Auth + Hosting + Cloud Functions | console.firebase.google.com |
+| Firebase | Auth + Hosting (sin Cloud Functions en plan gratuito) | console.firebase.google.com |
+| Render (BFF) | API pedidos, favoritos, login proxy | render.com |
 | Supabase | Base de datos PostgreSQL | supabase.com |
 | Cloudinary | CDN de imágenes | cloudinary.com |
 | Stripe | Procesamiento de pagos | stripe.com |
@@ -128,7 +129,7 @@ firebase login
 # Compilar para producción
 npm run build
 
-# Desplegar hosting y reglas de Firestore
+# Desplegar solo Hosting (Auth en Firebase; datos de negocio en Supabase + BFF Render)
 firebase deploy --only hosting
 ```
 

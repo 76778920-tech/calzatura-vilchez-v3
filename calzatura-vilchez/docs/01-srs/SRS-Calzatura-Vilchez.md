@@ -154,7 +154,7 @@ El sistema autentica usuarios con correo y contraseña mediante Firebase Auth. S
 El usuario autenticado puede consultar y actualizar: nombre, teléfono, y hasta 3 direcciones de envío. El correo electrónico no es modificable desde el perfil (solo desde Firebase Auth).
 
 **RF-09 — Favoritos**
-El usuario puede guardar y quitar productos de su lista de favoritos. Los favoritos se almacenan como subcolección del usuario en Firestore y son visibles en la sección de perfil.
+El usuario puede guardar y quitar productos de su lista de favoritos. Los favoritos se almacenan en la tabla `favoritos` de Supabase (vía BFF `/favorites`) y son visibles en la sección de perfil.
 
 **RF-10 — Historial de pedidos del cliente**
 El cliente puede consultar el historial de todos sus pedidos con: fecha, productos, talla/color, monto total y estado actual (pendiente, confirmado, en proceso, enviado, entregado, cancelado).

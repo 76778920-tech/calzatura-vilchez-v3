@@ -5,11 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../../core/config/env.dart';
 import '../../cart/domain/cart_item.dart';
 
 const _ordersTable = 'pedidos';
-const _functionsBaseUrl =
-    'https://us-central1-calzaturavilchez-ab17f.cloudfunctions.net';
 
 class OrderAddress {
   const OrderAddress({
@@ -148,8 +147,9 @@ class OrdersRepository {
     }
 
     final idToken = await user.getIdToken();
+    final base = Env.backendApiUrl.replaceAll(RegExp(r'/$'), '');
     final response = await _client.post(
-      Uri.parse('$_functionsBaseUrl/createOrder'),
+      Uri.parse('$base/createOrder'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $idToken',

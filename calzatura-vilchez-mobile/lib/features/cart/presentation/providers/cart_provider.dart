@@ -1,52 +1,24 @@
-import 'dart:async';
-
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/services/local_cart_store.dart';
 import '../../domain/cart_item.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/models/product.dart';
 
 class CartNotifier extends StateNotifier<List<CartItem>> {
   CartNotifier(this._userId) : super([]) {
-    _subscribe();
+    _load();
   }
 
   final String? _userId;
-  StreamSubscription<DocumentSnapshot>? _sub;
 
-  void _subscribe() {
-    if (_userId == null) return;
-    _sub = FirebaseFirestore.instance
-        .collection('carts')
-        .doc(_userId)
-        .snapshots()
-        .listen(
-          (snap) {
-            if (!snap.exists) {
-              state = [];
-              return;
-            }
-            final raw = snap.data()?['items'] as List<dynamic>? ?? [];
-            state = raw
-                .map((e) => CartItem.fromMap(e as Map<String, dynamic>))
-                .toList();
-          },
-          onError: (error, stackTrace) {
-            // Mantener el estado actual en memoria si falla el stream temporalmente.
-          },
-        );
+  Future<void> _load() async {
+    final items = await LocalCartStore.read(_userId);
+    state = items;
   }
 
-  void _save() {
-    if (_userId == null) return;
-    FirebaseFirestore.instance
-        .collection('carts')
-        .doc(_userId)
-        .set({'items': state.map((item) => item.toMap()).toList()})
-        .catchError((_) {
-          // El estado local ya se actualizó; el snapshot remoto reconciliará si hay red.
-        });
+  Future<void> _save() async {
+    await LocalCartStore.write(_userId, state);
   }
 
   void addItem(Product product, {String? talla, String? color}) {
@@ -101,12 +73,6 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
 
   double get total => state.fold(0.0, (acc, item) => acc + item.subtotal);
   int get itemCount => state.fold(0, (acc, item) => acc + item.quantity);
-
-  @override
-  void dispose() {
-    _sub?.cancel();
-    super.dispose();
-  }
 }
 
 final cartProvider = StateNotifierProvider<CartNotifier, List<CartItem>>(
