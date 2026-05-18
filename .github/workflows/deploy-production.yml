@@ -1,14 +1,15 @@
 name: Deploy — Producción (Firebase + Render)
 
-# Solo despliega si CI + CI Integration pasaron en el mismo commit (main).
-# Disparo manual (workflow_dispatch) omite la doble verificación de workflows.
+# Invocado por CI Integration (workflow_call) tras pasar quality + IA + E2E en main.
+# workflow_dispatch: deploy manual (omite verificación de otros workflows).
 
 on:
-  workflow_run:
-    workflows:
-      - CI Integration — Calzatura Vilchez (main only, secrets reales)
-    types: [completed]
-    branches: [main]
+  workflow_call:
+    inputs:
+      head_sha:
+        description: Commit en main a desplegar
+        required: true
+        type: string
   workflow_dispatch:
 
 env:
@@ -23,40 +24,30 @@ jobs:
     permissions:
       contents: read
       actions: read
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (
-        github.event.workflow_run.conclusion == 'success' &&
-        github.event.workflow_run.head_repository.full_name == github.repository
-      )
     outputs:
       head_sha: ${{ steps.sha.outputs.head_sha }}
     steps:
-      - name: Rechazar workflow_run de otro repositorio
-        if: github.event_name == 'workflow_run'
-        run: |
-          if [ "${{ github.event.workflow_run.head_repository.full_name }}" != "${{ github.repository }}" ]; then
-            echo "::error::Deploy bloqueado: origen ${{ github.event.workflow_run.head_repository.full_name }}"
-            exit 1
-          fi
-
       - name: Resolver SHA del despliegue
         id: sha
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             echo "head_sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
           else
-            echo "head_sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+            echo "head_sha=${{ inputs.head_sha }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Clonar main (ref de confianza)
+      - name: Clonar repositorio
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          ref: main
+          repository: ${{ github.repository }}
+          ref: ${{ steps.sha.outputs.head_sha }}
           fetch-depth: 0
 
-      - name: Exigir CI + CI Integration en success (solo tras push)
-        if: github.event_name != 'workflow_dispatch'
+      - name: Exigir commit en main
+        run: bash scripts/verify-deploy-checkout-sha.sh "${{ steps.sha.outputs.head_sha }}"
+
+      - name: Exigir CI + CI Integration en success (solo tras workflow_call)
+        if: github.event_name == 'workflow_call'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
@@ -73,14 +64,12 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Clonar main (ref de confianza)
+      - name: Clonar repositorio
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
-          ref: main
+          repository: ${{ github.repository }}
+          ref: ${{ needs.gate.outputs.head_sha }}
           fetch-depth: 0
-
-      - name: Fijar commit verificado en main
-        run: bash scripts/verify-deploy-checkout-sha.sh "${{ needs.gate.outputs.head_sha }}"
 
       # GitHub no permite `secrets` en `if:` de pasos; el JSON Firebase rompe `test -n` en bash.
       - name: Verificar secrets Firebase

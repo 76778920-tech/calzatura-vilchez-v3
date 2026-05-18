@@ -229,3 +229,12 @@ jobs:
           name: playwright-report-integration
           path: calzatura-vilchez/playwright-report/
           retention-days: 30
+
+  deploy-production:
+    name: Deploy — Producción (Firebase + Render)
+    needs: [quality, ai-service, ai-service-docker, e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/deploy-production.yml
+    with:
+      head_sha: ${{ github.sha }}
+    secrets: inherit

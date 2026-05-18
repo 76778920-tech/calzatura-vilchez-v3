@@ -18,5 +18,9 @@ if ! git merge-base --is-ancestor "${HEAD_SHA}" HEAD; then
   exit 1
 fi
 
-git checkout --force "${HEAD_SHA}"
-echo "Checkout OK — ${HEAD_SHA}"
+# Ya estamos en HEAD_SHA tras actions/checkout; solo validar que pertenece a main.
+current="$(git rev-parse HEAD)"
+if [ "$current" != "$HEAD_SHA" ]; then
+  git checkout --force "${HEAD_SHA}"
+fi
+echo "Commit verificado en main — ${HEAD_SHA}"
