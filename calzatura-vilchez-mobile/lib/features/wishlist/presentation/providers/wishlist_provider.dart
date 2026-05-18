@@ -31,6 +31,7 @@ class WishlistNotifier extends AsyncNotifier<Set<String>> {
       updated.remove(productId);
     }
     state = AsyncData(updated);
+    ref.invalidate(wishlistProductsProvider);
 
     try {
       if (isAdding) {
@@ -40,6 +41,7 @@ class WishlistNotifier extends AsyncNotifier<Set<String>> {
       }
     } catch (_) {
       state = AsyncData(Set<String>.from(original));
+      ref.invalidate(wishlistProductsProvider);
     }
   }
 

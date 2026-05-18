@@ -39,7 +39,9 @@ function authorizeLookupRequest(req) {
 }
 
 const RATE_LIMIT_WINDOW_MS = 30 * 60 * 1000;
-const RATE_LIMIT_MAX_REQUESTS = 4;
+/** Web: límite estricto por IP. App móvil: más intentos (registro / reintentos). */
+const RATE_LIMIT_MAX_WEB = 4;
+const RATE_LIMIT_MAX_MOBILE = 25;
 const ipBuckets = new Map();
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -60,15 +62,22 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || "unknown";
 }
 
-function isRateLimited(ip) {
+function rateLimitKey(ip, req) {
+  const scope = isMobileAppRequest(req) ? "mobile" : "web";
+  return `${scope}:${ip}`;
+}
+
+function isRateLimited(ip, req) {
+  const key = rateLimitKey(ip, req);
+  const max = isMobileAppRequest(req) ? RATE_LIMIT_MAX_MOBILE : RATE_LIMIT_MAX_WEB;
   const now = Date.now();
-  const bucket = ipBuckets.get(ip);
+  const bucket = ipBuckets.get(key);
   if (!bucket || now - bucket.windowStart >= RATE_LIMIT_WINDOW_MS) {
-    ipBuckets.set(ip, { windowStart: now, count: 1 });
+    ipBuckets.set(key, { windowStart: now, count: 1 });
     return false;
   }
   bucket.count += 1;
-  return bucket.count > RATE_LIMIT_MAX_REQUESTS;
+  return bucket.count > max;
 }
 
 function setCorsHeaders(req, res) {
@@ -210,7 +219,12 @@ async function tryLatinfo(dni) {
     method: "GET",
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!ok) return { person: null, httpStatus: status, skipped: false };
+  if (!ok) {
+    if (status === 404 && json?.error === "out_of_scope") {
+      return { person: null, httpStatus: null, skipped: true };
+    }
+    return { person: null, httpStatus: status, skipped: false };
+  }
   const person = personFromRecord(json, dni);
   return { person, httpStatus: status, skipped: false };
 }
@@ -281,12 +295,13 @@ async function tryApiperuDev(dni) {
   return { person, httpStatus: status, skipped: false };
 }
 
+/** Latinfo al final: solo entidades jurídicas, no DNI de personas naturales. */
 const PROVIDERS = [
-  { name: "latinfo", run: tryLatinfo },
   { name: "consultasperu", run: tryConsultasPeru },
   { name: "peruapi", run: tryPeruApi },
   { name: "apiinti", run: tryApiInti },
   { name: "apiperu.dev", run: tryApiperuDev },
+  { name: "latinfo", run: tryLatinfo },
 ];
 
 export default async function handler(req, res) {
@@ -308,7 +323,7 @@ export default async function handler(req, res) {
   const origin = req.headers.origin;
 
   const clientIp = getClientIp(req);
-  if (isRateLimited(clientIp)) {
+  if (isRateLimited(clientIp, req)) {
     return res.status(429).json({ error: "Demasiadas solicitudes. Intenta nuevamente." });
   }
 

@@ -35,6 +35,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
 
   bool _showPass = false;
   bool _lookingUpDni = false;
+  bool _manualNameEntry = false;
   String _validatedDni = '';
 
   @override
@@ -50,14 +51,45 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   }
 
   void _onDniInputChanged(String _) {
-    final n = normalizeDni(_dniCtrl.text);
-    if (_validatedDni.isNotEmpty && n != _validatedDni) {
-      setState(() {
+    setState(() {
+      final n = normalizeDni(_dniCtrl.text);
+      if (_validatedDni.isNotEmpty && n != _validatedDni) {
         _validatedDni = '';
+        _manualNameEntry = false;
         _nombresCtrl.clear();
         _apellidosCtrl.clear();
-      });
+      }
+    });
+  }
+
+  void _enableManualNameEntry(String dni, {bool fromLookupFailure = false}) {
+    setState(() {
+      _manualNameEntry = true;
+      _validatedDni = dni;
+    });
+    if (!fromLookupFailure) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Escribe tu nombre y apellidos en los campos de abajo'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
+  }
+
+  void _tryStartManualEntry() {
+    final dni = normalizeDni(_dniCtrl.text);
+    if (!isValidDni(dni)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Ingresa un DNI válido de 8 dígitos primero'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    _enableManualNameEntry(dni);
   }
 
   Future<void> _lookupDni() async {
@@ -85,6 +117,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       final person = await _dniLookup.lookup(normalized, Env.dniLookupUrl);
       if (!mounted) return;
       setState(() {
+        _manualNameEntry = false;
         _nombresCtrl.text = person.nombres;
         _apellidosCtrl.text = person.apellidos;
         _validatedDni = person.dni;
@@ -98,30 +131,48 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       );
     } on DniLookupError catch (e) {
       if (!mounted) return;
-      setState(() {
-        _validatedDni = '';
-        _nombresCtrl.clear();
-        _apellidosCtrl.clear();
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(e.userMessage),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      final dni = normalizeDni(_dniCtrl.text);
+      final autoManual =
+          e == DniLookupError.serviceUnavailable || e == DniLookupError.failed;
+      if (autoManual) {
+        _enableManualNameEntry(dni, fromLookupFailure: true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Consulta RENIEC no disponible. Completa nombre y apellidos abajo.',
+            ),
+            backgroundColor: AppColors.warning,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      } else {
+        setState(() {
+          _validatedDni = '';
+          _manualNameEntry = false;
+          _nombresCtrl.clear();
+          _apellidosCtrl.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.userMessage),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _validatedDni = '';
-        _nombresCtrl.clear();
-        _apellidosCtrl.clear();
-      });
+      final dni = normalizeDni(_dniCtrl.text);
+      _enableManualNameEntry(dni, fromLookupFailure: true);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No se pudo consultar el DNI'),
-          backgroundColor: AppColors.error,
+          content: Text(
+            'Consulta RENIEC no disponible. Completa nombre y apellidos abajo.',
+          ),
+          backgroundColor: AppColors.warning,
           behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 4),
         ),
       );
     } finally {
@@ -144,13 +195,26 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       );
       return;
     }
-    if (_validatedDni.isEmpty ||
-        _nombresCtrl.text.trim().isEmpty ||
-        _apellidosCtrl.text.trim().isEmpty) {
+    if (_nombresCtrl.text.trim().isEmpty || _apellidosCtrl.text.trim().isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Primero busca tu DNI con el ícono de búsqueda'),
+          content: Text('Completa nombres y apellidos'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (_validatedDni.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            _manualNameEntry
+                ? 'Confirma tu DNI'
+                : 'Busca tu DNI con la lupa o usa «Manual» si RENIEC no responde',
+          ),
           backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ),
@@ -190,6 +254,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
   Widget build(BuildContext context) {
     final isLoading = ref.watch(authNotifierProvider).isLoading;
     final dniDigits = normalizeDni(_dniCtrl.text);
+    final canLookupDni = dniDigits.length == 8 && !_lookingUpDni;
 
     ref.listen<AsyncValue<void>>(authNotifierProvider, (_, next) {
       if (next is AsyncError) {
@@ -304,38 +369,70 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                                 color: AppColors.gold,
                                               ),
                                             )
-                                          : const Icon(
+                                          : Icon(
                                               Icons.search,
-                                              color: Colors.white54,
+                                              color: canLookupDni
+                                                  ? AppColors.gold
+                                                  : Colors.white38,
                                             ),
-                                      onPressed:
-                                          _lookingUpDni || dniDigits.length != 8
-                                          ? null
-                                          : _lookupDni,
+                                      onPressed: canLookupDni ? _lookupDni : null,
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                   Align(
                                     alignment: Alignment.centerLeft,
                                     child: Text(
-                                      dniDigits.length == 8
+                                      _manualNameEntry
+                                          ? 'Completa nombre y apellidos (consulta automática no disponible).'
+                                          : dniDigits.length == 8
                                           ? 'Pulsa la lupa para validar con RENIEC.'
                                           : 'Ingresa 8 dígitos (${dniDigits.length}/8) y pulsa la lupa.',
-                                      style: const TextStyle(
-                                        color: Colors.white38,
+                                      style: TextStyle(
+                                        color: _manualNameEntry
+                                            ? AppColors.gold.withValues(
+                                                alpha: 0.85,
+                                              )
+                                            : Colors.white38,
                                         fontSize: 11,
                                       ),
                                     ),
                                   ),
+                                  if (!_manualNameEntry) ...[
+                                    const SizedBox(height: 4),
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: TextButton(
+                                        onPressed: canLookupDni
+                                            ? _tryStartManualEntry
+                                            : null,
+                                        style: TextButton.styleFrom(
+                                          padding: EdgeInsets.zero,
+                                          minimumSize: Size.zero,
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                        child: const Text(
+                                          'O ingresa nombre y apellidos manualmente',
+                                          style: TextStyle(
+                                            color: AppColors.gold,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                   const SizedBox(height: 14),
                                   AuthField(
                                     controller: _nombresCtrl,
                                     label: 'Nombres',
                                     icon: Icons.person_outline,
-                                    readOnly: true,
+                                    readOnly: !_manualNameEntry,
                                     validator: (v) {
                                       if (v == null || v.trim().isEmpty) {
-                                        return 'Valida el DNI con la lupa';
+                                        return _manualNameEntry
+                                            ? 'Ingresa tus nombres'
+                                            : 'Valida el DNI con la lupa';
                                       }
                                       return null;
                                     },
@@ -345,10 +442,12 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                     controller: _apellidosCtrl,
                                     label: 'Apellidos',
                                     icon: Icons.person_outline,
-                                    readOnly: true,
+                                    readOnly: !_manualNameEntry,
                                     validator: (v) {
                                       if (v == null || v.trim().isEmpty) {
-                                        return 'Valida el DNI con la lupa';
+                                        return _manualNameEntry
+                                            ? 'Ingresa tus apellidos'
+                                            : 'Valida el DNI con la lupa';
                                       }
                                       return null;
                                     },

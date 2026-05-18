@@ -10,12 +10,10 @@ final searchQueryProvider = StateProvider<String>((ref) => '');
 // la tabla `productos` (INSERT, UPDATE, DELETE).
 final _catalogVersionProvider = StateProvider<int>((ref) => 0);
 
-// Canal Supabase Realtime — vive toda la sesión (no autoDispose).
-// Al detectar cualquier cambio en `productos`, incrementa _catalogVersionProvider,
-// lo que fuerza a productsProvider y featuredProductsProvider a re-ejecutarse.
+// Canal Supabase Realtime — activo toda la sesión (ver catalogLiveSyncProvider).
 final _productRealtimeProvider = Provider<void>((ref) {
   final channel = Supabase.instance.client
-      .channel('cv-productos')
+      .channel('cv-productos-mobile')
       .onPostgresChanges(
         event: PostgresChangeEvent.all,
         schema: 'public',
@@ -27,6 +25,12 @@ final _productRealtimeProvider = Provider<void>((ref) {
       .subscribe();
 
   ref.onDispose(() => channel.unsubscribe());
+});
+
+/// Mantener Realtime siempre encendido (aunque no estés en Catálogo).
+final catalogLiveSyncProvider = Provider<void>((ref) {
+  ref.watch(_productRealtimeProvider);
+  ref.keepAlive();
 });
 
 final productsProvider = FutureProvider.autoDispose<List<Product>>((ref) async {
@@ -53,6 +57,8 @@ final featuredProductsProvider = FutureProvider.autoDispose<List<Product>>((
 
 final productDetailProvider = FutureProvider.autoDispose
     .family<Product?, String>((ref, id) async {
+      ref.watch(catalogLiveSyncProvider);
+      ref.watch(_catalogVersionProvider);
       return ref.watch(catalogRepositoryProvider).getProductById(id);
     });
 

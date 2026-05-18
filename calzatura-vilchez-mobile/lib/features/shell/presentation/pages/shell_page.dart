@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/cv_logo.dart';
 import '../../../cart/presentation/providers/cart_provider.dart';
+import '../../../catalog/presentation/providers/catalog_provider.dart';
+import '../../../wishlist/presentation/providers/wishlist_provider.dart';
 
 class ShellPage extends ConsumerWidget {
   const ShellPage({super.key, required this.child});
@@ -22,6 +24,8 @@ class ShellPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(catalogLiveSyncProvider);
+
     final location = GoRouterState.of(context).matchedLocation;
     final cartCount = ref.watch(cartItemCountProvider);
     final currentIdx = _currentIndex(location);
@@ -38,8 +42,11 @@ class ShellPage extends ConsumerWidget {
             case 1:
               context.go('/catalog');
             case 2:
+              ref.invalidate(wishlistProvider);
+              ref.invalidate(wishlistProductsProvider);
               context.go('/wishlist');
             case 3:
+              ref.read(cartProvider.notifier).reload();
               context.go('/cart');
           }
         },

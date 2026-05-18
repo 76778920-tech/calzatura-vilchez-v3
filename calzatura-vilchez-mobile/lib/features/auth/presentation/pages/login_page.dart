@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/auth_background.dart';
 import '../../../../shared/widgets/auth_field.dart';
 import '../../../../shared/widgets/cv_logo.dart';
 import '../providers/auth_provider.dart';
@@ -176,32 +177,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     return Scaffold(
       backgroundColor: AppColors.black,
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          // Efecto decorativo dorado superior
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 280,
-              height: 280,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.gold.withValues(alpha: 0.08),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -120,
-            left: -80,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.gold.withValues(alpha: 0.05),
-              ),
-            ),
-          ),
+          const AuthBackground(),
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 28),
