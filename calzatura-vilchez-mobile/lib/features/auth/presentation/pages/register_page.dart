@@ -7,6 +7,7 @@ import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/utils/dni.dart';
 import '../../../../shared/utils/peru_phone.dart';
+import '../../../../shared/widgets/auth_background.dart';
 import '../../../../shared/widgets/auth_field.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../data/dni_lookup_service.dart';
@@ -210,19 +211,9 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
       child: Scaffold(
         backgroundColor: AppColors.black,
         body: Stack(
+          fit: StackFit.expand,
           children: [
-            Positioned(
-              top: -60,
-              left: -80,
-              child: Container(
-                width: 280,
-                height: 280,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.gold.withValues(alpha: 0.08),
-                ),
-              ),
-            ),
+            const AuthBackground(),
             SafeArea(
               child: Column(
                 children: [
@@ -324,11 +315,13 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                                     ),
                                   ),
                                   const SizedBox(height: 8),
-                                  const Align(
+                                  Align(
                                     alignment: Alignment.centerLeft,
                                     child: Text(
-                                      '8 dígitos. Pulsa la lupa para validar con RENIEC.',
-                                      style: TextStyle(
+                                      dniDigits.length == 8
+                                          ? 'Pulsa la lupa para validar con RENIEC.'
+                                          : 'Ingresa 8 dígitos (${dniDigits.length}/8) y pulsa la lupa.',
+                                      style: const TextStyle(
                                         color: Colors.white38,
                                         fontSize: 11,
                                       ),

@@ -24,10 +24,12 @@ class Env {
     return 'https://calzatura-vilchez-bff.onrender.com';
   }
 
-  /// Misma URL que `VITE_DNI_LOOKUP_URL` en la web (opcional).
-  static String? get dniLookupUrl {
-    final u = dotenv.env['DNI_LOOKUP_URL']?.trim();
-    if (u == null || u.isEmpty) return null;
-    return u;
+  /// Misma URL que `VITE_DNI_LOOKUP_URL` en la web (`/api/lookup-dni` en Vercel).
+  static String get dniLookupUrl {
+    final fromEnv =
+        dotenv.env['DNI_LOOKUP_URL']?.trim() ??
+        dotenv.env['VITE_DNI_LOOKUP_URL']?.trim();
+    if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
+    return 'https://project-rif8c.vercel.app/api/lookup-dni';
   }
 }

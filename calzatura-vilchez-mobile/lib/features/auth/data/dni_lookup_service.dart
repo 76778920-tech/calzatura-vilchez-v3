@@ -31,12 +31,14 @@ class DniLookupService {
     return DniLookupResult(dni: dni, nombres: nombres, apellidos: apellidos);
   }
 
-  Future<DniLookupResult> lookup(String dniInput, String? lookupUrl) async {
+  static const _mobileClientHeader = 'calzatura-mobile';
+
+  Future<DniLookupResult> lookup(String dniInput, String lookupUrl) async {
     final normalized = normalizeDni(dniInput);
     if (!isValidDni(normalized)) {
       throw DniLookupError.invalid;
     }
-    if (lookupUrl == null || lookupUrl.trim().isEmpty) {
+    if (lookupUrl.trim().isEmpty) {
       throw DniLookupError.notConfigured;
     }
 
@@ -44,7 +46,10 @@ class DniLookupService {
     final response = await http
         .post(
           uri,
-          headers: const {'Content-Type': 'application/json'},
+          headers: const {
+            'Content-Type': 'application/json',
+            'X-Calzatura-Client': _mobileClientHeader,
+          },
           body: jsonEncode({'dni': normalized}),
         )
         .timeout(const Duration(seconds: 20));

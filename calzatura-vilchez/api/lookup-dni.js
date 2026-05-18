@@ -14,9 +14,28 @@
 const allowedOrigins = new Set([
   "https://calzaturavilchez-ab17f.web.app",
   "https://calzaturavilchez-ab17f.firebaseapp.com",
+  "https://project-rif8c.vercel.app",
+  "https://calzatura-vilchez-v3.vercel.app",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
 ]);
+
+const MOBILE_CLIENT_HEADER = "calzatura-mobile";
+
+function isMobileAppRequest(req) {
+  const h = req.headers["x-calzatura-client"];
+  return typeof h === "string" && h.trim() === MOBILE_CLIENT_HEADER;
+}
+
+function authorizeLookupRequest(req) {
+  if (isMobileAppRequest(req)) return { ok: true };
+  const origin = req.headers.origin;
+  if (!origin) return { ok: false, status: 403, error: "Origen requerido" };
+  if (!allowedOrigins.has(origin)) {
+    return { ok: false, status: 403, error: "Origen no permitido" };
+  }
+  return { ok: true };
+}
 
 const RATE_LIMIT_WINDOW_MS = 30 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 4;
@@ -58,7 +77,10 @@ function setCorsHeaders(req, res) {
     res.setHeader("Vary", "Origin");
   }
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, X-Calzatura-Client"
+  );
 }
 
 function normalizeDni(value) {
@@ -277,14 +299,12 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Metodo no permitido" });
   }
 
-  const origin = req.headers.origin;
-  if (!origin) {
-    return res.status(403).json({ error: "Origen requerido" });
+  const authz = authorizeLookupRequest(req);
+  if (!authz.ok) {
+    return res.status(authz.status).json({ error: authz.error });
   }
 
-  if (!allowedOrigins.has(origin)) {
-    return res.status(403).json({ error: "Origen no permitido" });
-  }
+  const origin = req.headers.origin;
 
   const clientIp = getClientIp(req);
   if (isRateLimited(clientIp)) {

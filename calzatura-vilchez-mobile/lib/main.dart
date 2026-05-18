@@ -26,6 +26,11 @@ void main() async {
   );
 
   await dotenv.load(fileName: '.env');
+  assert(() {
+    debugPrint('[Calzatura] BFF: ${Env.backendApiUrl}');
+    debugPrint('[Calzatura] DNI lookup: ${Env.dniLookupUrl}');
+    return true;
+  }());
 
   try {
     await Firebase.initializeApp(
