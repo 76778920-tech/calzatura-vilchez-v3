@@ -3,7 +3,9 @@
   "description": "Firebase Cloud Functions para Calzatura Vilchez",
   "scripts": {
     "lint": "eslint .",
-    "build": "echo 'No build needed for JS'"
+    "build": "echo 'No build needed for JS'",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "engines": {
     "node": "20"
@@ -19,7 +21,8 @@
   "devDependencies": {
     "@eslint/js": "^8.57.1",
     "eslint": "^8.15.0",
-    "eslint-config-google": "^0.14.0"
+    "eslint-config-google": "^0.14.0",
+    "vitest": "^4.1.6"
   },
   "private": true
 }

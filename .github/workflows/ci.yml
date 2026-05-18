@@ -46,6 +46,10 @@ jobs:
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID || '123456789' }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID || '1:123456789:web:abcdef' }}
 
+      - name: Pruebas unitarias Cloud Functions
+        working-directory: calzatura-vilchez/functions
+        run: npm ci --ignore-scripts && npm test
+
       - name: Cobertura de código (Vitest Coverage)
         run: npm run test:coverage
         env:

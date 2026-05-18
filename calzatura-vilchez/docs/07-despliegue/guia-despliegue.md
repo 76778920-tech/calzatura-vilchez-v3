@@ -129,7 +129,7 @@ firebase login
 npm run build
 
 # Desplegar hosting y reglas de Firestore
-firebase deploy --only hosting,firestore:rules
+firebase deploy --only hosting
 ```
 
 **URL de producción:** `https://calzaturavilchez-ab17f.web.app`

@@ -82,13 +82,13 @@ Gestiona catálogo, detalle de producto y administración de productos. Permite 
 
 Ubicacion: `src/domains/carrito`
 
-Gestiona carrito de compras, cantidades, seleccion de talla/color y checkout. La información del carrito se maneja en contexto React para la experiencia del usuario.
+Gestiona carrito de compras, cantidades, seleccion de talla/color y checkout. El carrito del cliente vive en `localStorage` (por usuario autenticado); los pedidos se crean vía BFF hacia Supabase.
 
 ### 5.4 Módulo Clientes
 
 Ubicacion: `src/domains/clientes`
 
-Gestiona favoritos y vistas privadas del cliente. Los favoritos se almacenan como subcoleccion del usuario en Firestore.
+Gestiona favoritos y vistas privadas del cliente. Los favoritos se persisten en Supabase (tabla `favoritos`) mediante el BFF (`/favorites`), con Firebase Auth para identidad.
 
 ### 5.5 Módulo Pedidos
 
@@ -256,7 +256,7 @@ Este comando ejecuta lint, typecheck y build.
 ### Frontend Y Reglas Firebase
 
 ```bash
-firebase deploy --only hosting,firestore:rules
+firebase deploy --only hosting
 ```
 
 ### Servicio IA
@@ -277,7 +277,7 @@ Cada nueva funcionalidad debe considerar:
 
 - Ruta en `src/routes/paths.ts`.
 - Permisos en `AreaRoute` si no es pública.
-- Reglas Firestore si escribe o lee datos sensibles.
+- Políticas RLS en Supabase y rutas BFF para datos sensibles.
 - Validación de entrada.
 - Documentacion del flujo si modifica procesos del negocio.
 

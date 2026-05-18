@@ -251,6 +251,16 @@ test.describe("admin predicciones → cold start y carga exitosa", () => {
     await expect(page.locator(".ire-variable-tags span", { hasText: "Inicio escolar" })).toBeVisible();
   });
 
+  test("data_sufficient true muestra IRE proyectado y modelo ML (TC-PRED-004)", async ({ page }) => {
+    await setupAISuccess(page);
+    await goToPredictions(page);
+
+    await expect(page.getByText("Índice de Riesgo Empresarial")).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/IRE proyectado a \d+ días/)).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("tab", { name: /Modelo IA/i }).click();
+    await expect(page.getByText("Temporadas y campañas incorporadas")).toBeVisible();
+  });
+
   test("data_sufficient false muestra banner operativo, oculta IRE proyectado y ML (TC-PRED-003)", async ({ page }) => {
     await setupAISuccess(page, MOCK_COMBINED_INSUFFICIENT);
     await goToPredictions(page);

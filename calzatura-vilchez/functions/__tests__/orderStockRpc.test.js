@@ -7,9 +7,9 @@ const {
   shouldRestoreOrderStockOnCancel,
   applyOrderStatusStockSideEffects,
   mapOrderStockRpcError,
-} = require("../../functions/fnUtils");
+} = require("../fnUtils");
 
-describe("orderStockRpc", () => {
+describe("orderStockRpc (functions)", () => {
   it("buildOrderStockRpcItems normaliza líneas del pedido", () => {
     const items = buildOrderStockRpcItems({
       items: [
