@@ -21,6 +21,46 @@ OMIT_COVERAGE_FILENAMES = {
 }
 
 
+def _set_repo_source(root: ET.Element, repo_source: str) -> None:
+    sources_el = root.find("sources")
+    if sources_el is None:
+        sources_el = ET.SubElement(root, "sources")
+    sources_el.clear()
+    ET.SubElement(sources_el, "source").text = repo_source
+
+
+def _normalize_filename(fn: str) -> str:
+    norm = fn.replace("\\", "/").strip()
+    if not norm.startswith("ai-service/"):
+        norm = f"ai-service/{norm}"
+    return norm
+
+
+def _process_class(cls: ET.Element) -> bool:
+    """Normaliza filename; devuelve True si la clase debe omitirse del XML."""
+    fn = cls.get("filename")
+    if not fn:
+        return False
+    norm = _normalize_filename(fn)
+    if norm in OMIT_COVERAGE_FILENAMES:
+        return True
+    cls.set("filename", norm)
+    return False
+
+
+def _strip_excluded_classes(root: ET.Element) -> int:
+    removed = 0
+    for package in root.iter("package"):
+        classes_el = package.find("classes")
+        if classes_el is None:
+            continue
+        for cls in classes_el.findall("class")[:]:
+            if _process_class(cls):
+                classes_el.remove(cls)
+                removed += 1
+    return removed
+
+
 def main() -> None:
     ai_service_dir = Path(__file__).resolve().parent.parent
     repo_root = ai_service_dir.parent
@@ -32,28 +72,8 @@ def main() -> None:
     root = tree.getroot()
     repo_source = str(repo_root).replace("\\", "/")
 
-    sources_el = root.find("sources")
-    if sources_el is None:
-        sources_el = ET.SubElement(root, "sources")
-    sources_el.clear()
-    ET.SubElement(sources_el, "source").text = repo_source
-
-    removed = 0
-    for package in list(root.iter("package")):
-        for cls in list(package.findall("classes/class")):
-            fn = cls.get("filename")
-            if not fn:
-                continue
-            norm = fn.replace("\\", "/").strip()
-            if not norm.startswith("ai-service/"):
-                norm = f"ai-service/{norm}"
-            if norm in OMIT_COVERAGE_FILENAMES:
-                classes_el = package.find("classes")
-                if classes_el is not None:
-                    classes_el.remove(cls)
-                    removed += 1
-                continue
-            cls.set("filename", norm)
+    _set_repo_source(root, repo_source)
+    removed = _strip_excluded_classes(root)
 
     tree.write(path, encoding="utf-8", xml_declaration=True)
     print(
