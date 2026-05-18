@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/auth_field.dart';
 import '../../../../shared/widgets/cv_logo.dart';
@@ -150,8 +151,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
         .read(authNotifierProvider.notifier)
         .signIn(_emailCtrl.text.trim(), _passCtrl.text);
     if (!ok || !mounted) return;
-    // El router redirige automáticamente según el rol
-    context.go('/catalog');
+    navigateAfterAuth(context);
   }
 
   @override

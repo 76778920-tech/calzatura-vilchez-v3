@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
 import '../../../../core/config/env.dart';
+import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/utils/dni.dart';
 import '../../../../shared/utils/peru_phone.dart';
@@ -183,7 +182,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           nombre: nombre,
           telefonoFormatted: formatPeruPhone(_telefonoCtrl.text),
         );
-    if (ok && mounted) context.go('/catalog');
+    if (ok && mounted) navigateAfterAuth(context);
   }
 
   @override

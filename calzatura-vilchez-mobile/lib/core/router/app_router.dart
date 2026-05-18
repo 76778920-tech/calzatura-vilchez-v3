@@ -24,6 +24,7 @@ import '../../features/product/presentation/pages/product_detail_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/wishlist/presentation/pages/wishlist_page.dart';
+import 'auth_navigation.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -38,8 +39,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       final isOnAuth =
           loc == '/login' || loc == '/register' || loc == '/splash';
 
-      if (isLoading) return '/splash';
-      if (!isAuth && !isOnAuth) return '/login';
+      if (isLoading && loc != '/splash') return '/splash';
+
+      if (!isAuth) {
+        if (loc.startsWith('/admin')) return '/home';
+        if (loc.startsWith('/profile/')) {
+          return loginPathWithRedirect(loc);
+        }
+        if (loc.startsWith('/order-success')) return '/home';
+        if (!isGuestBrowsableLocation(loc)) return '/home';
+        return null;
+      }
 
       if (isAuth && !isOnAuth) {
         final role = roleAsync.valueOrNull;
@@ -62,6 +72,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       if (isAuth && isOnAuth && loc != '/splash') {
         final role = roleAsync.valueOrNull;
+        final redirect = safeRedirectFrom(state);
+        if (redirect != null) return redirect;
         if (role == 'admin' || role == 'trabajador') return '/admin';
         return '/home';
       }

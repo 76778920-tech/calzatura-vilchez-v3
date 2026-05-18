@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../../../shared/widgets/cv_logo.dart';
@@ -63,7 +64,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
     final user = ref.read(currentUserProvider);
 
     if (user == null) {
-      if (mounted) context.go('/login');
+      if (mounted) context.go(loginPathWithRedirect('/checkout'));
       return;
     }
 
@@ -647,8 +648,14 @@ class _CheckoutLoginPrompt extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             ElevatedButton(
-              onPressed: () => context.go('/login'),
+              onPressed: () =>
+                  context.go(loginPathWithRedirect('/checkout')),
               child: const Text('Iniciar sesión'),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => context.go('/register?redirect=${Uri.encodeComponent('/checkout')}'),
+              child: const Text('Crear cuenta'),
             ),
           ],
         ),

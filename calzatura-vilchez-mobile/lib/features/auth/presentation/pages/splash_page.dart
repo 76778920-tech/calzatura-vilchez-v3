@@ -40,8 +40,7 @@ class _SplashPageState extends ConsumerState<SplashPage>
     final auth = ref.read(authStateProvider);
     if (auth.isLoading) return; // el listener en build llamará de nuevo
     _navigated = true;
-    final user = auth.valueOrNull;
-    context.go(user != null ? '/home' : '/login');
+    context.go('/home');
   }
 
   @override

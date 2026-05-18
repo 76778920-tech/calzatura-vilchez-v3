@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shimmer/shimmer.dart';
 
+import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/product.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../cart/presentation/providers/cart_provider.dart';
 import '../../../wishlist/presentation/providers/wishlist_provider.dart';
 
@@ -171,6 +173,15 @@ class ProductCard extends ConsumerWidget {
                               right: 8,
                               child: GestureDetector(
                                 onTap: () {
+                                  if (ref.read(currentUserProvider) == null) {
+                                    final here = GoRouterState.of(
+                                      context,
+                                    ).matchedLocation;
+                                    context.push(
+                                      loginPathWithRedirect(here),
+                                    );
+                                    return;
+                                  }
                                   ref
                                       .read(wishlistProvider.notifier)
                                       .toggle(product.id);

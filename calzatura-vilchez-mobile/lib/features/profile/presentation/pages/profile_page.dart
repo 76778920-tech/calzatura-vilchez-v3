@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/cv_logo.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -12,12 +13,16 @@ class ProfilePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
+    if (user == null) {
+      return const _ProfileGuestPrompt();
+    }
+
     final roleAsync = ref.watch(userRoleProvider);
     final isAdmin = ref.watch(isAdminProvider);
 
     final nombre =
-        user?.displayName ?? user?.email?.split('@').first ?? 'Usuario';
-    final email = user?.email ?? '';
+        user.displayName ?? user.email?.split('@').first ?? 'Usuario';
+    final email = user.email ?? '';
     final initial = nombre.isNotEmpty ? nombre[0].toUpperCase() : 'U';
 
     return Scaffold(
@@ -232,7 +237,7 @@ class ProfilePage extends ConsumerWidget {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       await ref.read(authNotifierProvider.notifier).signOut();
-                      if (context.mounted) context.go('/login');
+                      if (context.mounted) context.go('/home');
                     },
                     icon: const Icon(
                       Icons.logout_rounded,
@@ -256,6 +261,63 @@ class ProfilePage extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProfileGuestPrompt extends StatelessWidget {
+  const _ProfileGuestPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.beige,
+      appBar: AppBar(
+        backgroundColor: AppColors.black,
+        foregroundColor: Colors.white,
+        title: const Text('Mi cuenta'),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.person_outline_rounded,
+                size: 56,
+                color: AppColors.gold,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Inicia sesión para ver tu perfil,\npedidos y favoritos',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () =>
+                      context.go(loginPathWithRedirect('/profile')),
+                  child: const Text('Iniciar sesión'),
+                ),
+              ),
+              TextButton(
+                onPressed: () => context.go(
+                  '/register?redirect=${Uri.encodeComponent('/profile')}',
+                ),
+                child: const Text('Crear cuenta'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
