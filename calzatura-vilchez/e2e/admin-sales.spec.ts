@@ -18,7 +18,6 @@ import {
   mirrorAdminProductCodigos,
   mirrorAdminProductFinanzas,
   mirrorAdminProducts,
-  mirrorAdminVentasDiarias,
 } from "./helpers/mirrorAdminDataRoutes";
 
 // ─── Datos semilla ────────────────────────────────────────────────────────────

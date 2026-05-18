@@ -2,7 +2,7 @@
  * E2E: checkout Stripe — createCheckoutSession vía BFF (mock).
  * No usa tarjeta real; valida redirect y pedido pendiente.
  */
-import { expect, test, type Browser } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   E2EClientUser,
   mockBffCheckoutDelivery,
