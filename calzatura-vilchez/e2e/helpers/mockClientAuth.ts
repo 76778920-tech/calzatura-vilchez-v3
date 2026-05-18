@@ -39,7 +39,11 @@ export function fakeJwt(user: E2EClientUser): string {
   return `${header}.${payload}.e2e-fake-sig`;
 }
 
-export function storageStateForUser(origin: string, user: E2EClientUser) {
+export function storageStateForUser(
+  origin: string,
+  user: E2EClientUser,
+  extraLocalStorage: Array<{ name: string; value: string }> = [],
+) {
   const token = fakeJwt(user);
   return {
     cookies: [],
@@ -75,10 +79,91 @@ export function storageStateForUser(origin: string, user: E2EClientUser) {
               appName: "[DEFAULT]",
             }),
           },
+          ...extraLocalStorage,
         ],
       },
     ],
   };
+}
+
+/** Mock GET productos (catálogo y `fetchPublicProductsByIds` con filtro `id=in.(...)`). */
+export async function mockSupabasePublicProductos(
+  page: Page,
+  catalog: Array<Record<string, unknown>>,
+): Promise<void> {
+  const byId = new Map(catalog.map((p) => [String(p.id), p]));
+
+  await page.route("**/rest/v1/productos*", async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+
+    const url = route.request().url();
+    const matched = catalog.filter((p) => url.includes(String(p.id)));
+    if (matched.length > 0) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(matched),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(catalog),
+    });
+  });
+}
+
+const E2E_DELIVERY_CANDIDATE = {
+  label: "Av. Benavides 123, Miraflores, Huancayo",
+  lat: -12.065,
+  lng: -75.204,
+  layer: "address",
+};
+
+/** Checkout con BFF + ORS proxy: geocodificación y distancia simuladas. */
+export async function mockBffCheckoutDelivery(page: Page): Promise<void> {
+  const matchDelivery = (url: URL) => url.pathname.startsWith("/delivery/");
+  await page.route(matchDelivery, async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith("/geocode")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ candidates: [E2E_DELIVERY_CANDIDATE] }),
+      });
+      return;
+    }
+    if (path.endsWith("/distance") || path.endsWith("/route")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ distanceKm: 2.5, positions: [] }),
+      });
+      return;
+    }
+    if (path.endsWith("/reverse")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ label: E2E_DELIVERY_CANDIDATE.label }),
+      });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+  });
+
+  await page.route((url) => url.pathname.startsWith("/ors/"), async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ features: [] }),
+    });
+  });
 }
 
 export async function mockClientFirebaseAuth(page: Page, user: E2EClientUser): Promise<void> {
@@ -206,8 +291,10 @@ export async function mockBffFavoritesForUser(page: Page): Promise<{
     await route.fulfill({ status: 405, headers: corsHeaders(), body: JSON.stringify({ error: "Metodo no permitido" }) });
   };
 
-  await page.route(/\/favorites(\?.*)?$/i, handle);
-  await page.route(/\/favoritos(\?.*)?$/i, handle);
+  const matchFavorites = (url: URL) =>
+    /\/favorites\/?$/i.test(url.pathname) || /\/favoritos\/?$/i.test(url.pathname);
+
+  await page.route(matchFavorites, handle);
 
   return { favoriteIds };
 }

@@ -1,8 +1,8 @@
-import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { expect, test, type Browser, type BrowserContext } from "@playwright/test";
 import {
   type E2EClientUser,
-  mockBffFavoritesForUser,
   mockClientFirebaseAuth,
+  mockSupabasePublicProductos,
   storageStateForUser,
 } from "./helpers/mockClientAuth";
 
@@ -35,27 +35,12 @@ const USER_B: E2EClientUser = {
   name: "Cliente B",
 };
 
-async function mockProductCatalog(page: Page) {
-  await page.route("**/rest/v1/productos*", async (route) => {
-    if (route.request().method() !== "GET") {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify([FAVORITE_PRODUCT]),
-    });
-  });
-}
-
 async function newClientPage(browser: Browser, baseURL: string, user: E2EClientUser) {
   const origin = new URL(baseURL).origin;
   const context = await browser.newContext({ storageState: storageStateForUser(origin, user) });
   const page = await context.newPage();
   await mockClientFirebaseAuth(page, user);
-  await mockBffFavoritesForUser(page);
-  await mockProductCatalog(page);
+  await mockSupabasePublicProductos(page, [FAVORITE_PRODUCT]);
   return { context, page };
 }
 
