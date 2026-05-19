@@ -345,13 +345,16 @@ async function tryApiperuDev(dni) {
   return { person, httpStatus: status, skipped: false };
 }
 
-/** Latinfo al final: orientado a entidades jurídicas, no siempre útil para DNI natural. */
+/**
+ * Failover en cadena: 1 → 2 → 3… hasta el primer proveedor que devuelva nombre/apellidos.
+ * Si un proveedor no tiene token, se omite (skipped). Si responde pero sin datos o con error, sigue el siguiente.
+ */
 const PROVIDERS = [
-  { name: "consultasperu", run: tryConsultasPeru },
-  { name: "apiperu.dev", run: tryApiperuDev },
-  { name: "apiinti", run: tryApiInti },
-  { name: "peruapi", run: tryPeruApi },
   { name: "latinfo", run: tryLatinfo },
+  { name: "consultasperu", run: tryConsultasPeru },
+  { name: "peruapi", run: tryPeruApi },
+  { name: "apiinti", run: tryApiInti },
+  { name: "apiperu.dev", run: tryApiperuDev },
 ];
 
 async function handleLookupDni(req, res) {

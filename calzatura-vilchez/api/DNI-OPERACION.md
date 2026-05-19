@@ -2,13 +2,15 @@
 
 ## Variables en Vercel (al menos una activa)
 
-| Variable | Proveedor |
-|----------|-----------|
-| `LATINFO_API_KEY` / `CLAVE_API_LATINFO` | Latinfo |
-| `CONSULTAS_PERU_TOKEN` | ConsultasPerú |
-| `PERUAPI_TOKEN` / `TOKEN_PERUAPI` | Perú API |
-| `API_INTI_TOKEN` | ApiInti |
-| `APIPERU_DEV_TOKEN` | apiperu.dev |
+| Orden | Variable | Proveedor |
+|-------|----------|-----------|
+| 1 | `LATINFO_API_KEY` / `CLAVE_API_LATINFO` | Latinfo |
+| 2 | `CONSULTAS_PERU_TOKEN` | ConsultasPerú |
+| 3 | `PERUAPI_TOKEN` / `TOKEN_PERUAPI` | Perú API |
+| 4 | `API_INTI_TOKEN` | ApiInti |
+| 5 | `APIPERU_DEV_TOKEN` | apiperu.dev |
+
+Si el 1 no encuentra el DNI o falla, se prueba el 2, y así sucesivamente (primer éxito gana).
 
 Sin token válido: la API responde error y el registro en la app permite **carga manual** de nombres.
 
