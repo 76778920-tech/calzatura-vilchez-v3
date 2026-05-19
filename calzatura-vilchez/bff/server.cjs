@@ -273,8 +273,25 @@ function httpErrorStatus(error) {
   return 500;
 }
 
+function supabaseFriendlyError(error) {
+  const msg = String(error?.message || error?.details || "");
+  const code = String(error?.code || "");
+  if (code === "23505" || msg.includes("duplicate key")) {
+    return "Ya existe un registro para este trabajador y periodo";
+  }
+  if (code === "23503" || msg.includes("foreign key")) {
+    return "Referencia invalida: verifica que el trabajador exista en usuarios";
+  }
+  if (code === "PGRST116" || msg.includes("multiple")) {
+    return "Datos duplicados en base de datos; contacta soporte";
+  }
+  return "";
+}
+
 function publicError(error) {
   if (!error) return "No se pudo procesar la solicitud";
+  const friendly = supabaseFriendlyError(error);
+  if (friendly) return friendly;
   const http = error.status ?? error.statusCode;
   const msg = typeof error.message === "string" ? error.message.trim() : "";
   if (msg && typeof http === "number" && http < 500) return msg;
@@ -1535,7 +1552,11 @@ async function createStaffNotification(supabase, payload) {
     })
     .select("*")
     .single();
-  if (error) throw error;
+  if (error) {
+    console.warn("createStaffNotification:", error.message || error);
+    if (isRecoverableSupabaseError(error)) return null;
+    throw error;
+  }
   return data;
 }
 
@@ -1866,11 +1887,12 @@ app.post("/hr/alerts/refer", (req, res) => {
       }
       const existing = await supabase
         .from("rrhh_alertas")
-        .select("*")
+        .select("id")
         .eq("trabajadorUid", trabajadorUid)
         .eq("periodo", period)
         .eq("tipo", "manual")
-        .maybeSingle();
+        .order("creadoEn", { ascending: false })
+        .limit(1);
       if (existing.error) throw existing.error;
 
       const payload = {
@@ -1885,12 +1907,13 @@ app.post("/hr/alerts/refer", (req, res) => {
         actualizadoEn: new Date().toISOString(),
       };
 
+      const existingId = existing.data?.[0]?.id;
       let alert;
-      if (existing.data) {
+      if (existingId) {
         const { data, error } = await supabase
           .from("rrhh_alertas")
           .update(payload)
-          .eq("id", existing.data.id)
+          .eq("id", existingId)
           .select("*")
           .single();
         if (error) throw error;
@@ -1906,17 +1929,40 @@ app.post("/hr/alerts/refer", (req, res) => {
           })
           .select("*")
           .single();
-        if (error) throw error;
-        alert = data;
+        if (error) {
+          if (error.code === "23505") {
+            const retry = await supabase
+              .from("rrhh_alertas")
+              .update(payload)
+              .eq("trabajadorUid", trabajadorUid)
+              .eq("periodo", period)
+              .eq("tipo", "manual")
+              .select("*")
+              .maybeSingle();
+            if (retry.error) throw retry.error;
+            alert = retry.data;
+          } else {
+            throw error;
+          }
+        } else {
+          alert = data;
+        }
+      }
+      if (!alert?.id) {
+        return res.status(500).json({ error: "No se pudo crear la alerta de derivacion" });
       }
 
-      await createStaffNotification(supabase, {
-        destinatarioUid: trabajadorUid,
-        tipo: "derivacion_rrhh",
-        titulo: "Evaluación psicológica solicitada",
-        mensaje: "RR.HH. ha solicitado una evaluación profesional. El psicólogo te contactará para coordinar la cita.",
-        metadata: { alertaId: alert.id, periodo: period },
-      });
+      try {
+        await createStaffNotification(supabase, {
+          destinatarioUid: trabajadorUid,
+          tipo: "derivacion_rrhh",
+          titulo: "Evaluación psicológica solicitada",
+          mensaje: "RR.HH. ha solicitado una evaluación profesional. El psicólogo te contactará para coordinar la cita.",
+          metadata: { alertaId: alert.id, periodo: period },
+        });
+      } catch (notifyError) {
+        console.warn("hr/alerts/refer notification:", notifyError?.message || notifyError);
+      }
 
       await logAuditFn(
         supabase,
@@ -1930,7 +1976,7 @@ app.post("/hr/alerts/refer", (req, res) => {
       );
       return res.status(200).json({ alert });
     } catch (error) {
-      console.error("hr/alerts/refer error:", error);
+      console.error("hr/alerts/refer error:", error?.message || error, error?.code, error?.details);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
