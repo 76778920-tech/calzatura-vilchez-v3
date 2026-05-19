@@ -10,6 +10,7 @@ type AdminSaleDetailModalProps = Readonly<{
   onReturn: () => void;
   returning: boolean;
   onViewDocument: (sale: DailySale) => void;
+  showFinancialDetails?: boolean;
 }>;
 
 export function AdminSaleDetailModal({
@@ -20,6 +21,7 @@ export function AdminSaleDetailModal({
   onReturn,
   returning,
   onViewDocument,
+  showFinancialDetails = true,
 }: AdminSaleDetailModalProps) {
   return (
     <div className="sale-modal-overlay">
@@ -76,10 +78,12 @@ export function AdminSaleDetailModal({
               <span>Total vendido</span>
               <strong>S/ {sale.total.toFixed(2)}</strong>
             </div>
-            <div>
-              <span>Ganancia</span>
-              <strong>S/ {sale.ganancia.toFixed(2)}</strong>
-            </div>
+            {showFinancialDetails && (
+              <div>
+                <span>Ganancia</span>
+                <strong>S/ {sale.ganancia.toFixed(2)}</strong>
+              </div>
+            )}
           </div>
 
           {sale.cliente && (

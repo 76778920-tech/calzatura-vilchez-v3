@@ -24,14 +24,18 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
       </div>
 
       <div className="admin-stats-grid product-stats-grid">
+        {p.showFinancialDetails && (
         <div className="stat-card admin-metric-card">
           <CircleDollarSign size={22} />
           <div><span>Vendido — {new Date(p.date + "T12:00:00").toLocaleDateString("es-PE", { day: "numeric", month: "short" })}</span><strong>S/ {p.totals.total.toFixed(2)}</strong></div>
         </div>
+        )}
+        {p.showFinancialDetails && (
         <div className="stat-card admin-metric-card">
           <TrendingUp size={22} />
           <div><span>Ganancia</span><strong>S/ {p.totals.ganancia.toFixed(2)}</strong></div>
         </div>
+        )}
         <div className="stat-card admin-metric-card">
           <PackageSearch size={22} />
           <div><span>Unidades</span><strong>{p.totals.cantidad}</strong></div>
@@ -187,15 +191,21 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
               <div className="admin-section-header">
                 <div>
                   <h2>Precio y cantidad</h2>
-                  <span>Confirma el precio dentro del rango permitido.</span>
+                  <span>{p.showFinancialDetails ? "Confirma el precio dentro del rango permitido." : "Confirma el precio de venta del producto."}</span>
                 </div>
               </div>
 
               {p.selectedProduct.finanzas ? (
                 <div className="admin-price-consult">
-                  <span>Minimo: S/ {p.selectedProduct.finanzas.precioMinimo.toFixed(2)}</span>
-                  <strong>Sugerido: S/ {p.selectedProduct.finanzas.precioSugerido.toFixed(2)}</strong>
-                  <span>Maximo: S/ {p.selectedProduct.finanzas.precioMaximo.toFixed(2)}</span>
+                  {p.showFinancialDetails ? (
+                    <>
+                      <span>Minimo: S/ {p.selectedProduct.finanzas.precioMinimo.toFixed(2)}</span>
+                      <strong>Sugerido: S/ {p.selectedProduct.finanzas.precioSugerido.toFixed(2)}</strong>
+                      <span>Maximo: S/ {p.selectedProduct.finanzas.precioMaximo.toFixed(2)}</span>
+                    </>
+                  ) : (
+                    <strong>Precio sugerido: S/ {p.selectedProduct.finanzas.precioSugerido.toFixed(2)}</strong>
+                  )}
                 </div>
               ) : (
                 <p className="admin-empty">Este producto necesita costo real y margenes en Productos.</p>
@@ -351,6 +361,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
           historialSearch={p.historialSearch}
           onHistorialSearchChange={p.setHistorialSearch}
           onClearHistorialSearch={() => p.setHistorialSearch("")}
+          showFinancialDetails={p.showFinancialDetails}
           onSelectSale={(sale) => {
             p.setSelectedSale(sale);
             p.setReturnMotivo("");
@@ -367,6 +378,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
           onReturn={() => void p.handleReturn()}
           returning={p.returning}
           onViewDocument={p.handleViewDocument}
+          showFinancialDetails={p.showFinancialDetails}
         />
       )}
     </div>

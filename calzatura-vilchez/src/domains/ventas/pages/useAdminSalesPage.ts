@@ -86,10 +86,13 @@ export type AdminSalesPageModel = {
   registerPendingLines: () => void;
   handleViewDocument: (sale: DailySale) => void;
   handleReturn: () => Promise<void>;
+  /** Vendido, ganancia, mín/máx y columna ganancia: solo administrador. */
+  showFinancialDetails: boolean;
 };
 
 export function useAdminSalesPage(): AdminSalesPageModel {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, isAdmin } = useAuth();
+  const showFinancialDetails = isAdmin;
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [sales, setSales] = useState<DailySale[]>([]);
   const [pendingLines, setPendingLines] = useState<PendingSaleLine[]>([]);
@@ -474,5 +477,6 @@ export function useAdminSalesPage(): AdminSalesPageModel {
     registerPendingLines,
     handleViewDocument,
     handleReturn,
+    showFinancialDetails,
   };
 }

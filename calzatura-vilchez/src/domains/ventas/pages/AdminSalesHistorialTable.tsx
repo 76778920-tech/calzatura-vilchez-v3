@@ -9,6 +9,7 @@ type AdminSalesHistorialTableProps = {
   onHistorialSearchChange: (value: string) => void;
   onClearHistorialSearch: () => void;
   onSelectSale: (sale: DailySale) => void;
+  showFinancialDetails?: boolean;
 };
 
 export function AdminSalesHistorialTable({
@@ -17,8 +18,10 @@ export function AdminSalesHistorialTable({
   onHistorialSearchChange,
   onClearHistorialSearch,
   onSelectSale,
+  showFinancialDetails = true,
 }: AdminSalesHistorialTableProps) {
   const filtered = filterDailySalesBySearch(sales, historialSearch);
+  const colSpan = showFinancialDetails ? 10 : 9;
 
   return (
     <div className="admin-table-wrapper product-table-wrapper">
@@ -56,14 +59,14 @@ export function AdminSalesHistorialTable({
             <th>Hora</th>
             <th>Encargado</th>
             <th>Total</th>
-            <th>Ganancia</th>
+            {showFinancialDetails && <th>Ganancia</th>}
             <th>Documento</th>
           </tr>
         </thead>
         <tbody>
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={10} className="admin-empty-cell">
+              <td colSpan={colSpan} className="admin-empty-cell">
                 {sales.length === 0 ? "No hay ventas para esta fecha." : "Sin resultados para esa búsqueda."}
               </td>
             </tr>
@@ -91,9 +94,11 @@ export function AdminSalesHistorialTable({
                 </div>
               </td>
               <td>S/ {sale.total.toFixed(2)}</td>
-              <td>
-                <strong>S/ {sale.ganancia.toFixed(2)}</strong>
-              </td>
+              {showFinancialDetails && (
+                <td>
+                  <strong>S/ {sale.ganancia.toFixed(2)}</strong>
+                </td>
+              )}
               <td>
                 <div className="admin-sale-document-cell">
                   <strong>{SALE_DOCUMENT_LABELS[sale.documentoTipo ?? "ninguno"]}</strong>
