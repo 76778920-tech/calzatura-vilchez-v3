@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { Brain, CalendarPlus, FileUp, ShieldAlert } from "lucide-react";
+import { Bell, Brain, CalendarPlus, FileUp, ShieldAlert } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   createPsychologyReport,
   fetchPsychologyAlerts,
+  fetchPsychologyNotifications,
+  markAllPsychologyNotificationsRead,
+  markPsychologyNotificationRead,
   schedulePsychologyAppointment,
   updatePsychologyAppointment,
   uploadPsychologyReportPdf,
 } from "@/domains/rrhh/services/humanResources";
-import type { HrAlert, PsychologicalReport, PsychologyAppointment, WorkerPerformanceMetrics } from "@/types";
+import type {
+  HrAlert,
+  PsychologicalReport,
+  PsychologyAppointment,
+  StaffNotification,
+  WorkerPerformanceMetrics,
+} from "@/types";
 
 function currentPeriod() {
   const date = new Date();
@@ -50,6 +59,9 @@ export default function PsychologyDashboard() {
   const [notasCita, setNotasCita] = useState("");
   const [saving, setSaving] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
+  const [notificaciones, setNotificaciones] = useState<StaffNotification[]>([]);
+
+  const unreadCount = notificaciones.filter((item) => !item.leida).length;
 
   const reportsByAlert = useMemo(() => {
     return reports.reduce<Record<string, PsychologicalReport[]>>((acc, report) => {
@@ -70,11 +82,15 @@ export default function PsychologyDashboard() {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetchPsychologyAlerts(period, { includeClosed: showClosed })
-      .then((data) => {
+    Promise.all([
+      fetchPsychologyAlerts(period, { includeClosed: showClosed }),
+      fetchPsychologyNotifications(),
+    ])
+      .then(([data, notif]) => {
         setAlerts(data.alerts);
         setReports(data.reports);
         setAppointments(data.appointments);
+        setNotificaciones(notif);
         setSelectedAlertId((current) => current || data.alerts[0]?.id || "");
       })
       .catch(() => {
@@ -82,9 +98,36 @@ export default function PsychologyDashboard() {
         setAlerts([]);
         setReports([]);
         setAppointments([]);
+        setNotificaciones([]);
       })
       .finally(() => setLoading(false));
   }, [period, showClosed]);
+
+  const handleNotificationClick = async (notification: StaffNotification) => {
+    const alertaId = typeof notification.metadata?.alertaId === "string"
+      ? notification.metadata.alertaId
+      : "";
+    if (alertaId) setSelectedAlertId(alertaId);
+    if (notification.leida) return;
+    try {
+      await markPsychologyNotificationRead(notification.id);
+      setNotificaciones((current) =>
+        current.map((item) => (item.id === notification.id ? { ...item, leida: true } : item)),
+      );
+    } catch {
+      toast.error("No se pudo marcar la notificación");
+    }
+  };
+
+  const handleMarkAllNotificationsRead = async () => {
+    try {
+      await markAllPsychologyNotificationsRead();
+      setNotificaciones((current) => current.map((item) => ({ ...item, leida: true })));
+      toast.success("Notificaciones marcadas como leídas");
+    } catch {
+      toast.error("No se pudieron actualizar las notificaciones");
+    }
+  };
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -194,6 +237,37 @@ export default function PsychologyDashboard() {
             />
             Incluir casos cerrados
           </label>
+        </div>
+      </section>
+
+      <section className="hr-panel-card">
+        <div className="staff-section-heading">
+          <div>
+            <p>Avisos de derivación</p>
+            <h2>Notificaciones</h2>
+          </div>
+          <div className="hr-inline-actions">
+            {unreadCount > 0 && <span className="hr-badge">{unreadCount} sin leer</span>}
+            <button type="button" className="btn-secondary btn-sm" onClick={handleMarkAllNotificationsRead}>
+              Marcar todas leídas
+            </button>
+          </div>
+        </div>
+        <div className="hr-notification-list">
+          {notificaciones.length === 0 ? (
+            <p className="staff-empty-state">No tienes notificaciones de derivación.</p>
+          ) : notificaciones.map((notification) => (
+            <button
+              key={notification.id}
+              type="button"
+              className={`hr-notification-item ${notification.leida ? "" : "unread"}`}
+              onClick={() => handleNotificationClick(notification)}
+            >
+              <span><Bell size={14} /> {notification.titulo}</span>
+              <p>{notification.mensaje}</p>
+              <small>{new Date(notification.creadoEn).toLocaleString("es-PE")}</small>
+            </button>
+          ))}
         </div>
       </section>
 

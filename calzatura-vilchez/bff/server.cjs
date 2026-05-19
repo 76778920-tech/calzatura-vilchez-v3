@@ -1635,11 +1635,11 @@ async function createStaffNotification(supabase, payload) {
   return data;
 }
 
-async function fetchStaffNotifications(supabase, workerUid, limit = 50) {
+async function fetchUserNotifications(supabase, userUid, limit = 50) {
   const { data, error } = await supabase
     .from("rrhh_notificaciones")
     .select("*")
-    .eq("destinatarioUid", workerUid)
+    .eq("destinatarioUid", userUid)
     .order("creadoEn", { ascending: false })
     .limit(limit);
   if (error) {
@@ -1647,6 +1647,50 @@ async function fetchStaffNotifications(supabase, workerUid, limit = 50) {
     throw error;
   }
   return data ?? [];
+}
+
+async function fetchStaffNotifications(supabase, workerUid, limit = 50) {
+  return fetchUserNotifications(supabase, workerUid, limit);
+}
+
+async function fetchPsychologistProfiles(supabase) {
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select("uid,nombres,apellidos,nombre,email,rol")
+    .eq("rol", "psicologo")
+    .order("nombre");
+  if (error) {
+    if (isRecoverableSupabaseError(error)) return [];
+    throw error;
+  }
+  return data ?? [];
+}
+
+async function notifyPsychologistsNewCase(supabase, { alert, titulo, mensaje }) {
+  const psychologists = await fetchPsychologistProfiles(supabase);
+  if (psychologists.length === 0) {
+    console.warn("notifyPsychologistsNewCase: no hay usuarios con rol psicologo");
+    return;
+  }
+  await Promise.all(
+    psychologists.map((psy) =>
+      createStaffNotification(supabase, {
+        destinatarioUid: psy.uid,
+        tipo: "general",
+        titulo,
+        mensaje,
+        metadata: {
+          alertaId: alert.id,
+          trabajadorUid: alert.trabajadorUid,
+          trabajadorNombre: alert.trabajadorNombre,
+          periodo: alert.periodo,
+          audience: "psicologo",
+        },
+      }).catch((err) => {
+        console.warn(`notify psychologist ${psy.uid}:`, err?.message || err);
+      }),
+    ),
+  );
 }
 
 async function fetchWorkerAppointments(supabase, workerUid, period) {
@@ -1887,6 +1931,11 @@ app.post("/hr/alerts/generate", (req, res) => {
               mensaje: "RR.HH. reactivó el seguimiento de tu desempeño del periodo. El psicólogo podrá contactarte si corresponde.",
               metadata: { alertaId: data.id, periodo: period },
             });
+            await notifyPsychologistsNewCase(supabase, {
+              alert: data,
+              titulo: "Caso reabierto por RR.HH.",
+              mensaje: `${data.trabajadorNombre} requiere evaluación (periodo ${period}). Revisa la solicitud en tu panel.`,
+            });
           } catch (notifyError) {
             console.warn("hr/alerts/generate notify update:", notifyError?.message || notifyError);
           }
@@ -1912,6 +1961,13 @@ app.post("/hr/alerts/generate", (req, res) => {
             metadata: { alertaId: data.id, periodo: period },
           }).catch((notifyError) => {
             console.warn("hr/alerts/generate notify:", notifyError?.message || notifyError);
+          });
+          await notifyPsychologistsNewCase(supabase, {
+            alert: data,
+            titulo: "Nueva derivación automática",
+            mensaje: `${data.trabajadorNombre} fue derivado por desempeño bajo (periodo ${period}).`,
+          }).catch((notifyError) => {
+            console.warn("hr/alerts/generate notify psychologist:", notifyError?.message || notifyError);
           });
         }
       }
@@ -2031,6 +2087,11 @@ app.post("/hr/alerts/refer", (req, res) => {
           titulo: "Evaluación psicológica solicitada",
           mensaje: "RR.HH. ha solicitado una evaluación profesional. El psicólogo te contactará para coordinar la cita.",
           metadata: { alertaId: alert.id, periodo: period },
+        });
+        await notifyPsychologistsNewCase(supabase, {
+          alert,
+          titulo: "Nueva derivación de RR.HH.",
+          mensaje: `${alert.trabajadorNombre} fue derivado para evaluación (periodo ${period}). ${motivoGeneral}`,
         });
       } catch (notifyError) {
         console.warn("hr/alerts/refer notification:", notifyError?.message || notifyError);
@@ -2324,6 +2385,62 @@ app.patch("/staff/notifications/read-all", (req, res) => {
       return res.status(200).json({ ok: true });
     } catch (error) {
       console.error("staff/notifications read-all error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/psychology/notifications", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertPsychologistRole(supabase, decodedToken.uid);
+      const notificaciones = await fetchUserNotifications(supabase, decodedToken.uid);
+      return res.status(200).json({ notificaciones });
+    } catch (error) {
+      console.error("psychology/notifications error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.patch("/psychology/notifications/:notificationId/read", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertPsychologistRole(supabase, decodedToken.uid);
+      const notificationId = String(req.params.notificationId || "").trim();
+      const { error } = await supabase
+        .from("rrhh_notificaciones")
+        .update({ leida: true })
+        .eq("id", notificationId)
+        .eq("destinatarioUid", decodedToken.uid);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("psychology/notifications read error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.patch("/psychology/notifications/read-all", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertPsychologistRole(supabase, decodedToken.uid);
+      const { error } = await supabase
+        .from("rrhh_notificaciones")
+        .update({ leida: true })
+        .eq("destinatarioUid", decodedToken.uid)
+        .eq("leida", false);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("psychology/notifications read-all error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });

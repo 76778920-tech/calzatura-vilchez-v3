@@ -6,6 +6,7 @@ import type {
   HrAlert,
   PsychologicalReport,
   PsychologyAppointment,
+  StaffNotification,
   StaffPerformancePayload,
   WorkerDailySalesRow,
   WorkerPerformanceMetrics,
@@ -116,6 +117,21 @@ export async function createHrAction(data: {
     body: JSON.stringify(data),
   });
   return action;
+}
+
+export async function fetchPsychologyNotifications(): Promise<StaffNotification[]> {
+  const { notificaciones } = await bffFetch<{ notificaciones: StaffNotification[] }>("/psychology/notifications");
+  return notificaciones;
+}
+
+export async function markPsychologyNotificationRead(notificationId: string): Promise<void> {
+  await bffFetch(`/psychology/notifications/${encodeURIComponent(notificationId)}/read`, {
+    method: "PATCH",
+  });
+}
+
+export async function markAllPsychologyNotificationsRead(): Promise<void> {
+  await bffFetch("/psychology/notifications/read-all", { method: "PATCH" });
 }
 
 export async function fetchPsychologyAlerts(
