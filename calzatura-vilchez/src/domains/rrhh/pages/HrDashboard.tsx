@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   Building2,
   Download,
@@ -96,7 +96,7 @@ export default function HrDashboard() {
 
   const selectedAlert = (data?.alerts ?? []).find((alert) => alert.id === selectedAlertId) ?? data?.alerts[0] ?? null;
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     fetchHrDashboard(period)
       .then((payload) => {
@@ -108,11 +108,12 @@ export default function HrDashboard() {
         setData(null);
       })
       .finally(() => setLoading(false));
-  };
+  }, [period]);
 
   useEffect(() => {
-    load();
-  }, [period]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   const summary = useMemo(() => {
     const workers = data?.workers ?? [];

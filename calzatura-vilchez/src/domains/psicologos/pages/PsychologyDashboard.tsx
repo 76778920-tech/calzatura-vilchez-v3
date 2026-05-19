@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { Brain, CalendarPlus, FileUp, ShieldAlert } from "lucide-react";
 import toast from "react-hot-toast";
 import {
@@ -61,7 +61,7 @@ export default function PsychologyDashboard() {
   const selectedAlert = alerts.find((alert) => alert.id === selectedAlertId) ?? alerts[0] ?? null;
   const selectedMetrics = (selectedAlert?.metricas ?? null) as WorkerPerformanceMetrics | null;
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoading(true);
     fetchPsychologyAlerts(period)
       .then((data) => {
@@ -77,11 +77,12 @@ export default function PsychologyDashboard() {
         setAppointments([]);
       })
       .finally(() => setLoading(false));
-  };
+  }, [period]);
 
   useEffect(() => {
-    load();
-  }, [period]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
+  }, [load]);
 
   const handleSchedule = async (event: FormEvent) => {
     event.preventDefault();

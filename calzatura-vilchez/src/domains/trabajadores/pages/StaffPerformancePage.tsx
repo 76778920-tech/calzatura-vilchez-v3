@@ -49,7 +49,8 @@ export default function StaffPerformancePage() {
   }, [period]);
 
   useEffect(() => {
-    load();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void load();
   }, [load]);
 
   const performance = payload?.performance ?? null;
