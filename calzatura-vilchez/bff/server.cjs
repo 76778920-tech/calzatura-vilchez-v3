@@ -287,6 +287,30 @@ function isNonEmptyString(value, max) {
   return typeof value === "string" && value.trim().length > 0 && value.trim().length <= max;
 }
 
+function isRecoverableSupabaseError(error) {
+  const msg = String(error?.message || error?.details || error || "").toLowerCase();
+  const code = String(error?.code || "");
+  return (
+    code === "42P01"
+    || code === "PGRST205"
+    || code === "42703"
+    || msg.includes("does not exist")
+    || msg.includes("schema cache")
+    || msg.includes("could not find")
+    || msg.includes("encargadouid")
+  );
+}
+
+async function supabaseRows(queryPromise, label, fallback = []) {
+  const result = await queryPromise;
+  if (!result.error) return result.data ?? fallback;
+  if (isRecoverableSupabaseError(result.error)) {
+    console.warn(`[${label}]`, result.error.message || result.error);
+    return fallback;
+  }
+  throw result.error;
+}
+
 const LOGIN_RATE_WINDOW_MS = 30 * 60 * 1000; // ventana: 30 minutos
 const LOGIN_RATE_MAX = 15; // máximo de POST /authLogin por IP en esa ventana (antes de cortar sin llamar a Google)
 const loginRateByIp = new Map();
@@ -1307,10 +1331,35 @@ async function fetchWorkerGoal(supabase, worker, period) {
     .eq("trabajadorUid", worker.uid)
     .eq("periodo", period)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    if (isRecoverableSupabaseError(error)) {
+      return { metaVentas: 3500, metaPedidos: 20 };
+    }
+    throw error;
+  }
   return {
     metaVentas: Number(data?.metaVentas ?? 3500) || 3500,
     metaPedidos: Number(data?.metaPedidos ?? 20) || 20,
+  };
+}
+
+function defaultWorkerPerformance(worker, period) {
+  return {
+    trabajadorUid: worker.uid,
+    trabajadorNombre: workerDisplayName(worker),
+    trabajadorEmail: worker.email || "",
+    periodo: period,
+    ventasCantidad: 0,
+    ventasTotal: 0,
+    gananciaTotal: 0,
+    unidadesVendidas: 0,
+    pedidosGestionados: 0,
+    metaVentas: 3500,
+    metaPedidos: 20,
+    cumplimientoVentas: 0,
+    cumplimientoPedidos: 0,
+    cumplimientoGeneral: 0,
+    feedback: "Sin datos de ventas para este periodo.",
   };
 }
 
@@ -1336,11 +1385,15 @@ async function fetchWorkerPerformance(supabase, worker, period) {
       .limit(1000),
   ]);
 
-  if (salesResult.error) throw salesResult.error;
-  if (auditResult.error) throw auditResult.error;
+  if (salesResult.error && !isRecoverableSupabaseError(salesResult.error)) throw salesResult.error;
+  if (auditResult.error && !isRecoverableSupabaseError(auditResult.error)) throw auditResult.error;
 
-  const sales = (salesResult.data ?? []).filter((sale) => !sale.devuelto);
-  const pedidosGestionados = new Set((auditResult.data ?? []).map((item) => item.entidadId).filter(Boolean)).size;
+  const sales = salesResult.error
+    ? []
+    : (salesResult.data ?? []).filter((sale) => !sale.devuelto);
+  const pedidosGestionados = auditResult.error
+    ? 0
+    : new Set((auditResult.data ?? []).map((item) => item.entidadId).filter(Boolean)).size;
   const ventasTotal = money(sales.reduce((acc, sale) => acc + Number(sale.total || 0), 0));
   const gananciaTotal = money(sales.reduce((acc, sale) => acc + Number(sale.ganancia || 0), 0));
   const unidadesVendidas = sales.reduce((acc, sale) => acc + Number(sale.cantidad || 0), 0);
@@ -1378,13 +1431,25 @@ async function fetchWorkerProfiles(supabase) {
     .select("uid,nombres,apellidos,nombre,email,rol")
     .eq("rol", "trabajador")
     .order("nombre");
-  if (error) throw error;
+  if (error) {
+    if (isRecoverableSupabaseError(error)) return [];
+    throw error;
+  }
   return data ?? [];
 }
 
 async function fetchAllWorkerPerformances(supabase, period) {
   const workers = await fetchWorkerProfiles(supabase);
-  return Promise.all(workers.map((worker) => fetchWorkerPerformance(supabase, worker, period)));
+  return Promise.all(
+    workers.map(async (worker) => {
+      try {
+        return await fetchWorkerPerformance(supabase, worker, period);
+      } catch (error) {
+        console.warn(`fetchWorkerPerformance ${worker.uid}:`, error?.message || error);
+        return defaultWorkerPerformance(worker, period);
+      }
+    }),
+  );
 }
 
 async function fetchWorkerSalesForPeriod(supabase, workerUid, period) {
@@ -1396,7 +1461,10 @@ async function fetchWorkerSalesForPeriod(supabase, workerUid, period) {
     .gte("fecha", bounds.startDate)
     .lt("fecha", bounds.nextDate)
     .limit(2000);
-  if (error) throw error;
+  if (error) {
+    if (isRecoverableSupabaseError(error)) return [];
+    throw error;
+  }
   return (data ?? []).filter((sale) => !sale.devuelto);
 }
 
@@ -1455,7 +1523,10 @@ async function fetchStaffNotifications(supabase, workerUid, limit = 50) {
     .eq("destinatarioUid", workerUid)
     .order("creadoEn", { ascending: false })
     .limit(limit);
-  if (error) throw error;
+  if (error) {
+    if (isRecoverableSupabaseError(error)) return [];
+    throw error;
+  }
   return data ?? [];
 }
 
@@ -1468,7 +1539,10 @@ async function fetchWorkerAppointments(supabase, workerUid, period) {
     .gte("fechaCita", bounds.startISO)
     .lt("fechaCita", bounds.nextISO)
     .order("fechaCita", { ascending: true });
-  if (error) throw error;
+  if (error) {
+    if (isRecoverableSupabaseError(error)) return [];
+    throw error;
+  }
   return data ?? [];
 }
 
@@ -1481,7 +1555,12 @@ async function fetchWorkerActiveCase(supabase, workerUid, period) {
     .neq("estado", "cerrada")
     .order("creadoEn", { ascending: false })
     .limit(1);
-  if (error) throw error;
+  if (error) {
+    if (isRecoverableSupabaseError(error)) {
+      return { alertaActiva: null, proximaCita: null };
+    }
+    throw error;
+  }
   const alertaActiva = alerts?.[0] ?? null;
   let proximaCita = null;
   if (alertaActiva) {
@@ -1492,7 +1571,7 @@ async function fetchWorkerActiveCase(supabase, workerUid, period) {
       .eq("estado", "programada")
       .order("fechaCita", { ascending: true })
       .limit(1);
-    if (citaError) throw citaError;
+    if (citaError && !isRecoverableSupabaseError(citaError)) throw citaError;
     proximaCita = citas?.[0] ?? null;
   }
   return { alertaActiva, proximaCita };
@@ -1591,30 +1670,40 @@ app.get("/hr/dashboard", (req, res) => {
       const supabase = getSupabaseAdmin();
       await assertHrRole(supabase, decodedToken.uid);
       const period = validPeriod(String(req.query.periodo || ""));
-      const [performances, alertsResult, reportsResult, actionsResult, appointmentsResult, goalsResult] = await Promise.all([
+      const [performances, alerts, reports, actions, appointments, goals] = await Promise.all([
         fetchAllWorkerPerformances(supabase, period),
-        supabase.from("rrhh_alertas").select("*").eq("periodo", period).order("creadoEn", { ascending: false }),
-        supabase.from("rrhh_informes_psicologicos").select("*").eq("periodo", period).order("creadoEn", { ascending: false }),
-        supabase.from("rrhh_acciones").select("*").order("creadoEn", { ascending: false }).limit(200),
-        supabase.from("rrhh_citas").select("*").order("fechaCita", { ascending: true }).limit(500),
-        supabase.from("rrhh_metas_mensuales").select("*").eq("periodo", period),
+        supabaseRows(
+          supabase.from("rrhh_alertas").select("*").eq("periodo", period).order("creadoEn", { ascending: false }),
+          "rrhh_alertas",
+        ),
+        supabaseRows(
+          supabase.from("rrhh_informes_psicologicos").select("*").eq("periodo", period).order("creadoEn", { ascending: false }),
+          "rrhh_informes_psicologicos",
+        ),
+        supabaseRows(
+          supabase.from("rrhh_acciones").select("*").order("creadoEn", { ascending: false }).limit(200),
+          "rrhh_acciones",
+        ),
+        supabaseRows(
+          supabase.from("rrhh_citas").select("*").order("fechaCita", { ascending: true }).limit(500),
+          "rrhh_citas",
+        ),
+        supabaseRows(
+          supabase.from("rrhh_metas_mensuales").select("*").eq("periodo", period),
+          "rrhh_metas_mensuales",
+        ),
       ]);
-      if (alertsResult.error) throw alertsResult.error;
-      if (reportsResult.error) throw reportsResult.error;
-      if (actionsResult.error) throw actionsResult.error;
-      if (appointmentsResult.error) throw appointmentsResult.error;
-      if (goalsResult.error) throw goalsResult.error;
       return res.status(200).json({
         period,
         workers: performances,
-        alerts: alertsResult.data ?? [],
-        reports: reportsResult.data ?? [],
-        actions: actionsResult.data ?? [],
-        appointments: appointmentsResult.data ?? [],
-        goals: goalsResult.data ?? [],
+        alerts,
+        reports,
+        actions,
+        appointments,
+        goals,
       });
     } catch (error) {
-      console.error("hr/dashboard error:", error);
+      console.error("hr/dashboard error:", error?.message || error, error?.details || "");
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -1984,32 +2073,38 @@ app.get("/psychology/alerts", (req, res) => {
       const supabase = getSupabaseAdmin();
       await assertPsychologistRole(supabase, decodedToken.uid);
       const period = validPeriod(String(req.query.periodo || ""));
-      const [alertsResult, reportsResult, appointmentsResult] = await Promise.all([
-        supabase
-          .from("rrhh_alertas")
-          .select("*")
-          .eq("periodo", period)
-          .in("estado", ["pendiente_psicologo", "evaluada", "accion_rrhh"])
-          .order("creadoEn", { ascending: false }),
-        supabase
-          .from("rrhh_informes_psicologicos")
-          .select("*")
-          .eq("periodo", period)
-          .order("creadoEn", { ascending: false }),
-        supabase
-          .from("rrhh_citas")
-          .select("*")
-          .order("fechaCita", { ascending: true })
-          .limit(500),
+      const [alerts, reports, appointments] = await Promise.all([
+        supabaseRows(
+          supabase
+            .from("rrhh_alertas")
+            .select("*")
+            .eq("periodo", period)
+            .in("estado", ["pendiente_psicologo", "evaluada", "accion_rrhh"])
+            .order("creadoEn", { ascending: false }),
+          "rrhh_alertas",
+        ),
+        supabaseRows(
+          supabase
+            .from("rrhh_informes_psicologicos")
+            .select("*")
+            .eq("periodo", period)
+            .order("creadoEn", { ascending: false }),
+          "rrhh_informes_psicologicos",
+        ),
+        supabaseRows(
+          supabase
+            .from("rrhh_citas")
+            .select("*")
+            .order("fechaCita", { ascending: true })
+            .limit(500),
+          "rrhh_citas",
+        ),
       ]);
-      if (alertsResult.error) throw alertsResult.error;
-      if (reportsResult.error) throw reportsResult.error;
-      if (appointmentsResult.error) throw appointmentsResult.error;
       return res.status(200).json({
         period,
-        alerts: alertsResult.data ?? [],
-        reports: reportsResult.data ?? [],
-        appointments: appointmentsResult.data ?? [],
+        alerts,
+        reports,
+        appointments,
       });
     } catch (error) {
       console.error("psychology/alerts error:", error);
