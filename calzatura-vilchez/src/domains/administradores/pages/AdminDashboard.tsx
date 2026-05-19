@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   Package, ShoppingBag, Users, TrendingUp, CircleDollarSign,
   AlertCircle, X, MapPin, Phone, Mail, ChevronRight,
-  BarChart2, Clock, Store, Globe,
+  BarChart2, Clock, Store, Globe, Brain, FileSpreadsheet,
 } from "lucide-react";
 import {
   computeDashboardFromFetchedData,
@@ -480,7 +480,7 @@ export default function AdminDashboard() {
       <div className="dash-header">
         <div>
           <p className="dash-greeting">{greetingText()}, Administrador</p>
-          <h1 className="dash-title">Dashboard</h1>
+          <h1 className="dash-title">Centro de control comercial</h1>
         </div>
         <div className="dash-header-date">
           <p className="dash-date-label">Hoy</p>
@@ -491,6 +491,35 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPI row 1 — ingresos/ganancias estáticos a la izquierda */}
+      <section className="dash-executive-band" aria-label="Resumen ejecutivo">
+        <div className="dash-executive-copy">
+          <p className="dash-executive-kicker">Operacion omnicanal</p>
+          <h2>Ventas, inventario, pedidos y prediccion en una sola vista</h2>
+          <div className="dash-executive-pills" aria-label="Indicadores clave">
+            <span><Globe size={14} /> Web: {formatCurrency(stats.ingresosWeb)}</span>
+            <span><Store size={14} /> Tienda: {formatCurrency(stats.ingresosTienda)}</span>
+            <span><AlertCircle size={14} /> Pendientes: {stats.pendientes}</span>
+          </div>
+        </div>
+        <div className="dash-executive-actions">
+          <Link to={ADMIN_ROUTES.predictions} className="dash-executive-action dash-executive-action-ai">
+            <Brain size={18} />
+            <span>Predicciones IA</span>
+            <ChevronRight size={15} />
+          </Link>
+          <Link to={ADMIN_ROUTES.data} className="dash-executive-action">
+            <FileSpreadsheet size={18} />
+            <span>Datos Excel</span>
+            <ChevronRight size={15} />
+          </Link>
+          <Link to={ADMIN_ROUTES.sales} className="dash-executive-action">
+            <CircleDollarSign size={18} />
+            <span>Registrar venta</span>
+            <ChevronRight size={15} />
+          </Link>
+        </div>
+      </section>
+
       <div className="dash-kpi-grid">
         <div className="dash-kpi-card dash-kpi-card-static dash-kpi-purple" aria-label={`Ingresos totales: ${formatCurrency(stats.ingresosTotales)}`}>
           <div className="dash-kpi-icon"><CircleDollarSign size={22} /></div>

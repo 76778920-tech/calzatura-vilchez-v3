@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain, FileSpreadsheet, ChevronLeft, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain, FileSpreadsheet, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { ADMIN_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 import { logoutUser } from "@/domains/usuarios/services/auth";
@@ -8,7 +8,7 @@ import { useThemeMode } from "@/hooks/useThemeMode";
 import toast from "react-hot-toast";
 
 export default function AdminLayout() {
-  const { user, isAdmin, loading } = useAuth();
+  const { user, userProfile, isAdmin, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useThemeMode();
@@ -47,6 +47,18 @@ export default function AdminLayout() {
   if (!user) return <Navigate to={`/login?redirect=${location.pathname}`} replace />;
   if (!isAdmin) return <Navigate to={PUBLIC_ROUTES.home} replace />;
 
+  const pageTitles: Record<string, string> = {
+    [ADMIN_ROUTES.dashboard]: "Dashboard ejecutivo",
+    [ADMIN_ROUTES.products]: "Gestion de productos",
+    [ADMIN_ROUTES.orders]: "Gestion de pedidos",
+    [ADMIN_ROUTES.sales]: "Ventas en tienda",
+    [ADMIN_ROUTES.users]: "Usuarios y roles",
+    [ADMIN_ROUTES.manufacturers]: "Fabricantes",
+    [ADMIN_ROUTES.predictions]: "Predicciones IA",
+    [ADMIN_ROUTES.data]: "Datos e importacion",
+  };
+  const activePageTitle = pageTitles[location.pathname] ?? "Administracion";
+
   const handleLogout = async () => {
     try {
       await logoutUser();
@@ -63,7 +75,10 @@ export default function AdminLayout() {
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-brand">
             <span className="logo-icon">CV</span>
-            <span className="admin-brand-name">Admin Panel</span>
+            <span className="admin-brand-name">
+              <strong>Vilchez Admin</strong>
+              <small>Gestion comercial</small>
+            </span>
           </div>
           <button
             type="button"
@@ -77,9 +92,11 @@ export default function AdminLayout() {
         </div>
 
         <nav className="admin-nav" aria-label="Módulos del panel">
+          <p className="admin-nav-section">Principal</p>
           <NavLink to={ADMIN_ROUTES.dashboard} end className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Dashboard">
             <LayoutDashboard size={18} /><span className="admin-nav-label">Dashboard</span>
           </NavLink>
+          <p className="admin-nav-section">Operacion</p>
           <NavLink to={ADMIN_ROUTES.products} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Productos">
             <Package size={18} /><span className="admin-nav-label">Productos</span>
           </NavLink>
@@ -89,6 +106,7 @@ export default function AdminLayout() {
           <NavLink to={ADMIN_ROUTES.sales} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Ventas">
             <CircleDollarSign size={18} /><span className="admin-nav-label">Ventas</span>
           </NavLink>
+          <p className="admin-nav-section">Gestion</p>
           <NavLink to={ADMIN_ROUTES.users} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Usuarios">
             <Users size={18} /><span className="admin-nav-label">Usuarios</span>
           </NavLink>
@@ -103,12 +121,14 @@ export default function AdminLayout() {
           </NavLink>
         </nav>
 
-        <button type="button" className="admin-nav-item admin-back-link" onClick={() => navigate(PUBLIC_ROUTES.home)} title="Ver tienda">
-          <Store size={18} /><span className="admin-nav-label">Ver tienda</span>
-        </button>
-        <button type="button" className="admin-nav-item admin-back-link" onClick={handleLogout} title="Cerrar sesión">
-          <LogOut size={18} /><span className="admin-nav-label">Cerrar sesión</span>
-        </button>
+        <div className="admin-sidebar-footer">
+          <button type="button" className="admin-nav-item admin-back-link" onClick={() => navigate(PUBLIC_ROUTES.home)} title="Ver tienda">
+            <Store size={18} /><span className="admin-nav-label">Ver tienda</span>
+          </button>
+          <button type="button" className="admin-nav-item admin-back-link" onClick={handleLogout} title="Cerrar sesion">
+            <LogOut size={18} /><span className="admin-nav-label">Cerrar sesion</span>
+          </button>
+        </div>
       </aside>
 
       {/* Tira de colapso entre sidebar y contenido */}
@@ -125,6 +145,19 @@ export default function AdminLayout() {
       </button>
 
       <main ref={mainRef} tabIndex={-1} className="admin-main">
+        <header className="admin-topbar">
+          <div>
+            <p className="admin-topbar-kicker">Panel administrativo</p>
+            <h1>{activePageTitle}</h1>
+          </div>
+          <div className="admin-session-card" aria-label="Sesion administrativa">
+            <span className="admin-session-icon"><ShieldCheck size={18} /></span>
+            <div>
+              <strong>{userProfile?.nombre ?? "Administrador"}</strong>
+              <span>{user.email}</span>
+            </div>
+          </div>
+        </header>
         <Outlet />
       </main>
     </div>
