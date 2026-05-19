@@ -221,14 +221,15 @@ export default function PsychologyDashboard() {
           </p>
         </div>
         <div className="hr-period-control">
-          <label htmlFor="psychology-period">Periodo</label>
-          <input
-            id="psychology-period"
-            className="form-input"
-            type="month"
-            value={period}
-            onChange={(event) => setPeriod(event.target.value || currentPeriod())}
-          />
+          <label>
+            Periodo
+            <input
+              className="form-input"
+              type="month"
+              value={period}
+              onChange={(event) => setPeriod(event.target.value || currentPeriod())}
+            />
+          </label>
           <label className="hr-checkbox">
             <input
               type="checkbox"

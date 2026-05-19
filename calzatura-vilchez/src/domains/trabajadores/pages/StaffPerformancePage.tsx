@@ -135,14 +135,15 @@ export default function StaffPerformancePage() {
           </p>
         </div>
         <div className="hr-period-control">
-          <label htmlFor="staff-period">Periodo</label>
-          <input
-            id="staff-period"
-            className="form-input"
-            type="month"
-            value={period}
-            onChange={(event) => setPeriod(event.target.value || currentPeriod())}
-          />
+          <label>
+            Periodo
+            <input
+              className="form-input"
+              type="month"
+              value={period}
+              onChange={(event) => setPeriod(event.target.value || currentPeriod())}
+            />
+          </label>
         </div>
       </section>
 

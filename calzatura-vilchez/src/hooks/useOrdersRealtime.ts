@@ -21,7 +21,7 @@ export function useOrdersRealtime(onOrderChange: () => void, userId?: string): v
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void channel.unsubscribe();
     };
   }, [userId]);
 }

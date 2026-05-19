@@ -35,7 +35,7 @@ export function useProductsRealtime(onProductChange: () => void): void {
         globalThis.clearTimeout(debounceRef.current);
         debounceRef.current = null;
       }
-      supabase.removeChannel(channel);
+      void channel.unsubscribe();
     };
   }, []);
 }

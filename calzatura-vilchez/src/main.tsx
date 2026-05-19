@@ -7,10 +7,12 @@ import "./index.css";
 import App from "./App.tsx";
 import { AuthProvider } from "@/domains/usuarios/context/AuthContext";
 import { AppErrorBoundary } from "./components/layout/AppErrorBoundary";
+import { installBenignRejectionFilter } from "./utils/benignRejectionFilter";
 import { installChunkErrorRecovery } from "./utils/chunkRecovery";
 import { installClientStorageGuard } from "./utils/clientStorageGuard";
 
 installClientStorageGuard();
+installBenignRejectionFilter();
 installChunkErrorRecovery();
 
 createRoot(document.getElementById("root")!).render(

@@ -298,14 +298,15 @@ export default function HrDashboard() {
           </p>
         </div>
         <div className="hr-period-control">
-          <label htmlFor="hr-period">Periodo</label>
-          <input
-            id="hr-period"
-            className="form-input"
-            type="month"
-            value={period}
-            onChange={(event) => setPeriod(event.target.value || currentPeriod())}
-          />
+          <label>
+            Periodo
+            <input
+              className="form-input"
+              type="month"
+              value={period}
+              onChange={(event) => setPeriod(event.target.value || currentPeriod())}
+            />
+          </label>
           <button type="button" className="btn-primary" onClick={handleGenerateAlerts} disabled={saving}>
             {saving ? "Procesando..." : "Generar alertas automáticas"}
           </button>
