@@ -1387,6 +1387,117 @@ async function fetchAllWorkerPerformances(supabase, period) {
   return Promise.all(workers.map((worker) => fetchWorkerPerformance(supabase, worker, period)));
 }
 
+async function fetchWorkerSalesForPeriod(supabase, workerUid, period) {
+  const bounds = periodBounds(period);
+  const { data, error } = await supabase
+    .from("ventasDiarias")
+    .select("fecha,cantidad,total,devuelto")
+    .eq("encargadoUid", workerUid)
+    .gte("fecha", bounds.startDate)
+    .lt("fecha", bounds.nextDate)
+    .limit(2000);
+  if (error) throw error;
+  return (data ?? []).filter((sale) => !sale.devuelto);
+}
+
+function buildDailyHistoryFromSales(sales) {
+  const byDate = new Map();
+  for (const sale of sales) {
+    const fecha = String(sale.fecha || "");
+    if (!fecha) continue;
+    const current = byDate.get(fecha) || { fecha, pares: 0, ventasTotal: 0, transacciones: 0 };
+    current.pares += Number(sale.cantidad || 0);
+    current.ventasTotal += Number(sale.total || 0);
+    current.transacciones += 1;
+    byDate.set(fecha, current);
+  }
+  return Array.from(byDate.values())
+    .map((row) => ({ ...row, ventasTotal: money(row.ventasTotal) }))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+}
+
+async function buildWorkerDailyHistory(supabase, workerUid, period) {
+  const sales = await fetchWorkerSalesForPeriod(supabase, workerUid, period);
+  return buildDailyHistoryFromSales(sales);
+}
+
+function formatCitaForMessage(fechaCita) {
+  const value = new Date(fechaCita);
+  if (Number.isNaN(value.getTime())) return fechaCita;
+  return value.toLocaleString("es-PE", {
+    dateStyle: "full",
+    timeStyle: "short",
+  });
+}
+
+async function createStaffNotification(supabase, payload) {
+  const { data, error } = await supabase
+    .from("rrhh_notificaciones")
+    .insert({
+      destinatarioUid: payload.destinatarioUid,
+      tipo: payload.tipo,
+      titulo: payload.titulo,
+      mensaje: payload.mensaje,
+      metadata: payload.metadata || {},
+      leida: false,
+      creadoEn: new Date().toISOString(),
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function fetchStaffNotifications(supabase, workerUid, limit = 50) {
+  const { data, error } = await supabase
+    .from("rrhh_notificaciones")
+    .select("*")
+    .eq("destinatarioUid", workerUid)
+    .order("creadoEn", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function fetchWorkerAppointments(supabase, workerUid, period) {
+  const bounds = periodBounds(period);
+  const { data, error } = await supabase
+    .from("rrhh_citas")
+    .select("*")
+    .eq("trabajadorUid", workerUid)
+    .gte("fechaCita", bounds.startISO)
+    .lt("fechaCita", bounds.nextISO)
+    .order("fechaCita", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function fetchWorkerActiveCase(supabase, workerUid, period) {
+  const { data: alerts, error } = await supabase
+    .from("rrhh_alertas")
+    .select("*")
+    .eq("trabajadorUid", workerUid)
+    .eq("periodo", period)
+    .neq("estado", "cerrada")
+    .order("creadoEn", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const alertaActiva = alerts?.[0] ?? null;
+  let proximaCita = null;
+  if (alertaActiva) {
+    const { data: citas, error: citaError } = await supabase
+      .from("rrhh_citas")
+      .select("*")
+      .eq("alertaId", alertaActiva.id)
+      .eq("estado", "programada")
+      .order("fechaCita", { ascending: true })
+      .limit(1);
+    if (citaError) throw citaError;
+    proximaCita = citas?.[0] ?? null;
+  }
+  return { alertaActiva, proximaCita };
+}
+
 function sanitizeStorageFilename(fileName) {
   return String(fileName || "informe.pdf")
     .normalize("NFD")
@@ -1452,8 +1563,20 @@ app.get("/staff/performance", (req, res) => {
       if (!worker) {
         throw Object.assign(new Error("Perfil de trabajador no encontrado"), { status: 404 });
       }
-      const performance = await fetchWorkerPerformance(supabase, worker, period);
-      return res.status(200).json({ performance });
+      const [performance, historialDiario, notificaciones, citas, workflow] = await Promise.all([
+        fetchWorkerPerformance(supabase, worker, period),
+        buildWorkerDailyHistory(supabase, worker.uid, period),
+        fetchStaffNotifications(supabase, worker.uid),
+        fetchWorkerAppointments(supabase, worker.uid, period),
+        fetchWorkerActiveCase(supabase, worker.uid, period),
+      ]);
+      return res.status(200).json({
+        performance,
+        historialDiario,
+        notificaciones,
+        citas,
+        workflow,
+      });
     } catch (error) {
       console.error("staff/performance error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
@@ -1468,21 +1591,27 @@ app.get("/hr/dashboard", (req, res) => {
       const supabase = getSupabaseAdmin();
       await assertHrRole(supabase, decodedToken.uid);
       const period = validPeriod(String(req.query.periodo || ""));
-      const [performances, alertsResult, reportsResult, actionsResult] = await Promise.all([
+      const [performances, alertsResult, reportsResult, actionsResult, appointmentsResult, goalsResult] = await Promise.all([
         fetchAllWorkerPerformances(supabase, period),
         supabase.from("rrhh_alertas").select("*").eq("periodo", period).order("creadoEn", { ascending: false }),
         supabase.from("rrhh_informes_psicologicos").select("*").eq("periodo", period).order("creadoEn", { ascending: false }),
         supabase.from("rrhh_acciones").select("*").order("creadoEn", { ascending: false }).limit(200),
+        supabase.from("rrhh_citas").select("*").order("fechaCita", { ascending: true }).limit(500),
+        supabase.from("rrhh_metas_mensuales").select("*").eq("periodo", period),
       ]);
       if (alertsResult.error) throw alertsResult.error;
       if (reportsResult.error) throw reportsResult.error;
       if (actionsResult.error) throw actionsResult.error;
+      if (appointmentsResult.error) throw appointmentsResult.error;
+      if (goalsResult.error) throw goalsResult.error;
       return res.status(200).json({
         period,
         workers: performances,
         alerts: alertsResult.data ?? [],
         reports: reportsResult.data ?? [],
         actions: actionsResult.data ?? [],
+        appointments: appointmentsResult.data ?? [],
+        goals: goalsResult.data ?? [],
       });
     } catch (error) {
       console.error("hr/dashboard error:", error);
@@ -1568,6 +1697,178 @@ app.post("/hr/alerts/generate", (req, res) => {
   });
 });
 
+app.post("/hr/alerts/refer", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertHrRole(supabase, decodedToken.uid);
+      const period = validPeriod(String(req.body?.periodo || ""));
+      const trabajadorUid = String(req.body?.trabajadorUid || "").trim();
+      const motivoGeneral = String(req.body?.motivoGeneral || "").trim()
+        || "Derivación manual a evaluación psicológica por RR.HH.";
+      if (!isNonEmptyString(trabajadorUid, 80)) {
+        return res.status(400).json({ error: "Trabajador invalido" });
+      }
+      const { data: worker, error: workerError } = await supabase
+        .from("usuarios")
+        .select("uid,nombres,apellidos,nombre,email,rol")
+        .eq("uid", trabajadorUid)
+        .eq("rol", "trabajador")
+        .maybeSingle();
+      if (workerError) throw workerError;
+      if (!worker) return res.status(404).json({ error: "Trabajador no encontrado" });
+
+      const metrics = await fetchWorkerPerformance(supabase, worker, period);
+      const existing = await supabase
+        .from("rrhh_alertas")
+        .select("*")
+        .eq("trabajadorUid", trabajadorUid)
+        .eq("periodo", period)
+        .eq("tipo", "manual")
+        .maybeSingle();
+      if (existing.error) throw existing.error;
+
+      const payload = {
+        trabajadorUid,
+        trabajadorNombre: workerDisplayName(worker),
+        trabajadorEmail: worker.email || "",
+        periodo: period,
+        tipo: "manual",
+        motivoGeneral,
+        metricas: metrics,
+        estado: "pendiente_psicologo",
+        actualizadoEn: new Date().toISOString(),
+      };
+
+      let alert;
+      if (existing.data) {
+        const { data, error } = await supabase
+          .from("rrhh_alertas")
+          .update(payload)
+          .eq("id", existing.data.id)
+          .select("*")
+          .single();
+        if (error) throw error;
+        alert = data;
+      } else {
+        const { data, error } = await supabase
+          .from("rrhh_alertas")
+          .insert({
+            ...payload,
+            creadoPorUid: decodedToken.uid,
+            creadoPorEmail: decodedToken.email || "",
+            creadoEn: new Date().toISOString(),
+          })
+          .select("*")
+          .single();
+        if (error) throw error;
+        alert = data;
+      }
+
+      await createStaffNotification(supabase, {
+        destinatarioUid: trabajadorUid,
+        tipo: "derivacion_rrhh",
+        titulo: "Evaluación psicológica solicitada",
+        mensaje: "RR.HH. ha solicitado una evaluación profesional. El psicólogo te contactará para coordinar la cita.",
+        metadata: { alertaId: alert.id, periodo: period },
+      });
+
+      await logAuditFn(
+        supabase,
+        "crear",
+        "rrhh_alerta",
+        alert.id,
+        "Derivacion manual",
+        decodedToken.uid,
+        decodedToken.email || "",
+        { trabajadorUid, period },
+      );
+      return res.status(200).json({ alert });
+    } catch (error) {
+      console.error("hr/alerts/refer error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/hr/workers/:workerUid/history", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertHrRole(supabase, decodedToken.uid);
+      const workerUid = String(req.params.workerUid || "").trim();
+      const period = validPeriod(String(req.query.periodo || ""));
+      if (!isNonEmptyString(workerUid, 80)) {
+        return res.status(400).json({ error: "Trabajador invalido" });
+      }
+      const { data: worker, error: workerError } = await supabase
+        .from("usuarios")
+        .select("uid,nombres,apellidos,nombre,email,rol")
+        .eq("uid", workerUid)
+        .maybeSingle();
+      if (workerError) throw workerError;
+      if (!worker) return res.status(404).json({ error: "Trabajador no encontrado" });
+
+      const [performance, historialDiario] = await Promise.all([
+        fetchWorkerPerformance(supabase, worker, period),
+        buildWorkerDailyHistory(supabase, workerUid, period),
+      ]);
+      return res.status(200).json({ performance, historialDiario });
+    } catch (error) {
+      console.error("hr/workers history error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.put("/hr/metas", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertHrRole(supabase, decodedToken.uid);
+      const trabajadorUid = String(req.body?.trabajadorUid || "").trim();
+      const period = validPeriod(String(req.body?.periodo || ""));
+      const metaVentas = Number(req.body?.metaVentas);
+      const metaPedidos = Number(req.body?.metaPedidos);
+      if (!isNonEmptyString(trabajadorUid, 80) || !Number.isFinite(metaVentas) || metaVentas <= 0 || !Number.isFinite(metaPedidos) || metaPedidos <= 0) {
+        return res.status(400).json({ error: "Metas invalidas" });
+      }
+      const { data: worker, error: workerError } = await supabase
+        .from("usuarios")
+        .select("uid,nombres,apellidos,nombre,email")
+        .eq("uid", trabajadorUid)
+        .eq("rol", "trabajador")
+        .maybeSingle();
+      if (workerError) throw workerError;
+      if (!worker) return res.status(404).json({ error: "Trabajador no encontrado" });
+
+      const { data, error } = await supabase
+        .from("rrhh_metas_mensuales")
+        .upsert({
+          trabajadorUid,
+          trabajadorNombre: workerDisplayName(worker),
+          trabajadorEmail: worker.email || "",
+          periodo: period,
+          metaVentas: money(metaVentas),
+          metaPedidos: Math.round(metaPedidos),
+          creadoPorUid: decodedToken.uid,
+          creadoPorEmail: decodedToken.email || "",
+          actualizadoEn: new Date().toISOString(),
+        }, { onConflict: "trabajadorUid,periodo" })
+        .select("*")
+        .single();
+      if (error) throw error;
+      return res.status(200).json({ goal: data });
+    } catch (error) {
+      console.error("hr/metas error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.post("/hr/actions", (req, res) => {
   cors(req, res, async () => {
     try {
@@ -1575,7 +1876,15 @@ app.post("/hr/actions", (req, res) => {
       const supabase = getSupabaseAdmin();
       await assertHrRole(supabase, decodedToken.uid);
       const { alertaId, tipoAccion, descripcion } = req.body || {};
-      const allowed = new Set(["capacitacion", "redistribucion_tareas", "derivacion_formal", "observacion", "cerrar_seguimiento"]);
+      const allowed = new Set([
+        "capacitacion",
+        "redistribucion_tareas",
+        "derivacion_formal",
+        "observacion",
+        "cerrar_seguimiento",
+        "continuar",
+        "no_continuar",
+      ]);
       if (!isNonEmptyString(alertaId, 80) || !allowed.has(tipoAccion) || !isNonEmptyString(descripcion, 1200)) {
         return res.status(400).json({ error: "Datos de accion invalidos" });
       }
@@ -1602,12 +1911,29 @@ app.post("/hr/actions", (req, res) => {
         .single();
       if (error) throw error;
 
-      const nextStatus = tipoAccion === "cerrar_seguimiento" ? "cerrada" : "accion_rrhh";
+      const closesCase = new Set(["cerrar_seguimiento", "continuar", "no_continuar"]).has(tipoAccion);
+      const nextStatus = closesCase ? "cerrada" : "accion_rrhh";
       const { error: updateError } = await supabase
         .from("rrhh_alertas")
         .update({ estado: nextStatus, actualizadoEn: new Date().toISOString() })
         .eq("id", alertaId);
       if (updateError) throw updateError;
+
+      if (tipoAccion === "continuar" || tipoAccion === "no_continuar") {
+        const decisionTitulo = tipoAccion === "continuar"
+          ? "Decisión RR.HH.: continúas en la empresa"
+          : "Decisión RR.HH.: proceso de salida";
+        const decisionMensaje = tipoAccion === "continuar"
+          ? "RR.HH. ha registrado que continúas en tu puesto tras la evaluación. Revisa el detalle con tu encargado si tienes dudas."
+          : "RR.HH. ha registrado una decisión de no continuidad. Coordinación con RR.HH. para los siguientes pasos.";
+        await createStaffNotification(supabase, {
+          destinatarioUid: alert.trabajadorUid,
+          tipo: "decision_rrhh",
+          titulo: decisionTitulo,
+          mensaje: decisionMensaje,
+          metadata: { alertaId, tipoAccion },
+        });
+      }
 
       await logAuditFn(
         supabase,
@@ -1658,7 +1984,7 @@ app.get("/psychology/alerts", (req, res) => {
       const supabase = getSupabaseAdmin();
       await assertPsychologistRole(supabase, decodedToken.uid);
       const period = validPeriod(String(req.query.periodo || ""));
-      const [alertsResult, reportsResult] = await Promise.all([
+      const [alertsResult, reportsResult, appointmentsResult] = await Promise.all([
         supabase
           .from("rrhh_alertas")
           .select("*")
@@ -1670,16 +1996,158 @@ app.get("/psychology/alerts", (req, res) => {
           .select("*")
           .eq("periodo", period)
           .order("creadoEn", { ascending: false }),
+        supabase
+          .from("rrhh_citas")
+          .select("*")
+          .order("fechaCita", { ascending: true })
+          .limit(500),
       ]);
       if (alertsResult.error) throw alertsResult.error;
       if (reportsResult.error) throw reportsResult.error;
+      if (appointmentsResult.error) throw appointmentsResult.error;
       return res.status(200).json({
         period,
         alerts: alertsResult.data ?? [],
         reports: reportsResult.data ?? [],
+        appointments: appointmentsResult.data ?? [],
       });
     } catch (error) {
       console.error("psychology/alerts error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.patch("/staff/notifications/:notificationId/read", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const notificationId = String(req.params.notificationId || "").trim();
+      const { error } = await supabase
+        .from("rrhh_notificaciones")
+        .update({ leida: true })
+        .eq("id", notificationId)
+        .eq("destinatarioUid", decodedToken.uid);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("staff/notifications read error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.patch("/staff/notifications/read-all", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const { error } = await supabase
+        .from("rrhh_notificaciones")
+        .update({ leida: true })
+        .eq("destinatarioUid", decodedToken.uid)
+        .eq("leida", false);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("staff/notifications read-all error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/psychology/appointments", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertPsychologistRole(supabase, decodedToken.uid);
+      const { alertaId, fechaCita, lugar, notas } = req.body || {};
+      if (!isNonEmptyString(alertaId, 80) || !isNonEmptyString(fechaCita, 40)) {
+        return res.status(400).json({ error: "Cita incompleta" });
+      }
+      const citaDate = new Date(fechaCita);
+      if (Number.isNaN(citaDate.getTime())) {
+        return res.status(400).json({ error: "Fecha de cita invalida" });
+      }
+      const { data: alert, error: alertError } = await supabase
+        .from("rrhh_alertas")
+        .select("*")
+        .eq("id", alertaId)
+        .maybeSingle();
+      if (alertError) throw alertError;
+      if (!alert) return res.status(404).json({ error: "Alerta no encontrada" });
+
+      const lugarFinal = isNonEmptyString(lugar, 200) ? String(lugar).trim() : "Consultorio / sala de evaluación";
+      const { data, error } = await supabase
+        .from("rrhh_citas")
+        .insert({
+          alertaId,
+          trabajadorUid: alert.trabajadorUid,
+          psicologoUid: decodedToken.uid,
+          psicologoEmail: decodedToken.email || "",
+          fechaCita: citaDate.toISOString(),
+          lugar: lugarFinal,
+          notas: isNonEmptyString(notas, 800) ? String(notas).trim() : null,
+          estado: "programada",
+          creadoEn: new Date().toISOString(),
+          actualizadoEn: new Date().toISOString(),
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+
+      await createStaffNotification(supabase, {
+        destinatarioUid: alert.trabajadorUid,
+        tipo: "cita_psicologo",
+        titulo: "Cita de evaluación programada",
+        mensaje: `Tu cita está programada para el ${formatCitaForMessage(data.fechaCita)} en ${lugarFinal}.`,
+        metadata: { citaId: data.id, alertaId, fechaCita: data.fechaCita, lugar: lugarFinal },
+      });
+
+      await logAuditFn(
+        supabase,
+        "crear",
+        "rrhh_cita",
+        data.id,
+        alert.trabajadorNombre || alert.trabajadorUid,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { alertaId },
+      );
+      return res.status(200).json({ appointment: data });
+    } catch (error) {
+      console.error("psychology/appointments error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.patch("/psychology/appointments/:appointmentId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertPsychologistRole(supabase, decodedToken.uid);
+      const appointmentId = String(req.params.appointmentId || "").trim();
+      const estado = String(req.body?.estado || "").trim();
+      if (!["programada", "realizada", "cancelada"].includes(estado)) {
+        return res.status(400).json({ error: "Estado de cita invalido" });
+      }
+      const { data, error } = await supabase
+        .from("rrhh_citas")
+        .update({ estado, actualizadoEn: new Date().toISOString() })
+        .eq("id", appointmentId)
+        .select("*")
+        .single();
+      if (error) throw error;
+      if (!data) return res.status(404).json({ error: "Cita no encontrada" });
+      return res.status(200).json({ appointment: data });
+    } catch (error) {
+      console.error("psychology/appointments patch error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -1767,6 +2235,14 @@ app.post("/psychology/reports", (req, res) => {
         .update({ estado: "evaluada", actualizadoEn: new Date().toISOString() })
         .eq("id", alertaId);
       if (updateError) throw updateError;
+
+      await createStaffNotification(supabase, {
+        destinatarioUid: alert.trabajadorUid,
+        tipo: "informe_disponible",
+        titulo: "Evaluación psicológica registrada",
+        mensaje: "El psicólogo ha registrado tu evaluación. RR.HH. revisará el informe y te comunicará la decisión.",
+        metadata: { alertaId, reportId: data.id },
+      });
 
       await logAuditFn(
         supabase,

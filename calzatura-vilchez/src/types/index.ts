@@ -161,7 +161,66 @@ export type UserRole = "cliente" | "trabajador" | "psicologo" | "rrhh" | "admin"
 
 export type HrAlertStatus = "pendiente_psicologo" | "evaluada" | "accion_rrhh" | "cerrada";
 export type HrAlertType = "rendimiento_bajo" | "seguimiento" | "manual";
-export type HrActionType = "capacitacion" | "redistribucion_tareas" | "derivacion_formal" | "observacion" | "cerrar_seguimiento";
+export type HrActionType =
+  | "capacitacion"
+  | "redistribucion_tareas"
+  | "derivacion_formal"
+  | "observacion"
+  | "cerrar_seguimiento"
+  | "continuar"
+  | "no_continuar";
+
+export interface WorkerDailySalesRow {
+  fecha: string;
+  pares: number;
+  ventasTotal: number;
+  transacciones: number;
+}
+
+export interface StaffNotification {
+  id: string;
+  destinatarioUid: string;
+  tipo: "cita_psicologo" | "derivacion_rrhh" | "informe_disponible" | "decision_rrhh" | "general";
+  titulo: string;
+  mensaje: string;
+  metadata: Record<string, unknown>;
+  leida: boolean;
+  creadoEn: string;
+}
+
+export interface PsychologyAppointment {
+  id: string;
+  alertaId: string;
+  trabajadorUid: string;
+  psicologoUid: string;
+  psicologoEmail?: string;
+  fechaCita: string;
+  lugar: string;
+  notas?: string;
+  estado: "programada" | "realizada" | "cancelada";
+  creadoEn: string;
+  actualizadoEn?: string;
+}
+
+export interface WorkerMonthlyGoal {
+  trabajadorUid: string;
+  periodo: string;
+  metaVentas: number;
+  metaPedidos: number;
+}
+
+export interface StaffWorkflowSummary {
+  alertaActiva: HrAlert | null;
+  proximaCita: PsychologyAppointment | null;
+}
+
+export type StaffPerformancePayload = {
+  performance: WorkerPerformanceMetrics;
+  historialDiario: WorkerDailySalesRow[];
+  notificaciones: StaffNotification[];
+  citas: PsychologyAppointment[];
+  workflow: StaffWorkflowSummary;
+};
 
 export interface WorkerPerformanceMetrics {
   trabajadorUid: string;
