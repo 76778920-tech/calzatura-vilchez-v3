@@ -157,4 +157,65 @@ export interface UserProfile {
   direcciones?: Address[];
 }
 
-export type UserRole = "cliente" | "trabajador" | "admin";
+export type UserRole = "cliente" | "trabajador" | "psicologo" | "rrhh" | "admin";
+
+export type HrAlertStatus = "pendiente_psicologo" | "evaluada" | "accion_rrhh" | "cerrada";
+export type HrAlertType = "rendimiento_bajo" | "seguimiento" | "manual";
+export type HrActionType = "capacitacion" | "redistribucion_tareas" | "derivacion_formal" | "observacion" | "cerrar_seguimiento";
+
+export interface WorkerPerformanceMetrics {
+  trabajadorUid: string;
+  trabajadorNombre: string;
+  trabajadorEmail?: string;
+  periodo: string;
+  ventasCantidad: number;
+  ventasTotal: number;
+  gananciaTotal: number;
+  unidadesVendidas: number;
+  pedidosGestionados: number;
+  metaVentas: number;
+  metaPedidos: number;
+  cumplimientoVentas: number;
+  cumplimientoPedidos: number;
+  cumplimientoGeneral: number;
+  feedback: string;
+}
+
+export interface HrAlert {
+  id: string;
+  trabajadorUid: string;
+  trabajadorNombre: string;
+  trabajadorEmail?: string;
+  periodo: string;
+  tipo: HrAlertType;
+  motivoGeneral: string;
+  estado: HrAlertStatus;
+  metricas: WorkerPerformanceMetrics;
+  creadoEn: string;
+  actualizadoEn?: string;
+}
+
+export interface PsychologicalReport {
+  id: string;
+  alertaId: string;
+  trabajadorUid: string;
+  periodo: string;
+  psicologoUid: string;
+  psicologoEmail?: string;
+  resumen: string;
+  recomendacion: string;
+  pdfPath: string;
+  pdfNombre: string;
+  creadoEn: string;
+}
+
+export interface HrAction {
+  id: string;
+  alertaId: string;
+  trabajadorUid: string;
+  tipoAccion: HrActionType;
+  descripcion: string;
+  responsableUid: string;
+  responsableEmail?: string;
+  creadoEn: string;
+}

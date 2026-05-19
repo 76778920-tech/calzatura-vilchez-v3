@@ -51,6 +51,19 @@ export const STAFF_ROUTES = {
   home: "/staff",
   orders: "/staff/pedidos",
   sales: "/staff/ventas",
+  performance: "/staff/desempeno",
+} as const;
+
+/** Intervencion profesional ante alertas derivadas. */
+export const PSYCHOLOGY_ROUTES = {
+  root: "/psicologo/*",
+  home: "/psicologo",
+} as const;
+
+/** Recursos humanos: informes, historial y acciones finales. */
+export const HR_ROUTES = {
+  root: "/rrhh/*",
+  home: "/rrhh",
 } as const;
 
 export const ROUTE_GROUPS = {
@@ -59,4 +72,6 @@ export const ROUTE_GROUPS = {
   clientes: CLIENT_ROUTES,
   administradores: ADMIN_ROUTES,
   trabajadores: STAFF_ROUTES,
+  psicologos: PSYCHOLOGY_ROUTES,
+  rrhh: HR_ROUTES,
 } as const;

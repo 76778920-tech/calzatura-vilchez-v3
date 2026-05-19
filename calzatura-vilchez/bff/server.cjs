@@ -181,8 +181,30 @@ async function assertStaffRole(supabase, uid) {
   throw Object.assign(new Error("Sin permisos para gestionar pedidos"), { status: 403 });
 }
 
+async function assertPsychologistRole(supabase, uid) {
+  const { data, error } = await supabase.from("usuarios").select("rol").eq("uid", uid).maybeSingle();
+  if (error) {
+    throw Object.assign(new Error("No se pudo verificar el rol"), { status: 500 });
+  }
+  if (data?.rol === "admin" || data?.rol === "psicologo") {
+    return;
+  }
+  throw Object.assign(new Error("Sin permisos para el panel de psicologia"), { status: 403 });
+}
+
+async function assertHrRole(supabase, uid) {
+  const { data, error } = await supabase.from("usuarios").select("rol").eq("uid", uid).maybeSingle();
+  if (error) {
+    throw Object.assign(new Error("No se pudo verificar el rol"), { status: 500 });
+  }
+  if (data?.rol === "admin" || data?.rol === "rrhh") {
+    return;
+  }
+  throw Object.assign(new Error("Sin permisos para recursos humanos"), { status: 403 });
+}
+
 const ORDER_STATUSES = new Set(["pendiente", "pagado", "enviado", "entregado", "cancelado"]);
-const USER_ROLES = new Set(["cliente", "trabajador", "admin"]);
+const USER_ROLES = new Set(["cliente", "trabajador", "psicologo", "rrhh", "admin"]);
 
 function profileString(value) {
   return typeof value === "string" ? value.trim() : undefined;
@@ -1240,6 +1262,135 @@ function sinceDateISO(days) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+function currentPeriod() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function validPeriod(value) {
+  return typeof value === "string" && /^\d{4}-\d{2}$/.test(value) ? value : currentPeriod();
+}
+
+function periodBounds(period) {
+  const [year, month] = period.split("-").map(Number);
+  const start = new Date(Date.UTC(year, month - 1, 1));
+  const next = new Date(Date.UTC(year, month, 1));
+  const date = (d) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  return {
+    startDate: date(start),
+    nextDate: date(next),
+    startISO: start.toISOString(),
+    nextISO: next.toISOString(),
+  };
+}
+
+function money(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function workerDisplayName(worker) {
+  return [worker?.nombres, worker?.apellidos].filter(Boolean).join(" ").trim()
+    || worker?.nombre
+    || worker?.email
+    || "Trabajador";
+}
+
+async function fetchWorkerGoal(supabase, worker, period) {
+  const { data, error } = await supabase
+    .from("rrhh_metas_mensuales")
+    .select("*")
+    .eq("trabajadorUid", worker.uid)
+    .eq("periodo", period)
+    .maybeSingle();
+  if (error) throw error;
+  return {
+    metaVentas: Number(data?.metaVentas ?? 3500) || 3500,
+    metaPedidos: Number(data?.metaPedidos ?? 20) || 20,
+  };
+}
+
+async function fetchWorkerPerformance(supabase, worker, period) {
+  const bounds = periodBounds(period);
+  const [goalResult, salesResult, auditResult] = await Promise.all([
+    fetchWorkerGoal(supabase, worker, period),
+    supabase
+      .from("ventasDiarias")
+      .select("*")
+      .eq("encargadoUid", worker.uid)
+      .gte("fecha", bounds.startDate)
+      .lt("fecha", bounds.nextDate)
+      .limit(1000),
+    supabase
+      .from("auditoria")
+      .select("entidadId,realizadoEn")
+      .eq("usuarioUid", worker.uid)
+      .eq("entidad", "pedido")
+      .eq("accion", "cambiar_estado")
+      .gte("realizadoEn", bounds.startISO)
+      .lt("realizadoEn", bounds.nextISO)
+      .limit(1000),
+  ]);
+
+  if (salesResult.error) throw salesResult.error;
+  if (auditResult.error) throw auditResult.error;
+
+  const sales = (salesResult.data ?? []).filter((sale) => !sale.devuelto);
+  const pedidosGestionados = new Set((auditResult.data ?? []).map((item) => item.entidadId).filter(Boolean)).size;
+  const ventasTotal = money(sales.reduce((acc, sale) => acc + Number(sale.total || 0), 0));
+  const gananciaTotal = money(sales.reduce((acc, sale) => acc + Number(sale.ganancia || 0), 0));
+  const unidadesVendidas = sales.reduce((acc, sale) => acc + Number(sale.cantidad || 0), 0);
+  const cumplimientoVentas = goalResult.metaVentas > 0 ? Math.min(1, ventasTotal / goalResult.metaVentas) : 1;
+  const cumplimientoPedidos = goalResult.metaPedidos > 0 ? Math.min(1, pedidosGestionados / goalResult.metaPedidos) : 1;
+  const cumplimientoGeneral = money(((cumplimientoVentas + cumplimientoPedidos) / 2) * 100) / 100;
+  const feedback = cumplimientoGeneral >= 0.9
+    ? "Desempeno sobresaliente para el periodo."
+    : cumplimientoGeneral >= 0.65
+      ? "Desempeno en rango esperado; mantener seguimiento operativo."
+      : "Desempeno por debajo del umbral; requiere seguimiento de RR.HH.";
+
+  return {
+    trabajadorUid: worker.uid,
+    trabajadorNombre: workerDisplayName(worker),
+    trabajadorEmail: worker.email || "",
+    periodo,
+    ventasCantidad: sales.length,
+    ventasTotal,
+    gananciaTotal,
+    unidadesVendidas,
+    pedidosGestionados,
+    metaVentas: goalResult.metaVentas,
+    metaPedidos: goalResult.metaPedidos,
+    cumplimientoVentas: money(cumplimientoVentas * 100),
+    cumplimientoPedidos: money(cumplimientoPedidos * 100),
+    cumplimientoGeneral: money(cumplimientoGeneral * 100),
+    feedback,
+  };
+}
+
+async function fetchWorkerProfiles(supabase) {
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select("uid,nombres,apellidos,nombre,email,rol")
+    .eq("rol", "trabajador")
+    .order("nombre");
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function fetchAllWorkerPerformances(supabase, period) {
+  const workers = await fetchWorkerProfiles(supabase);
+  return Promise.all(workers.map((worker) => fetchWorkerPerformance(supabase, worker, period)));
+}
+
+function sanitizeStorageFilename(fileName) {
+  return String(fileName || "informe.pdf")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 80) || "informe.pdf";
+}
+
 app.get("/admin/dailySales", (req, res) => {
   cors(req, res, async () => {
     if (req.method !== "GET") {
@@ -1275,6 +1426,356 @@ app.get("/admin/dailySales", (req, res) => {
       return res.status(200).json({ sales });
     } catch (error) {
       console.error("admin/dailySales error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/staff/performance", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertStaffRole(supabase, decodedToken.uid);
+      const period = validPeriod(String(req.query.periodo || ""));
+      const { data: worker, error } = await supabase
+        .from("usuarios")
+        .select("uid,nombres,apellidos,nombre,email,rol")
+        .eq("uid", decodedToken.uid)
+        .maybeSingle();
+      if (error) throw error;
+      if (!worker) {
+        throw Object.assign(new Error("Perfil de trabajador no encontrado"), { status: 404 });
+      }
+      const performance = await fetchWorkerPerformance(supabase, worker, period);
+      return res.status(200).json({ performance });
+    } catch (error) {
+      console.error("staff/performance error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/hr/dashboard", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertHrRole(supabase, decodedToken.uid);
+      const period = validPeriod(String(req.query.periodo || ""));
+      const [performances, alertsResult, reportsResult, actionsResult] = await Promise.all([
+        fetchAllWorkerPerformances(supabase, period),
+        supabase.from("rrhh_alertas").select("*").eq("periodo", period).order("creadoEn", { ascending: false }),
+        supabase.from("rrhh_informes_psicologicos").select("*").eq("periodo", period).order("creadoEn", { ascending: false }),
+        supabase.from("rrhh_acciones").select("*").order("creadoEn", { ascending: false }).limit(200),
+      ]);
+      if (alertsResult.error) throw alertsResult.error;
+      if (reportsResult.error) throw reportsResult.error;
+      if (actionsResult.error) throw actionsResult.error;
+      return res.status(200).json({
+        period,
+        workers: performances,
+        alerts: alertsResult.data ?? [],
+        reports: reportsResult.data ?? [],
+        actions: actionsResult.data ?? [],
+      });
+    } catch (error) {
+      console.error("hr/dashboard error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/hr/alerts/generate", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertHrRole(supabase, decodedToken.uid);
+      const period = validPeriod(String(req.body?.periodo || ""));
+      const threshold = Math.min(95, Math.max(10, Number(req.body?.threshold ?? 65))) || 65;
+      const performances = await fetchAllWorkerPerformances(supabase, period);
+      const generated = [];
+
+      for (const metrics of performances) {
+        if (Number(metrics.cumplimientoGeneral) >= threshold) continue;
+        const existing = await supabase
+          .from("rrhh_alertas")
+          .select("*")
+          .eq("trabajadorUid", metrics.trabajadorUid)
+          .eq("periodo", period)
+          .eq("tipo", "rendimiento_bajo")
+          .maybeSingle();
+        if (existing.error) throw existing.error;
+
+        const payload = {
+          trabajadorUid: metrics.trabajadorUid,
+          trabajadorNombre: metrics.trabajadorNombre,
+          trabajadorEmail: metrics.trabajadorEmail,
+          periodo: period,
+          tipo: "rendimiento_bajo",
+          motivoGeneral: "Desempeno mensual bajo el umbral operativo definido para seguimiento.",
+          metricas: metrics,
+          actualizadoEn: new Date().toISOString(),
+        };
+
+        if (existing.data) {
+          const { data, error } = await supabase
+            .from("rrhh_alertas")
+            .update(payload)
+            .eq("id", existing.data.id)
+            .select("*")
+            .single();
+          if (error) throw error;
+          generated.push(data);
+        } else {
+          const { data, error } = await supabase
+            .from("rrhh_alertas")
+            .insert({
+              ...payload,
+              estado: "pendiente_psicologo",
+              creadoPorUid: decodedToken.uid,
+              creadoPorEmail: decodedToken.email || "",
+              creadoEn: new Date().toISOString(),
+            })
+            .select("*")
+            .single();
+          if (error) throw error;
+          generated.push(data);
+        }
+      }
+
+      await logAuditFn(
+        supabase,
+        "crear",
+        "rrhh_alerta",
+        period,
+        "Generacion de alertas RR.HH.",
+        decodedToken.uid,
+        decodedToken.email || "",
+        { period, threshold, generated: generated.length },
+      );
+      return res.status(200).json({ alerts: generated });
+    } catch (error) {
+      console.error("hr/alerts/generate error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/hr/actions", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertHrRole(supabase, decodedToken.uid);
+      const { alertaId, tipoAccion, descripcion } = req.body || {};
+      const allowed = new Set(["capacitacion", "redistribucion_tareas", "derivacion_formal", "observacion", "cerrar_seguimiento"]);
+      if (!isNonEmptyString(alertaId, 80) || !allowed.has(tipoAccion) || !isNonEmptyString(descripcion, 1200)) {
+        return res.status(400).json({ error: "Datos de accion invalidos" });
+      }
+      const { data: alert, error: alertError } = await supabase
+        .from("rrhh_alertas")
+        .select("*")
+        .eq("id", alertaId)
+        .maybeSingle();
+      if (alertError) throw alertError;
+      if (!alert) return res.status(404).json({ error: "Alerta no encontrada" });
+
+      const { data, error } = await supabase
+        .from("rrhh_acciones")
+        .insert({
+          alertaId,
+          trabajadorUid: alert.trabajadorUid,
+          tipoAccion,
+          descripcion: String(descripcion).trim(),
+          responsableUid: decodedToken.uid,
+          responsableEmail: decodedToken.email || "",
+          creadoEn: new Date().toISOString(),
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+
+      const nextStatus = tipoAccion === "cerrar_seguimiento" ? "cerrada" : "accion_rrhh";
+      const { error: updateError } = await supabase
+        .from("rrhh_alertas")
+        .update({ estado: nextStatus, actualizadoEn: new Date().toISOString() })
+        .eq("id", alertaId);
+      if (updateError) throw updateError;
+
+      await logAuditFn(
+        supabase,
+        "cambiar_estado",
+        "rrhh_alerta",
+        alertaId,
+        tipoAccion,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { tipoAccion },
+      );
+      return res.status(200).json({ action: data });
+    } catch (error) {
+      console.error("hr/actions error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/hr/reports/:reportId/download-url", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertHrRole(supabase, decodedToken.uid);
+      const reportId = String(req.params.reportId || "").trim();
+      const { data: report, error } = await supabase
+        .from("rrhh_informes_psicologicos")
+        .select("*")
+        .eq("id", reportId)
+        .maybeSingle();
+      if (error) throw error;
+      if (!report) return res.status(404).json({ error: "Informe no encontrado" });
+      const signed = await supabase.storage.from("rrhh-informes").createSignedUrl(report.pdfPath, 300);
+      if (signed.error) throw signed.error;
+      return res.status(200).json({ signedUrl: signed.data?.signedUrl ?? "" });
+    } catch (error) {
+      console.error("hr/reports download error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/psychology/alerts", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertPsychologistRole(supabase, decodedToken.uid);
+      const period = validPeriod(String(req.query.periodo || ""));
+      const [alertsResult, reportsResult] = await Promise.all([
+        supabase
+          .from("rrhh_alertas")
+          .select("*")
+          .eq("periodo", period)
+          .in("estado", ["pendiente_psicologo", "evaluada", "accion_rrhh"])
+          .order("creadoEn", { ascending: false }),
+        supabase
+          .from("rrhh_informes_psicologicos")
+          .select("*")
+          .eq("periodo", period)
+          .order("creadoEn", { ascending: false }),
+      ]);
+      if (alertsResult.error) throw alertsResult.error;
+      if (reportsResult.error) throw reportsResult.error;
+      return res.status(200).json({
+        period,
+        alerts: alertsResult.data ?? [],
+        reports: reportsResult.data ?? [],
+      });
+    } catch (error) {
+      console.error("psychology/alerts error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/psychology/reports/upload-url", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertPsychologistRole(supabase, decodedToken.uid);
+      const { alertaId, fileName, contentType } = req.body || {};
+      if (!isNonEmptyString(alertaId, 80) || contentType !== "application/pdf") {
+        return res.status(400).json({ error: "Solo se aceptan informes PDF" });
+      }
+      const { data: alert, error: alertError } = await supabase
+        .from("rrhh_alertas")
+        .select("id")
+        .eq("id", alertaId)
+        .maybeSingle();
+      if (alertError) throw alertError;
+      if (!alert) return res.status(404).json({ error: "Alerta no encontrada" });
+
+      const safeFile = sanitizeStorageFilename(fileName);
+      const path = `informes/${alertaId}/${Date.now()}-${safeFile.endsWith(".pdf") ? safeFile : `${safeFile}.pdf`}`;
+      const signed = await supabase.storage.from("rrhh-informes").createSignedUploadUrl(path, { upsert: true });
+      if (signed.error) throw signed.error;
+      return res.status(200).json({
+        bucket: "rrhh-informes",
+        path,
+        token: signed.data?.token,
+        signedUrl: signed.data?.signedUrl,
+      });
+    } catch (error) {
+      console.error("psychology upload-url error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/psychology/reports", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertPsychologistRole(supabase, decodedToken.uid);
+      const { alertaId, resumen, recomendacion, pdfPath, pdfNombre } = req.body || {};
+      if (
+        !isNonEmptyString(alertaId, 80)
+        || !isNonEmptyString(resumen, 2000)
+        || !isNonEmptyString(recomendacion, 2000)
+        || !isNonEmptyString(pdfPath, 240)
+        || !String(pdfPath).startsWith(`informes/${alertaId}/`)
+      ) {
+        return res.status(400).json({ error: "Informe psicologico incompleto" });
+      }
+      const { data: alert, error: alertError } = await supabase
+        .from("rrhh_alertas")
+        .select("*")
+        .eq("id", alertaId)
+        .maybeSingle();
+      if (alertError) throw alertError;
+      if (!alert) return res.status(404).json({ error: "Alerta no encontrada" });
+
+      const { data, error } = await supabase
+        .from("rrhh_informes_psicologicos")
+        .insert({
+          alertaId,
+          trabajadorUid: alert.trabajadorUid,
+          periodo: alert.periodo,
+          psicologoUid: decodedToken.uid,
+          psicologoEmail: decodedToken.email || "",
+          resumen: String(resumen).trim(),
+          recomendacion: String(recomendacion).trim(),
+          pdfPath,
+          pdfNombre: sanitizeStorageFilename(pdfNombre || "informe.pdf"),
+          creadoEn: new Date().toISOString(),
+        })
+        .select("*")
+        .single();
+      if (error) throw error;
+
+      const { error: updateError } = await supabase
+        .from("rrhh_alertas")
+        .update({ estado: "evaluada", actualizadoEn: new Date().toISOString() })
+        .eq("id", alertaId);
+      if (updateError) throw updateError;
+
+      await logAuditFn(
+        supabase,
+        "crear",
+        "rrhh_informe",
+        data.id,
+        alert.trabajadorNombre || alert.trabajadorUid,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { alertaId },
+      );
+      return res.status(200).json({ report: data });
+    } catch (error) {
+      console.error("psychology/reports error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });

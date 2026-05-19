@@ -5901,6 +5901,220 @@ button.order-card-header {
   .staff-workbench { grid-template-columns: 1fr; }
 }
 
+.hr-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  color: var(--text);
+}
+.hr-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-md);
+  background:
+    radial-gradient(circle at top left, rgba(59,130,246,0.14), transparent 34%),
+    var(--white);
+  box-shadow: 0 18px 42px rgba(0,0,0,0.055);
+}
+.hr-hero span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--gold-dark);
+  font-size: 12px;
+  font-weight: 850;
+  letter-spacing: 0.65px;
+  text-transform: uppercase;
+}
+.hr-hero h1 {
+  margin: 0.35rem 0;
+  color: var(--text);
+  font-size: clamp(1.55rem, 3vw, 2.25rem);
+}
+.hr-hero p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--text-muted);
+}
+.hr-period-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: end;
+  justify-content: flex-end;
+}
+.hr-period-control label,
+.hr-form-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.45px;
+}
+.hr-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(330px, 0.45fr);
+  gap: 1rem;
+  align-items: start;
+}
+.hr-panel-grid-wide {
+  grid-template-columns: minmax(0, 1.25fr) minmax(330px, 0.55fr);
+}
+.hr-panel-card {
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  box-shadow: 0 16px 38px rgba(0,0,0,0.05);
+}
+.hr-feedback-card {
+  background: linear-gradient(135deg, rgba(201,162,39,0.12), rgba(255,255,255,0.96));
+}
+.hr-feedback-card p {
+  margin: 0 0 0.35rem;
+  color: var(--gold-dark);
+  font-size: 12px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.hr-feedback-card h2 {
+  margin: 0;
+  color: var(--text);
+}
+.hr-feedback-card span {
+  display: block;
+  margin-top: 0.6rem;
+  color: var(--text-muted);
+}
+.hr-progress-list {
+  display: grid;
+  gap: 1rem;
+}
+.hr-progress-list > div {
+  display: grid;
+  gap: 0.35rem;
+}
+.hr-progress-list span,
+.hr-progress-list small {
+  color: var(--text-muted);
+}
+.hr-progress-list strong {
+  color: var(--text);
+}
+.hr-progress-bar {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--border) 70%, transparent);
+}
+.hr-progress-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--gold), #2563eb);
+}
+.hr-worker-list,
+.hr-alert-list,
+.hr-report-list,
+.hr-form-card {
+  display: grid;
+  gap: 0.7rem;
+}
+.hr-worker-item {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(82px, auto));
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-alt) 42%, var(--white));
+}
+.hr-worker-item strong,
+.hr-selected-worker strong,
+.hr-report-item strong {
+  display: block;
+  color: var(--text);
+}
+.hr-worker-item span,
+.hr-worker-item small,
+.hr-selected-worker span,
+.hr-report-item span,
+.hr-report-item small {
+  color: var(--text-muted);
+}
+.hr-alert-item {
+  display: grid;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.hr-alert-item.active {
+  border-color: rgba(201,162,39,0.42);
+  background: rgba(201,162,39,0.08);
+}
+.hr-alert-item > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--gold-dark);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.hr-alert-item small,
+.hr-alert-item em {
+  color: var(--text-muted);
+  font-style: normal;
+}
+.hr-selected-worker {
+  padding: 0.8rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-alt) 55%, var(--white));
+}
+.hr-report-item {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-alt) 36%, var(--white));
+}
+.hr-report-item p {
+  margin: 0;
+  color: var(--text);
+}
+.hr-report-item button {
+  justify-self: start;
+}
+.hr-form-card textarea {
+  min-height: 104px;
+  resize: vertical;
+}
+@media (max-width: 900px) {
+  .hr-hero,
+  .hr-panel-grid,
+  .hr-panel-grid-wide {
+    grid-template-columns: 1fr;
+  }
+  .hr-worker-item {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
 /* ── Dashboard Mejorado ─────────────────────────────────────────────────── */
 
 .dash-root { display: flex; flex-direction: column; gap: 1.5rem; }
@@ -8407,6 +8621,8 @@ dialog.admin-color-popover { margin: 0; max-width: none; }
 .admin-role-badge.cliente { background: #dcfce7; color: #166534; }
 .admin-role-badge.usuario { background: #e0f2fe; color: #075985; }
 .admin-role-badge.trabajador { background: #fef3c7; color: #92400e; }
+.admin-role-badge.psicologo { background: #ede9fe; color: #6d28d9; }
+.admin-role-badge.rrhh { background: #dbeafe; color: #1d4ed8; }
 .admin-role-control { display: flex; align-items: center; gap: 0.55rem; min-width: 250px; }
 .admin-role-select { width: 145px; min-height: 36px; padding: 0 0.55rem; font-size: 13px; }
 .admin-size-stock-grid {

@@ -11,7 +11,7 @@ function ScrollToTop() {
 }
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
-import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "./routes/paths";
+import { ADMIN_ROUTES, CLIENT_ROUTES, HR_ROUTES, INFO_ROUTES, PSYCHOLOGY_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "./routes/paths";
 import { CATALOG_SHELF } from "./routes/catalogRouting";
 import { AreaRoute, AuthenticatedRoute, PageLoader } from "./routes/RouteGuards";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
@@ -30,6 +30,11 @@ const AdminData = lazy(() => import("@/domains/administradores/pages/AdminData")
 
 const StaffLayout = lazy(() => import("@/domains/trabajadores/components/StaffLayout"));
 const StaffHomePage = lazy(() => import("@/domains/trabajadores/pages/StaffHomePage"));
+const StaffPerformancePage = lazy(() => import("@/domains/trabajadores/pages/StaffPerformancePage"));
+const PsychologyLayout = lazy(() => import("@/domains/psicologos/components/PsychologyLayout"));
+const PsychologyDashboard = lazy(() => import("@/domains/psicologos/pages/PsychologyDashboard"));
+const HrLayout = lazy(() => import("@/domains/rrhh/components/HrLayout"));
+const HrDashboard = lazy(() => import("@/domains/rrhh/pages/HrDashboard"));
 
 const HomePage = lazy(() => import("@/domains/publico/pages/HomePage"));
 const ProductsPage = lazy(() => import("@/domains/productos/pages/ProductsPage"));
@@ -144,6 +149,19 @@ export default function App() {
             <Route index element={<StaffHomePage />} />
             <Route path="pedidos" element={<AdminOrders />} />
             <Route path="ventas" element={<AdminSales />} />
+            <Route path="desempeno" element={<StaffPerformancePage />} />
+          </Route>
+          <Route
+            path={PSYCHOLOGY_ROUTES.root}
+            element={<AreaRoute area="psicologos"><PsychologyLayout /></AreaRoute>}
+          >
+            <Route index element={<PsychologyDashboard />} />
+          </Route>
+          <Route
+            path={HR_ROUTES.root}
+            element={<AreaRoute area="rrhh"><HrLayout /></AreaRoute>}
+          >
+            <Route index element={<HrDashboard />} />
           </Route>
           <Route
             path={ADMIN_ROUTES.root}
