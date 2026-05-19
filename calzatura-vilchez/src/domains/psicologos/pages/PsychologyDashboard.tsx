@@ -29,6 +29,12 @@ function currency(value: number) {
   return `S/ ${Number(value || 0).toFixed(2)}`;
 }
 
+function formatCita(fechaCita: string) {
+  const value = new Date(fechaCita);
+  if (Number.isNaN(value.getTime())) return fechaCita;
+  return value.toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "full", timeStyle: "short" });
+}
+
 export default function PsychologyDashboard() {
   const [period, setPeriod] = useState(currentPeriod);
   const [alerts, setAlerts] = useState<HrAlert[]>([]);
@@ -43,6 +49,7 @@ export default function PsychologyDashboard() {
   const [lugar, setLugar] = useState("Consultorio / sala de evaluación");
   const [notasCita, setNotasCita] = useState("");
   const [saving, setSaving] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
 
   const reportsByAlert = useMemo(() => {
     return reports.reduce<Record<string, PsychologicalReport[]>>((acc, report) => {
@@ -63,7 +70,7 @@ export default function PsychologyDashboard() {
 
   const load = useCallback(() => {
     setLoading(true);
-    fetchPsychologyAlerts(period)
+    fetchPsychologyAlerts(period, { includeClosed: showClosed })
       .then((data) => {
         setAlerts(data.alerts);
         setReports(data.reports);
@@ -77,7 +84,7 @@ export default function PsychologyDashboard() {
         setAppointments([]);
       })
       .finally(() => setLoading(false));
-  }, [period]);
+  }, [period, showClosed]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -98,7 +105,7 @@ export default function PsychologyDashboard() {
     try {
       await schedulePsychologyAppointment({
         alertaId: selectedAlert.id,
-        fechaCita: new Date(fechaCita).toISOString(),
+        fechaCita,
         lugar,
         notas: notasCita.trim() || undefined,
       });
@@ -179,6 +186,14 @@ export default function PsychologyDashboard() {
             value={period}
             onChange={(event) => setPeriod(event.target.value || currentPeriod())}
           />
+          <label className="hr-checkbox">
+            <input
+              type="checkbox"
+              checked={showClosed}
+              onChange={(event) => setShowClosed(event.target.checked)}
+            />
+            Incluir casos cerrados
+          </label>
         </div>
       </section>
 
@@ -275,7 +290,7 @@ export default function PsychologyDashboard() {
                 {(appointmentsByAlert[selectedAlert.id] ?? []).map((cita) => (
                   <div key={cita.id} className="hr-appointment-item">
                     <div>
-                      <strong>{new Date(cita.fechaCita).toLocaleString("es-PE")}</strong>
+                      <strong>{formatCita(cita.fechaCita)}</strong>
                       <span>{cita.lugar} · {cita.estado}</span>
                     </div>
                     {cita.estado === "programada" && (

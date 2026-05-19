@@ -1347,16 +1347,18 @@ async function fetchWorkerGoal(supabase, worker, period) {
     .select("*")
     .eq("trabajadorUid", worker.uid)
     .eq("periodo", period)
-    .maybeSingle();
+    .order("actualizadoEn", { ascending: false })
+    .limit(1);
   if (error) {
     if (isRecoverableSupabaseError(error)) {
       return { metaVentas: 3500, metaPedidos: 20 };
     }
     throw error;
   }
+  const row = data?.[0];
   return {
-    metaVentas: Number(data?.metaVentas ?? 3500) || 3500,
-    metaPedidos: Number(data?.metaPedidos ?? 20) || 20,
+    metaVentas: Number(row?.metaVentas ?? 3500) || 3500,
+    metaPedidos: Number(row?.metaPedidos ?? 20) || 20,
   };
 }
 
@@ -1393,10 +1395,9 @@ async function fetchWorkerPerformance(supabase, worker, period) {
       .limit(1000),
     supabase
       .from("auditoria")
-      .select("entidadId,realizadoEn")
+      .select("entidadId,realizadoEn,accion")
       .eq("usuarioUid", worker.uid)
       .eq("entidad", "pedido")
-      .eq("accion", "cambiar_estado")
       .gte("realizadoEn", bounds.startISO)
       .lt("realizadoEn", bounds.nextISO)
       .limit(1000),
@@ -1408,18 +1409,19 @@ async function fetchWorkerPerformance(supabase, worker, period) {
   const sales = salesResult.error
     ? []
     : (salesResult.data ?? []).filter((sale) => !sale.devuelto);
-  const pedidosGestionados = auditResult.error
+  const pedidosAudit = auditResult.error
     ? 0
     : new Set((auditResult.data ?? []).map((item) => item.entidadId).filter(Boolean)).size;
+  const operacionesTienda = Math.max(pedidosAudit, sales.length);
   const ventasTotal = money(sales.reduce((acc, sale) => acc + Number(sale.total || 0), 0));
   const gananciaTotal = money(sales.reduce((acc, sale) => acc + Number(sale.ganancia || 0), 0));
   const unidadesVendidas = sales.reduce((acc, sale) => acc + Number(sale.cantidad || 0), 0);
   const cumplimientoVentas = goalResult.metaVentas > 0 ? Math.min(1, ventasTotal / goalResult.metaVentas) : 1;
-  const cumplimientoPedidos = goalResult.metaPedidos > 0 ? Math.min(1, pedidosGestionados / goalResult.metaPedidos) : 1;
-  const cumplimientoGeneral = money(((cumplimientoVentas + cumplimientoPedidos) / 2) * 100) / 100;
-  const feedback = cumplimientoGeneral >= 0.9
+  const cumplimientoPedidos = goalResult.metaPedidos > 0 ? Math.min(1, operacionesTienda / goalResult.metaPedidos) : 1;
+  const cumplimientoPct = money(((cumplimientoVentas + cumplimientoPedidos) / 2) * 100);
+  const feedback = cumplimientoPct >= 90
     ? "Desempeno sobresaliente para el periodo."
-    : cumplimientoGeneral >= 0.65
+    : cumplimientoPct >= 65
       ? "Desempeno en rango esperado; mantener seguimiento operativo."
       : "Desempeno por debajo del umbral; requiere seguimiento de RR.HH.";
 
@@ -1432,12 +1434,12 @@ async function fetchWorkerPerformance(supabase, worker, period) {
     ventasTotal,
     gananciaTotal,
     unidadesVendidas,
-    pedidosGestionados,
+    pedidosGestionados: operacionesTienda,
     metaVentas: goalResult.metaVentas,
     metaPedidos: goalResult.metaPedidos,
     cumplimientoVentas: money(cumplimientoVentas * 100),
     cumplimientoPedidos: money(cumplimientoPedidos * 100),
-    cumplimientoGeneral: money(cumplimientoGeneral * 100),
+    cumplimientoGeneral: cumplimientoPct,
     feedback,
   };
 }
@@ -1457,16 +1459,7 @@ async function fetchWorkerProfiles(supabase) {
 
 async function fetchAllWorkerPerformances(supabase, period) {
   const workers = await fetchWorkerProfiles(supabase);
-  return Promise.all(
-    workers.map(async (worker) => {
-      try {
-        return await fetchWorkerPerformance(supabase, worker, period);
-      } catch (error) {
-        console.warn(`fetchWorkerPerformance ${worker.uid}:`, error?.message || error);
-        return defaultWorkerPerformance(worker, period);
-      }
-    }),
-  );
+  return Promise.all(workers.map((worker) => safeWorkerPerformance(supabase, worker, period)));
 }
 
 async function fetchWorkerSalesForPeriod(supabase, workerUid, period, options = {}) {
@@ -1529,13 +1522,95 @@ async function buildWorkerDailyHistory(supabase, workerUid, period) {
   }
 }
 
+const PERU_TIMEZONE = "America/Lima";
+
+function peruDatetimeLocalToISO(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const normalized = raw.length === 16 ? `${raw}:00` : raw;
+  const withTz = /[zZ]|[+-]\d{2}:\d{2}$/.test(normalized) ? normalized : `${normalized}-05:00`;
+  const date = new Date(withTz);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
 function formatCitaForMessage(fechaCita) {
   const value = new Date(fechaCita);
   if (Number.isNaN(value.getTime())) return fechaCita;
   return value.toLocaleString("es-PE", {
+    timeZone: PERU_TIMEZONE,
     dateStyle: "full",
     timeStyle: "short",
   });
+}
+
+async function safeWorkerPerformance(supabase, worker, period) {
+  try {
+    return await fetchWorkerPerformance(supabase, worker, period);
+  } catch (error) {
+    console.warn(`safeWorkerPerformance ${worker.uid}:`, error?.message || error);
+    return defaultWorkerPerformance(worker, period);
+  }
+}
+
+async function findHrAlertId(supabase, filters) {
+  let query = supabase.from("rrhh_alertas").select("id");
+  for (const [key, value] of Object.entries(filters)) {
+    query = query.eq(key, value);
+  }
+  const { data, error } = await query.order("creadoEn", { ascending: false }).limit(1);
+  if (error) throw error;
+  return data?.[0]?.id ?? null;
+}
+
+function pickPrimaryAlert(alerts) {
+  const priority = { manual: 3, rendimiento_bajo: 2, seguimiento: 1 };
+  return [...alerts].sort((a, b) => {
+    const diff = (priority[b.tipo] ?? 0) - (priority[a.tipo] ?? 0);
+    if (diff !== 0) return diff;
+    return String(b.creadoEn || "").localeCompare(String(a.creadoEn || ""));
+  })[0] ?? null;
+}
+
+function groupAlertsByWorker(alerts) {
+  const grouped = new Map();
+  for (const alert of alerts) {
+    const list = grouped.get(alert.trabajadorUid) ?? [];
+    list.push(alert);
+    grouped.set(alert.trabajadorUid, list);
+  }
+  return Array.from(grouped.entries()).map(([trabajadorUid, workerAlerts]) => ({
+    trabajadorUid,
+    trabajadorNombre: workerAlerts[0]?.trabajadorNombre ?? "",
+    alerts: workerAlerts,
+    primaryAlert: pickPrimaryAlert(workerAlerts),
+  }));
+}
+
+async function enrichAlertsWithLiveMetrics(supabase, alerts, period) {
+  const workerUids = [...new Set(alerts.map((alert) => alert.trabajadorUid).filter(Boolean))];
+  if (workerUids.length === 0) return alerts;
+
+  const { data: workers, error } = await supabase
+    .from("usuarios")
+    .select("uid,nombres,apellidos,nombre,email,rol")
+    .in("uid", workerUids);
+  if (error) {
+    console.warn("enrichAlertsWithLiveMetrics:", error.message || error);
+    return alerts;
+  }
+
+  const metricsByUid = new Map();
+  await Promise.all(
+    (workers ?? []).map(async (worker) => {
+      metricsByUid.set(worker.uid, await safeWorkerPerformance(supabase, worker, period));
+    }),
+  );
+
+  return alerts.map((alert) => ({
+    ...alert,
+    metricas: metricsByUid.get(alert.trabajadorUid) ?? alert.metricas,
+  }));
 }
 
 async function createStaffNotification(supabase, payload) {
@@ -1694,13 +1769,7 @@ app.get("/staff/performance", (req, res) => {
       if (!worker) {
         throw Object.assign(new Error("Perfil de trabajador no encontrado"), { status: 404 });
       }
-      let performance;
-      try {
-        performance = await fetchWorkerPerformance(supabase, worker, period);
-      } catch (perfError) {
-        console.warn("staff/performance metrics:", perfError?.message || perfError);
-        performance = defaultWorkerPerformance(worker, period);
-      }
+      const performance = await safeWorkerPerformance(supabase, worker, period);
       const [historialDiario, notificaciones, citas, workflow] = await Promise.all([
         buildWorkerDailyHistory(supabase, worker.uid, period),
         fetchStaffNotifications(supabase, worker.uid),
@@ -1755,6 +1824,7 @@ app.get("/hr/dashboard", (req, res) => {
         period,
         workers: performances,
         alerts,
+        alertGroups: groupAlertsByWorker(alerts),
         reports,
         actions,
         appointments,
@@ -1780,14 +1850,11 @@ app.post("/hr/alerts/generate", (req, res) => {
 
       for (const metrics of performances) {
         if (Number(metrics.cumplimientoGeneral) >= threshold) continue;
-        const existing = await supabase
-          .from("rrhh_alertas")
-          .select("*")
-          .eq("trabajadorUid", metrics.trabajadorUid)
-          .eq("periodo", period)
-          .eq("tipo", "rendimiento_bajo")
-          .maybeSingle();
-        if (existing.error) throw existing.error;
+        const existingId = await findHrAlertId(supabase, {
+          trabajadorUid: metrics.trabajadorUid,
+          periodo: period,
+          tipo: "rendimiento_bajo",
+        });
 
         const payload = {
           trabajadorUid: metrics.trabajadorUid,
@@ -1800,18 +1867,29 @@ app.post("/hr/alerts/generate", (req, res) => {
           actualizadoEn: new Date().toISOString(),
         };
 
-        if (existing.data) {
+        if (existingId) {
           const { data, error } = await supabase
             .from("rrhh_alertas")
             .update({
               ...payload,
               estado: "pendiente_psicologo",
             })
-            .eq("id", existing.data.id)
+            .eq("id", existingId)
             .select("*")
             .single();
           if (error) throw error;
           generated.push(data);
+          try {
+            await createStaffNotification(supabase, {
+              destinatarioUid: metrics.trabajadorUid,
+              tipo: "derivacion_rrhh",
+              titulo: "Seguimiento de desempeño reabierto",
+              mensaje: "RR.HH. reactivó el seguimiento de tu desempeño del periodo. El psicólogo podrá contactarte si corresponde.",
+              metadata: { alertaId: data.id, periodo: period },
+            });
+          } catch (notifyError) {
+            console.warn("hr/alerts/generate notify update:", notifyError?.message || notifyError);
+          }
         } else {
           const { data, error } = await supabase
             .from("rrhh_alertas")
@@ -1878,13 +1956,7 @@ app.post("/hr/alerts/refer", (req, res) => {
       if (workerError) throw workerError;
       if (!worker) return res.status(404).json({ error: "Trabajador no encontrado" });
 
-      let metrics;
-      try {
-        metrics = await fetchWorkerPerformance(supabase, worker, period);
-      } catch (perfError) {
-        console.warn("hr/alerts/refer metrics:", perfError?.message || perfError);
-        metrics = defaultWorkerPerformance(worker, period);
-      }
+      const metrics = await safeWorkerPerformance(supabase, worker, period);
       const existing = await supabase
         .from("rrhh_alertas")
         .select("id")
@@ -2001,13 +2073,7 @@ app.get("/hr/workers/:workerUid/history", (req, res) => {
       if (workerError) throw workerError;
       if (!worker) return res.status(404).json({ error: "Trabajador no encontrado" });
 
-      let performance;
-      try {
-        performance = await fetchWorkerPerformance(supabase, worker, period);
-      } catch (perfError) {
-        console.warn("hr/workers history performance:", perfError?.message || perfError, perfError?.details || "");
-        performance = defaultWorkerPerformance(worker, period);
-      }
+      const performance = await safeWorkerPerformance(supabase, worker, period);
       const historialDiario = await buildWorkerDailyHistory(supabase, workerUid, period);
       return res.status(200).json({ performance, historialDiario });
     } catch (error) {
@@ -2178,16 +2244,17 @@ app.get("/psychology/alerts", (req, res) => {
       const supabase = getSupabaseAdmin();
       await assertPsychologistRole(supabase, decodedToken.uid);
       const period = validPeriod(String(req.query.periodo || ""));
+      const includeClosed = String(req.query.incluirCerradas || "") === "1";
+      let alertsQuery = supabase
+        .from("rrhh_alertas")
+        .select("*")
+        .eq("periodo", period)
+        .order("creadoEn", { ascending: false });
+      if (!includeClosed) {
+        alertsQuery = alertsQuery.in("estado", ["pendiente_psicologo", "evaluada", "accion_rrhh"]);
+      }
       const [alerts, reports, allAppointments] = await Promise.all([
-        supabaseRows(
-          supabase
-            .from("rrhh_alertas")
-            .select("*")
-            .eq("periodo", period)
-            .in("estado", ["pendiente_psicologo", "evaluada", "accion_rrhh"])
-            .order("creadoEn", { ascending: false }),
-          "rrhh_alertas",
-        ),
+        supabaseRows(alertsQuery, "rrhh_alertas"),
         supabaseRows(
           supabase
             .from("rrhh_informes_psicologicos")
@@ -2205,11 +2272,12 @@ app.get("/psychology/alerts", (req, res) => {
           "rrhh_citas",
         ),
       ]);
-      const alertIds = new Set(alerts.map((row) => row.id));
+      const enrichedAlerts = await enrichAlertsWithLiveMetrics(supabase, alerts, period);
+      const alertIds = new Set(enrichedAlerts.map((row) => row.id));
       const appointments = allAppointments.filter((cita) => alertIds.has(cita.alertaId));
       return res.status(200).json({
         period,
-        alerts,
+        alerts: enrichedAlerts,
         reports,
         appointments,
       });
@@ -2271,8 +2339,8 @@ app.post("/psychology/appointments", (req, res) => {
       if (!isNonEmptyString(alertaId, 80) || !isNonEmptyString(fechaCita, 40)) {
         return res.status(400).json({ error: "Cita incompleta" });
       }
-      const citaDate = new Date(fechaCita);
-      if (Number.isNaN(citaDate.getTime())) {
+      const citaIso = peruDatetimeLocalToISO(fechaCita);
+      if (!citaIso) {
         return res.status(400).json({ error: "Fecha de cita invalida" });
       }
       const { data: alert, error: alertError } = await supabase
@@ -2291,7 +2359,7 @@ app.post("/psychology/appointments", (req, res) => {
           trabajadorUid: alert.trabajadorUid,
           psicologoUid: decodedToken.uid,
           psicologoEmail: decodedToken.email || "",
-          fechaCita: citaDate.toISOString(),
+          fechaCita: citaIso,
           lugar: lugarFinal,
           notas: isNonEmptyString(notas, 800) ? String(notas).trim() : null,
           estado: "programada",
@@ -2302,13 +2370,17 @@ app.post("/psychology/appointments", (req, res) => {
         .single();
       if (error) throw error;
 
-      await createStaffNotification(supabase, {
-        destinatarioUid: alert.trabajadorUid,
-        tipo: "cita_psicologo",
-        titulo: "Cita de evaluación programada",
-        mensaje: `Tu cita está programada para el ${formatCitaForMessage(data.fechaCita)} en ${lugarFinal}.`,
-        metadata: { citaId: data.id, alertaId, fechaCita: data.fechaCita, lugar: lugarFinal },
-      });
+      try {
+        await createStaffNotification(supabase, {
+          destinatarioUid: alert.trabajadorUid,
+          tipo: "cita_psicologo",
+          titulo: "Cita de evaluación programada",
+          mensaje: `Tu cita está programada para el ${formatCitaForMessage(data.fechaCita)} en ${lugarFinal}.`,
+          metadata: { citaId: data.id, alertaId, fechaCita: data.fechaCita, lugar: lugarFinal },
+        });
+      } catch (notifyError) {
+        console.warn("psychology/appointments notify:", notifyError?.message || notifyError);
+      }
 
       await logAuditFn(
         supabase,
@@ -2339,6 +2411,17 @@ app.patch("/psychology/appointments/:appointmentId", (req, res) => {
       if (!["programada", "realizada", "cancelada"].includes(estado)) {
         return res.status(400).json({ error: "Estado de cita invalido" });
       }
+      const { data: existing, error: existingError } = await supabase
+        .from("rrhh_citas")
+        .select("*")
+        .eq("id", appointmentId)
+        .maybeSingle();
+      if (existingError) throw existingError;
+      if (!existing) return res.status(404).json({ error: "Cita no encontrada" });
+      if (existing.psicologoUid && existing.psicologoUid !== decodedToken.uid) {
+        return res.status(403).json({ error: "No autorizado para modificar esta cita" });
+      }
+
       const { data, error } = await supabase
         .from("rrhh_citas")
         .update({ estado, actualizadoEn: new Date().toISOString() })
@@ -2347,6 +2430,20 @@ app.patch("/psychology/appointments/:appointmentId", (req, res) => {
         .single();
       if (error) throw error;
       if (!data) return res.status(404).json({ error: "Cita no encontrada" });
+
+      if (estado === "cancelada") {
+        try {
+          await createStaffNotification(supabase, {
+            destinatarioUid: data.trabajadorUid,
+            tipo: "general",
+            titulo: "Cita de evaluación cancelada",
+            mensaje: `La cita del ${formatCitaForMessage(data.fechaCita)} fue cancelada. RR.HH. o el psicólogo te contactará para reprogramar.`,
+            metadata: { citaId: data.id, alertaId: data.alertaId },
+          });
+        } catch (notifyError) {
+          console.warn("psychology/appointments cancel notify:", notifyError?.message || notifyError);
+        }
+      }
       return res.status(200).json({ appointment: data });
     } catch (error) {
       console.error("psychology/appointments patch error:", error);
@@ -2414,23 +2511,45 @@ app.post("/psychology/reports", (req, res) => {
       if (alertError) throw alertError;
       if (!alert) return res.status(404).json({ error: "Alerta no encontrada" });
 
-      const { data, error } = await supabase
+      const { data: priorReports, error: priorError } = await supabase
         .from("rrhh_informes_psicologicos")
-        .insert({
-          alertaId,
-          trabajadorUid: alert.trabajadorUid,
-          periodo: alert.periodo,
-          psicologoUid: decodedToken.uid,
-          psicologoEmail: decodedToken.email || "",
-          resumen: String(resumen).trim(),
-          recomendacion: String(recomendacion).trim(),
-          pdfPath,
-          pdfNombre: sanitizeStorageFilename(pdfNombre || "informe.pdf"),
-          creadoEn: new Date().toISOString(),
-        })
-        .select("*")
-        .single();
-      if (error) throw error;
+        .select("id")
+        .eq("alertaId", alertaId)
+        .order("creadoEn", { ascending: false })
+        .limit(1);
+      if (priorError) throw priorError;
+
+      const reportPayload = {
+        alertaId,
+        trabajadorUid: alert.trabajadorUid,
+        periodo: alert.periodo,
+        psicologoUid: decodedToken.uid,
+        psicologoEmail: decodedToken.email || "",
+        resumen: String(resumen).trim(),
+        recomendacion: String(recomendacion).trim(),
+        pdfPath,
+        pdfNombre: sanitizeStorageFilename(pdfNombre || "informe.pdf"),
+      };
+
+      let data;
+      if (priorReports?.[0]?.id) {
+        const { data: updated, error } = await supabase
+          .from("rrhh_informes_psicologicos")
+          .update(reportPayload)
+          .eq("id", priorReports[0].id)
+          .select("*")
+          .single();
+        if (error) throw error;
+        data = updated;
+      } else {
+        const { data: inserted, error } = await supabase
+          .from("rrhh_informes_psicologicos")
+          .insert({ ...reportPayload, creadoEn: new Date().toISOString() })
+          .select("*")
+          .single();
+        if (error) throw error;
+        data = inserted;
+      }
 
       const { error: updateError } = await supabase
         .from("rrhh_alertas")

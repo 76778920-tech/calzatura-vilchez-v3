@@ -5958,6 +5958,18 @@ button.order-card-header {
   text-transform: uppercase;
   letter-spacing: 0.45px;
 }
+.hr-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 0.45rem !important;
+  text-transform: none;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.hr-checkbox input {
+  width: auto;
+}
 .hr-panel-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(330px, 0.45fr);

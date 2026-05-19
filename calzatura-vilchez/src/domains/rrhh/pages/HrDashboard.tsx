@@ -21,6 +21,7 @@ import {
   generateHrAlerts,
   referWorkerToPsychology,
   upsertWorkerGoal,
+  type HrAlertGroup,
   type HrDashboardPayload,
 } from "@/domains/rrhh/services/humanResources";
 import type { HrAction, HrActionType, HrAlert, PsychologicalReport, WorkerDailySalesRow, WorkerPerformanceMetrics } from "@/types";
@@ -42,6 +43,27 @@ function statusLabel(status: HrAlert["estado"]) {
     cerrada: "Cerrada",
   };
   return labels[status];
+}
+
+function formatCita(fechaCita: string) {
+  const value = new Date(fechaCita);
+  if (Number.isNaN(value.getTime())) return fechaCita;
+  return value.toLocaleString("es-PE", { timeZone: "America/Lima", dateStyle: "short", timeStyle: "short" });
+}
+
+function buildAlertGroups(data: HrDashboardPayload | null): HrAlertGroup[] {
+  if (!data) return [];
+  if (data.alertGroups?.length) return data.alertGroups;
+  const grouped = new Map<string, HrAlert[]>();
+  for (const alert of data.alerts) {
+    grouped.set(alert.trabajadorUid, [...(grouped.get(alert.trabajadorUid) ?? []), alert]);
+  }
+  return Array.from(grouped.entries()).map(([trabajadorUid, alerts]) => ({
+    trabajadorUid,
+    trabajadorNombre: alerts[0]?.trabajadorNombre ?? "",
+    alerts,
+    primaryAlert: alerts.find((item) => item.tipo === "manual") ?? alerts[0],
+  }));
 }
 
 function actionLabel(action: HrActionType) {
@@ -94,7 +116,32 @@ export default function HrDashboard() {
     }, {});
   }, [data?.appointments]);
 
-  const selectedAlert = (data?.alerts ?? []).find((alert) => alert.id === selectedAlertId) ?? data?.alerts[0] ?? null;
+  const alertGroups = useMemo(() => buildAlertGroups(data), [data]);
+
+  const selectedAlert = (data?.alerts ?? []).find((alert) => alert.id === selectedAlertId)
+    ?? alertGroups[0]?.primaryAlert
+    ?? null;
+
+  const selectedWorkerMetrics = selectedAlert
+    ? (data?.workers ?? []).find((worker) => worker.trabajadorUid === selectedAlert.trabajadorUid) ?? null
+    : null;
+
+  const selectedGroup = useMemo(
+    () => alertGroups.find((group) => group.trabajadorUid === selectedAlert?.trabajadorUid) ?? null,
+    [alertGroups, selectedAlert],
+  );
+
+  const selectedGroupActions = useMemo(() => {
+    if (!selectedGroup) return [];
+    return selectedGroup.alerts
+      .flatMap((alert) => actionsByAlert[alert.id] ?? [])
+      .sort((a, b) => String(b.creadoEn).localeCompare(String(a.creadoEn)));
+  }, [selectedGroup, actionsByAlert]);
+
+  const selectedGroupReports = useMemo(() => {
+    if (!selectedGroup) return [];
+    return selectedGroup.alerts.flatMap((alert) => reportsByAlert[alert.id] ?? []);
+  }, [selectedGroup, reportsByAlert]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -126,13 +173,13 @@ export default function HrDashboard() {
 
   const summary = useMemo(() => {
     const workers = data?.workers ?? [];
-    const alerts = data?.alerts ?? [];
     const reports = data?.reports ?? [];
+    const groups = buildAlertGroups(data);
     const avgPerformance = workers.length
       ? Math.round(workers.reduce((acc, item) => acc + item.cumplimientoGeneral, 0) / workers.length)
       : 0;
     const totalPares = workers.reduce((acc, item) => acc + item.unidadesVendidas, 0);
-    return { workers: workers.length, alerts: alerts.length, reports: reports.length, avgPerformance, totalPares };
+    return { workers: workers.length, alerts: groups.length, reports: reports.length, avgPerformance, totalPares };
   }, [data]);
 
   const handleGenerateAlerts = async () => {
@@ -373,26 +420,32 @@ export default function HrDashboard() {
               <p>Historial de alertas</p>
               <h2>Casos derivados</h2>
             </div>
-            <span>{data?.alerts.length ?? 0} caso(s)</span>
+            <span>{alertGroups.length} trabajador(es)</span>
           </div>
           <div className="hr-alert-list">
-            {(data?.alerts ?? []).length === 0 ? (
+            {alertGroups.length === 0 ? (
               <p className="staff-empty-state">No hay alertas para este periodo.</p>
-            ) : data?.alerts.map((alert) => (
-              <button
-                key={alert.id}
-                type="button"
-                className={`hr-alert-item ${selectedAlert?.id === alert.id ? "active" : ""}`}
-                onClick={() => setSelectedAlertId(alert.id)}
-              >
-                <span>{statusLabel(alert.estado)} · {alert.tipo.replaceAll("_", " ")}</span>
-                <strong>{alert.trabajadorNombre}</strong>
-                <small>{alert.motivoGeneral}</small>
-                {(appointmentsByAlert[alert.id] ?? []).length > 0 && (
-                  <em>Cita: {new Date(appointmentsByAlert[alert.id][0].fechaCita).toLocaleString("es-PE")}</em>
-                )}
-              </button>
-            ))}
+            ) : alertGroups.map((group) => {
+              const alert = group.primaryAlert;
+              const relatedIds = group.alerts.map((item) => item.id);
+              const nextAppointment = relatedIds
+                .flatMap((id) => appointmentsByAlert[id] ?? [])
+                .find((cita) => cita.estado === "programada");
+              return (
+                <button
+                  key={group.trabajadorUid}
+                  type="button"
+                  className={`hr-alert-item ${selectedAlert?.trabajadorUid === group.trabajadorUid ? "active" : ""}`}
+                  onClick={() => setSelectedAlertId(alert.id)}
+                >
+                  <span>{statusLabel(alert.estado)} · {alert.tipo.replaceAll("_", " ")}</span>
+                  <strong>{group.trabajadorNombre}</strong>
+                  {group.alerts.length > 1 && <em>{group.alerts.length} alertas en el periodo</em>}
+                  <small>{alert.motivoGeneral}</small>
+                  {nextAppointment && <em>Cita: {formatCita(nextAppointment.fechaCita)}</em>}
+                </button>
+              );
+            })}
           </div>
         </article>
 
@@ -405,9 +458,9 @@ export default function HrDashboard() {
           </div>
           {selectedAlert ? (
             <div className="hr-action-history">
-              {(actionsByAlert[selectedAlert.id] ?? []).length === 0 ? (
-                <p className="staff-empty-state">Sin acciones para esta alerta.</p>
-              ) : (actionsByAlert[selectedAlert.id] ?? []).map((action) => (
+              {selectedGroupActions.length === 0 ? (
+                <p className="staff-empty-state">Sin acciones para este trabajador.</p>
+              ) : selectedGroupActions.map((action) => (
                 <div key={action.id} className="hr-action-item">
                   <strong>{actionLabel(action.tipoAccion)}</strong>
                   <p>{action.descripcion}</p>
@@ -431,9 +484,9 @@ export default function HrDashboard() {
             <FileText size={18} />
           </div>
           {selectedAlert ? (
-            (reportsByAlert[selectedAlert.id] ?? []).length > 0 ? (
+            selectedGroupReports.length > 0 ? (
               <div className="hr-report-list">
-                {reportsByAlert[selectedAlert.id].map((report) => (
+                {selectedGroupReports.map((report) => (
                   <div key={report.id} className="hr-report-item">
                     <div>
                       <strong>{report.pdfNombre}</strong>
@@ -468,6 +521,12 @@ export default function HrDashboard() {
               <div className="hr-selected-worker">
                 <strong>{selectedAlert.trabajadorNombre}</strong>
                 <span>{statusLabel(selectedAlert.estado)}</span>
+                {selectedWorkerMetrics && (
+                  <small>
+                    Métricas actuales: {selectedWorkerMetrics.unidadesVendidas} pares ·{" "}
+                    {Math.round(selectedWorkerMetrics.cumplimientoGeneral)}% cumplimiento
+                  </small>
+                )}
               </div>
               <div className="hr-decision-buttons">
                 <button

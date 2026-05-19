@@ -25,7 +25,11 @@ function percent(value: number) {
 function formatCita(fechaCita: string) {
   const value = new Date(fechaCita);
   if (Number.isNaN(value.getTime())) return fechaCita;
-  return value.toLocaleString("es-PE", { dateStyle: "full", timeStyle: "short" });
+  return value.toLocaleString("es-PE", {
+    timeZone: "America/Lima",
+    dateStyle: "full",
+    timeStyle: "short",
+  });
 }
 
 export default function StaffPerformancePage() {
@@ -202,6 +206,30 @@ export default function StaffPerformancePage() {
               ) : (
                 <p>RR.HH. ha solicitado una evaluación. El psicólogo coordinará contigo la fecha de la cita.</p>
               )}
+            </section>
+          )}
+
+          {(payload?.citas ?? []).length > 0 && (
+            <section className="hr-panel-card">
+              <div className="staff-section-heading">
+                <div>
+                  <p>Evaluación profesional</p>
+                  <h2>Mis citas programadas</h2>
+                </div>
+                <CalendarClock size={18} />
+              </div>
+              <div className="hr-appointment-list">
+                {(payload?.citas ?? []).map((cita) => (
+                  <div key={cita.id} className="hr-appointment-item">
+                    <div>
+                      <strong>{formatCita(cita.fechaCita)}</strong>
+                      <span>{cita.lugar}</span>
+                    </div>
+                    <em>{cita.estado === "programada" ? "Programada" : cita.estado === "realizada" ? "Realizada" : "Cancelada"}</em>
+                    {cita.notas && <p>{cita.notas}</p>}
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 

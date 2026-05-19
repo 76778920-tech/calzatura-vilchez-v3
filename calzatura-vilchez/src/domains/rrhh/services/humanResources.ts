@@ -11,10 +11,18 @@ import type {
   WorkerPerformanceMetrics,
 } from "@/types";
 
+export type HrAlertGroup = {
+  trabajadorUid: string;
+  trabajadorNombre: string;
+  alerts: HrAlert[];
+  primaryAlert: HrAlert;
+};
+
 export type HrDashboardPayload = {
   period: string;
   workers: WorkerPerformanceMetrics[];
   alerts: HrAlert[];
+  alertGroups?: HrAlertGroup[];
   reports: PsychologicalReport[];
   actions: HrAction[];
   appointments: PsychologyAppointment[];
@@ -110,8 +118,14 @@ export async function createHrAction(data: {
   return action;
 }
 
-export async function fetchPsychologyAlerts(period?: string): Promise<PsychologyAlertsPayload> {
-  const qs = period ? `?periodo=${encodeURIComponent(period)}` : "";
+export async function fetchPsychologyAlerts(
+  period?: string,
+  options?: { includeClosed?: boolean },
+): Promise<PsychologyAlertsPayload> {
+  const params = new URLSearchParams();
+  if (period) params.set("periodo", period);
+  if (options?.includeClosed) params.set("incluirCerradas", "1");
+  const qs = params.toString() ? `?${params.toString()}` : "";
   return bffFetch<PsychologyAlertsPayload>(`/psychology/alerts${qs}`);
 }
 
