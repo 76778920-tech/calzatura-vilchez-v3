@@ -480,7 +480,7 @@ export default function AdminDashboard() {
       <div className="dash-header">
         <div>
           <p className="dash-greeting">{greetingText()}, Administrador</p>
-          <h1 className="dash-title">Centro de control comercial</h1>
+          <h1 className="dash-title">Dashboard</h1>
         </div>
         <div className="dash-header-date">
           <p className="dash-date-label">Hoy</p>

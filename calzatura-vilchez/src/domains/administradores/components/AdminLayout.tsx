@@ -53,7 +53,7 @@ export default function AdminLayout() {
     [ADMIN_ROUTES.orders]: "Gestion de pedidos",
     [ADMIN_ROUTES.sales]: "Ventas en tienda",
     [ADMIN_ROUTES.users]: "Usuarios y roles",
-    [ADMIN_ROUTES.manufacturers]: "Fabricantes",
+    [ADMIN_ROUTES.manufacturers]: "Gestion de fabricantes",
     [ADMIN_ROUTES.predictions]: "Predicciones IA",
     [ADMIN_ROUTES.data]: "Datos e importacion",
   };
@@ -125,8 +125,8 @@ export default function AdminLayout() {
           <button type="button" className="admin-nav-item admin-back-link" onClick={() => navigate(PUBLIC_ROUTES.home)} title="Ver tienda">
             <Store size={18} /><span className="admin-nav-label">Ver tienda</span>
           </button>
-          <button type="button" className="admin-nav-item admin-back-link" onClick={handleLogout} title="Cerrar sesion">
-            <LogOut size={18} /><span className="admin-nav-label">Cerrar sesion</span>
+          <button type="button" className="admin-nav-item admin-back-link" onClick={handleLogout} title="Cerrar sesión">
+            <LogOut size={18} /><span className="admin-nav-label">Cerrar sesión</span>
           </button>
         </div>
       </aside>
