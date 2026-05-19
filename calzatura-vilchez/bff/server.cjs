@@ -1452,20 +1452,38 @@ async function fetchAllWorkerPerformances(supabase, period) {
   );
 }
 
-async function fetchWorkerSalesForPeriod(supabase, workerUid, period) {
+async function fetchWorkerSalesForPeriod(supabase, workerUid, period, options = {}) {
+  const lenient = options.lenient === true;
   const bounds = periodBounds(period);
   const { data, error } = await supabase
     .from("ventasDiarias")
-    .select("fecha,cantidad,total,devuelto")
+    .select("fecha,cantidad,total,devuelto,encargadoUid")
     .eq("encargadoUid", workerUid)
     .gte("fecha", bounds.startDate)
     .lt("fecha", bounds.nextDate)
     .limit(2000);
   if (error) {
-    if (isRecoverableSupabaseError(error)) return [];
+    console.warn(`ventasDiarias encargado=${workerUid}:`, error.message || error);
+    if (lenient || isRecoverableSupabaseError(error)) return [];
     throw error;
   }
-  return (data ?? []).filter((sale) => !sale.devuelto);
+  let sales = (data ?? []).filter((sale) => !sale.devuelto);
+  if (sales.length === 0 && lenient) {
+    const workers = await fetchWorkerProfiles(supabase);
+    if (workers.length === 1 && workers[0]?.uid === workerUid) {
+      const legacy = await supabase
+        .from("ventasDiarias")
+        .select("fecha,cantidad,total,devuelto,encargadoUid")
+        .is("encargadoUid", null)
+        .gte("fecha", bounds.startDate)
+        .lt("fecha", bounds.nextDate)
+        .limit(2000);
+      if (!legacy.error) {
+        sales = (legacy.data ?? []).filter((sale) => !sale.devuelto);
+      }
+    }
+  }
+  return sales;
 }
 
 function buildDailyHistoryFromSales(sales) {
@@ -1485,8 +1503,13 @@ function buildDailyHistoryFromSales(sales) {
 }
 
 async function buildWorkerDailyHistory(supabase, workerUid, period) {
-  const sales = await fetchWorkerSalesForPeriod(supabase, workerUid, period);
-  return buildDailyHistoryFromSales(sales);
+  try {
+    const sales = await fetchWorkerSalesForPeriod(supabase, workerUid, period, { lenient: true });
+    return buildDailyHistoryFromSales(sales);
+  } catch (error) {
+    console.warn(`buildWorkerDailyHistory ${workerUid}:`, error?.message || error);
+    return [];
+  }
 }
 
 function formatCitaForMessage(fechaCita) {
@@ -1900,13 +1923,17 @@ app.get("/hr/workers/:workerUid/history", (req, res) => {
       if (workerError) throw workerError;
       if (!worker) return res.status(404).json({ error: "Trabajador no encontrado" });
 
-      const [performance, historialDiario] = await Promise.all([
-        fetchWorkerPerformance(supabase, worker, period),
-        buildWorkerDailyHistory(supabase, workerUid, period),
-      ]);
+      let performance;
+      try {
+        performance = await fetchWorkerPerformance(supabase, worker, period);
+      } catch (perfError) {
+        console.warn("hr/workers history performance:", perfError?.message || perfError, perfError?.details || "");
+        performance = defaultWorkerPerformance(worker, period);
+      }
+      const historialDiario = await buildWorkerDailyHistory(supabase, workerUid, period);
       return res.status(200).json({ performance, historialDiario });
     } catch (error) {
-      console.error("hr/workers history error:", error);
+      console.error("hr/workers history error:", error?.message || error, error?.details || "");
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
