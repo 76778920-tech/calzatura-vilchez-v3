@@ -43,6 +43,8 @@ on:
         required: false
       VITE_ORS_API_KEY:
         required: false
+      RENDER_BFF_DEPLOY_HOOK_URL:
+        required: false
       RENDER_DEPLOY_HOOK_URL:
         required: false
   workflow_dispatch:
@@ -100,9 +102,64 @@ jobs:
           DEPLOY_SHA: ${{ steps.sha.outputs.head_sha }}
         run: echo "Gate OK — SHA $DEPLOY_SHA"
 
+  render-bff-service:
+    name: Render — BFF
+    needs: gate
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Comprobar hook Render BFF
+        env:
+          RENDER_BFF_DEPLOY_HOOK_URL: ${{ secrets.RENDER_BFF_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_BFF_DEPLOY_HOOK_URL" ]; then
+            echo "::error::RENDER_BFF_DEPLOY_HOOK_URL no configurado — el BFF no se puede redeployar."
+            echo "Render → servicio BFF → Settings → Deploy Hook → copiar URL → GitHub Secrets."
+            exit 1
+          fi
+
+      - name: Disparar deploy hook BFF
+        env:
+          RENDER_BFF_DEPLOY_HOOK_URL: ${{ secrets.RENDER_BFF_DEPLOY_HOOK_URL }}
+        run: |
+          curl -fsS -X POST "$RENDER_BFF_DEPLOY_HOOK_URL"
+          echo "Deploy hook BFF enviado."
+
+      - name: Esperar health y rutas BFF
+        env:
+          BFF_BASE: ${{ secrets.VITE_BACKEND_API_URL || 'https://calzatura-vilchez-bff.onrender.com' }}
+        run: |
+          base="${BFF_BASE%/}"
+          echo "Comprobando $base/health (hasta 12 min por cold start/deploy)..."
+          for i in $(seq 1 48); do
+            if curl -fsS "$base/health" >/dev/null 2>&1; then
+              echo "BFF health OK en intento $i"
+              break
+            fi
+            sleep 15
+          done
+          if ! curl -fsS "$base/health" >/dev/null 2>&1; then
+            echo "::error::BFF no respondió en /health"
+            exit 1
+          fi
+
+          echo "Esperando rutas nuevas del BFF..."
+          for i in $(seq 1 48); do
+            users_code="$(curl -sS -o /tmp/bff_users_me_check.json -w "%{http_code}" "$base/users/me" || true)"
+            admin_code="$(curl -sS -o /tmp/bff_admin_users_check.json -w "%{http_code}" "$base/admin/users" || true)"
+            if [ "$users_code" = "401" ] && [ "$admin_code" = "401" ]; then
+              echo "Rutas BFF nuevas disponibles (401 sin token, esperado)."
+              exit 0
+            fi
+            echo "Intento $i: /users/me=$users_code /admin/users=$admin_code; esperando deploy..."
+            sleep 15
+          done
+          echo "::error::Rutas BFF desactualizadas tras deploy; se esperaba 401 sin token en /users/me y /admin/users."
+          exit 1
+
   firebase-hosting:
     name: Firebase Hosting
-    needs: gate
+    needs: [gate, render-bff-service]
     runs-on: ubuntu-latest
     permissions:
       contents: read

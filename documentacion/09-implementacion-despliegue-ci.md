@@ -193,12 +193,13 @@ No hay deploy en `pull_request`. El workflow antiguo `Deploy — Firebase Hostin
 | Secret | Uso |
 |--------|-----|
 | `FIREBASE_SERVICE_ACCOUNT` | Deploy Firebase Hosting |
+| `RENDER_BFF_DEPLOY_HOOK_URL` | Deploy hook del BFF en Render. Obligatorio antes de publicar Firebase, porque la web depende de sus rutas admin/usuario |
 | `RENDER_DEPLOY_HOOK_URL` | Deploy hook del servicio IA en Render (Settings → Deploy Hook) |
 | `VITE_*` (Firebase, Supabase, Stripe, Cloudinary, DNI, IA, BFF, ORS) | Build Vite en deploy |
 | `SUPABASE_URL` / `SUPABASE_SERVICE_KEY` | CI Integration + IA |
 | `SONAR_TOKEN` | SonarQube (opcional; skip si falta) |
 
-Sin `RENDER_DEPLOY_HOOK_URL` el job **Render — AI Service** muestra **warning** y omite el hook (no bloquea el workflow). **Firebase Hosting** sí requiere `FIREBASE_SERVICE_ACCOUNT` y los `VITE_*` mínimos; sin ellos el deploy falla.
+Sin `RENDER_BFF_DEPLOY_HOOK_URL` el deploy falla antes de Firebase Hosting para evitar publicar una web contra un BFF desactualizado. Sin `RENDER_DEPLOY_HOOK_URL` el job **Render — AI Service** muestra **warning** y omite el hook (no bloquea el workflow). **Firebase Hosting** sí requiere `FIREBASE_SERVICE_ACCOUNT` y los `VITE_*` mínimos; sin ellos el deploy falla.
 
 ### 7.2.1 Errores frecuentes en Actions
 
@@ -206,6 +207,7 @@ Sin `RENDER_DEPLOY_HOOK_URL` el job **Render — AI Service** muestra **warning*
 |---------|--------|-----------|
 | `Falta FIREBASE_SERVICE_ACCOUNT` | Secret no creado en GitHub | Settings → Secrets → Actions → New secret. Valor = JSON completo de la cuenta de servicio (una clave, no solo el PEM). |
 | `test: too many arguments` (antiguo) | Script bash con JSON en `env` | Corregido en el workflow: la presencia del secret se valida con `if: secrets.*` sin exportar el JSON al shell. |
+| `RENDER_BFF_DEPLOY_HOOK_URL no configurado` | Falta el hook del BFF | Render → servicio BFF → Settings → Deploy Hook → copiar URL → GitHub Secrets. |
 | `RENDER_DEPLOY_HOOK_URL no configurado` | Warning, no error | Opcional para redeploy automático de IA. Copiar Deploy Hook de Render si quieres que cada push a `main` actualice el servicio. |
 
 ### 7.3 Despliegue manual de emergencia

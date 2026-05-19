@@ -24,6 +24,21 @@ function loadAllowedOrigins() {
 
 const allowedOrigins = loadAllowedOrigins();
 
+function loadSuperadminEmails() {
+  const defaults = ["76778920@continental.edu.pe"];
+  const extras = (process.env.SUPERADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  return new Set([...defaults, ...extras]);
+}
+
+const superadminEmails = loadSuperadminEmails();
+
+function isSuperadminEmail(email) {
+  return superadminEmails.has(String(email || "").trim().toLowerCase());
+}
+
 function applyCorsHeaders(req, res, next) {
   const origin = req.headers.origin;
   if (!origin || allowedOrigins.has(origin)) {
@@ -167,6 +182,33 @@ async function assertStaffRole(supabase, uid) {
 }
 
 const ORDER_STATUSES = new Set(["pendiente", "pagado", "enviado", "entregado", "cancelado"]);
+const USER_ROLES = new Set(["cliente", "trabajador", "admin"]);
+
+function profileString(value) {
+  return typeof value === "string" ? value.trim() : undefined;
+}
+
+function sanitizeOwnUserProfile(decodedToken, incomingProfile, existingProfile) {
+  const emailFromToken = profileString(decodedToken.email);
+  const now = new Date().toISOString();
+  const profile = {
+    uid: decodedToken.uid,
+    email: emailFromToken || profileString(existingProfile?.email) || profileString(incomingProfile.email) || "",
+    rol: existingProfile?.rol || (isSuperadminEmail(emailFromToken) ? "admin" : "cliente"),
+    creadoEn: existingProfile?.creadoEn || profileString(incomingProfile.creadoEn) || now,
+  };
+
+  for (const key of ["nombre", "nombres", "apellidos", "dni", "telefono"]) {
+    const value = profileString(incomingProfile[key]);
+    if (value !== undefined) profile[key] = value;
+  }
+
+  if (Array.isArray(incomingProfile.direcciones)) {
+    profile.direcciones = incomingProfile.direcciones;
+  }
+
+  return profile;
+}
 
 function toCents(amount) {
   return Math.round(Number(amount || 0) * 100);
@@ -1716,7 +1758,16 @@ app.put("/users/me", (req, res) => {
       if (!profile || typeof profile !== "object" || profile.uid !== decodedToken.uid) {
         return res.status(400).json({ error: "Perfil invalido" });
       }
-      const { error } = await supabase.from("usuarios").upsert(profile, { onConflict: "uid" });
+
+      const { data: existingProfile, error: existingError } = await supabase
+        .from("usuarios")
+        .select("uid,email,rol,creadoEn")
+        .eq("uid", decodedToken.uid)
+        .maybeSingle();
+      if (existingError) throw existingError;
+
+      const safeProfile = sanitizeOwnUserProfile(decodedToken, profile, existingProfile);
+      const { error } = await supabase.from("usuarios").upsert(safeProfile, { onConflict: "uid" });
       if (error) throw error;
       return res.status(200).json({ ok: true });
     } catch (error) {
@@ -1760,8 +1811,17 @@ app.patch("/admin/users/:uid/role", (req, res) => {
       await assertAdminRole(supabase, decodedToken.uid);
       const uid = String(req.params.uid || "").trim();
       const { rol } = req.body || {};
-      if (!uid || typeof rol !== "string") {
+      if (!uid || typeof rol !== "string" || !USER_ROLES.has(rol)) {
         return res.status(400).json({ error: "Datos invalidos" });
+      }
+      const { data: targetUser, error: targetError } = await supabase
+        .from("usuarios")
+        .select("rol")
+        .eq("uid", uid)
+        .maybeSingle();
+      if (targetError) throw targetError;
+      if ((rol === "admin" || targetUser?.rol === "admin") && !isSuperadminEmail(decodedToken.email)) {
+        return res.status(403).json({ error: "Solo el superadministrador puede gestionar administradores" });
       }
       const { error } = await supabase.from("usuarios").update({ rol }).eq("uid", uid);
       if (error) throw error;

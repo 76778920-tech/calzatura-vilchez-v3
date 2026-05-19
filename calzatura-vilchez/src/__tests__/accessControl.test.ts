@@ -14,6 +14,7 @@ describe("canAccessArea", () => {
     expect(canAccessArea("clientes", "cliente")).toBe(true);
     expect(canAccessArea("administradores", "admin")).toBe(true);
     expect(canAccessArea("trabajadores", "trabajador")).toBe(true);
+    expect(canAccessArea("ventas", "trabajador")).toBe(true);
     expect(canAccessArea("pedidos", "cliente")).toBe(true);
   });
 
