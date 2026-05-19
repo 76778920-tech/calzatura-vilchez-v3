@@ -5629,7 +5629,7 @@ button.order-card-header {
 .staff-home-page {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
+  gap: 1.15rem;
   color: var(--text);
 }
 .staff-hero {
@@ -5675,10 +5675,170 @@ button.order-card-header {
   margin: 0.35rem 0 0;
   color: var(--text-muted);
 }
-.staff-action-grid {
+.staff-inline-warning {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid #fed7aa;
+  border-radius: var(--radius-sm);
+  background: #fff7ed;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 700;
+}
+.staff-ops-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
+}
+.staff-ops-card {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.045);
+}
+.staff-ops-card-primary {
+  border-color: rgba(201,162,39,0.28);
+  background: linear-gradient(135deg, rgba(255,255,255,0.98), rgba(201,162,39,0.08));
+}
+.staff-ops-icon {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: rgba(201,162,39,0.14);
+  color: var(--gold-dark);
+  flex-shrink: 0;
+}
+.staff-ops-icon-green {
+  background: #dcfce7;
+  color: #15803d;
+}
+.staff-ops-icon-blue {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+.staff-ops-card small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.55px;
+  text-transform: uppercase;
+}
+.staff-ops-card strong {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 1.45rem;
+  line-height: 1.1;
+  color: var(--text);
+}
+.staff-ops-card p {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.staff-workbench {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.42fr);
+  gap: 1rem;
+  align-items: start;
+}
+.staff-workbench-main,
+.staff-workbench-side {
+  border: 1px solid color-mix(in srgb, var(--border) 84%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  box-shadow: 0 16px 38px rgba(0,0,0,0.05);
+}
+.staff-workbench-main {
+  padding: 1.15rem;
+}
+.staff-workbench-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+.staff-workbench-side h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text);
+}
+.staff-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+.staff-section-heading p {
+  margin: 0 0 0.15rem;
+  color: var(--gold-dark);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+.staff-section-heading h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--text);
+}
+.staff-section-heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.staff-order-list {
+  display: grid;
+  gap: 0.65rem;
+}
+.staff-order-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--bg-alt) 44%, var(--white));
+}
+.staff-order-status {
+  min-width: 82px;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(201,162,39,0.14);
+  color: var(--gold-dark);
+  text-align: center;
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+.staff-order-item strong {
+  display: block;
+  color: var(--text);
+}
+.staff-order-item small {
+  display: block;
+  margin-top: 0.12rem;
+  color: var(--text-muted);
+}
+.staff-empty-state {
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed color-mix(in srgb, var(--border) 80%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--bg-alt) 50%, var(--white));
 }
 .staff-action-card {
   display: grid;
@@ -5737,7 +5897,8 @@ button.order-card-header {
 }
 @media (max-width: 760px) {
   .staff-hero { grid-template-columns: 1fr; }
-  .staff-action-grid { grid-template-columns: 1fr; }
+  .staff-ops-grid,
+  .staff-workbench { grid-template-columns: 1fr; }
 }
 
 /* ── Dashboard Mejorado ─────────────────────────────────────────────────── */
