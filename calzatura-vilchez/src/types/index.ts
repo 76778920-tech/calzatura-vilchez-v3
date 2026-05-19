@@ -64,6 +64,9 @@ export interface DailySale {
   documentoTipo?: SaleDocumentType;
   documentoNumero?: string;
   cliente?: SaleCustomer;
+  encargadoUid?: string;
+  encargadoNombre?: string;
+  encargadoEmail?: string;
   devuelto?: boolean;
   motivoDevolucion?: string;
   devueltoEn?: string;

@@ -13,6 +13,8 @@ export function filterDailySalesBySearch(sales: DailySale[], historialSearch: st
       s.cliente?.nombres,
       s.cliente?.apellidos,
       s.documentoNumero,
+      s.encargadoNombre,
+      s.encargadoEmail,
     ].some((v) => v?.toLowerCase().includes(term)),
   );
 }

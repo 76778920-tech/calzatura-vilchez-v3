@@ -54,6 +54,7 @@ export function AdminSalesHistorialTable({
             <th>Talla</th>
             <th>Cant.</th>
             <th>Hora</th>
+            <th>Encargado</th>
             <th>Total</th>
             <th>Ganancia</th>
             <th>Documento</th>
@@ -62,7 +63,7 @@ export function AdminSalesHistorialTable({
         <tbody>
           {filtered.length === 0 && (
             <tr>
-              <td colSpan={9} className="admin-empty-cell">
+              <td colSpan={10} className="admin-empty-cell">
                 {sales.length === 0 ? "No hay ventas para esta fecha." : "Sin resultados para esa búsqueda."}
               </td>
             </tr>
@@ -83,6 +84,12 @@ export function AdminSalesHistorialTable({
               <td>{sale.talla || "-"}</td>
               <td>{sale.cantidad}</td>
               <td>{new Date(sale.creadoEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</td>
+              <td>
+                <div className="admin-sale-operator-cell">
+                  <strong>{sale.encargadoNombre || "Sin encargado"}</strong>
+                  {sale.encargadoEmail && <span>{sale.encargadoEmail}</span>}
+                </div>
+              </td>
               <td>S/ {sale.total.toFixed(2)}</td>
               <td>
                 <strong>S/ {sale.ganancia.toFixed(2)}</strong>

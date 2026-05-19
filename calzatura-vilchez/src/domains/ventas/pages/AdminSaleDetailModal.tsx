@@ -57,6 +57,10 @@ export function AdminSaleDetailModal({
               <span className="sale-modal-info-label">Comprobante</span>
               <span>{SALE_DOCUMENT_LABELS[sale.documentoTipo ?? "ninguno"]}</span>
             </div>
+            <div className="sale-modal-info">
+              <span className="sale-modal-info-label">Encargado</span>
+              <span>{sale.encargadoNombre || "Sin encargado"}</span>
+            </div>
           </div>
 
           <div className="sale-modal-amounts">

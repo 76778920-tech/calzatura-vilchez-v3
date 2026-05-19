@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { fetchProductCodes, fetchProducts } from "@/domains/productos/services/products";
+import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { fetchDailySales, fetchProductFinancials, returnDailySaleAtomic } from "@/domains/ventas/services/finance";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import type { DailySale, SaleCustomer, SaleDocumentType } from "@/types";
@@ -88,6 +89,7 @@ export type AdminSalesPageModel = {
 };
 
 export function useAdminSalesPage(): AdminSalesPageModel {
+  const { user, userProfile } = useAuth();
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [sales, setSales] = useState<DailySale[]>([]);
   const [pendingLines, setPendingLines] = useState<PendingSaleLine[]>([]);
@@ -201,6 +203,16 @@ export function useAdminSalesPage(): AdminSalesPageModel {
       computeAdminSalesTotals(sales, pendingLines, products, date, saleLineTotal, saleLineProfit),
     [sales, pendingLines, products, date],
   );
+
+  const operator = useMemo(() => {
+    const fullName = [userProfile?.nombres, userProfile?.apellidos].filter(Boolean).join(" ").trim();
+    const name = userProfile?.nombre || fullName || user?.displayName || user?.email?.split("@")[0] || "Encargado";
+    return {
+      uid: userProfile?.uid || user?.uid || "",
+      nombre: name,
+      email: userProfile?.email || user?.email || "",
+    };
+  }, [user, userProfile]);
 
   const resetProductSelection = () => {
     setProductId("");
@@ -351,6 +363,7 @@ export function useAdminSalesPage(): AdminSalesPageModel {
       documentType,
       requiresCustomer,
       customer,
+      operator,
       setSaving,
       setCustomer,
       setValidatedDni,

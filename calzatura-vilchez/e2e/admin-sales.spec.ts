@@ -11,7 +11,7 @@
  *    (TC-SALE-004).
  */
 import { expect, test, type Page } from "@playwright/test";
-import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { FAKE_ADMIN_EMAIL, FAKE_ADMIN_UID, injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 import { todayISO } from "./helpers/dates";
 import { mockBffDailySales } from "./helpers/mockAdminBff";
 import {
@@ -78,6 +78,9 @@ function buildSale() {
   motivoDevolucion: null,
   cliente: null,
   documentoNumero: null,
+  encargadoUid: FAKE_ADMIN_UID,
+  encargadoNombre: "Admin E2E",
+  encargadoEmail: FAKE_ADMIN_EMAIL,
   canal: "tienda",
 };
 }
@@ -108,18 +111,18 @@ async function setupBaseMocks(page: Page) {
   });
 }
 
-async function mockRegisterSalesRpc(page: Page): Promise<() => boolean> {
-  let called = false;
+async function mockRegisterSalesRpc(page: Page): Promise<() => unknown | null> {
+  let payload: unknown | null = null;
   await page.route("**/*", async (route) => {
     const req = route.request();
     if (req.method() === "POST" && req.url().includes("register_daily_sales_atomic")) {
-      called = true;
+      payload = req.postDataJSON();
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ids: ["sale-new-001"] }) });
       return;
     }
     await route.fallback();
   });
-  return () => called;
+  return () => payload;
 }
 
 async function mockReturnSaleRpc(page: Page): Promise<() => boolean> {
@@ -172,7 +175,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // ──────────────────────────────────────────────────────────────────────────
   test("registrar venta llama register_daily_sales_atomic (TC-SALE-001)", async ({ page }) => {
     await setupBaseMocks(page);
-    await mockRegisterSalesRpc(page);
+    const registeredPayload = await mockRegisterSalesRpc(page);
     const registerPost = page.waitForRequest(
       (req) => req.method() === "POST" && req.url().includes("register_daily_sales_atomic"),
       { timeout: 15_000 },
@@ -193,6 +196,15 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await expect(page.getByText(/ventas registradas/i)).toBeVisible({ timeout: 8_000 });
 
     await registerPost;
+    expect(registeredPayload()).toMatchObject({
+      p_sales: [
+        expect.objectContaining({
+          encargadoUid: FAKE_ADMIN_UID,
+          encargadoNombre: "Admin E2E",
+          encargadoEmail: FAKE_ADMIN_EMAIL,
+        }),
+      ],
+    });
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -200,7 +212,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // ──────────────────────────────────────────────────────────────────────────
   test("cantidad mayor al stock muestra error y no agrega la línea (TC-SALE-002)", async ({ page }) => {
     await setupBaseMocks(page);
-    const wasRegistered = await mockRegisterSalesRpc(page);
+    const registeredPayload = await mockRegisterSalesRpc(page);
 
     await goToSales(page);
     await selectProductInForm(page);
@@ -213,7 +225,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await expect(page.getByText(/supera el stock disponible/i)).toBeVisible({ timeout: 5_000 });
 
     // RPC no debe haberse llamado
-    expect(wasRegistered()).toBe(false);
+    expect(registeredPayload()).toBeNull();
   });
 
   // ──────────────────────────────────────────────────────────────────────────

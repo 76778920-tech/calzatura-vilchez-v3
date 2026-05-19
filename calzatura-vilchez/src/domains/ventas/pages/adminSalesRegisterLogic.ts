@@ -13,6 +13,12 @@ import {
 
 export const EMPTY_SALE_CUSTOMER: SaleCustomer = { dni: "", nombres: "", apellidos: "" };
 
+export type SaleOperator = {
+  uid: string;
+  nombre: string;
+  email: string;
+};
+
 export function todayISO() {
   const today = new Date();
   const year = today.getFullYear();
@@ -100,7 +106,8 @@ function buildDailySalePayload(
   date: string,
   documentType: SaleDocumentType,
   docNumber: string | undefined,
-  saleCustomer: SaleCustomer | undefined
+  saleCustomer: SaleCustomer | undefined,
+  operator: SaleOperator
 ): DailySaleAtomicInput[] {
   return pendingLines.map((line) => {
     const product = products.find((p) => p.id === line.productId);
@@ -123,6 +130,9 @@ function buildDailySalePayload(
       documentoTipo: documentType,
       ...(docNumber ? { documentoNumero: docNumber } : {}),
       ...(saleCustomer ? { cliente: saleCustomer } : {}),
+      encargadoUid: operator.uid,
+      encargadoNombre: operator.nombre,
+      encargadoEmail: operator.email,
     };
   });
 }
@@ -191,6 +201,7 @@ export type RegisterPendingSalesParams = {
   documentType: SaleDocumentType;
   requiresCustomer: boolean;
   customer: SaleCustomer;
+  operator: SaleOperator;
   setSaving: (v: boolean) => void;
   setCustomer: (c: SaleCustomer) => void;
   setValidatedDni: (d: string) => void;
@@ -207,6 +218,7 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     documentType,
     requiresCustomer,
     customer,
+    operator,
     setSaving,
     setCustomer,
     setValidatedDni,
@@ -217,6 +229,10 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
 
   if (pendingLines.length === 0) {
     toast.error("Agrega al menos una línea de venta");
+    return;
+  }
+  if (!operator.uid || !operator.nombre) {
+    toast.error("No se pudo identificar al encargado de la venta");
     return;
   }
 
@@ -239,7 +255,7 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     );
     if (requiresCustomer && !saleCustomer) return;
 
-    const salesPayload = buildDailySalePayload(pendingLines, products, date, documentType, docNumber, saleCustomer);
+    const salesPayload = buildDailySalePayload(pendingLines, products, date, documentType, docNumber, saleCustomer, operator);
     const saleIds = await registerDailySalesAtomic(salesPayload);
     if (saleIds.length === 0) {
       throw new Error("La venta no generó registros en el servidor");

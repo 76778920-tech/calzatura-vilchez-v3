@@ -5606,6 +5606,25 @@ button.order-card-header {
 }
 .quick-link-card:hover { border-color: var(--gold); color: var(--gold); box-shadow: var(--shadow-gold); }
 
+.admin-sale-operator-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 145px;
+}
+.admin-sale-operator-cell strong {
+  font-size: 13px;
+  color: var(--text);
+}
+.admin-sale-operator-cell span {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
 /* Panel trabajador / tienda */
 .staff-home-page {
   display: flex;
