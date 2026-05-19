@@ -15,4 +15,8 @@ describe("isBenignUnhandledRejection", () => {
   it("ignores real application errors", () => {
     expect(isBenignUnhandledRejection(new Error("No se pudo cargar tu desempeño."))).toBe(false);
   });
+
+  it("detects partial extension message text", () => {
+    expect(isBenignUnhandledRejection(new Error("listener indicated an asynchronous response"))).toBe(true);
+  });
 });

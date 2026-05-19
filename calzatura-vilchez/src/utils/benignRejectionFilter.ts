@@ -3,7 +3,7 @@
  * promesas rechazadas con este mensaje. No provienen de la app.
  */
 const BENIGN_UNHANDLED_REJECTION_RE =
-  /message channel closed before a response was received|extension context invalidated/i;
+  /message channel closed before a response was received|extension context invalidated|listener indicated an asynchronous response/i;
 
 export function isBenignUnhandledRejection(reason: unknown): boolean {
   const message =
@@ -18,9 +18,18 @@ export function isBenignUnhandledRejection(reason: unknown): boolean {
 }
 
 export function installBenignRejectionFilter(): void {
-  globalThis.addEventListener("unhandledrejection", (event) => {
-    if (isBenignUnhandledRejection(event.reason)) {
-      event.preventDefault();
-    }
-  });
+  const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+    if (!isBenignUnhandledRejection(event.reason)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+
+  const onWindowError = (event: ErrorEvent) => {
+    if (!BENIGN_UNHANDLED_REJECTION_RE.test(event.message || "")) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+
+  globalThis.addEventListener("unhandledrejection", onUnhandledRejection, true);
+  globalThis.addEventListener("error", onWindowError, true);
 }
