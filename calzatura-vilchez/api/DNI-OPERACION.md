@@ -30,4 +30,9 @@ Si faltan, `lookup-dni.js` usa el contador en memoria de la instancia.
 
 ## Frontend
 
-`VITE_DNI_LOOKUP_URL` → URL del deployment Vercel (`/api/lookup-dni`).
+La web consulta primero el **BFF** (`VITE_BACKEND_API_URL` + `/lookup-dni`).  
+Opcional: `VITE_DNI_LOOKUP_URL` solo si no usas BFF.
+
+Configura los tokens en **Render** (mismo servicio del BFF) o en el proyecto Vercel que expone `api/lookup-dni`.
+
+Si ves `502` con `X-DNI-Last-Status: 401`, el token del proveedor (p. ej. `PERUAPI_TOKEN`) está vencido o mal copiado: renueva el token o activa otro proveedor de la tabla superior.

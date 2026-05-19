@@ -73,6 +73,7 @@ const {
   findOrderByIdempotency,
   idempotencyOrderJson,
 } = require("../functions/fnUtils");
+const { handleLookupDni } = require("./lookupDni.cjs");
 
 function loadFirebaseServiceAccount() {
   const filePath = process.env.FIREBASE_SERVICE_ACCOUNT_FILE;
@@ -948,6 +949,10 @@ app.get("/", (_req, res) =>
 );
 
 app.get("/health", (_req, res) => res.status(200).type("text/plain").send("ok"));
+
+app.post("/lookup-dni", (req, res) => {
+  cors(req, res, () => handleLookupDni(req, res));
+});
 
 const ORS_API_BASE = "https://api.openrouteservice.org";
 const deliveryProviders = require("./delivery.cjs");

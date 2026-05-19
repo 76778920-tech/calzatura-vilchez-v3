@@ -1,3 +1,4 @@
+import { dniLookupFailureMessage } from "@/domains/usuarios/services/dni";
 import { unknownClientErrorHttpStatus, unknownClientErrorMessage } from "@/utils/unknownClientError";
 
 const DNI_LOOKUP_ERRORS = new Set([
@@ -5,6 +6,8 @@ const DNI_LOOKUP_ERRORS = new Set([
   "DNI_LOOKUP_NOT_CONFIGURED",
   "DNI_NOT_FOUND",
   "DNI_LOOKUP_FAILED",
+  "DNI_AUTH_MISCONFIGURED",
+  "DNI_RATE_LIMITED",
 ]);
 
 export function isDniLookupError(err: unknown): boolean {
@@ -13,14 +16,7 @@ export function isDniLookupError(err: unknown): boolean {
 }
 
 export function dniLookupErrorToast(err: unknown): string {
-  const msg = err instanceof Error ? err.message : "";
-  if (msg === "DNI_LOOKUP_NOT_CONFIGURED") {
-    return "La busqueda por DNI aun no tiene API configurada";
-  }
-  if (msg === "DNI_NOT_FOUND") {
-    return "No se encontraron datos para este DNI";
-  }
-  return "No se pudo consultar el DNI";
+  return dniLookupFailureMessage(err);
 }
 
 export function salesOperationErrorToast(err: unknown): string {

@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { IdCard, User, Mail, Lock, Eye, EyeOff, Search, Smartphone } from "lucide-react";
 import { checkDisposableEmail, registerUser } from "@/domains/usuarios/services/auth";
 import { PUBLIC_ROUTES } from "@/routes/paths";
-import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
+import { dniLookupFailureMessage, isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import { getNormalizedRegisterEmail, getRegisterBlockingMessage } from "./registerFormValidation";
 import { savePendingVerificationEmail } from "@/utils/pendingVerification";
 import toast from "react-hot-toast";
@@ -25,14 +25,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
 
   const showDniLookupError = (err: unknown) => {
-    const msg = err instanceof Error ? err.message : "";
-    if (msg === "DNI_LOOKUP_NOT_CONFIGURED") {
-      toast.error("La busqueda por DNI aun no tiene API configurada");
-    } else if (msg === "DNI_NOT_FOUND") {
-      toast.error("No se encontraron datos para este DNI");
-    } else {
-      toast.error("No se pudo consultar el DNI");
-    }
+    toast.error(dniLookupFailureMessage(err));
   };
 
   const handleDniLookup = async () => {

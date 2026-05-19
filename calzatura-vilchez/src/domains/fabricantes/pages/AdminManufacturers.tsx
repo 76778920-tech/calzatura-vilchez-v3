@@ -22,7 +22,7 @@ import {
   fetchManufacturers,
   updateManufacturer,
 } from "@/domains/fabricantes/services/manufacturers";
-import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
+import { dniLookupFailureMessage, isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import type { Manufacturer, ManufacturerDocument } from "@/types";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import { compressImageFile, uploadImageToCloudinary } from "@/domains/administradores/services/cloudinary";
@@ -64,14 +64,8 @@ function documentLabel(type: DocumentType) {
   return type === "boleta" ? "Boleta" : "Guía";
 }
 
-const DNI_ERROR_MESSAGES: Record<string, string> = {
-  DNI_LOOKUP_NOT_CONFIGURED: "Configura VITE_DNI_LOOKUP_URL para validar el DNI",
-  DNI_NOT_FOUND: "No se encontraron datos para este DNI",
-};
-
 function showDniLookupError(error: unknown) {
-  const message = error instanceof Error ? error.message : "";
-  toast.error(DNI_ERROR_MESSAGES[message] ?? "No se pudo validar el DNI");
+  toast.error(dniLookupFailureMessage(error));
 }
 
 export default function AdminManufacturers() {
