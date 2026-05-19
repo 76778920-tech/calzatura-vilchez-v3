@@ -1555,12 +1555,20 @@ async function fetchStaffNotifications(supabase, workerUid, limit = 50) {
 
 async function fetchWorkerAppointments(supabase, workerUid, period) {
   const bounds = periodBounds(period);
+  const { data: alertRows, error: alertError } = await supabase
+    .from("rrhh_alertas")
+    .select("id")
+    .eq("trabajadorUid", workerUid)
+    .eq("periodo", period);
+  if (alertError && !isRecoverableSupabaseError(alertError)) throw alertError;
+  const alertIds = (alertRows ?? []).map((row) => row.id).filter(Boolean);
+  if (alertIds.length === 0) return [];
+
   const { data, error } = await supabase
     .from("rrhh_citas")
     .select("*")
     .eq("trabajadorUid", workerUid)
-    .gte("fechaCita", bounds.startISO)
-    .lt("fechaCita", bounds.nextISO)
+    .in("alertaId", alertIds)
     .order("fechaCita", { ascending: true });
   if (error) {
     if (isRecoverableSupabaseError(error)) return [];
@@ -1665,8 +1673,14 @@ app.get("/staff/performance", (req, res) => {
       if (!worker) {
         throw Object.assign(new Error("Perfil de trabajador no encontrado"), { status: 404 });
       }
-      const [performance, historialDiario, notificaciones, citas, workflow] = await Promise.all([
-        fetchWorkerPerformance(supabase, worker, period),
+      let performance;
+      try {
+        performance = await fetchWorkerPerformance(supabase, worker, period);
+      } catch (perfError) {
+        console.warn("staff/performance metrics:", perfError?.message || perfError);
+        performance = defaultWorkerPerformance(worker, period);
+      }
+      const [historialDiario, notificaciones, citas, workflow] = await Promise.all([
         buildWorkerDailyHistory(supabase, worker.uid, period),
         fetchStaffNotifications(supabase, worker.uid),
         fetchWorkerAppointments(supabase, worker.uid, period),
@@ -1768,7 +1782,10 @@ app.post("/hr/alerts/generate", (req, res) => {
         if (existing.data) {
           const { data, error } = await supabase
             .from("rrhh_alertas")
-            .update(payload)
+            .update({
+              ...payload,
+              estado: "pendiente_psicologo",
+            })
             .eq("id", existing.data.id)
             .select("*")
             .single();
@@ -1788,6 +1805,15 @@ app.post("/hr/alerts/generate", (req, res) => {
             .single();
           if (error) throw error;
           generated.push(data);
+          await createStaffNotification(supabase, {
+            destinatarioUid: metrics.trabajadorUid,
+            tipo: "derivacion_rrhh",
+            titulo: "Seguimiento de desempeño",
+            mensaje: "RR.HH. ha abierto un seguimiento por desempeño mensual. El psicólogo podrá coordinar contigo si corresponde.",
+            metadata: { alertaId: data.id, periodo: period },
+          }).catch((notifyError) => {
+            console.warn("hr/alerts/generate notify:", notifyError?.message || notifyError);
+          });
         }
       }
 
@@ -1831,7 +1857,13 @@ app.post("/hr/alerts/refer", (req, res) => {
       if (workerError) throw workerError;
       if (!worker) return res.status(404).json({ error: "Trabajador no encontrado" });
 
-      const metrics = await fetchWorkerPerformance(supabase, worker, period);
+      let metrics;
+      try {
+        metrics = await fetchWorkerPerformance(supabase, worker, period);
+      } catch (perfError) {
+        console.warn("hr/alerts/refer metrics:", perfError?.message || perfError);
+        metrics = defaultWorkerPerformance(worker, period);
+      }
       const existing = await supabase
         .from("rrhh_alertas")
         .select("*")
@@ -2100,7 +2132,7 @@ app.get("/psychology/alerts", (req, res) => {
       const supabase = getSupabaseAdmin();
       await assertPsychologistRole(supabase, decodedToken.uid);
       const period = validPeriod(String(req.query.periodo || ""));
-      const [alerts, reports, appointments] = await Promise.all([
+      const [alerts, reports, allAppointments] = await Promise.all([
         supabaseRows(
           supabase
             .from("rrhh_alertas")
@@ -2127,6 +2159,8 @@ app.get("/psychology/alerts", (req, res) => {
           "rrhh_citas",
         ),
       ]);
+      const alertIds = new Set(alerts.map((row) => row.id));
+      const appointments = allAppointments.filter((cita) => alertIds.has(cita.alertaId));
       return res.status(200).json({
         period,
         alerts,

@@ -115,6 +115,15 @@ export default function HrDashboard() {
     void load();
   }, [load]);
 
+  const handleGoalWorkerChange = (uid: string) => {
+    setGoalWorkerUid(uid);
+    const saved = (data?.goals ?? []).find((goal) => goal.trabajadorUid === uid);
+    if (saved) {
+      setMetaVentas(String(saved.metaVentas));
+      setMetaPedidos(String(saved.metaPedidos));
+    }
+  };
+
   const summary = useMemo(() => {
     const workers = data?.workers ?? [];
     const alerts = data?.alerts ?? [];
@@ -338,7 +347,7 @@ export default function HrDashboard() {
           </div>
           <label>
             Trabajador
-            <select className="form-input" value={goalWorkerUid} onChange={(event) => setGoalWorkerUid(event.target.value)}>
+            <select className="form-input" value={goalWorkerUid} onChange={(event) => handleGoalWorkerChange(event.target.value)}>
               <option value="">Seleccionar...</option>
               {(data?.workers ?? []).map((worker) => (
                 <option key={worker.trabajadorUid} value={worker.trabajadorUid}>{worker.trabajadorNombre}</option>

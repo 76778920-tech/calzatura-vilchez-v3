@@ -45,8 +45,8 @@ export default function PsychologyDashboard() {
   const [saving, setSaving] = useState(false);
 
   const reportsByAlert = useMemo(() => {
-    return reports.reduce<Record<string, PsychologicalReport>>((acc, report) => {
-      acc[report.alertaId] = report;
+    return reports.reduce<Record<string, PsychologicalReport[]>>((acc, report) => {
+      acc[report.alertaId] = [...(acc[report.alertaId] ?? []), report];
       return acc;
     }, {});
   }, [reports]);
@@ -206,7 +206,9 @@ export default function PsychologyDashboard() {
                 <span><ShieldAlert size={16} /> {statusLabel(alert.estado)}</span>
                 <strong>{alert.trabajadorNombre}</strong>
                 <small>{alert.motivoGeneral}</small>
-                {reportsByAlert[alert.id] && <em>Informe registrado</em>}
+                {(reportsByAlert[alert.id] ?? []).length > 0 && (
+                  <em>{reportsByAlert[alert.id].length} informe(s)</em>
+                )}
               </button>
             ))}
           </div>
@@ -317,6 +319,16 @@ export default function PsychologyDashboard() {
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
             </label>
+            {(reportsByAlert[selectedAlert.id] ?? []).length > 0 && (
+              <div className="hr-report-list">
+                {(reportsByAlert[selectedAlert.id] ?? []).map((report) => (
+                  <div key={report.id} className="hr-report-item">
+                    <strong>{report.pdfNombre}</strong>
+                    <small>{new Date(report.creadoEn).toLocaleString("es-PE")}</small>
+                  </div>
+                ))}
+              </div>
+            )}
             <button type="submit" className="btn-primary" disabled={saving}>
               {saving ? "Registrando..." : "Subir informe para RR.HH."}
             </button>
