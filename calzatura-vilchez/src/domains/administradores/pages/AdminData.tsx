@@ -2,8 +2,18 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { downloadXlsx, readXlsxFirstSheet } from "@/domains/administradores/utils/spreadsheet";
 import { AlertTriangle, CheckCircle, Download, FileSpreadsheet, Loader, Trash2, Upload } from "lucide-react";
 import toast from "react-hot-toast";
-import { supabase } from "@/supabase/client";
 import { logAudit } from "@/services/audit";
+import {
+  adminDataCountSalesUntil,
+  adminDataDeleteSalesUntil,
+  adminDataDeleteScenarioTestData,
+  adminDataDeleteTestBatch,
+  adminDataExport,
+  adminDataImport,
+  adminDataListTestDocs,
+  adminDataProductIds,
+  type AdminDataCollection,
+} from "@/domains/administradores/services/adminData";
 import { aiAdminFetch } from "@/services/aiAdminClient";
 import { calculatePriceRange } from "@/domains/ventas/services/finance";
 
@@ -190,13 +200,6 @@ const COLLECTIONS: CollectionConfig[] = [
       tallas: "[\"39\",\"40\",\"41\"]",
       tallaStock: "{\"39\":3,\"40\":4,\"41\":3}",
       destacado: false,
-    },
-    extraData: async () => {
-      const { data } = await supabase.from("productoCodigos").select("productoId, codigo");
-      return (data ?? []).reduce<Record<string, string>>((acc, d) => {
-        if (d.codigo) acc[d.productoId] = d.codigo;
-        return acc;
-      }, {});
     },
     exportTransform: (d, extra) => {
       const id = cellString(d.id);
@@ -472,10 +475,7 @@ const COLLECTIONS: CollectionConfig[] = [
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 async function exportCollection(config: CollectionConfig): Promise<void> {
-  const [{ data: docs }, extra] = await Promise.all([
-    supabase.from(config.id).select("*"),
-    config.extraData ? config.extraData() : Promise.resolve({}),
-  ]);
+  const { rows: docs, extra } = await adminDataExport(config.id as AdminDataCollection);
   const rows = (docs ?? []).map((d) => config.exportTransform(d as Row, extra));
   if (rows.length === 0) throw new Error("La colección está vacía");
   await downloadXlsx(
@@ -499,9 +499,7 @@ async function importRows(
   let validProductIds: Set<string> | null = null;
 
   if (config.id === "ventasDiarias" || config.id === "productoFinanzas") {
-    const { data, error } = await supabase.from("productos").select("id");
-    if (error) throw error;
-    validProductIds = new Set((data ?? []).map((item) => cellString(item.id).trim()).filter(Boolean));
+    validProductIds = await adminDataProductIds();
   }
 
   rows.forEach((row, i) => {
@@ -524,40 +522,33 @@ async function importRows(
   for (let i = 0; i < validRows.length; i += CHUNK) {
     const chunk = validRows.slice(i, i + CHUNK);
     const rowsToInsert = chunk.map(({ data, docId }) =>
-      docId ? { ...data, id: docId } : data
+      docId ? { ...data, id: docId } : data,
     );
-    const { error } = await supabase
-      .from(config.id)
-      .upsert(rowsToInsert as object[], config.upsertOnConflict ? { onConflict: config.upsertOnConflict } : undefined);
-    if (error) throw error;
+    const productCodes =
+      config.id === "productos"
+        ? chunk
+            .filter(({ source }) => cellString(source.codigo).trim())
+            .map(({ data, docId, source }) => ({
+              productoId: String(docId ?? (data as Record<string, unknown>).id ?? ""),
+              codigo: cellString(source.codigo).trim(),
+            }))
+            .filter((row) => row.productoId && row.codigo)
+        : undefined;
 
-    if (config.id === "productos") {
-      const codes = chunk
-        .filter(({ source }) => cellString(source.codigo).trim())
-        .map(({ data, docId, source }) => ({
-          productoId: docId ?? (data as Record<string, unknown>).id,
-          codigo: cellString(source.codigo).trim(),
-          actualizadoEn: context.importadoEn,
-        }));
-      if (codes.length > 0) {
-        await supabase.from("productoCodigos").upsert(codes, { onConflict: "productoId" });
-      }
-    }
+    await adminDataImport({
+      collection: config.id as AdminDataCollection,
+      rows: rowsToInsert as Record<string, unknown>[],
+      onConflict: config.upsertOnConflict,
+      productCodes,
+    });
   }
 
   return { ok: validRows.length, errors };
 }
 
-const IMPORTABLE_COLLECTIONS = COLLECTIONS.filter((item) => item.canImport).map((item) => item.id);
-
 async function fetchTestDocs() {
-  const results = await Promise.all(
-    IMPORTABLE_COLLECTIONS.map(async (colId) => {
-      const { data } = await supabase.from(colId).select("*").eq("esDePrueba", true);
-      return (data ?? []).map((item) => ({ colId, data: item as Row }));
-    })
-  );
-  return results.flat();
+  const docs = await adminDataListTestDocs();
+  return docs.map(({ colId, data }) => ({ colId, data: data as Row }));
 }
 
 async function listTestBatches(): Promise<TestBatchSummary[]> {
@@ -593,40 +584,25 @@ async function countScenarioTestData(escenario: ScenarioKey): Promise<number> {
 async function deleteScenarioTestData(escenario: ScenarioKey): Promise<number> {
   const docs = await fetchTestDocs();
   const targets = docs.filter(({ data }) => (cellString(data.escenario) || "general").trim() === escenario);
-  await Promise.all(
-    IMPORTABLE_COLLECTIONS.map((colId) =>
-      supabase.from(colId).delete().eq("esDePrueba", true).eq("escenario", escenario)
-    )
-  );
+  await adminDataDeleteScenarioTestData(escenario);
   return targets.length;
 }
 
 async function deleteTestBatch(loteImportacion: string): Promise<number> {
   const docs = await fetchTestDocs();
   const targets = docs.filter(({ data }) => cellString(data.loteImportacion).trim() === loteImportacion);
-  await Promise.all(
-    IMPORTABLE_COLLECTIONS.map((colId) =>
-      supabase.from(colId).delete().eq("esDePrueba", true).eq("loteImportacion", loteImportacion)
-    )
-  );
+  await adminDataDeleteTestBatch(loteImportacion);
   return targets.length;
 }
 
 // ── Eliminación por fecha ─────────────────────────────────────────────────────
 
 async function countSalesUpToDate(dateStr: string): Promise<number> {
-  const { count } = await supabase
-    .from("ventasDiarias")
-    .select("*", { count: "exact", head: true })
-    .lte("fecha", dateStr);
-  return count ?? 0;
+  return adminDataCountSalesUntil(dateStr);
 }
 
 async function deleteSalesUpToDate(dateStr: string): Promise<number> {
-  const total = await countSalesUpToDate(dateStr);
-  const { error } = await supabase.from("ventasDiarias").delete().lte("fecha", dateStr);
-  if (error) throw error;
-  return total;
+  return adminDataDeleteSalesUntil(dateStr);
 }
 
 // ── Escenarios de prueba (≈ 500 filas c/u) ───────────────────────────────────

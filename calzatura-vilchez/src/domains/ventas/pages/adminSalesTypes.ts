@@ -1,6 +1,6 @@
-import type { Product, ProductFinancial } from "@/types";
+import type { Product, ProductFinancial, ProductPriceRange } from "@/types";
 
-export type SaleProduct = Product & { codigo?: string; finanzas?: ProductFinancial };
+export type SaleProduct = Product & { codigo?: string; finanzas?: ProductFinancial | ProductPriceRange };
 
 export type PendingSaleLine = {
   id: string;

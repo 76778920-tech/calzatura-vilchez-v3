@@ -2,10 +2,14 @@ import { getBackendApiBaseUrl } from "@/config/apiBackend";
 import { auth } from "@/firebase/config";
 import { supabase } from "@/supabase/client";
 import { bffFetch } from "@/utils/bffClient";
-import type { DailySale, ProductFinancial } from "@/types";
+import type { PanelFetchScope } from "@/security/panelScope";
+import type { DailySale, ProductFinancial, ProductPriceRange } from "@/types";
 
 const FINANCIAL_COL = "productoFinanzas";
 const SALES_COL = "ventasDiarias";
+
+/** Admin: datos completos. Staff: solo ventas propias y rangos sin costo. */
+export type FinanceFetchScope = PanelFetchScope;
 
 function roundMoney(value: number) {
   return Math.round(value * 100) / 100;
@@ -32,10 +36,15 @@ export function calculatePriceRange(
   };
 }
 
-export async function fetchProductFinancials(): Promise<Record<string, ProductFinancial>> {
-  const { rows } = await bffFetch<{ rows: ProductFinancial[] }>("/admin/productFinanzas");
-  return (rows ?? []).reduce<Record<string, ProductFinancial>>((acc, item) => {
-    acc[item.productId] = item as ProductFinancial;
+export async function fetchProductFinancials(scope: "admin"): Promise<Record<string, ProductFinancial>>;
+export async function fetchProductFinancials(scope: "staff"): Promise<Record<string, ProductPriceRange>>;
+export async function fetchProductFinancials(
+  scope: FinanceFetchScope = "admin",
+): Promise<Record<string, ProductFinancial | ProductPriceRange>> {
+  const path = scope === "staff" ? "/staff/productPriceRanges" : "/admin/productFinanzas";
+  const { rows } = await bffFetch<{ rows: (ProductFinancial | ProductPriceRange)[] }>(path);
+  return (rows ?? []).reduce<Record<string, ProductFinancial | ProductPriceRange>>((acc, item) => {
+    acc[item.productId] = item;
     return acc;
   }, {});
 }
@@ -67,7 +76,9 @@ function sortDailySales(rows: DailySale[]) {
   return [...rows].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
 }
 
-async function fetchDailySalesViaBff(params: { fecha?: string; sinceDays?: number }): Promise<DailySale[] | null> {
+async function fetchDailySalesViaBff(
+  params: { fecha?: string; sinceDays?: number; scope: FinanceFetchScope },
+): Promise<DailySale[] | null> {
   const base = getBackendApiBaseUrl();
   const user = auth.currentUser;
   if (!base || !user) return null;
@@ -76,8 +87,10 @@ async function fetchDailySalesViaBff(params: { fecha?: string; sinceDays?: numbe
   if (params.fecha) qs.set("fecha", params.fecha);
   else qs.set("sinceDays", String(params.sinceDays ?? 90));
 
+  const path = params.scope === "staff" ? "/staff/dailySales" : "/admin/dailySales";
+
   try {
-    const response = await fetch(`${base}/admin/dailySales?${qs.toString()}`, {
+    const response = await fetch(`${base}${path}?${qs.toString()}`, {
       headers: { Authorization: `Bearer ${await user.getIdToken()}` },
     });
     if (!response.ok) return null;
@@ -125,10 +138,19 @@ async function fetchDailySalesFromSupabase(date?: string): Promise<DailySale[] |
   return fetchDailySalesTable(date);
 }
 
-/** Ventas en tienda física: BFF (service role) primero; fallback Supabase RPC / SELECT. */
-export async function fetchDailySales(date?: string): Promise<DailySale[]> {
-  const fromBff = await fetchDailySalesViaBff(date ? { fecha: date } : { sinceDays: 90 });
+/** Ventas en tienda física: BFF (service role) primero; fallback Supabase solo para admin. */
+export async function fetchDailySales(
+  date?: string,
+  scope: FinanceFetchScope = "admin",
+): Promise<DailySale[]> {
+  const fromBff = await fetchDailySalesViaBff(
+    date ? { fecha: date, scope } : { sinceDays: 90, scope },
+  );
   if (fromBff) return fromBff;
+
+  if (scope === "staff") {
+    throw new Error("No se pudieron cargar tus ventas diarias");
+  }
 
   const fromSupabase = await fetchDailySalesFromSupabase(date);
   if (fromSupabase) return fromSupabase;
@@ -148,12 +170,35 @@ export async function addDailySale(data: Omit<DailySale, "id" | "creadoEn">): Pr
 
 export type DailySaleAtomicInput = Omit<DailySale, "id" | "creadoEn" | "devuelto" | "motivoDevolucion" | "devueltoEn" | "canal">;
 
-export async function registerDailySalesAtomic(sales: DailySaleAtomicInput[]): Promise<string[]> {
-  const { data, error } = await supabase.rpc("register_daily_sales_atomic", {
-    p_sales: sales,
+/** Payload de registro sin costos (el BFF los calcula en servidor para trabajador). */
+export type StaffDailySaleAtomicInput = Omit<DailySaleAtomicInput, "costoUnitario" | "costoTotal" | "ganancia">;
+
+async function registerDailySalesViaBff(
+  path: "/staff/dailySales/register" | "/admin/dailySales/register",
+  sales: StaffDailySaleAtomicInput[] | DailySaleAtomicInput[],
+): Promise<string[]> {
+  const { ids } = await bffFetch<{ ids: string[] }>(path, {
+    method: "POST",
+    body: JSON.stringify({ sales }),
   });
-  if (error) throw error;
-  return (data as { ids?: string[] } | null)?.ids ?? [];
+  return ids ?? [];
+}
+
+export async function registerDailySalesAtomic(
+  sales: DailySaleAtomicInput[],
+  scope: FinanceFetchScope = "admin",
+): Promise<string[]> {
+  if (scope === "staff") {
+    const staffPayload: StaffDailySaleAtomicInput[] = sales.map(
+      ({ costoUnitario: _cu, costoTotal: _ct, ganancia: _g, ...rest }) => rest,
+    );
+    return registerDailySalesViaBff("/staff/dailySales/register", staffPayload);
+  }
+
+  const adminPayload: StaffDailySaleAtomicInput[] = sales.map(
+    ({ costoUnitario: _cu, costoTotal: _ct, ganancia: _g, ...rest }) => rest,
+  );
+  return registerDailySalesViaBff("/admin/dailySales/register", adminPayload);
 }
 
 export async function markSaleReturned(saleId: string, motivo: string): Promise<void> {
@@ -167,14 +212,17 @@ export async function markSaleReturned(saleId: string, motivo: string): Promise<
 
 export async function returnDailySaleAtomic(
   saleId: string,
-  motivo: string
+  motivo: string,
+  scope: FinanceFetchScope = "admin",
 ): Promise<Pick<DailySale, "id" | "productId" | "devuelto" | "motivoDevolucion" | "devueltoEn">> {
-  const { data, error } = await supabase.rpc("return_daily_sale_atomic", {
-    p_sale_id: saleId,
-    p_motivo: motivo,
+  const path = scope === "staff" ? "/staff/dailySales/return" : "/admin/dailySales/return";
+  const { sale } = await bffFetch<{
+    sale: Pick<DailySale, "id" | "productId" | "devuelto" | "motivoDevolucion" | "devueltoEn">;
+  }>(path, {
+    method: "POST",
+    body: JSON.stringify({ saleId, motivo }),
   });
-  if (error) throw error;
-  return data as Pick<DailySale, "id" | "productId" | "devuelto" | "motivoDevolucion" | "devueltoEn">;
+  return sale;
 }
 
 export async function decrementProductStock(

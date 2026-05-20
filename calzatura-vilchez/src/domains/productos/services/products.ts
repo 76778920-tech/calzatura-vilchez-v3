@@ -2,6 +2,7 @@ import { auth } from "@/firebase/config";
 import { supabase } from "@/supabase/client";
 import { logAudit } from "@/services/audit";
 import { postAdminBff } from "@/domains/productos/services/adminProductsBff";
+import type { PanelFetchScope } from "@/security/panelScope";
 import { bffFetch } from "@/utils/bffClient";
 import type { Product } from "@/types";
 import { effectiveFamiliaKey, tallyFamilyGroupSizes } from "@/utils/productFamily";
@@ -9,10 +10,11 @@ import { effectiveFamiliaKey, tallyFamilyGroupSizes } from "@/utils/productFamil
 const COL = "productos";
 const CODE_COL = "productoCodigos";
 
-/** Panel admin/staff: lista completa vía BFF (incluye inactivos). Catálogo público: `fetchPublicProducts`. */
-export async function fetchProducts(): Promise<Product[]> {
+/** Panel admin: todos los productos. Staff: solo activos. Público: `fetchPublicProducts`. */
+export async function fetchProducts(scope: PanelFetchScope = "admin"): Promise<Product[]> {
   if (auth.currentUser) {
-    const { products } = await bffFetch<{ products: Product[] }>("/admin/products");
+    const path = scope === "staff" ? "/staff/products" : "/admin/products";
+    const { products } = await bffFetch<{ products: Product[] }>(path);
     return products;
   }
   return fetchPublicProducts();
@@ -25,10 +27,11 @@ export async function fetchPublicProducts(): Promise<Product[]> {
   return data as Product[];
 }
 
-export async function fetchProductById(id: string): Promise<Product | null> {
+export async function fetchProductById(id: string, scope: PanelFetchScope = "admin"): Promise<Product | null> {
   if (auth.currentUser) {
     try {
-      const { product } = await bffFetch<{ product: Product }>(`/admin/products/${encodeURIComponent(id)}`);
+      const base = scope === "staff" ? "/staff/products" : "/admin/products";
+      const { product } = await bffFetch<{ product: Product }>(`${base}/${encodeURIComponent(id)}`);
       return product;
     } catch {
       return null;
@@ -202,13 +205,14 @@ export async function registrarIngresoStock(
   return result;
 }
 
-export async function fetchProductCodes(): Promise<Record<string, string>> {
-  const { data, error } = await supabase.from(CODE_COL).select("*");
-  if (error) throw error;
-  return (data ?? []).reduce<Record<string, string>>((acc, item) => {
-    if (item.codigo) acc[item.productoId] = item.codigo;
-    return acc;
-  }, {});
+/** Códigos internos: BFF admin (todos) o staff (solo productos activos). */
+export async function fetchProductCodes(scope: PanelFetchScope = "admin"): Promise<Record<string, string>> {
+  if (!auth.currentUser) {
+    return {};
+  }
+  const path = scope === "staff" ? "/staff/productCodes" : "/admin/productCodes";
+  const { codes } = await bffFetch<{ codes: Record<string, string> }>(path);
+  return codes ?? {};
 }
 
 export async function upsertProductCode(productId: string, codigo: string): Promise<void> {

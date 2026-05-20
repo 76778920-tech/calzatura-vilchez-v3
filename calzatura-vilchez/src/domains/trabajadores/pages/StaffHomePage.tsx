@@ -39,7 +39,7 @@ export default function StaffHomePage() {
   useEffect(() => {
     let active = true;
 
-    Promise.allSettled([fetchAllOrders(), fetchDailySales(date)])
+    Promise.allSettled([fetchAllOrders("staff"), fetchDailySales(date, "staff")])
       .then(([ordersResult, salesResult]) => {
         if (!active) return;
         const orders = ordersResult.status === "fulfilled" ? ordersResult.value : [];
@@ -63,7 +63,9 @@ export default function StaffHomePage() {
     const activeOrders = state.orders.filter((order) => order.estado === "pendiente" || order.estado === "pagado");
     const readyToPrepare = state.orders.filter((order) => order.estado === "pagado");
     const salesTotal = state.sales.filter((sale) => !sale.devuelto).reduce((acc, sale) => acc + sale.total, 0);
-    const profitTotal = state.sales.filter((sale) => !sale.devuelto).reduce((acc, sale) => acc + sale.ganancia, 0);
+    const pairsSold = state.sales
+      .filter((sale) => !sale.devuelto)
+      .reduce((acc, sale) => acc + sale.cantidad, 0);
     const latestOrders = [...activeOrders]
       .sort((a, b) => b.creadoEn.localeCompare(a.creadoEn))
       .slice(0, 3);
@@ -73,7 +75,7 @@ export default function StaffHomePage() {
       readyToPrepare: readyToPrepare.length,
       salesCount: state.sales.filter((sale) => !sale.devuelto).length,
       salesTotal,
-      profitTotal,
+      pairsSold,
       latestOrders,
     };
   }, [state.orders, state.sales]);
@@ -113,9 +115,9 @@ export default function StaffHomePage() {
         <article className="staff-ops-card">
           <span className="staff-ops-icon staff-ops-icon-blue"><TrendingUp size={22} /></span>
           <div>
-            <small>Ganancia estimada</small>
-            <strong>{state.loading ? "..." : currency(summary.profitTotal)}</strong>
-            <p>Calculada con ventas no devueltas.</p>
+            <small>Pares vendidos hoy</small>
+            <strong>{state.loading ? "..." : summary.pairsSold}</strong>
+            <p>Según ventas registradas en tienda.</p>
           </div>
         </article>
       </section>

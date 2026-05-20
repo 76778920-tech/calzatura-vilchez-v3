@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canAccessArea, isAdminRole } from "@/security/accessControl";
+import { canAccessArea, isAdminRole, isTrabajadorRole, panelFetchScopeForRole } from "@/security/accessControl";
 
 const SUPERADMIN = "76778920@continental.edu.pe";
 
@@ -34,6 +34,25 @@ describe("canAccessArea", () => {
     expect(canAccessArea("administradores", null, SUPERADMIN)).toBe(true);
     expect(canAccessArea("ventas", null, SUPERADMIN)).toBe(true);
     expect(canAccessArea("fabricantes", "cliente", SUPERADMIN)).toBe(true);
+  });
+});
+
+describe("isTrabajadorRole", () => {
+  it("solo rol trabajador", () => {
+    expect(isTrabajadorRole("trabajador")).toBe(true);
+    expect(isTrabajadorRole("admin")).toBe(false);
+    expect(isTrabajadorRole("cliente")).toBe(false);
+  });
+});
+
+describe("panelFetchScopeForRole", () => {
+  it("admin y superadmin usan scope admin", () => {
+    expect(panelFetchScopeForRole("admin")).toBe("admin");
+    expect(panelFetchScopeForRole("trabajador", SUPERADMIN)).toBe("admin");
+  });
+
+  it("trabajador usa scope staff", () => {
+    expect(panelFetchScopeForRole("trabajador")).toBe("staff");
   });
 });
 

@@ -19,7 +19,12 @@ Referencia de cierre de ítems “a medias” / “mal o falta”. Actualizar al
 | BPMN pedidos (PR-11–15) | Cerrado | `catalogo-mapas-procesos.md` |
 | BPMN PR-01–10 | Cerrado (texto) | `catalogo-mapas-procesos.md` alineado a Supabase/BFF |
 | firestore.rules | Legado | Comentario en archivo + negocio en Supabase |
-| Dominio trabajadores | Cerrado MVP | Rutas `/staff/*`, `StaffLayout`, pedidos/ventas |
+| Dominio trabajadores | Cerrado | Rutas `/staff/*`, BFF `/staff/*`, RLS ventas/finanzas — ver `ISO-CUMPLIMIENTO-INTERNO.md` |
+| Endurecimiento ISO trabajador | Cerrado | `20260519140000`, `20260519140100`, endpoints staff/admin separados |
+| Matriz ISO interna | Cerrado | `docs/ISO-CUMPLIMIENTO-INTERNO.md` |
+| Validación server-side ventas (min/max, activo) | Cerrado | BFF `validateDailySalesRegister` |
+| Auditoría ventas tienda | Cerrado | `registrar_venta` / `devolver_venta` en tabla `auditoria` |
+| Códigos producto vía BFF (staff) | Cerrado | `/staff/productCodes`, sin SELECT directo en ventas |
 | AdminPredictions tamaño | Fase 1 cerrada | `adminPredictionsTypes.ts`; lógica UI en fase 2 (`predictions/REFACTOR.md`) |
 | Vitest rutas/predictions | Cerrado | `staffRedirects.test.ts`, `adminPredictionsTypes.test.ts` + services/utils + E2E |
 | DNI rate limit global | Cerrado (opt-in) | Upstash REST si `UPSTASH_REDIS_*`; si no, memoria por instancia |

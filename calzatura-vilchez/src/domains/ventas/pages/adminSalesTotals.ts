@@ -1,8 +1,8 @@
-import type { DailySale } from "@/types";
+import type { DailySale, ProductFinancial, ProductPriceRange } from "@/types";
 
 export function computeAdminSalesTotals<
   L extends { productId: string; quantity: number; salePrice: number },
-  P extends { id: string; finanzas?: { costoCompra: number } },
+  P extends { id: string; finanzas?: ProductFinancial | ProductPriceRange },
 >(
   sales: DailySale[],
   pendingLines: L[],
@@ -17,7 +17,7 @@ export function computeAdminSalesTotals<
       (acc, sale) => ({
         cantidad: acc.cantidad + sale.cantidad,
         total: acc.total + sale.total,
-        ganancia: acc.ganancia + sale.ganancia,
+        ganancia: acc.ganancia + (sale.ganancia ?? 0),
       }),
       { cantidad: 0, total: 0, ganancia: 0 },
     );

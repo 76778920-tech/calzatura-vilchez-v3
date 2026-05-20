@@ -74,6 +74,8 @@ const {
   idempotencyOrderJson,
 } = require("../functions/fnUtils");
 const { handleLookupDni } = require("./lookupDni.cjs");
+const { redactOrderForStaff } = require("./privacy.cjs");
+const { buildCloudinaryUploadSignature } = require("./cloudinarySign.cjs");
 
 function loadFirebaseServiceAccount() {
   const filePath = process.env.FIREBASE_SERVICE_ACCOUNT_FILE;
@@ -168,7 +170,7 @@ async function assertAdminRole(supabase, uid) {
   if (data?.rol === "admin") {
     return;
   }
-  throw Object.assign(new Error("Solo administradores pueden consultar el servicio de IA"), { status: 403 });
+  throw Object.assign(new Error("Sin permisos de administrador"), { status: 403 });
 }
 
 async function assertStaffRole(supabase, uid) {
@@ -177,9 +179,73 @@ async function assertStaffRole(supabase, uid) {
     throw Object.assign(new Error("No se pudo verificar el rol"), { status: 500 });
   }
   if (data?.rol === "admin" || data?.rol === "trabajador") {
-    return;
+    return data.rol;
   }
   throw Object.assign(new Error("Sin permisos para gestionar pedidos"), { status: 403 });
+}
+
+async function assertTrabajadorRole(supabase, uid) {
+  const { data, error } = await supabase.from("usuarios").select("rol").eq("uid", uid).maybeSingle();
+  if (error) {
+    throw Object.assign(new Error("No se pudo verificar el rol"), { status: 500 });
+  }
+  if (data?.rol === "trabajador") {
+    return;
+  }
+  throw Object.assign(new Error("Sin permisos de trabajador"), { status: 403 });
+}
+
+const ADMIN_DATA_EXPORT_COLLECTIONS = new Set([
+  "productos",
+  "productoFinanzas",
+  "fabricantes",
+  "ventasDiarias",
+  "pedidos",
+  "usuarios",
+]);
+const ADMIN_DATA_IMPORT_COLLECTIONS = new Set([
+  "productos",
+  "productoFinanzas",
+  "fabricantes",
+  "ventasDiarias",
+]);
+const ADMIN_DATA_MAX_IMPORT_ROWS = 5000;
+
+function assertAdminDataCollection(collection, { importable = false } = {}) {
+  const allowed = importable ? ADMIN_DATA_IMPORT_COLLECTIONS : ADMIN_DATA_EXPORT_COLLECTIONS;
+  if (!allowed.has(collection)) {
+    throw Object.assign(new Error("Coleccion no permitida"), { status: 400 });
+  }
+}
+
+function assertImportRowsEsDePrueba(rows) {
+  for (let i = 0; i < rows.length; i += 1) {
+    if (rows[i]?.esDePrueba !== true) {
+      throw Object.assign(
+        new Error(`Fila ${i + 1}: solo se permiten datos de prueba (esDePrueba=true)`),
+        { status: 400 },
+      );
+    }
+  }
+}
+
+async function loadProductIdSet(supabase) {
+  const { data, error } = await supabase.from("productos").select("id");
+  if (error) {
+    throw error;
+  }
+  return new Set((data ?? []).map((item) => String(item.id || "").trim()).filter(Boolean));
+}
+
+async function assertOrderResponseForRole(supabase, decodedToken, order) {
+  const { data, error } = await supabase.from("usuarios").select("rol").eq("uid", decodedToken.uid).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  if (data?.rol === "trabajador") {
+    return redactOrderForStaff(order);
+  }
+  return order;
 }
 
 async function assertPsychologistRole(supabase, uid) {
@@ -1757,6 +1823,281 @@ function sanitizeStorageFilename(fileName) {
     .slice(0, 80) || "informe.pdf";
 }
 
+const DAILY_SALE_STAFF_OMIT_FIELDS = new Set(["ganancia", "costoUnitario", "costoTotal"]);
+
+function redactDailySaleForStaff(sale) {
+  const redacted = { ...sale };
+  for (const field of DAILY_SALE_STAFF_OMIT_FIELDS) {
+    delete redacted[field];
+  }
+  return redacted;
+}
+
+function redactWorkerPerformanceForStaff(performance) {
+  if (!performance || typeof performance !== "object") {
+    return performance;
+  }
+  const redacted = { ...performance };
+  delete redacted.gananciaTotal;
+  return redacted;
+}
+
+async function returnDailySaleOrThrow(supabase, saleId, motivo, options = {}) {
+  const ownerUid = options.ownerUid;
+  if (ownerUid) {
+    const { data: sale, error: readErr } = await supabase
+      .from("ventasDiarias")
+      .select("encargadoUid")
+      .eq("id", saleId)
+      .maybeSingle();
+    if (readErr) {
+      throw readErr;
+    }
+    if (!sale) {
+      throw Object.assign(new Error("Venta no encontrada"), { status: 404 });
+    }
+    if (sale.encargadoUid && sale.encargadoUid !== ownerUid) {
+      throw Object.assign(new Error("No puedes devolver una venta de otro encargado"), { status: 403 });
+    }
+  }
+
+  const { data, error } = await supabase.rpc("return_daily_sale_atomic", {
+    p_sale_id: saleId,
+    p_motivo: motivo,
+  });
+  if (error) {
+    throw error;
+  }
+  return data;
+}
+
+function toStaffProductPriceRange(row) {
+  return {
+    productId: row.productId,
+    margenMinimo: Number(row.margenMinimo) || 0,
+    margenObjetivo: Number(row.margenObjetivo) || 0,
+    margenMaximo: Number(row.margenMaximo) || 0,
+    precioMinimo: Number(row.precioMinimo) || 0,
+    precioSugerido: Number(row.precioSugerido) || 0,
+    precioMaximo: Number(row.precioMaximo) || 0,
+    actualizadoEn: row.actualizadoEn || "",
+  };
+}
+
+async function loadProductFinancialsMap(supabase, productIds) {
+  if (productIds.length === 0) {
+    return new Map();
+  }
+  const { data: finanzas, error } = await supabase
+    .from("productoFinanzas")
+    .select("productId,costoCompra,precioMinimo,precioMaximo")
+    .in("productId", productIds);
+  if (error) {
+    throw error;
+  }
+  return new Map((finanzas ?? []).map((row) => [row.productId, row]));
+}
+
+function stripClientFinancialFields(sale) {
+  const payload = { ...sale };
+  for (const field of DAILY_SALE_STAFF_OMIT_FIELDS) {
+    delete payload[field];
+  }
+  return payload;
+}
+
+/**
+ * Validación server-side (ISO 27001): precio en rango, producto activo (staff), encargado y cantidades.
+ */
+async function validateDailySalesRegister(supabase, sales, options = {}) {
+  const { requireActiveProduct = false, ownerUid } = options;
+  if (!Array.isArray(sales) || sales.length === 0) {
+    throw Object.assign(new Error("No hay ventas para registrar"), { status: 400 });
+  }
+
+  const productIds = [...new Set(sales.map((sale) => String(sale?.productId || "").trim()).filter(Boolean))];
+  const financialsByProduct = await loadProductFinancialsMap(supabase, productIds);
+
+  for (const sale of sales) {
+    const productId = String(sale?.productId || "").trim();
+    const encargadoUid = String(sale?.encargadoUid || "").trim();
+    const cantidad = Number(sale?.cantidad);
+    const precioVenta = Number(sale?.precioVenta);
+
+    if (!productId) {
+      throw Object.assign(new Error("Producto invalido en la venta"), { status: 400 });
+    }
+    if (ownerUid && encargadoUid !== ownerUid) {
+      throw Object.assign(new Error("No puedes registrar ventas de otro encargado"), { status: 403 });
+    }
+    if (!encargadoUid) {
+      throw Object.assign(new Error("Encargado de venta requerido"), { status: 400 });
+    }
+    if (!Number.isInteger(cantidad) || cantidad <= 0) {
+      throw Object.assign(new Error("Cantidad invalida en la venta"), { status: 400 });
+    }
+    if (!Number.isFinite(precioVenta) || precioVenta <= 0) {
+      throw Object.assign(new Error("Precio de venta invalido"), { status: 400 });
+    }
+
+    const { data: product, error: productError } = await supabase
+      .from("productos")
+      .select("id,activo,nombre")
+      .eq("id", productId)
+      .maybeSingle();
+    if (productError) {
+      throw productError;
+    }
+    if (!product) {
+      throw Object.assign(new Error("Producto no encontrado"), { status: 404 });
+    }
+    if (requireActiveProduct && product.activo !== true) {
+      throw Object.assign(new Error("Producto no disponible para venta en tienda"), { status: 400 });
+    }
+
+    const fin = financialsByProduct.get(productId);
+    if (!fin) {
+      throw Object.assign(
+        new Error(`El producto "${product.nombre || productId}" no tiene rango de precio registrado`),
+        { status: 400 },
+      );
+    }
+
+    const precioMinimo = Number(fin.precioMinimo);
+    const precioMaximo = Number(fin.precioMaximo);
+    if (precioVenta < precioMinimo || precioVenta > precioMaximo) {
+      throw Object.assign(
+        new Error(
+          `Precio fuera de rango para "${product.nombre || productId}" (min ${precioMinimo}, max ${precioMaximo})`,
+        ),
+        { status: 400 },
+      );
+    }
+  }
+
+  return sales;
+}
+
+async function enrichDailySalesWithCosts(supabase, sales) {
+  const productIds = [...new Set(sales.map((sale) => sale.productId).filter(Boolean))];
+  const financialsByProduct = await loadProductFinancialsMap(supabase, productIds);
+
+  return sales.map((sale) => {
+    const cantidad = Math.max(0, Number(sale.cantidad) || 0);
+    const precioVenta = Number(sale.precioVenta) || 0;
+    const total = Number(sale.total) || money(precioVenta * cantidad);
+    const fin = financialsByProduct.get(sale.productId);
+    const costoUnitario = Math.max(0, Number(fin?.costoCompra) || 0);
+    const costoTotal = money(costoUnitario * cantidad);
+    return {
+      ...sale,
+      total,
+      costoUnitario,
+      costoTotal,
+      ganancia: money(total - costoTotal),
+    };
+  });
+}
+
+async function registerDailySalesBatch(supabase, sales, auditContext) {
+  const { data, error } = await supabase.rpc("register_daily_sales_atomic", { p_sales: sales });
+  if (error) {
+    throw error;
+  }
+  const ids = (data && typeof data === "object" && Array.isArray(data.ids)) ? data.ids : [];
+  for (const saleId of ids) {
+    await logAuditFn(
+      supabase,
+      "registrar_venta",
+      "venta_diaria",
+      saleId,
+      saleId ? `#${String(saleId).slice(-8).toUpperCase()}` : "venta",
+      auditContext.uid,
+      auditContext.email || "",
+      { source: auditContext.source, cantidad: sales.length },
+    );
+  }
+  return ids;
+}
+
+async function fetchProductCodesMap(supabase, options = {}) {
+  const activeOnly = options.activeOnly === true;
+  let productIds = null;
+  if (activeOnly) {
+    const { data: products, error: productsError } = await supabase
+      .from("productos")
+      .select("id")
+      .eq("activo", true);
+    if (productsError) {
+      throw productsError;
+    }
+    productIds = (products ?? []).map((row) => row.id).filter(Boolean);
+    if (productIds.length === 0) {
+      return {};
+    }
+  }
+
+  let query = supabase.from("productoCodigos").select("productoId,codigo");
+  if (productIds) {
+    query = query.in("productoId", productIds);
+  }
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+  return (data ?? []).reduce((acc, row) => {
+    if (row.codigo && row.productoId) {
+      acc[row.productoId] = row.codigo;
+    }
+    return acc;
+  }, {});
+}
+
+async function assertOrderReadAccess(supabase, decodedToken, order) {
+  if (order?.userId === decodedToken.uid) {
+    return;
+  }
+  const { data, error } = await supabase.from("usuarios").select("rol").eq("uid", decodedToken.uid).maybeSingle();
+  if (error) {
+    throw error;
+  }
+  if (data?.rol === "admin" || data?.rol === "trabajador") {
+    return;
+  }
+  throw Object.assign(new Error("No autorizado para ver este pedido"), { status: 403 });
+}
+
+function parseDailySalesQuery(req) {
+  const fecha = typeof req.query.fecha === "string" ? req.query.fecha.trim() : "";
+  const sinceDays = Math.min(
+    365,
+    Math.max(1, Number.parseInt(String(req.query.sinceDays ?? "90"), 10) || 90),
+  );
+  return { fecha, sinceDays };
+}
+
+async function queryDailySales(supabase, { fecha, sinceDays, encargadoUid }) {
+  let query = supabase.from("ventasDiarias").select("*");
+  if (encargadoUid) {
+    query = query.eq("encargadoUid", encargadoUid);
+  }
+  if (fecha) {
+    query = query.eq("fecha", fecha);
+  } else {
+    query = query
+      .gte("fecha", sinceDateISO(sinceDays))
+      .order("fecha", { ascending: false })
+      .limit(500);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).sort((a, b) => String(b.creadoEn || "").localeCompare(String(a.creadoEn || "")));
+}
+
 app.get("/admin/dailySales", (req, res) => {
   cors(req, res, async () => {
     if (req.method !== "GET") {
@@ -1765,33 +2106,171 @@ app.get("/admin/dailySales", (req, res) => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertAdminRole(supabase, decodedToken.uid);
 
-      const fecha = typeof req.query.fecha === "string" ? req.query.fecha.trim() : "";
-      const sinceDays = Math.min(
-        365,
-        Math.max(1, Number.parseInt(String(req.query.sinceDays ?? "90"), 10) || 90),
-      );
-
-      let query = supabase.from("ventasDiarias").select("*");
-      if (fecha) {
-        query = query.eq("fecha", fecha);
-      } else {
-        query = query
-          .gte("fecha", sinceDateISO(sinceDays))
-          .order("fecha", { ascending: false })
-          .limit(500);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const sales = (data ?? []).sort((a, b) =>
-        String(b.creadoEn || "").localeCompare(String(a.creadoEn || "")),
-      );
+      const sales = await queryDailySales(supabase, parseDailySalesQuery(req));
       return res.status(200).json({ sales });
     } catch (error) {
       console.error("admin/dailySales error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/staff/dailySales", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "GET") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertTrabajadorRole(supabase, decodedToken.uid);
+
+      const sales = await queryDailySales(supabase, {
+        ...parseDailySalesQuery(req),
+        encargadoUid: decodedToken.uid,
+      });
+      return res.status(200).json({ sales: sales.map(redactDailySaleForStaff) });
+    } catch (error) {
+      console.error("staff/dailySales error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/staff/dailySales/register", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertTrabajadorRole(supabase, decodedToken.uid);
+
+      const incoming = Array.isArray(req.body?.sales) ? req.body.sales : [];
+      if (incoming.length === 0) {
+        return res.status(400).json({ error: "No hay ventas para registrar" });
+      }
+
+      const sanitized = incoming.map((sale) => stripClientFinancialFields(sale));
+      const validated = await validateDailySalesRegister(supabase, sanitized, {
+        requireActiveProduct: true,
+        ownerUid: decodedToken.uid,
+      });
+      const enriched = await enrichDailySalesWithCosts(supabase, validated);
+      const ids = await registerDailySalesBatch(supabase, enriched, {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        source: "staff/dailySales/register",
+      });
+      return res.status(200).json({ ids });
+    } catch (error) {
+      console.error("staff/dailySales/register error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/admin/dailySales/register", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+
+      const incoming = Array.isArray(req.body?.sales) ? req.body.sales : [];
+      if (incoming.length === 0) {
+        return res.status(400).json({ error: "No hay ventas para registrar" });
+      }
+
+      const sanitized = incoming.map((sale) => stripClientFinancialFields(sale));
+      const validated = await validateDailySalesRegister(supabase, sanitized);
+      const enriched = await enrichDailySalesWithCosts(supabase, validated);
+      const ids = await registerDailySalesBatch(supabase, enriched, {
+        uid: decodedToken.uid,
+        email: decodedToken.email,
+        source: "admin/dailySales/register",
+      });
+      return res.status(200).json({ ids });
+    } catch (error) {
+      console.error("admin/dailySales/register error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/staff/dailySales/return", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertTrabajadorRole(supabase, decodedToken.uid);
+
+      const saleId = String(req.body?.saleId || "").trim();
+      const motivo = String(req.body?.motivo || "").trim();
+      if (!saleId || !motivo) {
+        return res.status(400).json({ error: "Venta o motivo invalido" });
+      }
+
+      const data = await returnDailySaleOrThrow(supabase, saleId, motivo, {
+        ownerUid: decodedToken.uid,
+      });
+      await logAuditFn(
+        supabase,
+        "devolver_venta",
+        "venta_diaria",
+        saleId,
+        `#${String(saleId).slice(-8).toUpperCase()}`,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { source: "staff/dailySales/return", motivo },
+      );
+      return res.status(200).json({ sale: data });
+    } catch (error) {
+      console.error("staff/dailySales/return error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/admin/dailySales/return", (req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== "POST") {
+      return res.status(405).json({ error: "Metodo no permitido" });
+    }
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+
+      const saleId = String(req.body?.saleId || "").trim();
+      const motivo = String(req.body?.motivo || "").trim();
+      if (!saleId || !motivo) {
+        return res.status(400).json({ error: "Venta o motivo invalido" });
+      }
+
+      const data = await returnDailySaleOrThrow(supabase, saleId, motivo);
+      await logAuditFn(
+        supabase,
+        "devolver_venta",
+        "venta_diaria",
+        saleId,
+        `#${String(saleId).slice(-8).toUpperCase()}`,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { source: "admin/dailySales/return", motivo },
+      );
+      return res.status(200).json({ sale: data });
+    } catch (error) {
+      console.error("admin/dailySales/return error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -1802,7 +2281,7 @@ app.get("/staff/performance", (req, res) => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertTrabajadorRole(supabase, decodedToken.uid);
       const period = validPeriod(String(req.query.periodo || ""));
       const { data: worker, error } = await supabase
         .from("usuarios")
@@ -1821,7 +2300,7 @@ app.get("/staff/performance", (req, res) => {
         fetchWorkerActiveCase(supabase, worker.uid, period),
       ]);
       return res.status(200).json({
-        performance,
+        performance: redactWorkerPerformanceForStaff(performance),
         historialDiario,
         notificaciones,
         citas,
@@ -2708,7 +3187,7 @@ app.post("/updateProductAtomic", (req, res) => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertAdminRole(supabase, decodedToken.uid);
       const { p_id, product, codigo, finanzas } = req.body || {};
       if (!p_id || typeof p_id !== "string" || !product || !codigo || !finanzas) {
         return res.status(400).json({ error: "Datos de producto incompletos" });
@@ -2746,7 +3225,7 @@ app.post("/createProductVariantsAtomic", (req, res) => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertAdminRole(supabase, decodedToken.uid);
       const { variants } = req.body || {};
       if (!Array.isArray(variants) || variants.length === 0) {
         return res.status(400).json({ error: "Variantes invalidas" });
@@ -2770,7 +3249,7 @@ app.post("/deleteProductAtomic", (req, res) => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertAdminRole(supabase, decodedToken.uid);
       const { p_id } = req.body || {};
       if (!p_id || typeof p_id !== "string") {
         return res.status(400).json({ error: "Producto invalido" });
@@ -2793,7 +3272,7 @@ app.post("/registrarIngresoStock", (req, res) => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertAdminRole(supabase, decodedToken.uid);
       const {
         p_product_id,
         p_talla_stock,
@@ -3049,10 +3528,9 @@ app.get("/orders/:orderId", (req, res) => {
         return res.status(400).json({ error: "Pedido invalido" });
       }
       const order = await fetchOrderOrThrow(supabase, orderId);
-      if (order.userId !== decodedToken.uid) {
-        await assertStaffRole(supabase, decodedToken.uid);
-      }
-      return res.status(200).json({ order });
+      await assertOrderReadAccess(supabase, decodedToken, order);
+      const safeOrder = await assertOrderResponseForRole(supabase, decodedToken, order);
+      return res.status(200).json({ order: safeOrder });
     } catch (error) {
       console.error("orders/:orderId error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
@@ -3065,7 +3543,7 @@ app.get("/admin/orders", (req, res) => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertAdminRole(supabase, decodedToken.uid);
       const { data, error } = await supabase
         .from("pedidos")
         .select("*")
@@ -3074,6 +3552,26 @@ app.get("/admin/orders", (req, res) => {
       return res.status(200).json({ orders: data ?? [] });
     } catch (error) {
       console.error("admin/orders error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/staff/orders", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertTrabajadorRole(supabase, decodedToken.uid);
+      const { data, error } = await supabase
+        .from("pedidos")
+        .select("*")
+        .order("creadoEn", { ascending: false });
+      if (error) throw error;
+      const orders = (data ?? []).map(redactOrderForStaff);
+      return res.status(200).json({ orders });
+    } catch (error) {
+      console.error("staff/orders error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3095,12 +3593,271 @@ app.get("/admin/users", (req, res) => {
   });
 });
 
+app.get("/admin/data/product-ids", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const ids = await loadProductIdSet(supabase);
+      return res.status(200).json({ ids: Array.from(ids) });
+    } catch (error) {
+      console.error("admin/data/product-ids error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/data/export", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const collection = String(req.query.collection || "").trim();
+      assertAdminDataCollection(collection);
+      const { data, error } = await supabase.from(collection).select("*");
+      if (error) throw error;
+      let extra = undefined;
+      if (collection === "productos") {
+        const { data: codes, error: codesErr } = await supabase
+          .from("productoCodigos")
+          .select("productoId, codigo");
+        if (codesErr) throw codesErr;
+        extra = (codes ?? []).reduce((acc, row) => {
+          if (row.codigo) acc[row.productoId] = row.codigo;
+          return acc;
+        }, {});
+      }
+      return res.status(200).json({ rows: data ?? [], extra });
+    } catch (error) {
+      console.error("admin/data/export error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/admin/data/import", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const { collection, rows, productCodes, onConflict } = req.body || {};
+      const table = String(collection || "").trim();
+      const conflictColumn =
+        typeof onConflict === "string" && onConflict.trim() ? onConflict.trim() : undefined;
+      assertAdminDataCollection(table, { importable: true });
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return res.status(400).json({ error: "Sin filas para importar" });
+      }
+      if (rows.length > ADMIN_DATA_MAX_IMPORT_ROWS) {
+        return res.status(400).json({ error: "Demasiadas filas en una sola importacion" });
+      }
+      assertImportRowsEsDePrueba(rows);
+
+      let validProductIds = null;
+      if (table === "ventasDiarias" || table === "productoFinanzas") {
+        validProductIds = await loadProductIdSet(supabase);
+        for (let i = 0; i < rows.length; i += 1) {
+          const productId = String(rows[i]?.productId || "").trim();
+          if (productId && !validProductIds.has(productId)) {
+            return res.status(400).json({
+              error: `Fila ${i + 1}: productId '${productId}' no existe en productos`,
+            });
+          }
+        }
+      }
+
+      const CHUNK = 500;
+      let imported = 0;
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        const chunk = rows.slice(i, i + CHUNK);
+        const upsertOpts = conflictColumn ? { onConflict: conflictColumn } : undefined;
+        const { error } = await supabase.from(table).upsert(chunk, upsertOpts);
+        if (error) throw error;
+        imported += chunk.length;
+      }
+
+      if (table === "productos" && Array.isArray(productCodes) && productCodes.length > 0) {
+        const codes = productCodes
+          .map((row) => ({
+            productoId: String(row.productoId || "").trim(),
+            codigo: String(row.codigo || "").trim(),
+            actualizadoEn: new Date().toISOString(),
+          }))
+          .filter((row) => row.productoId && row.codigo);
+        if (codes.length > 0) {
+          const { error: codesErr } = await supabase
+            .from("productoCodigos")
+            .upsert(codes, { onConflict: "productoId" });
+          if (codesErr) throw codesErr;
+        }
+      }
+
+      await logAuditFn(
+        supabase,
+        "importar",
+        "admin_data",
+        table,
+        table,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { rows: imported },
+      );
+      return res.status(200).json({ ok: true, imported });
+    } catch (error) {
+      console.error("admin/data/import error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/data/test-batches", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const results = await Promise.all(
+        Array.from(ADMIN_DATA_IMPORT_COLLECTIONS).map(async (colId) => {
+          const { data, error } = await supabase.from(colId).select("*").eq("esDePrueba", true);
+          if (error) throw error;
+          return (data ?? []).map((item) => ({ colId, data: item }));
+        }),
+      );
+      return res.status(200).json({ docs: results.flat() });
+    } catch (error) {
+      console.error("admin/data/test-batches error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.delete("/admin/data/test-data", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const mode = String(req.query.mode || "").trim();
+      const escenario = String(req.query.escenario || "").trim();
+      const loteImportacion = String(req.query.loteImportacion || "").trim();
+
+      if (mode === "scenario") {
+        if (!escenario) {
+          return res.status(400).json({ error: "escenario requerido" });
+        }
+        await Promise.all(
+          Array.from(ADMIN_DATA_IMPORT_COLLECTIONS).map((colId) =>
+            supabase.from(colId).delete().eq("esDePrueba", true).eq("escenario", escenario),
+          ),
+        );
+        return res.status(200).json({ ok: true });
+      }
+
+      if (mode === "batch") {
+        if (!loteImportacion) {
+          return res.status(400).json({ error: "loteImportacion requerido" });
+        }
+        await Promise.all(
+          Array.from(ADMIN_DATA_IMPORT_COLLECTIONS).map((colId) =>
+            supabase
+              .from(colId)
+              .delete()
+              .eq("esDePrueba", true)
+              .eq("loteImportacion", loteImportacion),
+          ),
+        );
+        return res.status(200).json({ ok: true });
+      }
+
+      return res.status(400).json({ error: "mode invalido (scenario|batch)" });
+    } catch (error) {
+      console.error("admin/data/test-data error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/data/sales/count", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const until = String(req.query.until || "").trim();
+      if (!until) {
+        return res.status(400).json({ error: "until requerido (YYYY-MM-DD)" });
+      }
+      const { count, error } = await supabase
+        .from("ventasDiarias")
+        .select("*", { count: "exact", head: true })
+        .lte("fecha", until);
+      if (error) throw error;
+      return res.status(200).json({ count: count ?? 0 });
+    } catch (error) {
+      console.error("admin/data/sales/count error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.delete("/admin/data/sales", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const until = String(req.query.until || "").trim();
+      if (!until) {
+        return res.status(400).json({ error: "until requerido (YYYY-MM-DD)" });
+      }
+      const { count } = await supabase
+        .from("ventasDiarias")
+        .select("*", { count: "exact", head: true })
+        .lte("fecha", until);
+      const { error } = await supabase.from("ventasDiarias").delete().lte("fecha", until);
+      if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "eliminar",
+        "ventasDiarias",
+        until,
+        `ventas hasta ${until}`,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { deleted: count ?? 0 },
+      );
+      return res.status(200).json({ ok: true, deleted: count ?? 0 });
+    } catch (error) {
+      console.error("admin/data/sales error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/admin/media/cloudinary-signature", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const payload = buildCloudinaryUploadSignature();
+      return res.status(200).json(payload);
+    } catch (error) {
+      console.error("admin/media/cloudinary-signature error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.get("/admin/productFinanzas", (req, res) => {
   cors(req, res, async () => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertAdminRole(supabase, decodedToken.uid);
       const { data, error } = await supabase.from("productoFinanzas").select("*");
       if (error) throw error;
       return res.status(200).json({ rows: data ?? [] });
@@ -3111,12 +3868,32 @@ app.get("/admin/productFinanzas", (req, res) => {
   });
 });
 
+app.get("/staff/productPriceRanges", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertTrabajadorRole(supabase, decodedToken.uid);
+      const { data, error } = await supabase
+        .from("productoFinanzas")
+        .select(
+          "productId,margenMinimo,margenObjetivo,margenMaximo,precioMinimo,precioSugerido,precioMaximo,actualizadoEn",
+        );
+      if (error) throw error;
+      return res.status(200).json({ rows: (data ?? []).map(toStaffProductPriceRange) });
+    } catch (error) {
+      console.error("staff/productPriceRanges error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.get("/admin/products", (req, res) => {
   cors(req, res, async () => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertAdminRole(supabase, decodedToken.uid);
       const { data, error } = await supabase.from("productos").select("*").order("nombre");
       if (error) throw error;
       return res.status(200).json({ products: data ?? [] });
@@ -3127,12 +3904,32 @@ app.get("/admin/products", (req, res) => {
   });
 });
 
+app.get("/staff/products", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertTrabajadorRole(supabase, decodedToken.uid);
+      const { data, error } = await supabase
+        .from("productos")
+        .select("*")
+        .eq("activo", true)
+        .order("nombre");
+      if (error) throw error;
+      return res.status(200).json({ products: data ?? [] });
+    } catch (error) {
+      console.error("staff/products error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.get("/admin/products/:productId", (req, res) => {
   cors(req, res, async () => {
     try {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
-      await assertStaffRole(supabase, decodedToken.uid);
+      await assertAdminRole(supabase, decodedToken.uid);
       const productId = String(req.params.productId || "").trim();
       if (!productId) {
         return res.status(400).json({ error: "Producto invalido" });
@@ -3145,6 +3942,64 @@ app.get("/admin/products/:productId", (req, res) => {
       return res.status(200).json({ product: data });
     } catch (error) {
       console.error("admin/products/:id error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/productCodes", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const codes = await fetchProductCodesMap(supabase);
+      return res.status(200).json({ codes });
+    } catch (error) {
+      console.error("admin/productCodes error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/staff/productCodes", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertTrabajadorRole(supabase, decodedToken.uid);
+      const codes = await fetchProductCodesMap(supabase, { activeOnly: true });
+      return res.status(200).json({ codes });
+    } catch (error) {
+      console.error("staff/productCodes error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/staff/products/:productId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertTrabajadorRole(supabase, decodedToken.uid);
+      const productId = String(req.params.productId || "").trim();
+      if (!productId) {
+        return res.status(400).json({ error: "Producto invalido" });
+      }
+      const { data, error } = await supabase
+        .from("productos")
+        .select("*")
+        .eq("id", productId)
+        .eq("activo", true)
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        return res.status(404).json({ error: "Producto no encontrado" });
+      }
+      return res.status(200).json({ product: data });
+    } catch (error) {
+      console.error("staff/products/:id error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });

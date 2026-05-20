@@ -95,7 +95,7 @@ describe("finance service", () => {
     });
   });
 
-  it("fetchDailySales usa BFF cuando hay sesión y responde sales", async () => {
+  it("fetchDailySales usa BFF admin cuando hay sesión y responde sales", async () => {
     getBackendApiBaseUrlMock.mockReturnValue("https://bff.example");
     authState.user = { getIdToken: getIdTokenMock };
     const fetchMock = vi.mocked(fetch);
@@ -109,13 +109,29 @@ describe("finance service", () => {
       }),
     } as Response);
 
-    const rows = await fetchDailySales("2026-05-13");
+    const rows = await fetchDailySales("2026-05-13", "admin");
 
     expect(fetchMock).toHaveBeenCalledWith(
       "https://bff.example/admin/dailySales?fecha=2026-05-13",
       expect.objectContaining({ headers: { Authorization: "Bearer token-test" } }),
     );
     expect(rows.map((r) => r.id)).toEqual(["b1", "b2"]);
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("fetchDailySales staff consulta /staff/dailySales y no hace fallback Supabase", async () => {
+    getBackendApiBaseUrlMock.mockReturnValue("https://bff.example");
+    authState.user = { getIdToken: getIdTokenMock };
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValue({ ok: false } as Response);
+
+    await expect(fetchDailySales("2026-05-13", "staff")).rejects.toThrow(
+      "No se pudieron cargar tus ventas diarias",
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://bff.example/staff/dailySales?fecha=2026-05-13",
+      expect.any(Object),
+    );
     expect(rpcMock).not.toHaveBeenCalled();
   });
 
@@ -150,7 +166,7 @@ describe("finance service", () => {
     );
   });
 
-  it("fetchProductFinancials indexa resultados por productId", async () => {
+  it("fetchProductFinancials indexa resultados por productId (admin)", async () => {
     bffFetchMock.mockResolvedValue({
       rows: [
         { productId: "p1", costoCompra: 80 },
@@ -158,11 +174,22 @@ describe("finance service", () => {
       ],
     });
 
-    await expect(fetchProductFinancials()).resolves.toEqual({
+    await expect(fetchProductFinancials("admin")).resolves.toEqual({
       p1: { productId: "p1", costoCompra: 80 },
       p2: { productId: "p2", costoCompra: 120 },
     });
     expect(bffFetchMock).toHaveBeenCalledWith("/admin/productFinanzas");
+  });
+
+  it("fetchProductFinancials usa rangos de precio para staff", async () => {
+    bffFetchMock.mockResolvedValue({
+      rows: [{ productId: "p1", precioMinimo: 100, precioSugerido: 120, precioMaximo: 140 }],
+    });
+
+    await expect(fetchProductFinancials("staff")).resolves.toEqual({
+      p1: { productId: "p1", precioMinimo: 100, precioSugerido: 120, precioMaximo: 140 },
+    });
+    expect(bffFetchMock).toHaveBeenCalledWith("/staff/productPriceRanges");
   });
 
   it("upsertProductFinancial guarda fecha de actualizacion", async () => {
@@ -281,17 +308,41 @@ describe("finance service", () => {
     });
   });
 
-  it("registerDailySalesAtomic devuelve ids del RPC", async () => {
-    rpcMock.mockResolvedValue({ data: { ids: ["s1", "s2"] }, error: null });
+  it("registerDailySalesAtomic registra via BFF (admin)", async () => {
+    bffFetchMock.mockResolvedValue({ ids: ["s1", "s2"] });
 
     await expect(
-      registerDailySalesAtomic([
-        { fecha: "2026-05-13", total: 50, productId: "p1", cantidad: 1 } as never,
-      ]),
+      registerDailySalesAtomic(
+        [{ fecha: "2026-05-13", total: 50, productId: "p1", cantidad: 1 } as never],
+        "admin",
+      ),
     ).resolves.toEqual(["s1", "s2"]);
+
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/admin/dailySales/register",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("returnDailySaleAtomic devuelve fila devuelta", async () => {
+  it("registerDailySalesAtomic staff registra via BFF", async () => {
+    bffFetchMock.mockResolvedValue({ ids: ["s9"] });
+
+    await expect(
+      registerDailySalesAtomic(
+        [{ fecha: "2026-05-13", total: 50, productId: "p1", cantidad: 1, costoUnitario: 1, costoTotal: 1, ganancia: 0 } as never],
+        "staff",
+      ),
+    ).resolves.toEqual(["s9"]);
+
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/staff/dailySales/register",
+      expect.objectContaining({ method: "POST" }),
+    );
+    expect(rpcMock).not.toHaveBeenCalled();
+  });
+
+  it("returnDailySaleAtomic devuelve fila via BFF (admin)", async () => {
     const row = {
       id: "s1",
       productId: "p1",
@@ -299,9 +350,30 @@ describe("finance service", () => {
       motivoDevolucion: "Cambio",
       devueltoEn: "2026-05-13T10:00:00.000Z",
     };
-    rpcMock.mockResolvedValue({ data: row, error: null });
+    bffFetchMock.mockResolvedValue({ sale: row });
 
-    await expect(returnDailySaleAtomic("s1", "Cambio")).resolves.toEqual(row);
+    await expect(returnDailySaleAtomic("s1", "Cambio", "admin")).resolves.toEqual(row);
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/admin/dailySales/return",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("returnDailySaleAtomic staff usa endpoint de trabajador", async () => {
+    const row = {
+      id: "s2",
+      productId: "p1",
+      devuelto: true,
+      motivoDevolucion: "Talla",
+      devueltoEn: "2026-05-13T10:00:00.000Z",
+    };
+    bffFetchMock.mockResolvedValue({ sale: row });
+
+    await expect(returnDailySaleAtomic("s2", "Talla", "staff")).resolves.toEqual(row);
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/staff/dailySales/return",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("calculatePriceRange redondea montos", () => {

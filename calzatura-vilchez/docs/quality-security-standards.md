@@ -68,7 +68,7 @@ El proyecto queda organizado conceptualmente en:
 - `src/domains/clientes`: favoritos y datos privados del cliente.
 - `src/domains/pedidos`: pedidos de cliente y gestión administrativa.
 - `src/domains/administradores`: panel administrativo general.
-- `src/domains/trabajadores`: futuras operaciones internas.
+- `src/domains/trabajadores`: panel operativo (`/staff`: pedidos, ventas, desempeño).
 - `src/domains/fabricantes`: fabricantes y documentos.
 - `src/domains/ventas`: ventas diarias, costos y ganancias.
 - `src/domains/usuarios`: perfil, registro validado, roles y permisos.
@@ -127,6 +127,18 @@ firebase.cmd deploy --only hosting,firestore:rules
 - Admin: rutas y datos restringidos por rol.
 - Hosting: build estático desde `dist`, con cache control para `index.html` y assets versionados.
 
+## Mapa ISO interno (sin certificación)
+
+| Norma | Documento de evidencia |
+|-------|----------------------|
+| ISO 9001 (trazabilidad) | [ISO-CUMPLIMIENTO-INTERNO.md](ISO-CUMPLIMIENTO-INTERNO.md), [ESTADO-CUMPLIMIENTO-AUDITORIA.md](ESTADO-CUMPLIMIENTO-AUDITORIA.md) |
+| ISO/IEC 25010 (calidad) | Mismo mapa + `05-pruebas/plan-pruebas.md` |
+| ISO/IEC 27001 (seguridad) | [security-audit.md](security-audit.md), [supabase/RLS-MATRIX.md](../supabase/RLS-MATRIX.md) |
+| ISO/IEC/IEEE 29119 | No aplicado formalmente — ver plan de pruebas |
+
+Panel **trabajador** (`/staff`): privilegio mínimo vía BFF (`/staff/*`); datos financieros y ventas ajenas no expuestos por API.
+
 ## Auditorías internas
 
 - [security-audit.md](security-audit.md): hallazgos de seguridad, correcciones aplicadas y riesgos pendientes.
+- [ISO-CUMPLIMIENTO-INTERNO.md](ISO-CUMPLIMIENTO-INTERNO.md): matriz de controles por norma (excepto 29119).

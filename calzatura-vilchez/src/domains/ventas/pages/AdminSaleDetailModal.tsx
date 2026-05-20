@@ -81,7 +81,7 @@ export function AdminSaleDetailModal({
             {showFinancialDetails && (
               <div>
                 <span>Ganancia</span>
-                <strong>S/ {sale.ganancia.toFixed(2)}</strong>
+                <strong>S/ {(sale.ganancia ?? 0).toFixed(2)}</strong>
               </div>
             )}
           </div>

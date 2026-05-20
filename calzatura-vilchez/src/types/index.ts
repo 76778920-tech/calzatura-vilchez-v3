@@ -27,9 +27,9 @@ export interface Product {
   campana?: string;
 }
 
-export interface ProductFinancial {
+/** Rangos de venta visibles para trabajador (sin costo de compra). */
+export interface ProductPriceRange {
   productId: string;
-  costoCompra: number;
   margenMinimo: number;
   margenObjetivo: number;
   margenMaximo: number;
@@ -37,6 +37,10 @@ export interface ProductFinancial {
   precioSugerido: number;
   precioMaximo: number;
   actualizadoEn: string;
+}
+
+export interface ProductFinancial extends ProductPriceRange {
+  costoCompra: number;
 }
 
 export type SaleDocumentType = "ninguno" | "nota_venta" | "guia_remision";
@@ -58,9 +62,9 @@ export interface DailySale {
   cantidad: number;
   precioVenta: number;
   total: number;
-  costoUnitario: number;
-  costoTotal: number;
-  ganancia: number;
+  costoUnitario?: number;
+  costoTotal?: number;
+  ganancia?: number;
   documentoTipo?: SaleDocumentType;
   documentoNumero?: string;
   cliente?: SaleCustomer;
@@ -229,7 +233,7 @@ export interface WorkerPerformanceMetrics {
   periodo: string;
   ventasCantidad: number;
   ventasTotal: number;
-  gananciaTotal: number;
+  gananciaTotal?: number;
   unidadesVendidas: number;
   pedidosGestionados: number;
   metaVentas: number;

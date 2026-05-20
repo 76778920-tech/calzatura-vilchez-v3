@@ -1,4 +1,5 @@
 import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import {
   browserLocalPersistence,
   indexedDBLocalPersistence,
@@ -14,6 +15,14 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY as string | undefined;
+if (appCheckSiteKey && import.meta.env.VITE_E2E !== "true") {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 // En E2E (Playwright), usar localStorage para que storageState lo capture.
 // En producción, usar IndexedDB como persistencia primaria.

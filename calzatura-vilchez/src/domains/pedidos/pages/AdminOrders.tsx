@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { fetchAllOrders, updateOrderStatus } from "@/domains/pedidos/services/orders";
+import { panelFetchScopeForRole } from "@/security/accessControl";
+import type { PanelFetchScope } from "@/security/panelScope";
 import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
 import type { Order, OrderStatus } from "@/types";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
@@ -24,6 +27,11 @@ const STATUS_COLOR: Record<string, string> = {
 const ADMIN_ORDERS_SKELETON_KEYS = ["sk-1", "sk-2", "sk-3", "sk-4"] as const;
 
 export default function AdminOrders() {
+  const { user, userProfile } = useAuth();
+  const panelScope: PanelFetchScope = panelFetchScopeForRole(
+    userProfile?.rol,
+    user?.email ?? userProfile?.email,
+  );
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -31,8 +39,8 @@ export default function AdminOrders() {
   const [previewImage, setPreviewImage] = useState<{ src: string; title: string; subtitle?: string } | null>(null);
 
   const loadOrders = useCallback(() => {
-    fetchAllOrders().then(setOrders).finally(() => setLoading(false));
-  }, []);
+    fetchAllOrders(panelScope).then(setOrders).finally(() => setLoading(false));
+  }, [panelScope]);
 
   useEffect(() => {
     loadOrders();

@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { fetchProductCodes, fetchProducts } from "@/domains/productos/services/products";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
-import { fetchDailySales, fetchProductFinancials, returnDailySaleAtomic } from "@/domains/ventas/services/finance";
+import {
+  fetchDailySales,
+  fetchProductFinancials,
+  returnDailySaleAtomic,
+  type FinanceFetchScope,
+} from "@/domains/ventas/services/finance";
+import { panelFetchScopeForRole } from "@/security/accessControl";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import type { DailySale, SaleCustomer, SaleDocumentType } from "@/types";
 import { getProductColors } from "@/utils/colors";
@@ -93,6 +99,10 @@ export type AdminSalesPageModel = {
 export function useAdminSalesPage(): AdminSalesPageModel {
   const { user, userProfile, isAdmin } = useAuth();
   const showFinancialDetails = isAdmin;
+  const panelScope: FinanceFetchScope = panelFetchScopeForRole(
+    userProfile?.rol,
+    user?.email ?? userProfile?.email,
+  );
   const [products, setProducts] = useState<SaleProduct[]>([]);
   const [sales, setSales] = useState<DailySale[]>([]);
   const [pendingLines, setPendingLines] = useState<PendingSaleLine[]>([]);
@@ -119,7 +129,17 @@ export function useAdminSalesPage(): AdminSalesPageModel {
 
   const load = useCallback((targetDate = date) => {
     setLoading(true);
-    return Promise.allSettled([fetchProducts(), fetchProductCodes(), fetchProductFinancials(), fetchDailySales(targetDate)])
+    const financialsPromise =
+      panelScope === "admin"
+        ? fetchProductFinancials("admin")
+        : fetchProductFinancials("staff");
+
+    return Promise.allSettled([
+      fetchProducts(panelScope),
+      fetchProductCodes(panelScope),
+      financialsPromise,
+      fetchDailySales(targetDate, panelScope),
+    ])
       .then(([itemsResult, codesResult, financialsResult, daySalesResult]) => {
         if (itemsResult.status === "rejected") throw itemsResult.reason;
         const items = itemsResult.value;
@@ -151,7 +171,7 @@ export function useAdminSalesPage(): AdminSalesPageModel {
         setSales([]);
       })
       .finally(() => setLoading(false));
-  }, [date]);
+  }, [date, panelScope]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -367,6 +387,7 @@ export function useAdminSalesPage(): AdminSalesPageModel {
       requiresCustomer,
       customer,
       operator,
+      financeScope: panelScope,
       setSaving,
       setCustomer,
       setValidatedDni,
@@ -408,7 +429,7 @@ export function useAdminSalesPage(): AdminSalesPageModel {
     }
     setReturning(true);
     try {
-      const returned = await returnDailySaleAtomic(selectedSale.id, motivo);
+      const returned = await returnDailySaleAtomic(selectedSale.id, motivo, panelScope);
       await load(date);
       setSelectedSale((prev) => prev ? { ...prev, ...returned } : null);
       setReturnMotivo("");

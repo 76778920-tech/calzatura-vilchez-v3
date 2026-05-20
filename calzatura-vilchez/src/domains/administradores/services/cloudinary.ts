@@ -1,5 +1,6 @@
+import { fetchCloudinaryUploadSignature } from "@/domains/administradores/services/adminData";
+
 const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || "dnenqnvbg";
-const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || "calzatura_uploads";
 const CLOUDINARY_HOST = "res.cloudinary.com";
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_ORIGINAL_IMAGE_BYTES = 10 * 1024 * 1024;
@@ -12,7 +13,7 @@ interface CloudinaryUploadResponse {
 }
 
 export async function uploadImageToCloudinary(file: Blob, fileName: string): Promise<string> {
-  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+  if (!CLOUDINARY_CLOUD_NAME) {
     throw new Error("CLOUDINARY_NOT_CONFIGURED");
   }
   if (file.type && !ALLOWED_IMAGE_TYPES.has(file.type)) {
@@ -22,12 +23,18 @@ export async function uploadImageToCloudinary(file: Blob, fileName: string): Pro
     throw new Error("IMAGE_TOO_LARGE");
   }
 
+  const signed = await fetchCloudinaryUploadSignature();
+  const cloudName = signed.cloudName || CLOUDINARY_CLOUD_NAME;
+
   const formData = new FormData();
   formData.append("file", file, fileName);
-  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+  formData.append("api_key", signed.apiKey);
+  formData.append("timestamp", String(signed.timestamp));
+  formData.append("signature", signed.signature);
+  formData.append("folder", signed.folder);
 
   const response = await fetch(
-    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+    `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
     {
       method: "POST",
       body: formData,

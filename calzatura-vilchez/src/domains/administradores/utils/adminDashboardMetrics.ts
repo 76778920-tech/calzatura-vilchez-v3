@@ -101,14 +101,14 @@ export function computeDashboardFromFetchedData(
     .reduce((acc, s) => acc + s.total, 0);
   const ingresosTotales = ingresosWeb + ingresosTienda;
   const gananciasTotales =
-    tiendaSales.filter((s) => !s.devuelto).reduce((acc, s) => acc + s.ganancia, 0) +
+    tiendaSales.filter((s) => !s.devuelto).reduce((acc, s) => acc + (s.ganancia ?? 0), 0) +
     completedOrders.reduce((acc, o) => acc + estimateOrderProfit(o, financials), 0);
   const pendientes = orders.filter((o) => o.estado === "pendiente").length;
 
   const ventasHoyTienda = tiendaFisicaSalesTotalForDate(sales, today);
   const gananciaHoyTienda = tiendaSales
     .filter((s) => s.fecha === today)
-    .reduce((acc, s) => acc + s.ganancia, 0);
+    .reduce((acc, s) => acc + (s.ganancia ?? 0), 0);
 
   const ventasHoyWeb = completedOrdersToday.reduce((acc, o) => acc + (o.total ?? 0), 0);
   const gananciaHoyWeb = completedOrdersToday.reduce(

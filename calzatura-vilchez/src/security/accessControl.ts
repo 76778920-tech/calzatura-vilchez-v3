@@ -44,3 +44,15 @@ export function canAccessArea(
 export function isAdminRole(role?: UserRole | null, email?: string | null) {
   return isSuperAdminEmail(email) || role === "admin";
 }
+
+export function isTrabajadorRole(role?: UserRole | null) {
+  return role === "trabajador";
+}
+
+/** Panel de tienda: admin ve datos completos; trabajador solo alcance staff. */
+export function panelFetchScopeForRole(
+  role?: UserRole | null,
+  email?: string | null,
+): "admin" | "staff" {
+  return isAdminRole(role, email) ? "admin" : "staff";
+}

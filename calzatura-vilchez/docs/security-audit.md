@@ -113,6 +113,38 @@ Corrección:
 
 - Agregado `slowapi` con límite de 20 req/min en endpoints de predicción y 5 req/min en invalidate cache.
 
+## Rol trabajador (endurecimiento 2026-05-19)
+
+Alineado a ISO/IEC 27001 (privilegio mínimo) y `docs/quality-security-standards.md`.
+
+| Control | Estado |
+|---------|--------|
+| Rutas `/staff/*` con `AreaRoute` + `StaffLayout` | OK |
+| Ventas/finanzas: BFF separado admin vs trabajador | OK — ver tabla endpoints |
+| Registro/devolución ventas solo vía BFF | OK — RPC revocados a anon/authenticated (`20260519140000`) |
+| `ventasDiarias` RLS sin políticas cliente | OK — misma migración |
+| Desempeño trabajador sin `gananciaTotal` en API | OK — `GET /staff/performance` redactado |
+
+Endpoints trabajador (token Firebase + rol `trabajador` en Supabase):
+
+- `GET /staff/dailySales` — solo `encargadoUid = uid`; sin costos ni ganancia.
+- `GET /staff/productPriceRanges` — solo rangos de precio.
+- `POST /staff/dailySales/register` — costos calculados en servidor.
+- `POST /staff/dailySales/return` — solo ventas propias (`encargadoUid`).
+- `GET /staff/performance` — métricas propias sin ganancia agregada.
+
+### Riesgos residuales trabajador
+
+| ID | Riesgo | Severidad | Estado |
+|----|--------|-----------|--------|
+| T1 | Pedidos web — PII trabajador | Media | **Mitigado** — `redactOrderForStaff` en `GET /staff/orders` y `GET /orders/:orderId` (email/tel/dirección enmascarados; distrito para logística) |
+| T2 | Catálogo inactivo visible al trabajador | Baja | **Cerrado** — `GET /staff/products` y `/staff/productCodes` solo activos |
+| T6 | Precio de venta manipulable desde cliente | Alta | **Cerrado** — validación BFF min/max + recálculo de costos en servidor |
+| T7 | Sin auditoría de ventas tienda | Media | **Cerrado** — `registrar_venta` / `devolver_venta` en `auditoria` |
+| T3 | Roles `psicologo` / `rrhh` temporales | Baja | Pendiente eliminación de producto |
+| T4 | Tests E2E 403 trabajador (29119) | Media | Fuera de alcance 29119; cubierto parcial por Vitest (`panelScopeServices`, `financeService`) |
+| T5 | Orden despliegue migraciones ventas | Alta | Documentado en `ISO-CUMPLIMIENTO-INTERNO.md` |
+
 ## Riesgos pendientes
 
 ### S1 - Creación de pedidos desde frontend (parcialmente mitigado)
@@ -130,51 +162,29 @@ Recomendación pendiente:
 - Mover la creación del pedido a una Cloud Function `createOrder` que reciba solo `items[]` (productId, quantity, talla), dirección y método de pago, y construya el documento desde Firestore.
 - Bloquear `allow create` directo en `pedidos` para clientes en Firestore Rules.
 
-### S1 - Cloudinary unsigned upload preset expuesto
+### S1 - Cloudinary (mitigado en código)
 
-La subida de imágenes usa un unsigned upload preset desde el navegador. Aunque solo la UI admin lo expone, el preset queda visible en el bundle frontend.
+**Estado:** subida firmada vía `POST /admin/media/cloudinary-signature` (BFF + `CLOUDINARY_API_SECRET`). El frontend ya no envía `upload_preset`.
 
-Riesgo:
+**Pendiente operativo:** desactivar o restringir el preset unsigned `calzatura_uploads` en el panel Cloudinary; configurar `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_CLOUD_NAME` en Render.
 
-- Si el preset no está restringido en Cloudinary, terceros podrían subir imágenes al cloud.
+### S2 - App Check (parcial)
 
-Recomendación obligatoria:
+**Estado:** `initializeAppCheck` en `src/firebase/config.ts` si existe `VITE_FIREBASE_APPCHECK_SITE_KEY` (omitido en E2E).
 
-- Configurar el preset en Cloudinary con restricciones de formato, tamaño, carpeta y moderación si está disponible.
-- Migrar a subida firmada mediante Cloud Function admin-only.
-- No usar Cloudinary API secret en frontend.
+**Pendiente operativo:** registrar reCAPTCHA v3 en Firebase Console → App Check → enforcement en Auth/Hosting.
 
-### S2 - Falta App Check
+### S3 - CSP (implementada)
 
-No se evidencia Firebase App Check.
+**Estado:** `Content-Security-Policy` en `firebase.json` (Firebase, Stripe, HTTPS para API/BFF/Cloudinary).
 
-Riesgo:
-
-- Mayor exposición a automatización abusiva contra Firestore/Auth/Functions desde clientes no oficiales.
-
-Recomendación:
-
-- Activar Firebase App Check para Hosting, Firestore y Functions.
-
-### S3 - CSP no configurada
-
-Se agregaron headers base, pero no Content Security Policy.
-
-Riesgo:
-
-- Mayor exposición si en el futuro entra XSS.
-
-Recomendación:
-
-- Definir una CSP compatible con Firebase, Stripe, Cloudinary y Google Fonts.
-- Probar primero en modo `Content-Security-Policy-Report-Only`.
+**Mejora opcional:** modo `Content-Security-Policy-Report-Only` + endpoint de reportes antes de endurecer `script-src`.
 
 ## Prioridad siguiente
 
-1. Refactor de creación de pedidos a Cloud Function `createOrder` (elimina riesgo residual de datos COD incorrectos).
-2. Subida firmada a Cloudinary desde Function admin-only.
-3. App Check.
-4. CSP en modo reporte.
+1. Enforcement App Check en Firebase Console.
+2. Secretos Cloudinary en BFF y retirar preset unsigned en Cloudinary.
+3. Pentest / revisión externa antes de declarar SGSI.
 
 ## Arquitectura de rutas aplicada
 

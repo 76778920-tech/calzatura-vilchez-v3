@@ -1,5 +1,6 @@
 import { auth } from "@/firebase/config";
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
+import type { PanelFetchScope } from "@/security/panelScope";
 import { bffFetch } from "@/utils/bffClient";
 import type { Order, OrderStatus, CartItem, Address } from "@/types";
 
@@ -63,8 +64,9 @@ export async function fetchOrdersByUser(userId: string): Promise<Order[]> {
   return orders;
 }
 
-export async function fetchAllOrders(): Promise<Order[]> {
-  const { orders } = await bffFetch<{ orders: Order[] }>("/admin/orders");
+export async function fetchAllOrders(scope: PanelFetchScope = "admin"): Promise<Order[]> {
+  const path = scope === "staff" ? "/staff/orders" : "/admin/orders";
+  const { orders } = await bffFetch<{ orders: Order[] }>(path);
   return orders;
 }
 

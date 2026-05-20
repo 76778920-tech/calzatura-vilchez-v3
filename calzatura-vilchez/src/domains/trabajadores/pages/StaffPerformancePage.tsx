@@ -72,7 +72,10 @@ export default function StaffPerformancePage() {
       {
         label: "Ventas registradas",
         value: currency(performance.ventasTotal),
-        detail: `Ganancia estimada ${currency(performance.gananciaTotal)}`,
+        detail:
+          performance.gananciaTotal == null
+            ? `${performance.ventasCantidad} transacciones en el mes`
+            : `Ganancia estimada ${currency(performance.gananciaTotal)}`,
         icon: CircleDollarSign,
       },
       {

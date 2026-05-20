@@ -1,6 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
 import toast from "react-hot-toast";
-import { registerDailySalesAtomic, type DailySaleAtomicInput } from "@/domains/ventas/services/finance";
+import {
+  registerDailySalesAtomic,
+  type DailySaleAtomicInput,
+  type FinanceFetchScope,
+  type StaffDailySaleAtomicInput,
+} from "@/domains/ventas/services/finance";
 import { isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import type { SaleCustomer, SaleDocumentType } from "@/types";
 import { closeSaleDocumentWindow, openSaleDocumentWindow, renderSaleDocument, type SaleDocumentLine } from "@/utils/saleDocument";
@@ -43,7 +48,10 @@ export function saleLineTotal(line: PendingSaleLine) {
 }
 
 export function saleLineProfit(line: PendingSaleLine, product?: SaleProduct) {
-  const cost = product?.finanzas?.costoCompra ?? line.salePrice;
+  const cost =
+    product?.finanzas && "costoCompra" in product.finanzas
+      ? product.finanzas.costoCompra
+      : line.salePrice;
   return (line.salePrice - cost) * line.quantity;
 }
 
@@ -107,14 +115,14 @@ function buildDailySalePayload(
   documentType: SaleDocumentType,
   docNumber: string | undefined,
   saleCustomer: SaleCustomer | undefined,
-  operator: SaleOperator
-): DailySaleAtomicInput[] {
+  operator: SaleOperator,
+  scope: FinanceFetchScope,
+): DailySaleAtomicInput[] | StaffDailySaleAtomicInput[] {
   return pendingLines.map((line) => {
     const product = products.find((p) => p.id === line.productId);
     if (!product?.finanzas) throw new Error("Producto sin finanzas");
     const total = saleLineTotal(line);
-    const costoTotal = product.finanzas.costoCompra * line.quantity;
-    return {
+    const base = {
       productId: product.id,
       codigo: product.codigo || "SIN-CODIGO",
       nombre: product.nombre,
@@ -124,15 +132,26 @@ function buildDailySalePayload(
       cantidad: line.quantity,
       precioVenta: line.salePrice,
       total,
-      costoUnitario: product.finanzas.costoCompra,
-      costoTotal,
-      ganancia: total - costoTotal,
       documentoTipo: documentType,
       ...(docNumber ? { documentoNumero: docNumber } : {}),
       ...(saleCustomer ? { cliente: saleCustomer } : {}),
       encargadoUid: operator.uid,
       encargadoNombre: operator.nombre,
       encargadoEmail: operator.email,
+    };
+
+    if (scope === "staff") {
+      return base;
+    }
+
+    const costoCompra =
+      product.finanzas && "costoCompra" in product.finanzas ? product.finanzas.costoCompra : 0;
+    const costoTotal = costoCompra * line.quantity;
+    return {
+      ...base,
+      costoUnitario: costoCompra,
+      costoTotal,
+      ganancia: total - costoTotal,
     };
   });
 }
@@ -202,6 +221,7 @@ export type RegisterPendingSalesParams = {
   requiresCustomer: boolean;
   customer: SaleCustomer;
   operator: SaleOperator;
+  financeScope: FinanceFetchScope;
   setSaving: (v: boolean) => void;
   setCustomer: (c: SaleCustomer) => void;
   setValidatedDni: (d: string) => void;
@@ -219,6 +239,7 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     requiresCustomer,
     customer,
     operator,
+    financeScope,
     setSaving,
     setCustomer,
     setValidatedDni,
@@ -255,8 +276,20 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     );
     if (requiresCustomer && !saleCustomer) return;
 
-    const salesPayload = buildDailySalePayload(pendingLines, products, date, documentType, docNumber, saleCustomer, operator);
-    const saleIds = await registerDailySalesAtomic(salesPayload);
+    const salesPayload = buildDailySalePayload(
+      pendingLines,
+      products,
+      date,
+      documentType,
+      docNumber,
+      saleCustomer,
+      operator,
+      financeScope,
+    );
+    const saleIds = await registerDailySalesAtomic(
+      salesPayload as DailySaleAtomicInput[],
+      financeScope,
+    );
     if (saleIds.length === 0) {
       throw new Error("La venta no generó registros en el servidor");
     }

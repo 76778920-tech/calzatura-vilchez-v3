@@ -151,7 +151,7 @@ export function useAdminProductsPage() {
 
   const load = useCallback(() => {
     setLoading(true);
-    Promise.allSettled([fetchProducts(), fetchProductCodes(), fetchProductFinancials()])
+    Promise.allSettled([fetchProducts("admin"), fetchProductCodes(), fetchProductFinancials("admin")])
       .then(([itemsResult, codesResult, financialsResult]) => {
         if (itemsResult.status === "rejected") throw itemsResult.reason;
         const items = itemsResult.value;

@@ -96,7 +96,7 @@ export function AdminSalesHistorialTable({
               <td>S/ {sale.total.toFixed(2)}</td>
               {showFinancialDetails && (
                 <td>
-                  <strong>S/ {sale.ganancia.toFixed(2)}</strong>
+                  <strong>S/ {(sale.ganancia ?? 0).toFixed(2)}</strong>
                 </td>
               )}
               <td>

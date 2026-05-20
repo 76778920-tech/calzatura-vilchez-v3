@@ -360,7 +360,7 @@ export default function AdminDashboard() {
       fetchProducts(),
       fetchAllOrders(),
       fetchDailySales(),
-      fetchProductFinancials(),
+      fetchProductFinancials("admin"),
       fetchAllUsers(),
     ])
       .then(([products, orders, sales, financials, users]) => {
