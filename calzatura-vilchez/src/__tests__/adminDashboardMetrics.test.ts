@@ -3,14 +3,18 @@ import {
   buildDashboardChartSeries,
   computeDashboardFromFetchedData,
   estimateOrderProfit,
+  formatChartDayLabel,
+  formatShortDateES,
   getLast7Days,
   isCompletedOrder,
   isTiendaFisicaSale,
   todayISO,
   normalizeSaleDate,
   orderActivityDate,
+  tiendaFisicaProfitForDate,
   tiendaFisicaSalesTotalForDate,
   toDate,
+  webOrdersProfitForDate,
   toLocalISODate,
   webOrdersTotalForDate,
 } from "@/domains/administradores/utils/adminDashboardMetrics";
@@ -45,6 +49,18 @@ describe("adminDashboardMetrics helpers", () => {
 
   it("normalizeSaleDate recorta timestamp a YYYY-MM-DD", () => {
     expect(normalizeSaleDate("2026-05-16T00:00:00.000Z")).toBe("2026-05-16");
+  });
+
+  it("normalizeSaleDate devuelve vacío si la fecha no es válida", () => {
+    expect(normalizeSaleDate(undefined)).toBe("");
+    expect(normalizeSaleDate("")).toBe("");
+    expect(normalizeSaleDate("2026")).toBe("");
+  });
+
+  it("formatChartDayLabel y formatShortDateES formatean en español", () => {
+    expect(formatChartDayLabel("2026-05-16")).toMatch(/16/);
+    expect(formatShortDateES("2026-05-16")).toMatch(/16/);
+    expect(formatShortDateES("2026-05-16")).toMatch(/may/i);
   });
 
   it("orderActivityDate prioriza pagadoEn sobre creadoEn", () => {
@@ -122,13 +138,14 @@ describe("adminDashboardMetrics", () => {
       { fecha: today, total: 50, ganancia: 10, canal: "web" },
     ] as DailySale[];
 
+    const financials = { p1: { productId: "p1", costoCompra: 200 } as ProductFinancial };
     const { stats, chart } = computeDashboardFromFetchedData(
       today,
       last7,
       [],
       orders,
       sales,
-      {},
+      financials,
       [],
     );
 
@@ -140,8 +157,28 @@ describe("adminDashboardMetrics", () => {
     expect(stats.ventasHoyTienda).toBe(80);
     expect(stats.ventasUltimos7DiasWeb).toBe(329);
     expect(stats.ventasUltimos7DiasTienda).toBe(80);
+    expect(stats.gananciaHoyTienda).toBe(20);
+    expect(stats.gananciaHoyWeb).toBe(129);
+    expect(stats.gananciaUltimos7DiasTienda).toBe(20);
+    expect(stats.gananciaUltimos7DiasWeb).toBe(129);
     expect(chart.web[0]).toBe(329);
     expect(chart.tienda[0]).toBe(80);
+  });
+
+  it("tiendaFisicaProfitForDate y webOrdersProfitForDate suman por día", () => {
+    const iso = "2026-05-16";
+    const sales = [{ fecha: iso, ganancia: 15, canal: "tienda" }] as DailySale[];
+    const orders = [
+      {
+        estado: "entregado",
+        creadoEn: `${iso}T12:00:00.000Z`,
+        total: 100,
+        items: [{ quantity: 1, product: { id: "p1", precio: 100 } }],
+      },
+    ] as Order[];
+    const financials = { p1: { productId: "p1", costoCompra: 40 } as ProductFinancial };
+    expect(tiendaFisicaProfitForDate(sales, iso)).toBe(15);
+    expect(webOrdersProfitForDate(orders, iso, financials)).toBe(60);
   });
 
   it("buildDashboardChartSeries devuelve series independientes", () => {
