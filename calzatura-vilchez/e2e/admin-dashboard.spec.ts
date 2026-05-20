@@ -5,6 +5,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_ADMIN_EMAIL, FAKE_ADMIN_UID, injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
+import { expectAdminDashboardLoaded } from "./helpers/adminDashboard";
 import {
   mirrorAdminOrders,
   mirrorAdminProductFinanzas,
@@ -166,14 +167,14 @@ test.describe("admin dashboard → KPIs, auditoría y errores", () => {
     await page.getByRole("button", { name: /reintentar/i }).click();
     await page.waitForLoadState("domcontentloaded");
 
-    await expect(page.locator("h1.dash-title", { hasText: /^Dashboard$/ })).toBeVisible({ timeout: 15_000 });
+    await expectAdminDashboardLoaded(page);
   });
 
   test("fallo solo en auditoría: mensaje explícito sin confundir con vacío (TC-DASH-002)", async ({ page }) => {
     await setupDashboardSupabaseMocks(page, { auditoriaStatus: 500 });
     await goToDashboard(page);
 
-    await expect(page.locator("h1.dash-title", { hasText: /^Dashboard$/ })).toBeVisible({ timeout: 15_000 });
+    await expectAdminDashboardLoaded(page);
     await expect(page.getByText(/No se pudo cargar el historial de actividad/i)).toBeVisible();
     await expect(page.getByText(/Sin actividad registrada aún/i)).not.toBeVisible();
   });
@@ -182,7 +183,7 @@ test.describe("admin dashboard → KPIs, auditoría y errores", () => {
     await setupDashboardSupabaseMocks(page, { orders: [MOCK_ORDER] });
     await goToDashboard(page);
 
-    await expect(page.locator("h1.dash-title", { hasText: /^Dashboard$/ })).toBeVisible({ timeout: 15_000 });
+    await expectAdminDashboardLoaded(page);
 
     const row = page.locator("tr.dash-order-row").first();
     const rowButton = row.locator("button.dash-order-row-btn");
@@ -213,7 +214,7 @@ test.describe("admin dashboard → KPIs, auditoría y errores", () => {
     });
     await goToDashboard(page);
 
-    await expect(page.locator("h1.dash-title", { hasText: /^Dashboard$/ })).toBeVisible({ timeout: 15_000 });
+    await expectAdminDashboardLoaded(page);
 
     await expect(page.locator(".dash-kpi-blue .dash-kpi-value")).toHaveText("2");
     await expect(page.locator(".dash-kpi-green .dash-kpi-value")).toHaveText("2");
@@ -228,7 +229,7 @@ test.describe("admin dashboard → KPIs, auditoría y errores", () => {
     await setupDashboardSupabaseMocks(page, { orders: [], auditoria: [] });
     await goToDashboard(page);
 
-    await expect(page.locator("h1.dash-title", { hasText: /^Dashboard$/ })).toBeVisible({ timeout: 15_000 });
+    await expectAdminDashboardLoaded(page);
     await expect(page.locator("tr.dash-order-row")).toHaveCount(0);
     await expect(page.getByText(/No hay pedidos aún/i)).toBeVisible();
     await expect(page.getByText(/Sin actividad registrada aún/i)).toBeVisible();

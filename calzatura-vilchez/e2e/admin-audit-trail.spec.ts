@@ -12,6 +12,7 @@
  * INSERT en auditoria. Se usa injectFakeAdminAuth para simular la sesión de administrador.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { expectAdminDashboardLoaded } from "./helpers/adminDashboard";
 import { injectFakeAdminAuth, FAKE_ADMIN_UID, FAKE_ADMIN_EMAIL } from "./helpers/mockFirebaseAuth";
 import {
   mirrorAdminOrders,
@@ -130,7 +131,7 @@ async function setupProductoCodigosMock(page: Page) {
 async function goToAdmin(page: Page) {
   await page.goto("/admin");
   await page.waitForLoadState("domcontentloaded");
-  await expect(page.locator("h1.dash-title", { hasText: /^Dashboard$/ })).toBeVisible({ timeout: 20_000 });
+  await expectAdminDashboardLoaded(page, 20_000);
 }
 
 // ─── Suite ────────────────────────────────────────────────────────────────────
@@ -258,7 +259,7 @@ test.describe("admin → rastro de auditoría", () => {
 
     await goToAdmin(page);
 
-    await expect(page.locator("h1.dash-title", { hasText: /^Dashboard$/ })).toBeVisible({ timeout: 15_000 });
+    await expectAdminDashboardLoaded(page);
 
     // La primera celda de acción en la tabla debe ser "eliminar" (más reciente)
     const firstActionCell = page.locator("td[class*='accion'], tbody tr:first-child td").first();

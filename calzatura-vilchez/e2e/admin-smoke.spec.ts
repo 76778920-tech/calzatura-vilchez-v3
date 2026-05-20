@@ -5,7 +5,7 @@
  * Usa un mock genérico de Supabase REST (GET → []) y del servicio IA (abort)
  * para que ningún test dependa de datos reales.
  *
- * TC-SMOKE-001 /admin              → "Dashboard"
+ * TC-SMOKE-001 /admin              → "Dashboard ejecutivo"
  * TC-SMOKE-002 /admin/productos    → "Productos"
  * TC-SMOKE-003 /admin/pedidos      → "Pedidos"
  * TC-SMOKE-004 /admin/ventas       → "Consulta y registro de ventas"
@@ -51,7 +51,7 @@ async function setupGenericMocks(page: Page) {
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
 const SMOKE_ROUTES: Array<{ id: string; path: string; heading: RegExp }> = [
-  { id: "TC-SMOKE-001", path: "/admin",              heading: /^Dashboard$/ },
+  { id: "TC-SMOKE-001", path: "/admin",              heading: /^Dashboard ejecutivo$/ },
   { id: "TC-SMOKE-002", path: "/admin/productos",    heading: /^Productos$/ },
   { id: "TC-SMOKE-003", path: "/admin/pedidos",      heading: /^Pedidos/ },
   { id: "TC-SMOKE-004", path: "/admin/ventas",       heading: /Consulta y registro de ventas/i },
