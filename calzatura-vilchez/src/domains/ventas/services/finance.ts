@@ -173,6 +173,14 @@ export type DailySaleAtomicInput = Omit<DailySale, "id" | "creadoEn" | "devuelto
 /** Payload de registro sin costos (el BFF los calcula en servidor para trabajador). */
 export type StaffDailySaleAtomicInput = Omit<DailySaleAtomicInput, "costoUnitario" | "costoTotal" | "ganancia">;
 
+function stripClientFinancialFieldsFromSale(sale: DailySaleAtomicInput): StaffDailySaleAtomicInput {
+  const copy = { ...sale };
+  delete (copy as Partial<DailySaleAtomicInput>).costoUnitario;
+  delete (copy as Partial<DailySaleAtomicInput>).costoTotal;
+  delete (copy as Partial<DailySaleAtomicInput>).ganancia;
+  return copy as StaffDailySaleAtomicInput;
+}
+
 async function registerDailySalesViaBff(
   path: "/staff/dailySales/register" | "/admin/dailySales/register",
   sales: StaffDailySaleAtomicInput[] | DailySaleAtomicInput[],
@@ -188,17 +196,9 @@ export async function registerDailySalesAtomic(
   sales: DailySaleAtomicInput[],
   scope: FinanceFetchScope = "admin",
 ): Promise<string[]> {
-  if (scope === "staff") {
-    const staffPayload: StaffDailySaleAtomicInput[] = sales.map(
-      ({ costoUnitario: _cu, costoTotal: _ct, ganancia: _g, ...rest }) => rest,
-    );
-    return registerDailySalesViaBff("/staff/dailySales/register", staffPayload);
-  }
-
-  const adminPayload: StaffDailySaleAtomicInput[] = sales.map(
-    ({ costoUnitario: _cu, costoTotal: _ct, ganancia: _g, ...rest }) => rest,
-  );
-  return registerDailySalesViaBff("/admin/dailySales/register", adminPayload);
+  const path = scope === "staff" ? "/staff/dailySales/register" : "/admin/dailySales/register";
+  const payload = sales.map(stripClientFinancialFieldsFromSale);
+  return registerDailySalesViaBff(path, payload);
 }
 
 export async function markSaleReturned(saleId: string, motivo: string): Promise<void> {

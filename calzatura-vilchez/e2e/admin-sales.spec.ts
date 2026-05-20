@@ -13,7 +13,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_ADMIN_EMAIL, FAKE_ADMIN_UID, injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 import { todayISO } from "./helpers/dates";
-import { mockBffDailySales } from "./helpers/mockAdminBff";
+import {
+  mockBffDailySales,
+  mockBffRegisterDailySales,
+  mockBffReturnDailySale,
+} from "./helpers/mockAdminBff";
 import {
   mirrorAdminProductCodigos,
   mirrorAdminProductFinanzas,
@@ -111,43 +115,6 @@ async function setupBaseMocks(page: Page) {
   });
 }
 
-async function mockRegisterSalesRpc(page: Page): Promise<() => unknown | null> {
-  let payload: unknown | null = null;
-  await page.route("**/*", async (route) => {
-    const req = route.request();
-    if (req.method() === "POST" && req.url().includes("register_daily_sales_atomic")) {
-      payload = req.postDataJSON();
-      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ids: ["sale-new-001"] }) });
-      return;
-    }
-    await route.fallback();
-  });
-  return () => payload;
-}
-
-async function mockReturnSaleRpc(page: Page): Promise<() => boolean> {
-  let called = false;
-  await page.route("**/*", async (route) => {
-    const req = route.request();
-    if (req.method() === "POST" && req.url().includes("return_daily_sale_atomic")) {
-      called = true;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          id: "sale-001",
-          productId: "prod-001",
-          devuelto: true,
-          motivoDevolucion: "Talla equivocada",
-          devueltoEn: "2026-05-02T12:00:00.000Z",
-        }),
-      });
-      return;
-    }
-    await route.fallback();
-  });
-  return () => called;
-}
 
 async function goToSales(page: Page) {
   await page.goto("/admin/ventas");
@@ -175,9 +142,9 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // ──────────────────────────────────────────────────────────────────────────
   test("registrar venta llama register_daily_sales_atomic (TC-SALE-001)", async ({ page }) => {
     await setupBaseMocks(page);
-    const registeredPayload = await mockRegisterSalesRpc(page);
+    const registeredPayload = await mockBffRegisterDailySales(page);
     const registerPost = page.waitForRequest(
-      (req) => req.method() === "POST" && req.url().includes("register_daily_sales_atomic"),
+      (req) => req.method() === "POST" && req.url().includes("/admin/dailySales/register"),
       { timeout: 15_000 },
     );
 
@@ -197,7 +164,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
 
     await registerPost;
     expect(registeredPayload()).toMatchObject({
-      p_sales: [
+      sales: [
         expect.objectContaining({
           encargadoUid: FAKE_ADMIN_UID,
           encargadoNombre: "Admin E2E",
@@ -212,7 +179,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
   // ──────────────────────────────────────────────────────────────────────────
   test("cantidad mayor al stock muestra error y no agrega la línea (TC-SALE-002)", async ({ page }) => {
     await setupBaseMocks(page);
-    const registeredPayload = await mockRegisterSalesRpc(page);
+    const registeredPayload = await mockBffRegisterDailySales(page);
 
     await goToSales(page);
     await selectProductInForm(page);
@@ -224,7 +191,6 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await page.getByRole("button", { name: /agregar al detalle/i }).click();
     await expect(page.getByText(/supera el stock disponible/i)).toBeVisible({ timeout: 5_000 });
 
-    // RPC no debe haberse llamado
     expect(registeredPayload()).toBeNull();
   });
 
@@ -241,7 +207,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([sale]) });
     });
 
-    const wasReturned = await mockReturnSaleRpc(page);
+    const wasReturned = await mockBffReturnDailySale(page);
 
     await goToSales(page);
 
@@ -274,7 +240,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
       await route.fulfill({ status: 204, body: "" });
     });
 
-    const wasReturned = await mockReturnSaleRpc(page);
+    const wasReturned = await mockBffReturnDailySale(page);
 
     await goToSales(page);
 

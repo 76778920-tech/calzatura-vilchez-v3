@@ -11,6 +11,8 @@ const BFF_ROUTE_PATTERNS = {
   registrarIngreso: /\/registrarIngresoStock\/?(\?.*)?$/i,
   updateOrderStatus: /\/updateOrderStatus\/?(\?.*)?$/i,
   dailySales: /\/admin\/dailySales\/?(\?.*)?$/i,
+  dailySalesRegister: /\/admin\/dailySales\/register\/?(\?.*)?$/i,
+  dailySalesReturn: /\/admin\/dailySales\/return\/?(\?.*)?$/i,
 } as const;
 
 /** Evita ruido CORS/500 al invalidar cache del servicio IA tras guardar productos. */
@@ -99,6 +101,77 @@ export async function installDefaultAdminBffMocks(page: Page): Promise<void> {
       body: JSON.stringify({ sales: [] }),
     });
   });
+
+  await page.route(BFF_ROUTE_PATTERNS.dailySalesRegister, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ids: ["sale-new-001"] }),
+    });
+  });
+
+  await page.route(BFF_ROUTE_PATTERNS.dailySalesReturn, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        sale: {
+          id: "sale-001",
+          productId: "prod-001",
+          devuelto: true,
+          motivoDevolucion: "Talla equivocada",
+          devueltoEn: "2026-05-02T12:00:00.000Z",
+        },
+      }),
+    });
+  });
+}
+
+export async function mockBffRegisterDailySales(
+  page: Page,
+  onBody?: (body: Json) => void,
+): Promise<() => Json | null> {
+  let captured: Json | null = null;
+  await page.route(BFF_ROUTE_PATTERNS.dailySalesRegister, async (route) => {
+    const body = JSON.parse(route.request().postData() ?? "{}") as Json;
+    captured = body;
+    onBody?.(body);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ids: ["sale-new-001"] }),
+    });
+  });
+  return () => captured;
+}
+
+export async function mockBffReturnDailySale(page: Page): Promise<() => boolean> {
+  let called = false;
+  await page.route(BFF_ROUTE_PATTERNS.dailySalesReturn, async (route) => {
+    called = true;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        sale: {
+          id: "sale-001",
+          productId: "prod-001",
+          devuelto: true,
+          motivoDevolucion: "Talla equivocada",
+          devueltoEn: "2026-05-02T12:00:00.000Z",
+        },
+      }),
+    });
+  });
+  return () => called;
 }
 
 export async function mockBffUpdateProductAtomic(

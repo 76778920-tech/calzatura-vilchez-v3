@@ -151,6 +151,28 @@ export async function mirrorAdminProductFinanzas(page: Page, rows: unknown[]): P
 }
 
 export async function mirrorAdminProductCodigos(page: Page, rows: unknown[]): Promise<void> {
+  const codesMap = (rows as { productoId?: string; codigo?: string }[]).reduce<Record<string, string>>(
+    (acc, row) => {
+      if (row.productoId && row.codigo) {
+        acc[row.productoId] = row.codigo;
+      }
+      return acc;
+    },
+    {},
+  );
+
+  await page.route(/\/admin\/productCodes\/?(\?.*)?$/i, async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ codes: codesMap }),
+    });
+  });
+
   const body = JSON.stringify(rows);
   await page.route("**/rest/v1/productoCodigos*", async (route) => {
     const method = route.request().method();
@@ -224,6 +246,7 @@ export async function installDefaultAdminDataMirrors(page: Page): Promise<void> 
   await mirrorAdminOrders(page, []);
   await mirrorAdminUsers(page, [DEFAULT_ADMIN_PROFILE]);
   await mirrorAdminProductFinanzas(page, []);
+  await mirrorAdminProductCodigos(page, []);
   await mirrorAdminVentasDiarias(page, []);
 }
 
