@@ -7,6 +7,8 @@ import {
   isCompletedOrder,
   isTiendaFisicaSale,
   todayISO,
+  normalizeSaleDate,
+  orderActivityDate,
   tiendaFisicaSalesTotalForDate,
   toDate,
   toLocalISODate,
@@ -33,13 +35,25 @@ describe("adminDashboardMetrics helpers", () => {
     expect(toLocalISODate(d)).toBe("2026-05-16");
   });
 
-  it("getLast7Days devuelve 7 días con iso y label capitalizado", () => {
+  it("getLast7Days devuelve 7 días con iso y label con día del mes", () => {
     const days = getLast7Days();
     expect(days).toHaveLength(7);
     expect(days[0].iso).toBe("2026-05-10");
     expect(days[6].iso).toBe("2026-05-16");
-    expect(days[0].label.length).toBeGreaterThan(0);
-    expect(days[0].label).toMatch(/^[A-ZÁÉÍÓÚÑ]/);
+    expect(days[0].label).toMatch(/\d+/);
+  });
+
+  it("normalizeSaleDate recorta timestamp a YYYY-MM-DD", () => {
+    expect(normalizeSaleDate("2026-05-16T00:00:00.000Z")).toBe("2026-05-16");
+  });
+
+  it("orderActivityDate prioriza pagadoEn sobre creadoEn", () => {
+    expect(
+      orderActivityDate({
+        pagadoEn: "2026-05-18T15:00:00.000Z",
+        creadoEn: "2026-05-16T08:00:00.000Z",
+      } as import("@/types").Order),
+    ).toBe("2026-05-18");
   });
 
   it("isCompletedOrder acepta pagado, enviado y entregado", () => {
@@ -62,23 +76,25 @@ describe("adminDashboardMetrics helpers", () => {
     expect(estimateOrderProfit(order, financials)).toBe(2 * (100 - 60) + 1 * (50 - 50));
   });
 
-  it("tiendaFisicaSalesTotalForDate ignora web y otras fechas", () => {
+  it("tiendaFisicaSalesTotalForDate ignora web, devueltos y otras fechas", () => {
     const sales = [
       { fecha: "2026-05-16", total: 80, canal: "tienda" },
       { fecha: "2026-05-16", total: 50, canal: "web" },
-      { fecha: "2026-05-16", total: 30, canal: "tienda" },
+      { fecha: "2026-05-16", total: 30, canal: "tienda", devuelto: true },
+      { fecha: "2026-05-16T12:00:00Z", total: 40, canal: "tienda" },
       { fecha: "2026-05-15", total: 99, canal: "tienda" },
     ] as DailySale[];
-    expect(tiendaFisicaSalesTotalForDate(sales, "2026-05-16")).toBe(110);
+    expect(tiendaFisicaSalesTotalForDate(sales, "2026-05-16")).toBe(120);
   });
 
-  it("webOrdersTotalForDate solo suma pedidos completados del día", () => {
+  it("webOrdersTotalForDate usa pagadoEn y solo pedidos completados", () => {
     const orders = [
-      { estado: "entregado", creadoEn: "2026-05-16T08:00:00.000Z", total: 200 },
+      { estado: "entregado", pagadoEn: "2026-05-18T08:00:00.000Z", creadoEn: "2026-05-16T08:00:00.000Z", total: 200 },
       { estado: "pendiente", creadoEn: "2026-05-16T09:00:00.000Z", total: 999 },
-      { estado: "pagado", creadoEn: "2026-05-15T10:00:00.000Z", total: 50 },
+      { estado: "pagado", creadoEn: "2026-05-16T10:00:00.000Z", total: 50 },
     ] as Order[];
-    expect(webOrdersTotalForDate(orders, "2026-05-16")).toBe(200);
+    expect(webOrdersTotalForDate(orders, "2026-05-18")).toBe(200);
+    expect(webOrdersTotalForDate(orders, "2026-05-16")).toBe(50);
   });
 });
 
@@ -122,6 +138,8 @@ describe("adminDashboardMetrics", () => {
     expect(stats.gananciasTotales).toBeGreaterThan(0);
     expect(stats.ventasHoyWeb).toBe(329);
     expect(stats.ventasHoyTienda).toBe(80);
+    expect(stats.ventasUltimos7DiasWeb).toBe(329);
+    expect(stats.ventasUltimos7DiasTienda).toBe(80);
     expect(chart.web[0]).toBe(329);
     expect(chart.tienda[0]).toBe(80);
   });

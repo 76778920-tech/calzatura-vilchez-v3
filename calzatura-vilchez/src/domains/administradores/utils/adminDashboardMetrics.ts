@@ -13,6 +13,30 @@ export function toLocalISODate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+/** Fecha de venta en `ventasDiarias` (YYYY-MM-DD), sin hora. */
+export function normalizeSaleDate(fecha: string | undefined): string {
+  if (typeof fecha === "string" && fecha.length >= 10) return fecha.slice(0, 10);
+  return "";
+}
+
+/** Día calendario local del pedido (pago real si existe, si no creación). */
+export function orderActivityDate(order: Order): string {
+  const raw = order.pagadoEn || order.creadoEn;
+  return toLocalISODate(toDate(raw));
+}
+
+export function formatChartDayLabel(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  const weekday = d.toLocaleDateString("es-PE", { weekday: "short" });
+  const label = weekday.charAt(0).toUpperCase() + weekday.slice(1).replace(".", "");
+  return `${label} ${d.getDate()}`;
+}
+
+export function formatShortDateES(iso: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  return d.toLocaleDateString("es-PE", { day: "numeric", month: "short" });
+}
+
 export function isCompletedOrder(order: Order) {
   return order.estado === "pagado" || order.estado === "enviado" || order.estado === "entregado";
 }
@@ -37,21 +61,36 @@ export function getLast7Days(): DashboardChartDay[] {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
     const iso = toLocalISODate(d);
-    const label = d.toLocaleDateString("es-PE", { weekday: "short" });
-    return { iso, label: label.charAt(0).toUpperCase() + label.slice(1).replace(".", "") };
+    return { iso, label: formatChartDayLabel(iso) };
   });
 }
 
 export function tiendaFisicaSalesTotalForDate(sales: DailySale[], iso: string): number {
   return sales
-    .filter((s) => isTiendaFisicaSale(s) && s.fecha === iso)
+    .filter((s) => isTiendaFisicaSale(s) && !s.devuelto && normalizeSaleDate(s.fecha) === iso)
     .reduce((acc, s) => acc + s.total, 0);
+}
+
+export function tiendaFisicaProfitForDate(sales: DailySale[], iso: string): number {
+  return sales
+    .filter((s) => isTiendaFisicaSale(s) && !s.devuelto && normalizeSaleDate(s.fecha) === iso)
+    .reduce((acc, s) => acc + (s.ganancia ?? 0), 0);
 }
 
 export function webOrdersTotalForDate(orders: Order[], iso: string): number {
   return orders
-    .filter((o) => isCompletedOrder(o) && toLocalISODate(toDate(o.creadoEn)) === iso)
+    .filter((o) => isCompletedOrder(o) && orderActivityDate(o) === iso)
     .reduce((acc, o) => acc + (o.total ?? 0), 0);
+}
+
+export function webOrdersProfitForDate(
+  orders: Order[],
+  iso: string,
+  financials: Record<string, ProductFinancial>,
+): number {
+  return orders
+    .filter((o) => isCompletedOrder(o) && orderActivityDate(o) === iso)
+    .reduce((acc, o) => acc + estimateOrderProfit(o, financials), 0);
 }
 
 export function buildDashboardChartSeries(
@@ -78,6 +117,10 @@ export type DashboardStats = {
   ventasHoyTienda: number;
   gananciaHoyWeb: number;
   gananciaHoyTienda: number;
+  ventasUltimos7DiasWeb: number;
+  ventasUltimos7DiasTienda: number;
+  gananciaUltimos7DiasWeb: number;
+  gananciaUltimos7DiasTienda: number;
 };
 
 export function computeDashboardFromFetchedData(
@@ -90,9 +133,6 @@ export function computeDashboardFromFetchedData(
   users: UserProfile[],
 ): { stats: DashboardStats; chart: { web: number[]; tienda: number[] } } {
   const completedOrders = orders.filter(isCompletedOrder);
-  const completedOrdersToday = completedOrders.filter(
-    (o) => toLocalISODate(toDate(o.creadoEn)) === today,
-  );
   const tiendaSales = sales.filter(isTiendaFisicaSale);
 
   const ingresosWeb = completedOrders.reduce((acc, o) => acc + (o.total ?? 0), 0);
@@ -106,17 +146,21 @@ export function computeDashboardFromFetchedData(
   const pendientes = orders.filter((o) => o.estado === "pendiente").length;
 
   const ventasHoyTienda = tiendaFisicaSalesTotalForDate(sales, today);
-  const gananciaHoyTienda = tiendaSales
-    .filter((s) => s.fecha === today)
-    .reduce((acc, s) => acc + (s.ganancia ?? 0), 0);
-
-  const ventasHoyWeb = completedOrdersToday.reduce((acc, o) => acc + (o.total ?? 0), 0);
-  const gananciaHoyWeb = completedOrdersToday.reduce(
-    (acc, o) => acc + estimateOrderProfit(o, financials),
-    0,
-  );
+  const gananciaHoyTienda = tiendaFisicaProfitForDate(sales, today);
+  const ventasHoyWeb = webOrdersTotalForDate(completedOrders, today);
+  const gananciaHoyWeb = webOrdersProfitForDate(completedOrders, today, financials);
 
   const chart = buildDashboardChartSeries(last7Days, sales, completedOrders);
+  const ventasUltimos7DiasWeb = chart.web.reduce((acc, v) => acc + v, 0);
+  const ventasUltimos7DiasTienda = chart.tienda.reduce((acc, v) => acc + v, 0);
+  const gananciaUltimos7DiasWeb = last7Days.reduce(
+    (acc, { iso }) => acc + webOrdersProfitForDate(completedOrders, iso, financials),
+    0,
+  );
+  const gananciaUltimos7DiasTienda = last7Days.reduce(
+    (acc, { iso }) => acc + tiendaFisicaProfitForDate(sales, iso),
+    0,
+  );
 
   return {
     stats: {
@@ -132,6 +176,10 @@ export function computeDashboardFromFetchedData(
       ventasHoyTienda,
       gananciaHoyWeb,
       gananciaHoyTienda,
+      ventasUltimos7DiasWeb,
+      ventasUltimos7DiasTienda,
+      gananciaUltimos7DiasWeb,
+      gananciaUltimos7DiasTienda,
     },
     chart,
   };

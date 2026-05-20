@@ -7,7 +7,9 @@ import {
 } from "lucide-react";
 import {
   computeDashboardFromFetchedData,
+  formatShortDateES,
   getLast7Days,
+  todayISO,
   toDate,
   type DashboardChartDay,
   type DashboardStats,
@@ -24,11 +26,6 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import toast from "react-hot-toast";
 
 // ─── helpers ───────────────────────────────────────────────────────────────
-
-function todayISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function greetingText() {
   const h = new Date().getHours();
@@ -345,6 +342,10 @@ export default function AdminDashboard() {
     ventasHoyTienda: 0,
     gananciaHoyWeb: 0,
     gananciaHoyTienda: 0,
+    ventasUltimos7DiasWeb: 0,
+    ventasUltimos7DiasTienda: 0,
+    gananciaUltimos7DiasWeb: 0,
+    gananciaUltimos7DiasTienda: 0,
   });
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
@@ -356,6 +357,7 @@ export default function AdminDashboard() {
   const [auditError, setAuditError] = useState(false);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const last7Days = useMemo(() => getLast7Days(), []);
+  const todayLabel = useMemo(() => formatShortDateES(todayISO()), []);
 
   const loadDashboard = useCallback((options?: { showLoading?: boolean }) => {
     const today = todayISO();
@@ -579,16 +581,23 @@ export default function AdminDashboard() {
           />
           <div className="dash-channel-metrics">
         <div className="dash-today-card dash-today-web">
+          <BarChart2 size={20} />
+          <div>
+            <p className="dash-today-label">Total últimos 7 días — web</p>
+            <p className="dash-today-value">{formatCurrency(stats.ventasUltimos7DiasWeb)}</p>
+          </div>
+        </div>
+        <div className="dash-today-card dash-today-web">
           <CircleDollarSign size={20} />
           <div>
-            <p className="dash-today-label">Ventas hoy — web</p>
+            <p className="dash-today-label">Ventas hoy ({todayLabel}) — web</p>
             <p className="dash-today-value">{formatCurrency(stats.ventasHoyWeb)}</p>
           </div>
         </div>
         <div className="dash-today-card dash-today-web">
-          <BarChart2 size={20} />
+          <TrendingUp size={20} />
           <div>
-            <p className="dash-today-label">Ganancia hoy — web (est.)</p>
+            <p className="dash-today-label">Ganancia hoy ({todayLabel}) — web (est.)</p>
             <p className="dash-today-value">{formatCurrency(stats.gananciaHoyWeb)}</p>
           </div>
         </div>
@@ -624,25 +633,24 @@ export default function AdminDashboard() {
             titleId="dash-channel-store-title"
           />
           <div className="dash-channel-metrics">
-            <button type="button" className="dash-kpi-card dash-kpi-gold dash-channel-kpi" onClick={() => navigate(ADMIN_ROUTES.sales)}>
-          <div className="dash-kpi-icon"><Store size={22} /></div>
-          <div className="dash-kpi-body">
-            <p className="dash-kpi-label">Ingresos tienda física</p>
-            <p className="dash-kpi-value">{formatCurrency(stats.ingresosTienda)}</p>
+            <div className="dash-today-card dash-today-gold">
+          <BarChart2 size={20} />
+          <div>
+            <p className="dash-today-label">Total últimos 7 días — física</p>
+            <p className="dash-today-value">{formatCurrency(stats.ventasUltimos7DiasTienda)}</p>
           </div>
-          <ChevronRight size={16} className="dash-kpi-arrow" />
-        </button>
+        </div>
         <div className="dash-today-card dash-today-gold">
           <CircleDollarSign size={20} />
           <div>
-            <p className="dash-today-label">Ventas hoy — física</p>
+            <p className="dash-today-label">Ventas hoy ({todayLabel}) — física</p>
             <p className="dash-today-value">{formatCurrency(stats.ventasHoyTienda)}</p>
           </div>
         </div>
         <div className="dash-today-card dash-today-gold">
-          <BarChart2 size={20} />
+          <TrendingUp size={20} />
           <div>
-            <p className="dash-today-label">Ganancia hoy — física</p>
+            <p className="dash-today-label">Ganancia hoy ({todayLabel}) — física</p>
             <p className="dash-today-value">{formatCurrency(stats.gananciaHoyTienda)}</p>
           </div>
         </div>
