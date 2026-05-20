@@ -147,16 +147,18 @@ export default function AdminLayout() {
       <main ref={mainRef} tabIndex={-1} className="admin-main">
         <header className="admin-topbar">
           <div>
-            <p className="admin-topbar-kicker">Panel administrativo</p>
+            {location.pathname !== ADMIN_ROUTES.dashboard && (
+              <p className="admin-topbar-kicker">Panel administrativo</p>
+            )}
             <h1>{activePageTitle}</h1>
           </div>
-          <div className="admin-session-card" aria-label="Sesion administrativa">
+          <div className="admin-session-card" aria-label="Sesión activa">
             <span className="admin-session-icon"><ShieldCheck size={18} /></span>
             <div>
-              <strong>{userProfile?.nombre ?? "Administrador"}</strong>
-              <span>{user.email}</span>
+              <strong>{userProfile?.nombre?.trim() || user.email}</strong>
+              {userProfile?.nombre?.trim() ? <span>{user.email}</span> : null}
             </div>
-          </div>
+            </div>
         </header>
         <Outlet />
       </main>

@@ -20,6 +20,7 @@ import { fetchRecentAudit } from "@/services/audit";
 import type { Order, CartItem } from "@/types";
 import type { AuditEntry } from "@/services/audit";
 import { ADMIN_ROUTES } from "@/routes/paths";
+import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import toast from "react-hot-toast";
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -34,6 +35,11 @@ function greetingText() {
   if (h < 12) return "Buenos días";
   if (h < 19) return "Buenas tardes";
   return "Buenas noches";
+}
+
+function greetingWithName(nombre?: string | null) {
+  const first = nombre?.trim().split(/\s+/)[0];
+  return first ? `${greetingText()}, ${first}` : greetingText();
 }
 
 function formatCurrency(n: number) {
@@ -325,6 +331,7 @@ function OrderStatusSummary({ orders }: Readonly<{ orders: Order[] }>) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+  const { userProfile } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     productos: 0,
     pedidos: 0,
@@ -478,10 +485,7 @@ export default function AdminDashboard() {
     <div className="dash-root">
       {/* Header */}
       <div className="dash-header">
-        <div>
-          <p className="dash-greeting">{greetingText()}, Administrador</p>
-          <h1 className="dash-title">Dashboard</h1>
-        </div>
+        <p className="dash-greeting">{greetingWithName(userProfile?.nombre)}</p>
         <div className="dash-header-date">
           <p className="dash-date-label">Hoy</p>
           <p className="dash-date-value">
