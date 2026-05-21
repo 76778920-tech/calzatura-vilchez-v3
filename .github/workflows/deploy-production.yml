@@ -215,7 +215,7 @@ jobs:
           VITE_ORS_API_KEY: ${{ secrets.VITE_ORS_API_KEY }}
 
       - name: Deploy a Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@e2eda2e106cfa35cdbcf4ac9ddaf6c4756df2c8c # v0
+        uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # node24 (upstream main, PR #450)
         with:
           repoToken: ${{ github.token }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
