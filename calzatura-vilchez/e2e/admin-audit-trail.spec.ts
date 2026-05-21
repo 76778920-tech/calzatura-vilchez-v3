@@ -8,17 +8,19 @@
  *   🟢 TC-AUDIT-004: la tabla del dashboard muestra la acción más reciente primero — VERIFICADO
  *   🟢 TC-AUDIT-005: auditoría vacía muestra mensaje "Sin actividad registrada aún" — VERIFICADO
  *
- * Estrategia: mockear Supabase REST (incl. RPC de creación en TC-AUDIT-001) y capturar
- * INSERT en auditoria. Se usa injectFakeAdminAuth para simular la sesión de administrador.
+ * Estrategia: mockear BFF (`GET /admin/audit`, `POST /audit`) y RPC de creación en TC-AUDIT-001.
+ * Se usa injectFakeAdminAuth para simular la sesión de administrador.
  */
 import { expect, test, type Page } from "@playwright/test";
 import { expectAdminDashboardLoaded } from "./helpers/adminDashboard";
 import { injectFakeAdminAuth, FAKE_ADMIN_UID, FAKE_ADMIN_EMAIL } from "./helpers/mockFirebaseAuth";
 import {
+  mirrorAdminAudit,
   mirrorAdminOrders,
   mirrorAdminProductFinanzas,
   mirrorAdminProducts,
   mirrorAdminVentasDiarias,
+  trackBffAuditPosts,
 } from "./helpers/mirrorAdminDataRoutes";
 import { mockBffCreateProductVariantsAtomicOk } from "./helpers/mockAdminBff";
 
@@ -89,28 +91,7 @@ async function setupAdminMocks(
   await mirrorAdminOrders(page, []);
   await mirrorAdminVentasDiarias(page, []);
   await mirrorAdminProductFinanzas(page, []);
-
-  await page.route("**/rest/v1/auditoria*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify(auditoria),
-      });
-      return;
-    }
-    // Capturar INSERT para verificar payload (siempre responder OK)
-    if (route.request().method() === "POST") {
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify([{}]),
-      });
-      return;
-    }
-    await route.fallback();
-  });
-
+  await mirrorAdminAudit(page, auditoria);
 }
 
 /** Códigos de producto (GET) para que la tabla admin cargue sin llamadas reales. */
@@ -150,27 +131,11 @@ test.describe("admin → rastro de auditoría", () => {
   // TC-AUDIT-001: logAudit("crear", ...) se dispara tras create_product_variants_atomic exitoso,
   // no al pulsar solo «Producto nuevo». Flujo mínimo de creación (una variante + imagen URL).
   test("crear un producto registra una entrada de auditoría con accion='crear' (TC-AUDIT-001)", async ({ page }) => {
-    const insertedPayloads: unknown[] = [];
-
     await setupAdminMocks(page, { auditoria: [] });
     await setupProductoCodigosMock(page);
 
     await mockBffCreateProductVariantsAtomicOk(page, ["e2e-audit-new-1"]);
-
-    // Interceptar INSERT a auditoria para capturar el payload (LIFO: prevalece sobre setupAdminMocks)
-    await page.route("**/rest/v1/auditoria*", async (route) => {
-      if (route.request().method() === "POST") {
-        const body = route.request().postDataJSON();
-        insertedPayloads.push(body);
-        await route.fulfill({
-          status: 201,
-          contentType: "application/json",
-          body: JSON.stringify([{}]),
-        });
-        return;
-      }
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-    });
+    const auditCapture = await trackBffAuditPosts(page);
 
     await page.goto("/admin/productos");
     await page.waitForLoadState("domcontentloaded");
@@ -202,21 +167,21 @@ test.describe("admin → rastro de auditoría", () => {
     await expect
       .poll(
         () =>
-          insertedPayloads.some(
+          auditCapture.captured().some(
             (p) => (p as Record<string, unknown>)?.accion === "crear"
           ),
         { timeout: 10_000 }
       )
       .toBe(true);
 
-    const crearPayload = insertedPayloads.find(
+    const crearPayload = auditCapture.captured().find(
       (p) => (p as Record<string, unknown>)?.accion === "crear"
     ) as Record<string, unknown> | undefined;
-    expect(crearPayload, "POST a auditoría con acción crear").toBeDefined();
+    expect(crearPayload, "POST /audit con acción crear").toBeDefined();
     expect(crearPayload!.accion).toBe("crear");
     expect(crearPayload!.entidad).toBe("producto");
     expect(crearPayload!.entidadId).toBe("e2e-audit-new-1");
-    expect(typeof crearPayload!.realizadoEn).toBe("string");
+    // `realizadoEn` lo asigna el BFF al persistir; no va en el POST del cliente.
   });
 
   // ──────────────────────────────────────────────────────────────────────────

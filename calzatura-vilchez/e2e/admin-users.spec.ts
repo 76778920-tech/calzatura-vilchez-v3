@@ -9,6 +9,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_ADMIN_EMAIL, FAKE_ADMIN_UID, injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
 import { mirrorAdminOrders, mirrorAdminUserRolePatch, mirrorAdminUsers } from "./helpers/mirrorAdminDataRoutes";
+import { maskEmailForDisplay } from "../src/utils/maskEmail";
 
 // ─── Semilla ──────────────────────────────────────────────────────────────────
 
@@ -103,9 +104,6 @@ async function setupUserMocks(
     await mirrorAdminOrders(page, []);
   }
 
-  await page.route("**/rest/v1/auditoria*", async (route) => {
-    await route.fulfill({ status: 201, body: "" });
-  });
 }
 
 async function goToUsers(page: Page) {
@@ -151,7 +149,9 @@ test.describe("admin usuarios → KPIs, filtro y roles", () => {
     await page.selectOption("select.form-input", "cliente");
 
     await expect(page.locator("table tbody tr:not(:has(td[colspan]))")).toHaveCount(1);
-    await expect(page.locator("table tbody tr").first()).toContainText("cliente@test.com");
+    await expect(page.locator("table tbody tr").first()).toContainText(
+      maskEmailForDisplay(MOCK_CLIENTE.email),
+    );
   });
 
   test("si pedidos falla, mantiene usuarios y muestra aviso (TC-USR-005)", async ({ page }) => {
@@ -180,7 +180,7 @@ test.describe("admin usuarios → KPIs, filtro y roles", () => {
     await setupUserMocks(page);
     await goToUsers(page);
 
-    const ownRow = page.locator("table tbody tr").filter({ hasText: FAKE_ADMIN_EMAIL });
+    const ownRow = page.locator("table tbody tr").filter({ hasText: MOCK_ADMIN.nombre });
     await expect(ownRow).toBeVisible();
     await expect(ownRow.locator("select.admin-role-select")).toBeDisabled();
   });
@@ -193,7 +193,9 @@ test.describe("admin usuarios → KPIs, filtro y roles", () => {
     await goToUsers(page);
 
     // Cambiar rol del trabajador (no protegido)
-    const trabajadorRow = page.locator("table tbody tr").filter({ hasText: "trabajador@test.com" });
+    const trabajadorRow = page.locator("table tbody tr").filter({
+      hasText: maskEmailForDisplay(MOCK_TRABAJADOR.email),
+    });
     await expect(trabajadorRow).toBeVisible();
     await trabajadorRow.locator("select.admin-role-select").selectOption("cliente");
 

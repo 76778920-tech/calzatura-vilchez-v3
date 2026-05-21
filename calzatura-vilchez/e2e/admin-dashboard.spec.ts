@@ -5,8 +5,10 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_ADMIN_EMAIL, FAKE_ADMIN_UID, injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
-import { expectAdminDashboardLoaded } from "./helpers/adminDashboard";
+import { expectAdminDashboardLoaded, waitForAdminShell } from "./helpers/adminDashboard";
+import { maskEmailForDisplay } from "../src/utils/maskEmail";
 import {
+  mirrorAdminAudit,
   mirrorAdminOrders,
   mirrorAdminProductFinanzas,
   mirrorAdminProducts,
@@ -101,8 +103,6 @@ async function setupDashboardSupabaseMocks(
   const auditoria = opts.auditoria ?? [];
 
   const auditoriaStatus = opts.auditoriaStatus ?? 200;
-  const auditoriaBody =
-    auditoriaStatus >= 400 ? "{}" : JSON.stringify(auditoria);
 
   if (!opts.skipProductos) {
     await mirrorAdminProducts(page, products);
@@ -111,23 +111,15 @@ async function setupDashboardSupabaseMocks(
   await mirrorAdminVentasDiarias(page, ventasDiarias);
   await mirrorAdminProductFinanzas(page, productoFinanzas);
   await mirrorAdminUsers(page, users);
-
-  await page.route("**/rest/v1/auditoria*", async (route) => {
-    if (route.request().method() !== "GET") {
-      await route.fallback();
-      return;
-    }
-    await route.fulfill({
-      status: auditoriaStatus,
-      contentType: "application/json",
-      body: auditoriaBody,
-    });
+  await mirrorAdminAudit(page, auditoriaStatus >= 400 ? [] : auditoria, {
+    status: auditoriaStatus,
   });
 }
 
 async function goToDashboard(page: Page) {
   await page.goto("/admin");
   await page.waitForLoadState("domcontentloaded");
+  await waitForAdminShell(page);
 }
 
 test.describe("admin dashboard → KPIs, auditoría y errores", () => {
@@ -193,7 +185,9 @@ test.describe("admin dashboard → KPIs, auditoría y errores", () => {
     await page.keyboard.press("Enter");
 
     await expect(page.getByText(/Detalle del Pedido/i)).toBeVisible();
-    await expect(page.locator(".dash-order-modal").getByText(/cliente-e2e@test\.com/i)).toBeVisible();
+    await expect(
+      page.locator(".dash-order-modal").getByText(maskEmailForDisplay(MOCK_ORDER.userEmail)),
+    ).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(page.getByText(/Detalle del Pedido/i)).not.toBeVisible();

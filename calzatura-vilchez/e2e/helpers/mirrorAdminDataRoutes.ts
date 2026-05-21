@@ -208,6 +208,49 @@ export async function mirrorAdminVentasDiarias(page: Page, sales: unknown[]): Pr
   });
 }
 
+/** Lectura de auditoría vía BFF (`fetchRecentAudit` → GET /admin/audit). */
+export async function mirrorAdminAudit(
+  page: Page,
+  entries: unknown[],
+  opts?: { status?: number },
+): Promise<void> {
+  const status = opts?.status ?? 200;
+  await page.route(/\/admin\/audit\/?(\?.*)?$/i, async (route) => {
+    if (route.request().method() !== "GET") {
+      await route.fallback();
+      return;
+    }
+    await route.fulfill({
+      status,
+      contentType: "application/json",
+      body: JSON.stringify(status >= 400 ? { error: "audit unavailable" } : { entries }),
+    });
+  });
+}
+
+/** Captura POST /audit (`logAudit` en el cliente). Registrar después de mocks por defecto (LIFO). */
+export async function trackBffAuditPosts(page: Page): Promise<{ captured: () => unknown[] }> {
+  const inserted: unknown[] = [];
+  await page.route(/\/audit\/?(\?.*)?$/i, async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
+    const url = route.request().url();
+    if (/\/admin\/audit/i.test(url)) {
+      await route.fallback();
+      return;
+    }
+    inserted.push(route.request().postDataJSON());
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true }),
+    });
+  });
+  return { captured: () => [...inserted] };
+}
+
 /** Perfil autenticado vía BFF (AuthContext, perfil, admin usuarios). */
 export async function mirrorUsersMe(
   page: Page,
@@ -248,6 +291,7 @@ export async function installDefaultAdminDataMirrors(page: Page): Promise<void> 
   await mirrorAdminProductFinanzas(page, []);
   await mirrorAdminProductCodigos(page, []);
   await mirrorAdminVentasDiarias(page, []);
+  await mirrorAdminAudit(page, []);
 }
 
 /** Lista de productos en admin + recarga (patrón común en specs de productos). */

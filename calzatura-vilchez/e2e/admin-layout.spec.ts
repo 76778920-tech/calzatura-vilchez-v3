@@ -12,59 +12,12 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import { injectFakeAdminAuth } from "./helpers/mockFirebaseAuth";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Mockea todos los endpoints de datos para que el panel cargue sin errores. */
-async function setupDataMocks(page: Page) {
-  await page.route("**/rest/v1/productos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route("**/rest/v1/productoFinanzas*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route("**/rest/v1/productoCodigos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route("**/rest/v1/ventasDiarias*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route("**/rest/v1/pedidos*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
-  });
-  await page.route("**/rest/v1/auditoria*", async (route) => {
-    if (route.request().method() === "GET") {
-      await route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
-      return;
-    }
-    await route.fallback();
-  });
-}
+import { waitForAdminShell } from "./helpers/adminDashboard";
 
 async function goToAdmin(page: Page) {
   await page.goto("/admin");
   await page.waitForLoadState("domcontentloaded");
-  await page.locator("nav[aria-label='Módulos del panel']").waitFor({ state: "visible", timeout: 15_000 });
+  await waitForAdminShell(page);
 }
 
 function sidebarNav(page: Page) {
@@ -77,7 +30,6 @@ test.describe("admin layout → sidebar y acciones globales", () => {
   test.beforeEach(async ({ page }) => {
     page.on("pageerror", (err) => console.log(`[admin-layout] pageerror: ${err.message}`));
     await injectFakeAdminAuth(page);
-    await setupDataMocks(page);
   });
 
   // ──────────────────────────────────────────────────────────────────────────

@@ -92,6 +92,7 @@ jobs:
           VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
           VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_APPCHECK_SITE_KEY: ${{ secrets.VITE_FIREBASE_APPCHECK_SITE_KEY }}
 
   # ── Job 2: AI Service con validación real de Supabase ────────────────────────
   ai-service:
@@ -256,6 +257,7 @@ jobs:
       VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
       VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
       VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
+      VITE_FIREBASE_APPCHECK_SITE_KEY: ${{ secrets.VITE_FIREBASE_APPCHECK_SITE_KEY }}
       VITE_ORS_API_KEY: ${{ secrets.VITE_ORS_API_KEY }}
       RENDER_BFF_DEPLOY_HOOK_URL: ${{ secrets.RENDER_BFF_DEPLOY_HOOK_URL }}
       RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
