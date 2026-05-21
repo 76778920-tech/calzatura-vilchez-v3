@@ -4,11 +4,12 @@
 
 | Orden | Variable | Proveedor |
 |-------|----------|-----------|
-| 1 | `LATINFO_API_KEY` / `CLAVE_API_LATINFO` | Latinfo |
+| 1 | `APISPERU_TOKEN` / `APISPERU_DNIRUC_TOKEN` | [APIsPERU](https://www.apisperu.com/servicios/dniruc) (personas naturales) |
 | 2 | `CONSULTAS_PERU_TOKEN` | ConsultasPerú |
 | 3 | `PERUAPI_TOKEN` / `TOKEN_PERUAPI` | Perú API |
 | 4 | `API_INTI_TOKEN` | ApiInti |
 | 5 | `APIPERU_DEV_TOKEN` | apiperu.dev |
+| 6 | `LATINFO_API_KEY` / `CLAVE_API_LATINFO` | Latinfo (solo entidades; DNI persona → omitido) |
 
 Si el 1 no encuentra el DNI o falla, se prueba el 2, y así sucesivamente (primer éxito gana).
 

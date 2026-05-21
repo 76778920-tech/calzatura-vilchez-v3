@@ -1,12 +1,13 @@
 /**
  * Consulta DNI con failover entre proveedores (primer éxito gana).
  *
- * Variables de entorno (Vercel / serverless) — configura al menos UNA:
- *   LATINFO_API_KEY o CLAVE_API_LATINFO — Latinfo (Bearer), prioridad 1
+ * Variables de entorno (Render / serverless) — configura al menos UNA:
+ *   APISPERU_TOKEN o APISPERU_DNIRUC_TOKEN — APIsPERU dniruc.apisperu.com (query token), prioridad 1
  *   CONSULTAS_PERU_TOKEN — ConsultasPerú (body token), prioridad 2
  *   PERUAPI_TOKEN o TOKEN_PERUAPI — Perú API peruapi.com (cabecera X-API-KEY), prioridad 3
  *   API_INTI_TOKEN       — ApiInti app.apiinti.dev (Bearer), prioridad 4
  *   APIPERU_DEV_TOKEN    — apiperu.dev (Bearer), prioridad 5
+ *   LATINFO_API_KEY o CLAVE_API_LATINFO — Latinfo (solo entidades; personas → out_of_scope), último
  *
  * Orígenes CORS: allowedOrigins abajo (añade preview/staging si hace falta).
  */
@@ -293,12 +294,25 @@ async function fetchJson(url, init = {}) {
 
 function hasAnyProviderToken() {
   return Boolean(
-    envFirstTrimmed("LATINFO_API_KEY", "CLAVE_API_LATINFO")
+    envFirstTrimmed("APISPERU_TOKEN", "APISPERU_DNIRUC_TOKEN")
     || process.env.CONSULTAS_PERU_TOKEN?.trim()
     || envFirstTrimmed("PERUAPI_TOKEN", "TOKEN_PERUAPI")
     || process.env.API_INTI_TOKEN?.trim()
     || process.env.APIPERU_DEV_TOKEN?.trim()
+    || envFirstTrimmed("LATINFO_API_KEY", "CLAVE_API_LATINFO")
   );
+}
+
+/** @returns {{ person: object | null, httpStatus: number | null, skipped: boolean }} */
+async function tryApisPeru(dni) {
+  const token = envFirstTrimmed("APISPERU_TOKEN", "APISPERU_DNIRUC_TOKEN");
+  if (!token) return { person: null, httpStatus: null, skipped: true };
+  const url = new URL(`https://dniruc.apisperu.com/api/v1/dni/${dni}`);
+  url.searchParams.set("token", token);
+  const { ok, status, json } = await fetchJson(url.toString(), { method: "GET" });
+  if (!ok) return { person: null, httpStatus: status, skipped: false };
+  const person = personFromRecord(json, dni);
+  return { person, httpStatus: status, skipped: false };
 }
 
 /** @returns {{ person: object | null, httpStatus: number | null, skipped: boolean }} */
@@ -390,11 +404,12 @@ async function tryApiperuDev(dni) {
  * Si un proveedor no tiene token, se omite (skipped). Si responde pero sin datos o con error, sigue el siguiente.
  */
 const PROVIDERS = [
-  { name: "latinfo", run: tryLatinfo },
+  { name: "apisperu", run: tryApisPeru },
   { name: "consultasperu", run: tryConsultasPeru },
   { name: "peruapi", run: tryPeruApi },
   { name: "apiinti", run: tryApiInti },
   { name: "apiperu.dev", run: tryApiperuDev },
+  { name: "latinfo", run: tryLatinfo },
 ];
 
 async function handleLookupDni(req, res, options = {}) {
@@ -444,7 +459,7 @@ async function handleLookupDni(req, res, options = {}) {
     return res.status(500).json({
       error: "Servicio no configurado",
       detail:
-        "Define al menos una variable DNI: LATINFO_API_KEY o CLAVE_API_LATINFO, CONSULTAS_PERU_TOKEN, PERUAPI_TOKEN o TOKEN_PERUAPI, API_INTI_TOKEN o APIPERU_DEV_TOKEN",
+        "Define al menos una variable DNI: APISPERU_TOKEN, CONSULTAS_PERU_TOKEN, PERUAPI_TOKEN o TOKEN_PERUAPI, API_INTI_TOKEN o APIPERU_DEV_TOKEN, LATINFO_API_KEY",
     });
   }
 
@@ -501,7 +516,7 @@ async function handleLookupDni(req, res, options = {}) {
       );
       if (authFailure) {
         body.detail =
-          `Token invalido o sin permiso en ${authFailure.provider} (HTTP ${authFailure.status}). Renueva el token o configura otro proveedor (CONSULTAS_PERU_TOKEN, APIPERU_DEV_TOKEN, API_INTI_TOKEN, etc.) en el mismo servicio que expone /lookup-dni.`;
+          `Token invalido o sin permiso en ${authFailure.provider} (HTTP ${authFailure.status}). Renueva el token o configura otro proveedor (APISPERU_TOKEN, CONSULTAS_PERU_TOKEN, APIPERU_DEV_TOKEN, etc.) en el mismo servicio que expone /lookup-dni.`;
       } else if (lastProvider) {
         body.detail = `Ningun proveedor devolvio datos validos. Ultimo intento: ${lastProvider} (HTTP ${lastHttpStatus ?? "error"}).`;
       } else {

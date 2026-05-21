@@ -92,6 +92,12 @@ describe("BFF /audit policy guards", () => {
     expect(deployWorkflowSource).toContain("VITE_FIREBASE_APPCHECK_SITE_KEY:");
   });
 
+  it("prioriza APIsPERU (dniruc.apisperu.com) para consulta DNI de personas naturales", () => {
+    expect(lookupDniSource).toContain('name: "apisperu"');
+    expect(lookupDniSource).toContain("dniruc.apisperu.com/api/v1/dni/");
+    expect(lookupDniSource).toContain('envFirstTrimmed("APISPERU_TOKEN", "APISPERU_DNIRUC_TOKEN")');
+  });
+
   it("no permite deploy productivo sin CI completo ni secrets criticos", () => {
     expect(deployWorkflowSource).toContain("Exigir CI + CI Integration en success");
     expect(deployWorkflowSource).not.toContain("if: github.event_name == 'workflow_call'");
