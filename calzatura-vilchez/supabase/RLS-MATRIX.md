@@ -6,6 +6,7 @@
 | `productoCodigos` | Sí | SELECT (catálogo/admin) | Upsert vía RPC admin |
 | `productoFinanzas` | Sí | **Sin SELECT** (revocado anon + authenticated) | BFF `GET /admin/productFinanzas` (admin), `GET /staff/productPriceRanges` (trabajador) |
 | `pedidos` | Sí | **Denegado** | BFF `/myOrders`, `/admin/orders`, `createOrder` |
+| `auditoria` | Sí | **Denegado** (REVOKE ALL) | BFF/service_role directo o RPC `insert_auditoria_event`, `list_auditoria_events` |
 | `usuarios` | Sí | **Denegado** | BFF `/users/me`, `/admin/users` |
 | `favoritos` | Sí | **Denegado** (REVOKE ALL) | BFF `/favorites` |
 | `movimientosStock` | Sí | Sin políticas anon | Staff/admin vía RPC |

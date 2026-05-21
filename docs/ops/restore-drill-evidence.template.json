@@ -1,0 +1,31 @@
+{
+  "drillId": "restore-drill-YYYY-MM",
+  "date": "YYYY-MM-DD",
+  "owner": "Responsible person/team",
+  "environment": "staging",
+  "backupSource": "Backup identifier or export path",
+  "restoreTarget": "Temporary isolated target",
+  "startedAt": "YYYY-MM-DDTHH:mm:ss-05:00",
+  "completedAt": "YYYY-MM-DDTHH:mm:ss-05:00",
+  "rtoMinutes": 0,
+  "rpoMinutes": 0,
+  "result": "pass",
+  "rollbackPlan": "How temporary restore resources are discarded without production impact.",
+  "verificationChecks": [
+    {
+      "name": "Schema migrated",
+      "status": "pass",
+      "evidence": "What was checked and where the evidence is stored."
+    },
+    {
+      "name": "Critical read paths",
+      "status": "pass",
+      "evidence": "Queries/endpoints validated after restore."
+    },
+    {
+      "name": "AI dataset available",
+      "status": "pass",
+      "evidence": "Backtesting or data availability proof."
+    }
+  ]
+}

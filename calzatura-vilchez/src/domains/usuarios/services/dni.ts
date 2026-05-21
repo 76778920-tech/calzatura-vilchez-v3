@@ -1,10 +1,13 @@
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
 import { assertHttpsInProduction } from "@/utils/requireHttpsInProd";
+import { getToken } from "firebase/app-check";
+import { appCheck } from "@/firebase/config";
 
 export interface DniLookupResult {
   dni: string;
   nombres: string;
   apellidos: string;
+  lookupToken?: string;
 }
 
 const DNI_LOOKUP_URL = (import.meta.env.VITE_DNI_LOOKUP_URL as string | undefined)?.trim();
@@ -78,9 +81,15 @@ export async function lookupDni(dni: string): Promise<DniLookupResult> {
   }
 
   const endpoint = resolveDniLookupEndpoint();
+  const appCheckToken = appCheck
+    ? await getToken(appCheck, false).then((result) => result.token).catch(() => "")
+    : "";
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(appCheckToken ? { "X-Firebase-AppCheck": appCheckToken } : {}),
+    },
     body: JSON.stringify({ dni: normalized }),
   });
 
@@ -90,6 +99,7 @@ export async function lookupDni(dni: string): Promise<DniLookupResult> {
     dni?: string;
     nombres?: string;
     apellidos?: string;
+    lookupToken?: string;
     attempts?: Array<{ provider: string; status: number | string }>;
   };
 
@@ -110,5 +120,8 @@ export async function lookupDni(dni: string): Promise<DniLookupResult> {
     if (provider) console.debug(`[lookupDni] proveedor: ${provider}`);
   }
 
-  return normalizeResponse(payload, normalized);
+  return {
+    ...normalizeResponse(payload, normalized),
+    lookupToken: typeof payload.lookupToken === "string" ? payload.lookupToken : undefined,
+  };
 }

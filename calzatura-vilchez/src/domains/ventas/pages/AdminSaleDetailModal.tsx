@@ -1,6 +1,8 @@
 import { Eye, RotateCcw, X } from "lucide-react";
 import type { DailySale } from "@/types";
 import { SALE_DOCUMENT_LABELS } from "./adminSaleDocumentLabels";
+import { maskDniForDisplay } from "@/utils/maskEmail";
+import { maskPersonName } from "@/security/orderPrivacy";
 
 type AdminSaleDetailModalProps = Readonly<{
   sale: DailySale;
@@ -90,9 +92,9 @@ export function AdminSaleDetailModal({
             <div className="sale-modal-customer">
               <span className="sale-modal-info-label">Cliente</span>
               <strong>
-                {sale.cliente.nombres} {sale.cliente.apellidos}
+                {maskPersonName(sale.cliente.nombres)} {maskPersonName(sale.cliente.apellidos)}
               </strong>
-              <span>DNI: {sale.cliente.dni}</span>
+              <span>DNI: {maskDniForDisplay(sale.cliente.dni)}</span>
             </div>
           )}
 

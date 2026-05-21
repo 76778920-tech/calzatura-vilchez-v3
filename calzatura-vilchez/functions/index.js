@@ -14,10 +14,10 @@ const {
   isInvalidOrderQty, hasValidOrderItems, toCents, validStripeImage, publicError,
   normalizeOptionalText, normalizeAddress,
   readIdempotencyKey, findOrderByIdempotency, idempotencyOrderJson,
-  sumSizeStock, sumColorSizeStock, getAvailableSizes, deriveTotalStock, getSizeStock,
+  deriveTotalStock, getSizeStock,
   sanitizeOrderProduct, extractItemFields, assertStoredTotals,
-  assertStockAndPrice,   resolveColorBucket, findTallaKeyInMap, cellQty,
-  toFinitePrice, effectiveColorStock, effectiveTallaStock,
+  assertStockAndPrice,
+  toFinitePrice,
   discountOrderStockRpc,
   applyOrderStatusStockSideEffects,
   resolveAiAdminUpstreamRequest, sendUpstreamToClient,
@@ -414,6 +414,11 @@ exports.updateOrderStatus = onRequest(
         }
 
         const order = await fetchOrderOrThrow(supabase, orderId);
+        if (order.metodoPago === "stripe" && estado === "pagado") {
+          return res.status(409).json({
+            error: "Los pedidos Stripe solo se marcan como pagados desde el webhook de pago.",
+          });
+        }
         const patch = { estado };
         if (estado === "pagado") {
           patch.pagadoEn = new Date().toISOString();
@@ -638,11 +643,23 @@ exports.stripeWebhook = onRequest(
           const order = await fetchOrderOrThrow(supabase, orderId);
 
           if (order.estado !== "pagado") {
-            await discountOrderStockRpc(supabase, order);
+            let stockDescontadoEn = order.stockDescontadoEn || null;
+            if (!stockDescontadoEn) {
+              try {
+                await discountOrderStockRpc(supabase, order);
+                stockDescontadoEn = new Date().toISOString();
+              } catch (discountError) {
+                console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
+                return res.status(500).json({
+                  error: "No se pudo descontar stock. Stripe reintentara el webhook.",
+                });
+              }
+            }
             await updateOrder(supabase, orderId, {
               estado: "pagado",
               stripeSessionId: session.id,
               pagadoEn: new Date().toISOString(),
+              stockDescontadoEn,
             });
             await logAuditFn({
               supabase,

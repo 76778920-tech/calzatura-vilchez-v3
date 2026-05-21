@@ -13,13 +13,13 @@ export async function fetchManufacturers(): Promise<Manufacturer[]> {
 export async function addManufacturer(data: Omit<Manufacturer, "id">): Promise<string> {
   const { data: row, error } = await supabase.from(COL).insert(data).select("id").single();
   if (error) throw error;
-  void logAudit("crear", "fabricante", row.id, `${data.nombres} ${data.apellidos} — ${data.marca}`);
+  void logAudit("crear", "fabricante", row.id, data.marca || row.id);
   return row.id;
 }
 
 export async function updateManufacturer(
   id: string,
-  data: Partial<Omit<Manufacturer, "id" | "creadoEn">>
+  data: Partial<Omit<Manufacturer, "id" | "creadoEn">>,
 ): Promise<void> {
   const { error } = await supabase.from(COL).update(data).eq("id", id);
   if (error) throw error;

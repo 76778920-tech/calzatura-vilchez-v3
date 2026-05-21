@@ -56,7 +56,7 @@ async function openCatalog(page: Page) {
   await page.goto("/productos");
   await expect(page.locator("main.products-page")).toBeVisible({ timeout: 30_000 });
   await expect(page.locator(".catalog-campaign-track")).toBeVisible({ timeout: 20_000 });
-  await expect(page.locator("a.product-card")).toHaveCount(MOCK_PRODUCTS.length, { timeout: 20_000 });
+  await expect(page.locator(".product-card")).toHaveCount(MOCK_PRODUCTS.length, { timeout: 20_000 });
   await page.waitForFunction(() =>
     Array.from(document.querySelectorAll<HTMLImageElement>(".catalog-campaign-image"))
       .every((image) => image.complete && image.naturalWidth > 0)

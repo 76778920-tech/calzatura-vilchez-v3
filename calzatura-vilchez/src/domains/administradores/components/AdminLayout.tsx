@@ -5,6 +5,7 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { ADMIN_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 import { logoutUser } from "@/domains/usuarios/services/auth";
 import { useThemeMode } from "@/hooks/useThemeMode";
+import { maskEmailForDisplay } from "@/utils/maskEmail";
 import toast from "react-hot-toast";
 
 export default function AdminLayout() {
@@ -155,8 +156,8 @@ export default function AdminLayout() {
           <div className="admin-session-card" aria-label="Sesión activa">
             <span className="admin-session-icon"><ShieldCheck size={18} /></span>
             <div>
-              <strong>{userProfile?.nombre?.trim() || user.email}</strong>
-              {userProfile?.nombre?.trim() ? <span>{user.email}</span> : null}
+              <strong>{userProfile?.nombre?.trim() || maskEmailForDisplay(user.email ?? "")}</strong>
+              {userProfile?.nombre?.trim() ? <span>{maskEmailForDisplay(user.email ?? "")}</span> : null}
             </div>
             </div>
         </header>

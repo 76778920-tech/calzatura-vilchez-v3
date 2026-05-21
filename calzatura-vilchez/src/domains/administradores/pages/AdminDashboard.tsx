@@ -23,6 +23,7 @@ import type { Order, CartItem } from "@/types";
 import type { AuditEntry } from "@/services/audit";
 import { ADMIN_ROUTES } from "@/routes/paths";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
+import { maskEmailForDisplay } from "@/utils/maskEmail";
 import toast from "react-hot-toast";
 
 // ─── helpers ───────────────────────────────────────────────────────────────
@@ -148,7 +149,7 @@ function OrderDetailModal({ order, onClose }: Readonly<{ order: Order; onClose: 
           <div className="dash-modal-section">
             <p className="dash-modal-section-title">Cliente</p>
             <div className="dash-modal-info-grid">
-              <span className="dash-modal-info-item"><Mail size={14} /> {order.userEmail}</span>
+              <span className="dash-modal-info-item"><Mail size={14} /> {maskEmailForDisplay(order.userEmail)}</span>
               {order.direccion?.telefono && (
                 <span className="dash-modal-info-item"><Phone size={14} /> {order.direccion.telefono}</span>
               )}
@@ -469,7 +470,7 @@ export default function AdminDashboard() {
                 </td>
                 <td>{entry.entidad}</td>
                 <td className="dash-order-email">{entry.entidadNombre ?? "—"}</td>
-                <td className="dash-order-email">{entry.usuarioEmail ?? "—"}</td>
+                <td className="dash-order-email">{entry.usuarioEmail ? maskEmailForDisplay(entry.usuarioEmail) : "—"}</td>
                 <td style={{ whiteSpace: "nowrap", fontSize: "12px", color: "var(--text-muted)" }}>
                   {entry.realizadoEn
                     ? new Date(entry.realizadoEn).toLocaleString("es-PE")
@@ -704,7 +705,7 @@ export default function AdminDashboard() {
                           title="Ver detalle"
                         >
                           <span className="order-id-cell">#{o.id.slice(-8).toUpperCase()}</span>
-                          <span className="dash-order-email">{o.userEmail}</span>
+                          <span className="dash-order-email">{maskEmailForDisplay(o.userEmail)}</span>
                           <span><strong>{formatCurrency(o.total ?? 0)}</strong></span>
                           <span>
                             <span

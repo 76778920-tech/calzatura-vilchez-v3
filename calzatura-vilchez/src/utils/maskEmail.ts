@@ -9,3 +9,10 @@ export function maskEmailForDisplay(email: string): string {
   const visible = local.length <= 2 ? local.slice(0, 1) : local.slice(0, 2);
   return `${visible}${"*".repeat(Math.max(1, local.length - visible.length))}@${domain}`;
 }
+
+export function maskDniForDisplay(dni: string | undefined | null): string {
+  const digits = String(dni || "").replace(/\D/g, "");
+  if (digits.length >= 4) return `****${digits.slice(-4)}`;
+  const visibleSuffix = String(dni || "").trim().slice(-4);
+  return visibleSuffix ? `****${visibleSuffix}` : "Sin DNI";
+}

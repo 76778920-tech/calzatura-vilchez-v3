@@ -22,6 +22,7 @@ export default function Register() {
   const [showPass, setShowPass] = useState(false);
   const [lookingUpDni, setLookingUpDni] = useState(false);
   const [validatedDni, setValidatedDni] = useState("");
+  const [dniLookupToken, setDniLookupToken] = useState("");
   const [loading, setLoading] = useState(false);
 
   const showDniLookupError = (err: unknown) => {
@@ -40,12 +41,17 @@ export default function Register() {
     setLookingUpDni(true);
     try {
       const person = await lookupDni(normalized);
+      if (!person.lookupToken) {
+        throw new Error("DNI_LOOKUP_FAILED");
+      }
       setNombres(person.nombres);
       setApellidos(person.apellidos);
       setValidatedDni(normalized);
+      setDniLookupToken(person.lookupToken);
       toast.success("Datos encontrados");
     } catch (err: unknown) {
       setValidatedDni("");
+      setDniLookupToken("");
       showDniLookupError(err);
     } finally {
       setLookingUpDni(false);
@@ -68,6 +74,10 @@ export default function Register() {
       toast.error(blocking);
       return;
     }
+    if (!dniLookupToken) {
+      toast.error("Vuelve a validar el DNI antes de crear la cuenta");
+      return;
+    }
     const emailNorm = getNormalizedRegisterEmail(email);
 
     setLoading(true);
@@ -80,6 +90,7 @@ export default function Register() {
         email: emailNorm,
         password,
         celular,
+        lookupToken: dniLookupToken,
       });
       savePendingVerificationEmail(emailNorm);
       navigate(PUBLIC_ROUTES.verifyEmail, { replace: true });
@@ -122,6 +133,7 @@ export default function Register() {
                   setDni(nextDni);
                   if (nextDni !== validatedDni) {
                     setValidatedDni("");
+                    setDniLookupToken("");
                     setNombres("");
                     setApellidos("");
                   }

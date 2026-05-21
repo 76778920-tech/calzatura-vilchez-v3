@@ -27,27 +27,8 @@ import {
 
 const PENDING_PROFILE_PREFIX = "CV_PENDING";
 
-function encodePendingSegment(value: string): string {
-  return encodeURIComponent(value.trim());
-}
-
 function decodePendingSegment(value: string): string {
   return decodeURIComponent(value);
-}
-
-function buildPendingProfileMarker(data: {
-  dni: string;
-  nombres: string;
-  apellidos: string;
-  celular?: string;
-}): string {
-  return [
-    PENDING_PROFILE_PREFIX,
-    encodePendingSegment(data.dni),
-    encodePendingSegment(data.nombres),
-    encodePendingSegment(data.apellidos),
-    encodePendingSegment(data.celular ?? ""),
-  ].join("|");
 }
 
 function parsePendingProfileMarker(displayName: string | null): {
@@ -115,6 +96,7 @@ export async function registerUser(
     email: string;
     password: string;
     celular?: string;
+    lookupToken?: string;
   }
 ) {
   if (data.password.length < MIN_AUTH_PASSWORD_LENGTH) {
@@ -131,16 +113,23 @@ export async function registerUser(
   const user = userCredential.user;
   const nombres = data.nombres.trim();
   const apellidos = data.apellidos.trim();
+  const nombre = `${nombres} ${apellidos}`.trim() || data.email;
 
   try {
-    await updateProfile(user, {
-      displayName: buildPendingProfileMarker({
-        dni: data.dni,
-        nombres,
-        apellidos,
-        celular: data.celular,
-      }),
-    });
+    await updateProfile(user, { displayName: nombre });
+    const profile = {
+      uid: user.uid,
+      dni: data.dni,
+      lookupToken: data.lookupToken,
+      nombres,
+      apellidos,
+      nombre,
+      email: user.email ?? data.email,
+      rol: "cliente" as const,
+      creadoEn: new Date().toISOString(),
+      ...(data.celular ? { telefono: data.celular } : {}),
+    };
+    await saveUserProfile(profile);
     await sendEmailVerification(user);
   } catch (error) {
     await deleteUser(user).catch(() => undefined);
@@ -169,7 +158,6 @@ export async function ensureVerifiedUserProfile(user: User) {
 
   const profile = {
     uid: user.uid,
-    dni: pending?.dni,
     nombres,
     apellidos,
     nombre,
@@ -185,11 +173,9 @@ export async function ensureVerifiedUserProfile(user: User) {
     await updateProfile(user, { displayName: nombre }).catch(() => undefined);
   }
 
-  void logAudit("crear", "usuario", user.uid, nombre, {
-    dni: pending?.dni,
-    email: user.email ?? "",
+  void logAudit("crear", "usuario", user.uid, user.uid, {
     rol: profile.rol,
-    validadoPorDNI: Boolean(pending?.dni),
+    validadoPorDNI: false,
     correoVerificado: user.emailVerified,
   });
 
@@ -250,10 +236,7 @@ export async function deleteOwnAccount(): Promise<void> {
   const user = auth.currentUser;
   if (!user?.email) throw new Error("NO_USER");
 
-  const profile = await getUserProfile(user.uid).catch(() => null);
-  const entityName = profile?.nombre?.trim() || user.email;
-
-  await logAudit("eliminar", "usuario", user.uid, entityName, {
+  await logAudit("eliminar", "usuario", user.uid, user.uid, {
     email: user.email,
     selfService: true,
   });

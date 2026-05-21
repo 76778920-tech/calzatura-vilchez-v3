@@ -39,9 +39,9 @@ test.describe("catálogo → detalle → carrito", () => {
     await page.reload();
     await expect(page.locator("main.products-page")).toBeVisible({ timeout: 30_000 });
 
-    const firstCard = page.locator("a.product-card").first();
+    const firstCard = page.locator(".product-card").first();
     await expect(firstCard).toBeVisible({ timeout: 20_000 });
-    await firstCard.click();
+    await firstCard.getByText(MOCK_PRODUCT.nombre).click();
 
     await expect(page).toHaveURL(/\/producto\/[^/]+$/);
     await expect(page.locator("main.detail-page")).toBeVisible({ timeout: 20_000 });

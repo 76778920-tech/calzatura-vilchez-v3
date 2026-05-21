@@ -1,0 +1,29 @@
+==============================================================
+REPORTE DE EVALUACION EXPERIMENTAL
+Calzatura Vilchez - Modelo de Prediccion de Demanda
+==============================================================
+Generado      : 2026-05-20
+Historial     : 180 dias  |  Folds backtesting: 6
+
+--------------------------------------------------------------
+1. DATASET
+--------------------------------------------------------------
+  Periodo   : 2025-11-22  ->  2026-05-20
+  Productos : 12  |  Dias: 180  |  Filas: 2,160
+  Densidad  : 18.5%  (400/2,160 filas con ventas)
+
+--------------------------------------------------------------
+3. EXPERIMENTO 2 - BACKTESTING ROLLING
+--------------------------------------------------------------
+  RF gana en MAPE : 4/6 folds
+  RF gana en MAE  : 3/6 folds
+  Mejora MAPE promedio: +12.4pp vs baseline
+
+--------------------------------------------------------------
+6. CONCLUSIONES
+--------------------------------------------------------------
+  1. Backtesting (6 folds): RF gana MAPE en 4/6 folds y MAE en 3/6 folds.
+     MAPE promedio RF=42.6% vs Baseline=55.0% (delta +12.4pp; positivo = RF mejor).
+==============================================================
+FIN DEL REPORTE
+==============================================================

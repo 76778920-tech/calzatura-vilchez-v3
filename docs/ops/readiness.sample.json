@@ -1,0 +1,17 @@
+{
+  "requiredEnv": [],
+  "targets": [
+    {
+      "name": "bff-local",
+      "url": "http://127.0.0.1:8787/health",
+      "expectedStatus": [200],
+      "maxMs": 2000
+    },
+    {
+      "name": "ai-service-local",
+      "url": "http://127.0.0.1:8000/api/health",
+      "expectedStatus": [200],
+      "maxMs": 3000
+    }
+  ]
+}

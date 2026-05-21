@@ -1,5 +1,4 @@
-import { supabase } from "@/supabase/client";
-import { auth } from "@/firebase/config";
+import { bffFetch } from "@/utils/bffClient";
 
 export type AuditAction =
   | "crear"
@@ -32,12 +31,35 @@ const REDACTED = "[redacted]";
 
 function isSensitiveAuditKey(key: string): boolean {
   const k = key.toLowerCase();
-  if (k === "authorization" || k === "cookie" || k === "jwt") return true;
+  if (["authorization", "cookie", "jwt", "dni", "documento", "documentonumero", "email", "correo"].includes(k)) return true;
+  if (k.includes("telefono") || k.includes("celular") || k.includes("direccion") || k.includes("referencia")) return true;
   if (k.includes("password") || k.includes("passwd") || k.includes("contrase")) return true;
   if (/(^|_)api[_-]?key($|_)/.test(k) || k.endsWith("apikey")) return true;
   if (/(^|_)(access|refresh|id|bearer|session)?token($|_)/.test(k) || k.endsWith("token")) return true;
   if (k.includes("secret") || k.includes("bearer")) return true;
   return false;
+}
+
+function sanitizeAuditLabel(value: string): string {
+  const trimmed = value.trim();
+  if (/^\d{8}$/.test(trimmed)) return REDACTED;
+  const emailMatch = trimmed.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
+  if (!emailMatch) return trimmed;
+  const [local, domain] = trimmed.split("@", 2);
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
+function safeEntityRef(entidad: AuditEntity, entidadId: string): string {
+  const id = entidadId.trim();
+  const suffix = id.length > 8 ? id.slice(-8) : id || "sin-id";
+  return `${entidad}:${suffix}`;
+}
+
+function sanitizeAuditEntityLabel(entidad: AuditEntity, entidadId: string, value: string): string {
+  if (["usuario", "pedido", "venta", "fabricante", "importar"].includes(entidad)) {
+    return safeEntityRef(entidad, entidadId);
+  }
+  return sanitizeAuditLabel(value);
 }
 
 function sanitizeAuditValue(value: unknown): unknown {
@@ -54,7 +76,7 @@ function sanitizeAuditValue(value: unknown): unknown {
   return value;
 }
 
-/** `detalle` no debe incluir secretos; las claves sensibles se redactan al persistir. */
+/** `detalle` no debe incluir secretos ni PII; el BFF persiste con service_role. */
 export async function logAudit(
   accion: AuditAction,
   entidad: AuditEntity,
@@ -63,32 +85,24 @@ export async function logAudit(
   detalle?: Record<string, unknown>,
 ): Promise<void> {
   try {
-    const user = auth.currentUser;
     const safeDetalle = detalle == null ? null : (sanitizeAuditValue(detalle) as Record<string, unknown>);
-    const { error: dbError } = await supabase.from("auditoria").insert({
-      accion,
-      entidad,
-      entidadId,
-      entidadNombre,
-      detalle: safeDetalle,
-      usuarioUid: user?.uid ?? null,
-      usuarioEmail: user?.email ?? null,
-      realizadoEn: new Date().toISOString(),
+    await bffFetch("/audit", {
+      method: "POST",
+      body: JSON.stringify({
+        accion,
+        entidad,
+        entidadId,
+        entidadNombre: sanitizeAuditEntityLabel(entidad, entidadId, entidadNombre),
+        detalle: safeDetalle,
+      }),
     });
-    if (dbError) {
-      console.error("[audit] logAudit falló silenciosamente:", dbError);
-    }
   } catch (err) {
-    console.error("[audit] logAudit falló silenciosamente:", err);
+    console.error("[audit] logAudit fallo silenciosamente:", err);
   }
 }
 
 export async function fetchRecentAudit(limit = 20): Promise<AuditEntry[]> {
-  const { data, error } = await supabase
-    .from("auditoria")
-    .select("*")
-    .order("realizadoEn", { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return data as AuditEntry[];
+  const safeLimit = Math.min(Math.max(Math.trunc(limit) || 20, 1), 100);
+  const { entries } = await bffFetch<{ entries: AuditEntry[] }>(`/admin/audit?limit=${safeLimit}`);
+  return entries;
 }

@@ -68,7 +68,8 @@ test.describe("admin pedidos → filtro, expansión y cambio de estado", () => {
     await page.selectOption("select.form-input", "pendiente");
 
     await expect(page.locator(".order-card")).toHaveCount(1);
-    await expect(page.locator(".order-card").first()).toContainText("cliente-e2e@test.com");
+    await expect(page.locator(".order-card").first()).toContainText("cl*********@test.com");
+    await expect(page.locator(".order-card").first()).not.toContainText("cliente-e2e@test.com");
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -88,6 +89,10 @@ test.describe("admin pedidos → filtro, expansión y cambio de estado", () => {
     await header.click();
     await expect(firstCard.locator(".order-card-body")).toBeVisible();
     await expect(firstCard.locator(".order-card-body")).toContainText("Zapatilla E2E");
+    await expect(firstCard.locator(".order-card-body")).toContainText("A** G***");
+    await expect(firstCard.locator(".order-card-body")).toContainText("Tel: ***1222");
+    await expect(firstCard.locator(".order-card-body")).not.toContainText("Av. Test 123");
+    await expect(firstCard.locator(".order-card-body")).not.toContainText("999111222");
 
     // Segundo click colapsa
     await header.click();

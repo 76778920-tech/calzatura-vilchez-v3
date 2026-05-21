@@ -31,7 +31,10 @@ function loadAllowedOrigins() {
 
 const allowedOrigins = loadAllowedOrigins();
 
+const crypto = require("crypto");
+
 const MOBILE_CLIENT_HEADER = "calzatura-mobile";
+const DNI_LOOKUP_PROOF_TTL_MS = 30 * 60 * 1000;
 
 function isMobileAppRequest(req) {
   const h = req.headers["x-calzatura-client"];
@@ -46,6 +49,43 @@ function authorizeLookupRequest(req) {
     return { ok: false, status: 403, error: "Origen no permitido" };
   }
   return { ok: true };
+}
+
+function lookupProofSecret() {
+  return process.env.DNI_LOOKUP_PROOF_SECRET?.trim() || "";
+}
+
+function base64url(input) {
+  return Buffer.from(input).toString("base64url");
+}
+
+function signLookupPayload(payload) {
+  const secret = lookupProofSecret();
+  if (!secret) return "";
+  const encoded = base64url(JSON.stringify(payload));
+  const sig = crypto.createHmac("sha256", secret).update(encoded).digest("base64url");
+  return `${encoded}.${sig}`;
+}
+
+function verifyDniLookupProof(token) {
+  const secret = lookupProofSecret();
+  const raw = String(token || "").trim();
+  if (!secret || !raw.includes(".")) return null;
+  const [encoded, sig] = raw.split(".", 2);
+  const expected = crypto.createHmac("sha256", secret).update(encoded).digest("base64url");
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+    const payload = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+    if (!payload || typeof payload !== "object") return null;
+    if (Number(payload.exp) < Date.now()) return null;
+    const dni = normalizeDni(payload.dni);
+    const nombres = String(payload.nombres || "").trim().toUpperCase();
+    const apellidos = String(payload.apellidos || "").trim().toUpperCase();
+    if (!/^\d{8}$/.test(dni) || !nombres || !apellidos) return null;
+    return { dni, nombres, apellidos };
+  } catch {
+    return null;
+  }
 }
 
 const RATE_LIMIT_WINDOW_MS = 30 * 60 * 1000;
@@ -139,7 +179,7 @@ function setCorsHeaders(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "Content-Type, X-Calzatura-Client"
+    "Content-Type, Authorization, X-Calzatura-Client, X-Firebase-AppCheck"
   );
 }
 
@@ -357,7 +397,7 @@ const PROVIDERS = [
   { name: "apiperu.dev", run: tryApiperuDev },
 ];
 
-async function handleLookupDni(req, res) {
+async function handleLookupDni(req, res, options = {}) {
   setCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
@@ -368,9 +408,24 @@ async function handleLookupDni(req, res) {
     return res.status(405).json({ error: "Metodo no permitido" });
   }
 
+  if (options.requireProofSecret && !lookupProofSecret()) {
+    return res.status(503).json({ error: "Validacion DNI no configurada" });
+  }
+
   const authz = authorizeLookupRequest(req);
   if (!authz.ok) {
     return res.status(authz.status).json({ error: authz.error });
+  }
+
+  if (options.requireAppCheck) {
+    const appCheckToken = req.headers["x-firebase-appcheck"];
+    const token = typeof appCheckToken === "string" ? appCheckToken.trim() : "";
+    const verified = token && typeof options.verifyAppCheckToken === "function"
+      ? await options.verifyAppCheckToken(token)
+      : false;
+    if (!verified) {
+      return res.status(401).json({ error: "App Check requerido" });
+    }
   }
 
   const origin = req.headers.origin;
@@ -430,7 +485,11 @@ async function handleLookupDni(req, res) {
           res.setHeader("Access-Control-Expose-Headers", "X-DNI-Provider");
         }
         res.setHeader("X-DNI-Provider", name);
-        return res.status(200).json(person);
+        const lookupToken = signLookupPayload({
+          ...person,
+          exp: Date.now() + DNI_LOOKUP_PROOF_TTL_MS,
+        });
+        return res.status(200).json({ ...person, lookupToken });
       }
     }
 
@@ -466,4 +525,4 @@ async function handleLookupDni(req, res) {
   }
 }
 
-module.exports = { handleLookupDni };
+module.exports = { handleLookupDni, verifyDniLookupProof };

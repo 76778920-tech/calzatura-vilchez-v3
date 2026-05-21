@@ -2,6 +2,8 @@ import { PackageSearch, X } from "lucide-react";
 import type { DailySale } from "@/types";
 import { SALE_DOCUMENT_LABELS } from "./adminSaleDocumentLabels";
 import { filterDailySalesBySearch } from "./adminSalesHistorialFilter";
+import { maskDniForDisplay, maskEmailForDisplay } from "@/utils/maskEmail";
+import { maskPersonName } from "@/security/orderPrivacy";
 
 type AdminSalesHistorialTableProps = {
   sales: DailySale[];
@@ -90,7 +92,7 @@ export function AdminSalesHistorialTable({
               <td>
                 <div className="admin-sale-operator-cell">
                   <strong>{sale.encargadoNombre || "Sin encargado"}</strong>
-                  {sale.encargadoEmail && <span>{sale.encargadoEmail}</span>}
+                  {sale.encargadoEmail && <span>{maskEmailForDisplay(sale.encargadoEmail)}</span>}
                 </div>
               </td>
               <td>S/ {sale.total.toFixed(2)}</td>
@@ -106,7 +108,7 @@ export function AdminSalesHistorialTable({
                     <span className="sale-devuelto-badge">Devuelto</span>
                   ) : sale.cliente ? (
                     <span>
-                      {sale.cliente.dni} - {sale.cliente.nombres}
+                      {maskDniForDisplay(sale.cliente.dni)} - {maskPersonName(sale.cliente.nombres)}
                     </span>
                   ) : (
                     <span>Venta simple</span>

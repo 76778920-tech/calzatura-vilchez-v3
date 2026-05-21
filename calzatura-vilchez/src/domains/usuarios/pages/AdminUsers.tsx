@@ -13,6 +13,7 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { isSuperAdminEmail } from "@/config/security";
 import { fetchAllOrders } from "@/domains/pedidos/services/orders";
 import { fetchAllUsers, updateUserRole } from "@/domains/usuarios/services/users";
+import { maskDniForDisplay, maskEmailForDisplay } from "@/utils/maskEmail";
 import type { Order, UserProfile, UserRole } from "@/types";
 
 type UserFilter = "todos" | UserRole;
@@ -332,10 +333,10 @@ export default function AdminUsers() {
                       </select>
                     </div>
                   </td>
-                  <td>{profile.dni || "Sin DNI"}</td>
+                  <td>{maskDniForDisplay(profile.dni)}</td>
                   <td>
                     <div className="admin-contact-cell">
-                      <span><Mail size={13} /> {profile.email}</span>
+                      <span><Mail size={13} /> {maskEmailForDisplay(profile.email)}</span>
                       <span><Phone size={13} /> {profile.telefono || "Sin teléfono"}</span>
                     </div>
                   </td>

@@ -26,6 +26,7 @@ import { dniLookupFailureMessage, isValidDni, lookupDni, normalizeDni } from "@/
 import type { Manufacturer, ManufacturerDocument } from "@/types";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import { compressImageFile, uploadImageToCloudinary } from "@/domains/administradores/services/cloudinary";
+import { maskDniForDisplay } from "@/utils/maskEmail";
 
 type ManufacturerForm = Omit<Manufacturer, "id" | "creadoEn" | "actualizadoEn">;
 type StatusFilter = "todos" | "activos" | "inactivos";
@@ -418,7 +419,7 @@ export default function AdminManufacturers() {
             )}
             {filteredManufacturers.map((item) => (
               <tr key={item.id}>
-                <td><span className="admin-code-badge">{item.dni}</span></td>
+                <td><span className="admin-code-badge">{maskDniForDisplay(item.dni)}</span></td>
                 <td>
                   <div className="admin-product-cell">
                     <strong>{fullName(item)}</strong>
@@ -719,7 +720,7 @@ export default function AdminManufacturers() {
               <div className="sale-modal-grid">
                 <div className="sale-modal-info">
                   <span className="sale-modal-info-label"><IdCard size={11} style={{ display: "inline", marginRight: 4 }} />DNI</span>
-                  <span>{detailManufacturer.dni}</span>
+                  <span>{maskDniForDisplay(detailManufacturer.dni)}</span>
                 </div>
                 <div className="sale-modal-info">
                   <span className="sale-modal-info-label"><Phone size={11} style={{ display: "inline", marginRight: 4 }} />Teléfono</span>

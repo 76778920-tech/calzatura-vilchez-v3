@@ -1,0 +1,31 @@
+{
+  "drillId": "restore-drill-2026-05-sample",
+  "date": "2026-05-20",
+  "owner": "DevOps",
+  "environment": "staging",
+  "backupSource": "Supabase scheduled backup or exported snapshot",
+  "restoreTarget": "Temporary isolated project/database",
+  "startedAt": "2026-05-20T09:00:00-05:00",
+  "completedAt": "2026-05-20T09:28:00-05:00",
+  "rtoMinutes": 28,
+  "rpoMinutes": 60,
+  "result": "pass",
+  "rollbackPlan": "Discard temporary target after validation; no production writes were executed.",
+  "verificationChecks": [
+    {
+      "name": "Schema migrated",
+      "status": "pass",
+      "evidence": "Migration count and critical tables matched expected inventory."
+    },
+    {
+      "name": "Critical read paths",
+      "status": "pass",
+      "evidence": "Productos, pedidos and ventas_diarias sample queries returned expected rows."
+    },
+    {
+      "name": "AI dataset available",
+      "status": "pass",
+      "evidence": "evaluate.py dry execution prerequisites were checked against restored data source."
+    }
+  ]
+}

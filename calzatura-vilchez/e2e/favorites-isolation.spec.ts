@@ -60,7 +60,7 @@ test.describe("favoritos privados por cuenta", () => {
       await clientA.page.goto("/productos");
       await expect(clientA.page.locator("main.products-page")).toBeVisible({ timeout: 20_000 });
       await clientA.page
-        .locator("a.product-card", { hasText: FAVORITE_PRODUCT.nombre })
+        .locator(".product-card", { hasText: FAVORITE_PRODUCT.nombre })
         .getByRole("button", { name: /agregar a favoritos/i })
         .click();
       await expect(clientA.page.getByText(/agregado a favoritos/i)).toBeVisible({ timeout: 8_000 });

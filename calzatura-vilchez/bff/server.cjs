@@ -35,6 +35,24 @@ function loadSuperadminEmails() {
 
 const superadminEmails = loadSuperadminEmails();
 
+function isProductionRuntime() {
+  return process.env.NODE_ENV === "production"
+    || process.env.VERCEL_ENV === "production"
+    || process.env.RENDER === "true"
+    || Boolean(process.env.RENDER_SERVICE_ID)
+    || Boolean(process.env.FLY_APP_NAME);
+}
+
+function requireDniAppCheck() {
+  if (isProductionRuntime()) return true;
+  return process.env.REQUIRE_DNI_APPCHECK === "true";
+}
+
+function requireDniProofSecret() {
+  if (isProductionRuntime()) return true;
+  return process.env.REQUIRE_DNI_PROOF_SECRET === "true";
+}
+
 function isSuperadminEmail(email) {
   return superadminEmails.has(String(email || "").trim().toLowerCase());
 }
@@ -73,7 +91,7 @@ const {
   findOrderByIdempotency,
   idempotencyOrderJson,
 } = require("../functions/fnUtils");
-const { handleLookupDni } = require("./lookupDni.cjs");
+const { handleLookupDni, verifyDniLookupProof } = require("./lookupDni.cjs");
 const { redactOrderForStaff } = require("./privacy.cjs");
 const { buildCloudinaryUploadSignature } = require("./cloudinarySign.cjs");
 
@@ -160,6 +178,16 @@ async function verifyFirebaseUser(req) {
     throw Object.assign(new Error("No autenticado"), { status: 401 });
   }
   return admin.auth().verifyIdToken(token);
+}
+
+async function verifyFirebaseAppCheckToken(token) {
+  try {
+    await admin.appCheck().verifyToken(token);
+    return true;
+  } catch (error) {
+    console.warn("App Check invalido:", error?.message || error);
+    return false;
+  }
 }
 
 async function assertAdminRole(supabase, uid) {
@@ -277,9 +305,70 @@ function profileString(value) {
   return typeof value === "string" ? value.trim() : undefined;
 }
 
+function normalizeDniValue(value) {
+  const dni = String(value || "").replace(/\D/g, "").slice(0, 8);
+  return /^\d{8}$/.test(dni) ? dni : "";
+}
+
+function maskDniValue(value) {
+  const dni = normalizeDniValue(value);
+  return dni ? `****${dni.slice(-4)}` : "";
+}
+
+function hashDniValue(value) {
+  const dni = normalizeDniValue(value);
+  if (!dni) return "";
+  const crypto = require("crypto");
+  return crypto.createHash("sha256").update(dni, "utf8").digest("hex");
+}
+
+function sanitizeProfileAddress(address) {
+  if (!address || typeof address !== "object") return null;
+  const normalized = {};
+  for (const key of ["nombre", "apellido", "direccion", "ciudad", "distrito", "referencia"]) {
+    if (typeof address[key] === "string") {
+      normalized[key] = normalizeTextField(address[key], key, key === "referencia" ? 180 : 120);
+    }
+  }
+  if (typeof address.telefono === "string") {
+    normalized.telefono = normalizeTextField(address.telefono, "Telefono", 15);
+  }
+  return normalized;
+}
+
+function sanitizeProfileAddresses(value) {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .slice(0, 5)
+    .map(sanitizeProfileAddress)
+    .filter(Boolean);
+}
+
 function sanitizeOwnUserProfile(decodedToken, incomingProfile, existingProfile) {
   const emailFromToken = profileString(decodedToken.email);
   const now = new Date().toISOString();
+  const lookup = verifyDniLookupProof(incomingProfile.lookupToken);
+  const incomingDni = normalizeDniValue(incomingProfile.dni);
+  if (incomingDni && (!lookup || lookup.dni !== incomingDni)) {
+    throw Object.assign(new Error("Validacion de DNI requerida"), { status: 400 });
+  }
+  const incomingIdentity = {
+    nombres: profileString(incomingProfile.nombres),
+    apellidos: profileString(incomingProfile.apellidos),
+    nombre: profileString(incomingProfile.nombre),
+  };
+  const hasIncomingLegalIdentity = Boolean(
+    incomingDni || incomingIdentity.nombres !== undefined || incomingIdentity.apellidos !== undefined,
+  );
+  if (!lookup && !existingProfile && hasIncomingLegalIdentity) {
+    throw Object.assign(new Error("Validacion de DNI requerida para registrar identidad"), { status: 400 });
+  }
+  const identityChangedWithoutLookup = !lookup && existingProfile && Object.entries(incomingIdentity).some(
+    ([key, value]) => value !== undefined && value !== profileString(existingProfile[key]),
+  );
+  if (identityChangedWithoutLookup) {
+    throw Object.assign(new Error("Validacion de DNI requerida para cambiar nombres"), { status: 400 });
+  }
   const profile = {
     uid: decodedToken.uid,
     email: emailFromToken || profileString(existingProfile?.email) || profileString(incomingProfile.email) || "",
@@ -287,13 +376,40 @@ function sanitizeOwnUserProfile(decodedToken, incomingProfile, existingProfile) 
     creadoEn: existingProfile?.creadoEn || profileString(incomingProfile.creadoEn) || now,
   };
 
-  for (const key of ["nombre", "nombres", "apellidos", "dni", "telefono"]) {
-    const value = profileString(incomingProfile[key]);
-    if (value !== undefined) profile[key] = value;
+  const telefono = profileString(incomingProfile.telefono);
+  if (telefono !== undefined) {
+    profile.telefono = telefono;
   }
 
-  if (Array.isArray(incomingProfile.direcciones)) {
-    profile.direcciones = incomingProfile.direcciones;
+  if (lookup) {
+    profile.dni = maskDniValue(lookup.dni);
+    profile.dni_hash = hashDniValue(lookup.dni);
+    profile.nombres = lookup.nombres;
+    profile.apellidos = lookup.apellidos;
+    profile.nombre = `${lookup.nombres} ${lookup.apellidos}`.trim();
+  } else {
+    const existingDni = profileString(existingProfile?.dni);
+    if (existingDni !== undefined) {
+      profile.dni = normalizeDniValue(existingDni) ? maskDniValue(existingDni) : existingDni;
+    }
+    const existingDniHash = profileString(existingProfile?.dni_hash);
+    if (existingDniHash !== undefined) {
+      profile.dni_hash = existingDniHash;
+    } else if (existingDni && normalizeDniValue(existingDni)) {
+      profile.dni_hash = hashDniValue(existingDni);
+    }
+    for (const key of ["nombres", "apellidos", "nombre"]) {
+      const value = profileString(existingProfile?.[key]);
+      if (value !== undefined) profile[key] = value;
+    }
+    if (!profile.nombre) {
+      profile.nombre = profile.email?.split("@")[0] || "Usuario";
+    }
+  }
+
+  const direcciones = sanitizeProfileAddresses(incomingProfile.direcciones);
+  if (direcciones) {
+    profile.direcciones = direcciones;
   }
 
   return profile;
@@ -312,18 +428,169 @@ function validStripeImage(image) {
   }
 }
 
+const AUDIT_REDACTED = "[redacted]";
+
+function isSensitiveAuditKey(key) {
+  const k = String(key || "").toLowerCase();
+  if (["authorization", "cookie", "jwt", "dni", "documento", "documentonumero", "email", "correo"].includes(k)) return true;
+  if (k.includes("password") || k.includes("passwd") || k.includes("contrase")) return true;
+  if (k.includes("token") || k.includes("secret") || k.includes("bearer")) return true;
+  if (k.includes("telefono") || k.includes("celular") || k.includes("direccion") || k.includes("referencia")) return true;
+  if (/(^|_)api[_-]?key($|_)/.test(k) || k.endsWith("apikey")) return true;
+  return false;
+}
+
+function sanitizeAuditValue(value) {
+  if (value == null) return value;
+  if (Array.isArray(value)) return value.map(sanitizeAuditValue);
+  if (typeof value === "object") {
+    const out = {};
+    for (const [key, inner] of Object.entries(value)) {
+      out[key] = isSensitiveAuditKey(key) ? AUDIT_REDACTED : sanitizeAuditValue(inner);
+    }
+    return out;
+  }
+  return value;
+}
+
+function sanitizeAuditEmail(value) {
+  const email = String(value || "").trim();
+  if (!email.includes("@")) return email || null;
+  const [local, domain] = email.split("@", 2);
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
+function sanitizeAuditLabel(value) {
+  const label = String(value || "").trim();
+  if (/^\d{8}$/.test(label)) return AUDIT_REDACTED;
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(label)) return sanitizeAuditEmail(label);
+  return label;
+}
+
+function safeAuditEntityRef(entidad, entidadId) {
+  const id = String(entidadId || "").trim();
+  const suffix = id.length > 8 ? id.slice(-8) : id || "sin-id";
+  return `${entidad}:${suffix}`;
+}
+
+function sanitizeAuditEntityLabel(entidad, entidadId, entidadNombre) {
+  const entity = String(entidad || "").trim();
+  if (["usuario", "fabricante"].includes(entity)) {
+    return safeAuditEntityRef(entity, entidadId);
+  }
+  return sanitizeAuditLabel(entidadNombre);
+}
+
+async function resolveClientAuditEntityLabel(supabase, entidad, entidadId, entidadNombre) {
+  const entity = String(entidad || "").trim();
+  const id = String(entidadId || "").trim();
+
+  if (["usuario", "pedido", "venta", "fabricante", "importar"].includes(entity)) {
+    return safeAuditEntityRef(entity, id);
+  }
+
+  if (entity === "producto") {
+    try {
+      const { data, error } = await supabase
+        .from("productos")
+        .select("nombre")
+        .eq("id", id)
+        .maybeSingle();
+      if (!error && typeof data?.nombre === "string" && data.nombre.trim()) {
+        return sanitizeAuditLabel(data.nombre);
+      }
+    } catch {
+      // Fallback seguro abajo: nunca usar el label enviado por cliente para productos.
+    }
+    return safeAuditEntityRef(entity, id);
+  }
+
+  return sanitizeAuditEntityLabel(entity, id, entidadNombre);
+}
+
+const CLIENT_AUDIT_ACTIONS = new Set(["crear", "editar", "eliminar", "cambiar_estado", "importar"]);
+const CLIENT_AUDIT_ENTITIES = new Set(["producto", "pedido", "fabricante", "usuario", "venta", "importar"]);
+const ADMIN_CLIENT_AUDIT_POLICY = {
+  producto: new Set(["crear", "editar", "eliminar", "importar"]),
+  fabricante: new Set(["crear", "editar", "eliminar", "importar"]),
+  usuario: new Set(["crear", "editar", "eliminar", "cambiar_estado"]),
+  venta: new Set(["crear", "editar", "eliminar", "cambiar_estado", "importar"]),
+  pedido: new Set(["cambiar_estado"]),
+  importar: new Set(["importar"]),
+};
+const STAFF_CLIENT_AUDIT_POLICY = {
+  venta: new Set(["crear", "editar", "eliminar", "cambiar_estado"]),
+  pedido: new Set(["cambiar_estado"]),
+};
+const SELF_USER_AUDIT_ACTIONS = new Set(["crear", "eliminar"]);
+const SELF_USER_AUDIT_DETAIL_KEYS = new Set(["rol", "validadoPorDNI", "correoVerificado", "selfService"]);
+
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function auditPolicyAllows(policy, accion, entidad) {
+  return Boolean(policy[entidad]?.has(accion));
+}
+
+function hasOnlyAllowedAuditDetailKeys(detalle, allowedKeys) {
+  if (detalle == null) return true;
+  if (!isPlainObject(detalle)) return false;
+  return Object.keys(detalle).every((key) => allowedKeys.has(key));
+}
+
+async function fetchAuditActorRole(supabase, decodedToken) {
+  const { data, error } = await supabase
+    .from("usuarios")
+    .select("rol")
+    .eq("uid", decodedToken.uid)
+    .maybeSingle();
+  if (error) {
+    throw Object.assign(new Error("No se pudo verificar el rol"), { status: 500 });
+  }
+  if (data?.rol) return data.rol;
+  return isSuperadminEmail(decodedToken.email) ? "admin" : "";
+}
+
+function assertClientAuditAllowed({ accion, entidad, entidadId, detalle, role, uid }) {
+  if (!CLIENT_AUDIT_ACTIONS.has(accion) || !CLIENT_AUDIT_ENTITIES.has(entidad)) {
+    throw Object.assign(new Error("Evento de auditoria no permitido"), { status: 403 });
+  }
+
+  if (role === "admin" && auditPolicyAllows(ADMIN_CLIENT_AUDIT_POLICY, accion, entidad)) {
+    return;
+  }
+  if (role === "trabajador" && auditPolicyAllows(STAFF_CLIENT_AUDIT_POLICY, accion, entidad)) {
+    return;
+  }
+  if (
+    role === "cliente" &&
+    entidad === "usuario" &&
+    entidadId === uid &&
+    SELF_USER_AUDIT_ACTIONS.has(accion) &&
+    hasOnlyAllowedAuditDetailKeys(detalle, SELF_USER_AUDIT_DETAIL_KEYS)
+  ) {
+    return;
+  }
+
+  throw Object.assign(new Error("Evento de auditoria no permitido"), { status: 403 });
+}
+
 // Inserta en la tabla auditoria desde el contexto de Cloud Functions.
 // No lanza: un fallo de auditoría nunca interrumpe la operación principal.
-async function logAuditFn(supabase, accion, entidad, entidadId, entidadNombre, usuarioUid, usuarioEmail, detalle) {
+async function logAuditFn(supabase, accion, entidad, entidadId, entidadNombre, usuarioUid, usuarioEmail, detalle, options = {}) {
   try {
+    const safeEntidadNombre = options.entityLabelResolved === true
+      ? sanitizeAuditLabel(entidadNombre)
+      : sanitizeAuditEntityLabel(entidad, entidadId, entidadNombre);
     await supabase.from("auditoria").insert({
       accion,
       entidad,
       entidadId,
-      entidadNombre,
-      detalle: detalle ?? null,
+      entidadNombre: safeEntidadNombre,
+      detalle: detalle == null ? null : sanitizeAuditValue(detalle),
       usuarioUid: usuarioUid ?? null,
-      usuarioEmail: usuarioEmail ?? null,
+      usuarioEmail: sanitizeAuditEmail(usuarioEmail),
       realizadoEn: new Date().toISOString(),
     });
   } catch {
@@ -746,16 +1013,6 @@ function extractProductName(item) {
   return "";
 }
 
-function clientProductFromItem(item) {
-  if (!item?.product || typeof item.product !== "object") return null;
-  const product = item.product;
-  const id = String(product.id ?? "").trim();
-  const nombre = typeof product.nombre === "string" ? product.nombre.trim() : "";
-  const precio = toFinitePrice(product.precio);
-  if (!id || !nombre || precio <= 0) return null;
-  return product;
-}
-
 async function fetchProductsByIds(supabase, ids) {
   const { data, error } = await supabase.from("productos").select("*").in("id", ids);
   if (error) {
@@ -858,14 +1115,10 @@ async function resolveOrderProduct(supabase, productMap, item) {
     }
   }
 
-  if (clientProductIsOrderable(item.clientProduct, item)) {
-    return item.clientProduct;
-  }
-
   if (!product) {
     throw Object.assign(new Error("Producto no encontrado"), { status: 400 });
   }
-  return product;
+  throw Object.assign(new Error("Producto sin stock, color o talla disponible"), { status: 409 });
 }
 
 async function fetchProductOrThrow(supabase, productId) {
@@ -930,7 +1183,6 @@ async function buildOrderDraft(supabase, rawItems) {
   const normalizedItems = rawItems.map((item) => {
     const productId = extractProductId(item);
     const productName = extractProductName(item);
-    const clientProduct = clientProductFromItem(item);
     const quantity = Number(item?.quantity || 0);
     const talla = normalizeOrderTalla(item?.talla);
     const color = normalizeOrderColor(item?.color);
@@ -942,7 +1194,6 @@ async function buildOrderDraft(supabase, rawItems) {
     return {
       productId,
       productName,
-      clientProduct,
       quantity,
       talla,
       color,
@@ -1058,7 +1309,11 @@ app.get("/", (_req, res) =>
 app.get("/health", (_req, res) => res.status(200).type("text/plain").send("ok"));
 
 app.post("/lookup-dni", (req, res) => {
-  cors(req, res, () => handleLookupDni(req, res));
+  cors(req, res, () => handleLookupDni(req, res, {
+    requireAppCheck: requireDniAppCheck(),
+    requireProofSecret: requireDniProofSecret(),
+    verifyAppCheckToken: verifyFirebaseAppCheckToken,
+  }));
 });
 
 const ORS_API_BASE = "https://api.openrouteservice.org";
@@ -1302,6 +1557,11 @@ app.post("/updateOrderStatus", (req, res) => {
       }
 
       const order = await fetchOrderOrThrow(supabase, orderId);
+      if (order.metodoPago === "stripe" && estado === "pagado") {
+        return res.status(409).json({
+          error: "Los pedidos Stripe solo se marcan como pagados desde el webhook de pago.",
+        });
+      }
       const patch = { estado };
       if (estado === "pagado") {
         patch.pagadoEn = new Date().toISOString();
@@ -3330,6 +3590,7 @@ app.post("/createCheckoutSession", (req, res) => {
         }
 
         assertStoredTotals(order);
+        await assertOrderStockAvailability(supabase, order.items);
 
         if (order.stripeSessionId) {
           try {
@@ -3449,12 +3710,17 @@ app.post("/stripeWebhook", async (req, res) => {
           const order = await fetchOrderOrThrow(supabase, orderId);
 
           if (order.estado !== "pagado") {
-            let stockDescontadoEn = null;
-            try {
-              await discountOrderStockRpc(supabase, order);
-              stockDescontadoEn = new Date().toISOString();
-            } catch (discountError) {
-              console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
+            let stockDescontadoEn = order.stockDescontadoEn || null;
+            if (!stockDescontadoEn) {
+              try {
+                await discountOrderStockRpc(supabase, order);
+                stockDescontadoEn = new Date().toISOString();
+              } catch (discountError) {
+                console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
+                return res.status(500).json({
+                  error: "No se pudo descontar stock. Stripe reintentara el webhook.",
+                });
+              }
             }
             await updateOrder(supabase, orderId, {
               estado: "pagado",
@@ -3583,7 +3849,9 @@ app.get("/admin/users", (req, res) => {
       const decodedToken = await verifyFirebaseUser(req);
       const supabase = getSupabaseAdmin();
       await assertAdminRole(supabase, decodedToken.uid);
-      const { data, error } = await supabase.from("usuarios").select("*");
+      const { data, error } = await supabase
+        .from("usuarios")
+        .select("uid,dni,nombres,apellidos,nombre,email,rol,creadoEn,telefono,direcciones");
       if (error) throw error;
       return res.status(200).json({ users: data ?? [] });
     } catch (error) {
@@ -4012,13 +4280,81 @@ app.get("/users/me", (req, res) => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("usuarios")
-        .select("*")
+        .select("uid,dni,nombres,apellidos,nombre,email,rol,creadoEn,telefono,direcciones")
         .eq("uid", decodedToken.uid)
         .maybeSingle();
       if (error) throw error;
       return res.status(200).json({ profile: data ?? null });
     } catch (error) {
       console.error("users/me GET error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/audit", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      const { accion, entidad, entidadId, entidadNombre, detalle } = req.body || {};
+      if (![accion, entidad, entidadId, entidadNombre].every((v) => typeof v === "string" && v.trim())) {
+        return res.status(400).json({ error: "Evento de auditoria invalido" });
+      }
+      const safeAccion = accion.trim();
+      const safeEntidad = entidad.trim();
+      const safeEntidadId = entidadId.trim();
+      const safeDetalle = detalle && isPlainObject(detalle) ? detalle : null;
+      const role = await fetchAuditActorRole(supabase, decodedToken);
+      assertClientAuditAllowed({
+        accion: safeAccion,
+        entidad: safeEntidad,
+        entidadId: safeEntidadId,
+        detalle: safeDetalle,
+        role,
+        uid: decodedToken.uid,
+      });
+      const safeEntidadNombre = await resolveClientAuditEntityLabel(
+        supabase,
+        safeEntidad,
+        safeEntidadId,
+        entidadNombre,
+      );
+      await logAuditFn(
+        supabase,
+        safeAccion,
+        safeEntidad,
+        safeEntidadId,
+        safeEntidadNombre,
+        decodedToken.uid,
+        decodedToken.email || "",
+        safeDetalle ? { ...safeDetalle, clientSubmitted: true } : { clientSubmitted: true },
+        { entityLabelResolved: true },
+      );
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("audit POST error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/audit", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const limit = Math.min(Math.max(Number.parseInt(String(req.query.limit || "20"), 10) || 20, 1), 100);
+      const { data, error } = await supabase
+        .from("auditoria")
+        .select("*")
+        .order("realizadoEn", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      return res.status(200).json({ entries: data ?? [] });
+    } catch (error) {
+      console.error("admin/audit error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -4036,7 +4372,7 @@ app.put("/users/me", (req, res) => {
 
       const { data: existingProfile, error: existingError } = await supabase
         .from("usuarios")
-        .select("uid,email,rol,creadoEn")
+        .select("uid,email,rol,creadoEn,dni,dni_hash,nombres,apellidos,nombre")
         .eq("uid", decodedToken.uid)
         .maybeSingle();
       if (existingError) throw existingError;
@@ -4063,7 +4399,7 @@ app.patch("/users/me", (req, res) => {
         allowed.telefono = patch.telefono;
       }
       if (Array.isArray(patch.direcciones)) {
-        allowed.direcciones = patch.direcciones;
+        allowed.direcciones = sanitizeProfileAddresses(patch.direcciones) || [];
       }
       if (Object.keys(allowed).length === 0) {
         return res.status(400).json({ error: "Sin campos para actualizar" });
@@ -4117,6 +4453,21 @@ app.delete("/admin/users/:uid", (req, res) => {
       const uid = String(req.params.uid || "").trim();
       if (!uid) {
         return res.status(400).json({ error: "Usuario invalido" });
+      }
+      if (uid === decodedToken.uid) {
+        return res.status(400).json({ error: "No puedes eliminar tu propio usuario desde administracion" });
+      }
+      const { data: targetUser, error: targetError } = await supabase
+        .from("usuarios")
+        .select("email,rol")
+        .eq("uid", uid)
+        .maybeSingle();
+      if (targetError) throw targetError;
+      if (targetUser?.rol === "admin" && !isSuperadminEmail(decodedToken.email)) {
+        return res.status(403).json({ error: "Solo el superadministrador puede eliminar administradores" });
+      }
+      if (targetUser?.email && isSuperadminEmail(targetUser.email)) {
+        return res.status(403).json({ error: "No se puede eliminar el superadministrador" });
       }
       const { error } = await supabase.from("usuarios").delete().eq("uid", uid);
       if (error) throw error;

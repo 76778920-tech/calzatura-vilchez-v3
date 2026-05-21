@@ -38,6 +38,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
     hoverImageSrc = failedHoverImage === secondaryImage ? imageSrc : secondaryImage;
   }
   const isLiked = Boolean(user) && favoriteIds.has(product.id);
+  const productHref = `/producto/${product.id}`;
 
   const handleOpenSizePicker = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -77,118 +78,139 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   };
 
   return (
-    <Link to={`/producto/${product.id}`} className="product-card" onMouseLeave={handleCloseSizePicker}>
-      <div className="product-card-img-wrapper">
-        <img
-          src={imageSrc}
-          alt={product.nombre}
-          className="product-card-img product-card-img-primary"
-          onError={(event) => {
-            const image = event.target as HTMLImageElement;
-            image.onerror = null;
-            setFailedImage(primaryImage);
-          }}
-        />
-        {hoverImageSrc && (
+    <article className="product-card" style={{ position: "relative" }} onMouseLeave={handleCloseSizePicker}>
+      <Link to={productHref} style={{ display: "contents", color: "inherit", textDecoration: "none" }}>
+        <div className="product-card-img-wrapper">
           <img
-            src={hoverImageSrc}
+            src={imageSrc}
             alt={product.nombre}
-            className="product-card-img product-card-img-hover"
+            className="product-card-img product-card-img-primary"
             onError={(event) => {
               const image = event.target as HTMLImageElement;
               image.onerror = null;
-              setFailedHoverImage(secondaryImage);
+              setFailedImage(primaryImage);
             }}
           />
-        )}
-        {product.stock === 0 && (
-          <span className="product-badge-agotado">Agotado</span>
-        )}
-        {product.descuento && product.stock > 0 && (
-          <span className="product-badge-cyber">{product.descuento}% OFF</span>
-        )}
-        {product.destacado && !product.descuento && product.stock > 0 && (
-          <span className="product-badge-nuevo">Destacado</span>
-        )}
-        {familyGroupSize > 1 && (
-          <span className="product-badge-familia" title={`${familyGroupSize - 1} color(es) más en catálogo`}>
-            Más colores
-          </span>
-        )}
-        <button
-          type="button"
-          onClick={handleLike}
-          disabled={favoriteBusy}
-          className={`like-btn ${isLiked ? "liked" : ""}`}
-          aria-label={isLiked ? "Quitar de favoritos" : "Agregar a favoritos"}
-          aria-pressed={isLiked}
-        >
-          <Heart size={18} fill={isLiked ? "currentColor" : "none"} />
-        </button>
-
-        {showSizePicker && (
-          <div className="product-size-picker">
-            <p className="product-size-picker-label">Selecciona tu talla</p>
-            <div className="product-size-picker-grid">
-              {availableSizes.map((size) => (
-                <button
-                  key={size}
-                  type="button"
-                  className="product-size-picker-chip"
-                  onClick={(e) => handleSelectSize(e, size)}
-                >
-                  {size}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="product-card-body">
-        <p className="product-card-category">{product.tipoCalzado || product.categoria}</p>
-        <h3 className="product-card-name">{product.nombre}</h3>
-        {product.marca && <p className="product-card-brand">{product.marca}</p>}
-        {colors.length > 0 && (
-          <div className="product-card-colors">
-            {colors.slice(0, 3).map((color) => (
-              <span key={color} className="color-chip">{color}</span>
-            ))}
-            {colors.length > 3 && <span className="color-chip">+{colors.length - 3}</span>}
-          </div>
-        )}
-        <div className="product-card-footer">
-          {product.descuento ? (
-            <div className="product-card-price-group">
-              <span className="product-card-price-original">S/ {product.precio.toFixed(2)}</span>
-              <span className="product-card-price product-card-price-cyber">
-                S/ {(product.precio * (1 - product.descuento / 100)).toFixed(2)}
-              </span>
-            </div>
-          ) : (
-            <span className="product-card-price">S/ {product.precio.toFixed(2)}</span>
+          {hoverImageSrc && (
+            <img
+              src={hoverImageSrc}
+              alt={product.nombre}
+              className="product-card-img product-card-img-hover"
+              onError={(event) => {
+                const image = event.target as HTMLImageElement;
+                image.onerror = null;
+                setFailedHoverImage(secondaryImage);
+              }}
+            />
           )}
-          {product.stock > 0 ? (
-            <button
-              onClick={handleOpenSizePicker}
-              className="add-to-cart-btn"
-              aria-label="Seleccionar talla"
-            >
-              <ShoppingCart size={16} />
-            </button>
-          ) : (
-            <span className="out-of-stock-label">Sin stock</span>
+          {product.stock === 0 && (
+            <span className="product-badge-agotado">Agotado</span>
+          )}
+          {product.descuento && product.stock > 0 && (
+            <span className="product-badge-cyber">{product.descuento}% OFF</span>
+          )}
+          {product.destacado && !product.descuento && product.stock > 0 && (
+            <span className="product-badge-nuevo">Destacado</span>
+          )}
+          {familyGroupSize > 1 && (
+            <span className="product-badge-familia" title={`${familyGroupSize - 1} color(es) más en catálogo`}>
+              Más colores
+            </span>
           )}
         </div>
-        {availableSizes.length > 0 && (
-          <div className="product-card-tallas">
-            {availableSizes.slice(0, 5).map((t) => (
-              <span key={t} className="talla-chip">{t}</span>
-            ))}
-            {availableSizes.length > 5 && <span className="talla-chip">+{availableSizes.length - 5}</span>}
+
+        <div className="product-card-body">
+          <p className="product-card-category">{product.tipoCalzado || product.categoria}</p>
+          <h3 className="product-card-name">{product.nombre}</h3>
+          {product.marca && <p className="product-card-brand">{product.marca}</p>}
+          {colors.length > 0 && (
+            <div className="product-card-colors">
+              {colors.slice(0, 3).map((color) => (
+                <span key={color} className="color-chip">{color}</span>
+              ))}
+              {colors.length > 3 && <span className="color-chip">+{colors.length - 3}</span>}
+            </div>
+          )}
+          <div className="product-card-footer">
+            {product.descuento ? (
+              <div className="product-card-price-group">
+                <span className="product-card-price-original">S/ {product.precio.toFixed(2)}</span>
+                <span className="product-card-price product-card-price-cyber">
+                  S/ {(product.precio * (1 - product.descuento / 100)).toFixed(2)}
+                </span>
+              </div>
+            ) : (
+              <span className="product-card-price">S/ {product.precio.toFixed(2)}</span>
+            )}
+            {product.stock > 0 ? (
+              <span className="add-to-cart-btn" aria-hidden="true" style={{ visibility: "hidden" }}>
+                <ShoppingCart size={16} />
+              </span>
+            ) : (
+              <span className="out-of-stock-label">Sin stock</span>
+            )}
           </div>
-        )}
-      </div>
-    </Link>
+          {availableSizes.length > 0 && (
+            <div className="product-card-tallas">
+              {availableSizes.slice(0, 5).map((t) => (
+                <span key={t} className="talla-chip">{t}</span>
+              ))}
+              {availableSizes.length > 5 && <span className="talla-chip">+{availableSizes.length - 5}</span>}
+            </div>
+          )}
+        </div>
+      </Link>
+
+      <button
+        type="button"
+        onClick={handleLike}
+        disabled={favoriteBusy}
+        className={`like-btn ${isLiked ? "liked" : ""}`}
+        aria-label={isLiked ? "Quitar de favoritos" : "Agregar a favoritos"}
+        aria-pressed={isLiked}
+      >
+        <Heart size={18} fill={isLiked ? "currentColor" : "none"} />
+      </button>
+
+      {product.stock > 0 && (
+        <button
+          type="button"
+          onClick={handleOpenSizePicker}
+          className="add-to-cart-btn"
+          aria-label="Seleccionar talla"
+          style={{
+            position: "absolute",
+            right: "1rem",
+            bottom: availableSizes.length > 0 ? "3.1rem" : "1rem",
+            zIndex: 2,
+          }}
+        >
+          <ShoppingCart size={16} />
+        </button>
+      )}
+
+      {showSizePicker && (
+        <div
+          className="product-size-picker"
+          role="dialog"
+          aria-label="Selecciona tu talla"
+          style={{ bottom: "auto", aspectRatio: "1 / 1" }}
+        >
+          <p className="product-size-picker-label">Selecciona tu talla</p>
+          <div className="product-size-picker-grid">
+            {availableSizes.map((size) => (
+              <button
+                key={size}
+                type="button"
+                className="product-size-picker-chip"
+                onClick={(e) => handleSelectSize(e, size)}
+              >
+                {size}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </article>
   );
 }

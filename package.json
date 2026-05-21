@@ -2,6 +2,9 @@
   "name": "calzatura-vilchez-v3",
   "private": true,
   "scripts": {
+    "ops:readiness": "node scripts/readiness-check.mjs",
+    "ops:ai-backtest": "node scripts/ai-backtest-gate.mjs",
+    "ops:restore-drill": "node scripts/restore-drill-check.mjs",
     "sonar": "node ./node_modules/sonarqube-scanner/bin/sonar-scanner.js"
   },
   "devDependencies": {

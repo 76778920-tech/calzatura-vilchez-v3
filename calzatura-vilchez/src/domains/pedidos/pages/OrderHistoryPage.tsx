@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Package, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertCircle, Package, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { fetchOrdersByUser } from "@/domains/pedidos/services/orders";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
@@ -15,19 +15,25 @@ export default function OrderHistoryPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const loadOrders = useCallback(() => {
+  const loadOrders = useCallback((showSpinner = false) => {
     if (!user) return;
+    if (showSpinner) setLoading(true);
+    setLoadError(null);
     fetchOrdersByUser(user.uid)
       .then(setOrders)
+      .catch(() => {
+        setOrders([]);
+        setLoadError("No pudimos cargar tus pedidos en este momento.");
+      })
       .finally(() => setLoading(false));
   }, [user]);
 
   useEffect(() => {
     queueMicrotask(() => {
-      setLoading(true);
-      loadOrders();
+      loadOrders(true);
     });
   }, [loadOrders]);
 
@@ -50,6 +56,21 @@ export default function OrderHistoryPage() {
           {ORDER_HISTORY_SKELETON_KEYS.map((id) => (
             <div key={id} className="skeleton-card" style={{ height: "80px" }} />
           ))}
+        </div>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="orders-page">
+        <h1>Mis Pedidos</h1>
+        <div className="empty-state">
+          <AlertCircle size={64} className="empty-cart-icon" />
+          <p>{loadError}</p>
+          <button type="button" onClick={() => loadOrders(true)} className="btn-primary">
+            <RefreshCw size={16} /> Reintentar
+          </button>
         </div>
       </main>
     );
