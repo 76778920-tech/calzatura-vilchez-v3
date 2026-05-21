@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent, type TouchEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+  type TouchEvent,
+} from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 
 export type HomeHeroSlide = {
   id: string;
@@ -56,6 +65,19 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
     },
     [heroSlides.length],
   );
+
+  const goToHeroSlide = useCallback(
+    (index: number) => {
+      if (heroSlides.length < 2 || index < 0 || index >= heroSlides.length) return;
+      setActiveHeroIndex(index);
+    },
+    [heroSlides.length],
+  );
+
+  const handleHeroControl = (action: () => void) => {
+    setIsHeroInteractionPaused(true);
+    action();
+  };
 
   useEffect(() => {
     const mediaQuery = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
@@ -193,6 +215,31 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
     event.stopPropagation();
   };
 
+  const handleHeroCarouselKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (heroSlides.length < 2) return;
+
+    switch (event.key) {
+      case "ArrowLeft":
+        event.preventDefault();
+        handleHeroControl(() => shiftHeroSlide(-1));
+        break;
+      case "ArrowRight":
+        event.preventDefault();
+        handleHeroControl(() => shiftHeroSlide(1));
+        break;
+      case "Home":
+        event.preventDefault();
+        handleHeroControl(() => goToHeroSlide(0));
+        break;
+      case "End":
+        event.preventDefault();
+        handleHeroControl(() => goToHeroSlide(heroSlides.length - 1));
+        break;
+      default:
+        break;
+    }
+  };
+
   const getHeroSlideState = (index: number) => {
     if (index === activeHeroIndex) return "active";
     if (index === (activeHeroIndex - 1 + heroSlides.length) % heroSlides.length) return "prev";
@@ -204,9 +251,9 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
     <section className="home-hero" aria-roledescription="carousel" aria-label="Promociones destacadas">
       <div
         ref={heroCarouselRef}
-        role="application"
-        tabIndex={0}
-        aria-label="Carrusel de promociones. Desliza o arrastra para cambiar de slide."
+        role="group"
+        aria-label="Carrusel de promociones destacadas"
+        aria-describedby="home-hero-carousel-keyboard-help"
         className={`home-hero-carousel ${isHeroDragging ? "is-dragging" : ""}`}
         data-drag-direction={heroDragDirection}
         style={
@@ -225,6 +272,8 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
         onTouchEnd={handleHeroTouchEnd}
         onTouchCancel={cancelHeroSwipe}
         onClickCapture={handleHeroClickCapture}
+        onKeyDown={handleHeroCarouselKeyDown}
+        tabIndex={heroSlides.length > 1 ? 0 : undefined}
         onFocus={() => setIsHeroInteractionPaused(true)}
         onBlur={(event) => {
           if (shouldResumeHeroCarouselAutoplay(event.currentTarget, event.relatedTarget)) {
@@ -232,6 +281,9 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
           }
         }}
       >
+        <div id="home-hero-carousel-keyboard-help" className="home-hero-progress-sr-only">
+          Usa las flechas izquierda y derecha para cambiar de promocion. Usa Inicio y Fin para ir a la primera o ultima promocion.
+        </div>
         {heroSlides.map((slide, index) => (
           <article
             key={slide.id}
@@ -248,10 +300,34 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
             />
           </article>
         ))}
+        <div className="home-hero-progress-sr-only" aria-live="polite" aria-atomic="true">
+          {`Promocion ${activeHeroIndex + 1} de ${heroSlides.length}: ${activeHero.title}`}
+        </div>
         <div className="home-hero-shade" />
         <div className="home-hero-grid" />
         <div className="home-hero-orbit home-hero-orbit-a" />
         <div className="home-hero-orbit home-hero-orbit-b" />
+
+        {heroSlides.length > 1 ? (
+          <>
+            <button
+              type="button"
+              className="home-hero-arrow-btn home-hero-arrow-prev"
+              aria-label="Promocion anterior"
+              onClick={() => handleHeroControl(() => shiftHeroSlide(-1))}
+            >
+              <ChevronLeft size={22} aria-hidden="true" focusable="false" />
+            </button>
+            <button
+              type="button"
+              className="home-hero-arrow-btn home-hero-arrow-next"
+              aria-label="Siguiente promocion"
+              onClick={() => handleHeroControl(() => shiftHeroSlide(1))}
+            >
+              <ChevronRight size={22} aria-hidden="true" focusable="false" />
+            </button>
+          </>
+        ) : null}
 
         <div className="home-hero-content">
           <div className="home-hero-inner">
@@ -331,6 +407,30 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
             />
           </span>
         </div>
+        {heroSlides.length > 1 ? (
+          <div className="home-hero-dots" aria-label="Seleccionar promocion">
+            {heroSlides.map((slide, index) => {
+              const isActive = index === activeHeroIndex;
+              return (
+                <button
+                  key={`hero-dot-${slide.id}`}
+                  type="button"
+                  className={`home-hero-dot${isActive ? " is-active" : ""}`}
+                  aria-label={`Ver promocion ${index + 1}: ${slide.title}`}
+                  aria-current={isActive ? "true" : undefined}
+                  onClick={() => handleHeroControl(() => goToHeroSlide(index))}
+                >
+                  <span
+                    className={`home-hero-dot-fill${isActive && canAutoRotateHero ? " is-animating" : ""}${
+                      isActive && isHeroInteractionPaused ? " is-paused" : ""
+                    }`}
+                    style={isActive && canAutoRotateHero ? ({ "--hero-progress-duration": `${HERO_ROTATION_MS}ms` } as CSSProperties) : undefined}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </section>
   );

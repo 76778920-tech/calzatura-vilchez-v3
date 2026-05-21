@@ -32,6 +32,33 @@ async function setupProductMock(page: Page) {
 }
 
 test.describe("catálogo → detalle → carrito", () => {
+  test("tarjeta de producto separa links y controles para navegacion por teclado", async ({ page }) => {
+    await setupProductMock(page);
+    await page.goto("/productos");
+    await expect(page.locator("main.products-page")).toBeVisible({ timeout: 30_000 });
+
+    const firstCard = page.locator(".product-card").first();
+    await expect(firstCard).toBeVisible({ timeout: 20_000 });
+
+    await expect(firstCard.locator("a button, button a")).toHaveCount(0);
+    await expect(firstCard.locator(".product-card-image-link")).toHaveAttribute("href", /\/producto\//);
+    await expect(firstCard.locator(".product-card-title-link")).toHaveAttribute("href", /\/producto\//);
+
+    await firstCard.locator(".product-card-title-link").focus();
+    await expect(firstCard.locator(".product-card-title-link")).toBeFocused();
+
+    await page.keyboard.press("Tab");
+    await expect(firstCard.getByRole("button", { name: /favoritos/i })).toBeFocused();
+
+    await page.keyboard.press("Tab");
+    const cartButton = firstCard.getByRole("button", { name: /Seleccionar talla/i });
+    await expect(cartButton).toBeFocused();
+    await page.keyboard.press("Enter");
+
+    await expect(firstCard.getByRole("dialog", { name: /Selecciona tu talla/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/productos/);
+  });
+
   test("desde productos abre ficha, agrega al carrito y aparece en /carrito", async ({ page }) => {
     await setupProductMock(page);
     await page.goto("/productos");
