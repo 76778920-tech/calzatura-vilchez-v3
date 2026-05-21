@@ -53,6 +53,45 @@ function requireDniProofSecret() {
   return process.env.REQUIRE_DNI_PROOF_SECRET === "true";
 }
 
+function hasEnvValue(name) {
+  return Boolean(String(process.env[name] || "").trim());
+}
+
+function validateProductionRuntimeConfig(serviceAccount) {
+  if (!isProductionRuntime()) return;
+
+  const missing = [];
+  const requiredEnv = [
+    "SUPABASE_URL",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "DNI_LOOKUP_PROOF_SECRET",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "AI_SERVICE_URL",
+    "AI_SERVICE_BEARER_TOKEN",
+    "FIREBASE_WEB_API_KEY",
+  ];
+
+  for (const name of requiredEnv) {
+    if (!hasEnvValue(name)) missing.push(name);
+  }
+
+  const hasFirebaseAdminCredential = Boolean(serviceAccount)
+    || hasEnvValue("GOOGLE_APPLICATION_CREDENTIALS");
+
+  if (!hasFirebaseAdminCredential) {
+    missing.push("FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 o FIREBASE_SERVICE_ACCOUNT_JSON o FIREBASE_SERVICE_ACCOUNT_FILE");
+  }
+
+  if (missing.length > 0) {
+    console.error("Configuracion BFF de produccion incompleta. Faltan secrets/variables:");
+    for (const name of missing) {
+      console.error(`- ${name}`);
+    }
+    process.exit(1);
+  }
+}
+
 function isSuperadminEmail(email) {
   return superadminEmails.has(String(email || "").trim().toLowerCase());
 }
@@ -141,6 +180,7 @@ function loadFirebaseServiceAccount() {
 }
 
 const serviceAccount = loadFirebaseServiceAccount();
+validateProductionRuntimeConfig(serviceAccount);
 if (serviceAccount) {
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 } else {

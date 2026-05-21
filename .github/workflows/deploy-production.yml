@@ -1,7 +1,7 @@
 name: Deploy — Producción (Firebase + Render)
 
 # Invocado por CI Integration (workflow_call) tras pasar quality + IA + E2E en main.
-# workflow_dispatch: deploy manual (omite verificación de otros workflows).
+# workflow_dispatch: deploy manual permitido solo si el commit ya tiene CI + CI Integration en success.
 
 on:
   workflow_call:
@@ -20,33 +20,33 @@ on:
       VITE_FIREBASE_APPCHECK_SITE_KEY:
         required: true
       VITE_FIREBASE_AUTH_DOMAIN:
-        required: false
+        required: true
       VITE_FIREBASE_PROJECT_ID:
-        required: false
+        required: true
       VITE_FIREBASE_MESSAGING_SENDER_ID:
-        required: false
+        required: true
       VITE_FIREBASE_APP_ID:
-        required: false
+        required: true
       VITE_SUPABASE_ANON_KEY:
-        required: false
+        required: true
       VITE_STRIPE_PUBLIC_KEY:
-        required: false
+        required: true
       VITE_CLOUDINARY_CLOUD_NAME:
-        required: false
+        required: true
       VITE_CLOUDINARY_UPLOAD_PRESET:
-        required: false
+        required: true
       VITE_DNI_LOOKUP_URL:
-        required: false
+        required: true
       VITE_AI_SERVICE_URL:
-        required: false
+        required: true
       VITE_AI_ADMIN_PROXY_URL:
-        required: false
+        required: true
       VITE_BACKEND_API_URL:
-        required: false
+        required: true
       VITE_ORS_API_KEY:
         required: false
       RENDER_BFF_DEPLOY_HOOK_URL:
-        required: false
+        required: true
       RENDER_DEPLOY_HOOK_URL:
         required: false
   workflow_dispatch:
@@ -86,13 +86,33 @@ jobs:
           ref: ${{ steps.sha.outputs.head_sha }}
           fetch-depth: 0
 
+      - name: Verificar secrets de produccion
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_FIREBASE_APPCHECK_SITE_KEY: ${{ secrets.VITE_FIREBASE_APPCHECK_SITE_KEY }}
+          VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
+          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+          VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
+          VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
+          VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
+          VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
+          RENDER_BFF_DEPLOY_HOOK_URL: ${{ secrets.RENDER_BFF_DEPLOY_HOOK_URL }}
+        run: node scripts/verify-deploy-firebase-secrets.mjs
+
       - name: Exigir commit en main
         env:
           DEPLOY_SHA: ${{ steps.sha.outputs.head_sha }}
         run: bash scripts/verify-deploy-checkout-sha.sh "$DEPLOY_SHA"
 
-      - name: Exigir CI + CI Integration en success (solo tras workflow_call)
-        if: github.event_name == 'workflow_call'
+      - name: Exigir CI + CI Integration en success
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
@@ -178,8 +198,21 @@ jobs:
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_APPCHECK_SITE_KEY: ${{ secrets.VITE_FIREBASE_APPCHECK_SITE_KEY }}
+          VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
+          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+          VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
+          VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
+          VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
+          VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
+          RENDER_BFF_DEPLOY_HOOK_URL: ${{ secrets.RENDER_BFF_DEPLOY_HOOK_URL }}
         run: node scripts/verify-deploy-firebase-secrets.mjs
 
       - name: Configurar Node.js 20

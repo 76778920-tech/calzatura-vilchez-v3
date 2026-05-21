@@ -76,6 +76,12 @@ describe("BFF /audit policy guards", () => {
   it("falla cerrado para DNI/App Check en produccion", () => {
     expect(serverSource).toContain("function requireDniAppCheck()");
     expect(serverSource).toContain("function requireDniProofSecret()");
+    expect(serverSource).toContain("function validateProductionRuntimeConfig(serviceAccount)");
+    expect(serverSource).toContain('"DNI_LOOKUP_PROOF_SECRET"');
+    expect(serverSource).toContain('"SUPABASE_SERVICE_ROLE_KEY"');
+    expect(serverSource).toContain('"STRIPE_WEBHOOK_SECRET"');
+    expect(serverSource).toContain('"AI_SERVICE_BEARER_TOKEN"');
+    expect(serverSource).toContain("Configuracion BFF de produccion incompleta");
     expect(serverSource).toContain("if (isProductionRuntime()) return true;");
     expect(serverSource).toContain("requireAppCheck: requireDniAppCheck()");
     expect(serverSource).toContain("requireProofSecret: requireDniProofSecret()");
@@ -84,6 +90,18 @@ describe("BFF /audit policy guards", () => {
     expect(lookupDniSource).toContain("Validacion DNI no configurada");
     expect(firebaseConfigSource).toContain("VITE_FIREBASE_APPCHECK_SITE_KEY requerido en produccion");
     expect(deployWorkflowSource).toContain("VITE_FIREBASE_APPCHECK_SITE_KEY:");
+  });
+
+  it("no permite deploy productivo sin CI completo ni secrets criticos", () => {
+    expect(deployWorkflowSource).toContain("Exigir CI + CI Integration en success");
+    expect(deployWorkflowSource).not.toContain("if: github.event_name == 'workflow_call'");
+    expect(deployWorkflowSource).toContain("RENDER_BFF_DEPLOY_HOOK_URL:");
+    expect(deployWorkflowSource).toContain("required: true");
+    expect(deployWorkflowSource).toContain("VITE_BACKEND_API_URL:");
+    expect(deployWorkflowSource).toContain("VITE_SUPABASE_ANON_KEY:");
+    expect(deployWorkflowSource).toContain("VITE_STRIPE_PUBLIC_KEY:");
+    expect(deployWorkflowSource).toContain("VITE_DNI_LOOKUP_URL:");
+    expect(deployWorkflowSource).toContain("run: node scripts/verify-deploy-firebase-secrets.mjs");
   });
 
   it("incluye migracion de saneamiento para auditoria historica con PII", () => {
