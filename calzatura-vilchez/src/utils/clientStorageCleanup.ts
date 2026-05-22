@@ -14,18 +14,20 @@ export function clearSensitiveClientStorage(): void {
     // ignorar
   }
 
-  try {
-    const keys: string[] = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k) keys.push(k);
-    }
-    for (const key of keys) {
-      if (key.startsWith(CART_PREFIX) || key.startsWith(RECEIPT_PREFIX)) {
-        localStorage.removeItem(key);
+  for (const storage of [localStorage, sessionStorage]) {
+    try {
+      const keys: string[] = [];
+      for (let i = 0; i < storage.length; i++) {
+        const k = storage.key(i);
+        if (k) keys.push(k);
       }
+      for (const key of keys) {
+        if (key.startsWith(CART_PREFIX) || key.startsWith(RECEIPT_PREFIX)) {
+          storage.removeItem(key);
+        }
+      }
+    } catch {
+      // ignorar
     }
-  } catch {
-    // ignorar
   }
 }

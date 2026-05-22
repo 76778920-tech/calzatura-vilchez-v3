@@ -33,7 +33,7 @@ const CHECKOUT_PRODUCT = {
   activo: true,
 };
 
-const CART_KEY = `calzatura_cart:${CHECKOUT_USER.uid}`;
+const CART_SESSION_KEY = "calzatura_cart:auth";
 
 const CART_ITEMS = [
   {
@@ -82,11 +82,15 @@ test.describe("Checkout Stripe (mock BFF)", () => {
   test("TC-CHK-STRIPE-01: redirige a Stripe tras crear pedido", async ({ browser, baseURL }) => {
     const origin = new URL(baseURL!).origin;
     const context = await browser.newContext({
-      storageState: storageStateForUser(origin, CHECKOUT_USER, [
-        { name: CART_KEY, value: JSON.stringify(CART_ITEMS) },
-      ]),
+      storageState: storageStateForUser(origin, CHECKOUT_USER),
     });
     const page = await context.newPage();
+    await page.addInitScript(
+      ({ key, items }) => {
+        sessionStorage.setItem(key, JSON.stringify(items));
+      },
+      { key: CART_SESSION_KEY, items: CART_ITEMS },
+    );
     await setupStripeCheckoutMocks(page);
 
     await page.goto("/checkout");

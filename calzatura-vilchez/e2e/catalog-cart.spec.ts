@@ -56,13 +56,21 @@ test.describe("catálogo → detalle → carrito", () => {
     await page.keyboard.press("Enter");
 
     await expect(firstCard.getByRole("dialog", { name: /Selecciona tu talla/i })).toBeVisible();
+    await expect(firstCard.getByRole("dialog", { name: /Selecciona tu talla/i })).toHaveAttribute("aria-modal", "true");
+    await expect(firstCard.getByRole("button", { name: /^40$/ })).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(firstCard.getByRole("dialog", { name: /Selecciona tu talla/i })).toBeHidden();
+    await expect(cartButton).toBeFocused();
     await expect(page).toHaveURL(/\/productos/);
   });
 
   test("desde productos abre ficha, agrega al carrito y aparece en /carrito", async ({ page }) => {
     await setupProductMock(page);
     await page.goto("/productos");
-    await page.evaluate(() => localStorage.removeItem("calzatura_cart"));
+    await page.evaluate(() => {
+      localStorage.removeItem("calzatura_cart");
+      sessionStorage.removeItem("calzatura_cart:guest");
+    });
     await page.reload();
     await expect(page.locator("main.products-page")).toBeVisible({ timeout: 30_000 });
 
@@ -90,14 +98,14 @@ test.describe("catálogo → detalle → carrito", () => {
 
     await addBtn.click();
 
-    // Esperar a que el CartContext persista el ítem en localStorage antes de
+    // Esperar a que el CartContext persista el ítem en sessionStorage antes de
     // la recarga completa de página que provoca page.goto(). Sin esta espera
     // existe una condición de carrera: el useEffect que hace
-    // localStorage.setItem puede no haberse ejecutado aún y la nueva página
+    // sessionStorage.setItem puede no haberse ejecutado aún y la nueva página
     // lee el carrito vacío.
     await page.waitForFunction(
       (key: string) => {
-        const stored = localStorage.getItem(key);
+        const stored = sessionStorage.getItem(key);
         if (!stored) return false;
         try {
           return (JSON.parse(stored) as unknown[]).length > 0;
@@ -105,7 +113,7 @@ test.describe("catálogo → detalle → carrito", () => {
           return false;
         }
       },
-      "calzatura_cart",
+      "calzatura_cart:guest",
       { timeout: 5_000 }
     );
 

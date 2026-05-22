@@ -61,7 +61,7 @@ async function goToProductDetail(page: Page, productId: string) {
 async function waitForCartPersistence(page: Page) {
   await page.waitForFunction(() => {
     try {
-      const raw = localStorage.getItem("calzatura_cart");
+      const raw = sessionStorage.getItem("calzatura_cart:guest");
       const parsed = raw ? JSON.parse(raw) : [];
       return Array.isArray(parsed) && parsed.length > 0;
     } catch {
@@ -77,7 +77,10 @@ test.describe("carrito → validación de stock", () => {
     );
     // Limpiar el carrito antes de cada test
     await page.goto("/");
-    await page.evaluate(() => localStorage.removeItem("calzatura_cart"));
+    await page.evaluate(() => {
+      localStorage.removeItem("calzatura_cart");
+      sessionStorage.removeItem("calzatura_cart:guest");
+    });
   });
 
   // ──────────────────────────────────────────────────────────────────────────

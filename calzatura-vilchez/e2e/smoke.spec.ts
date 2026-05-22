@@ -55,7 +55,10 @@ test.describe("smoke tienda publica", () => {
 
   test("carrito lateral vacio enlaza al catalogo", async ({ page }) => {
     await page.goto("/");
-    await page.evaluate(() => localStorage.removeItem("calzatura_cart"));
+    await page.evaluate(() => {
+      localStorage.removeItem("calzatura_cart");
+      sessionStorage.removeItem("calzatura_cart:guest");
+    });
 
     await page.getByRole("button", { name: /abrir carrito/i }).click();
     await expect(page.getByRole("dialog", { name: /mi carrito/i })).toBeVisible({ timeout: 10_000 });

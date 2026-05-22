@@ -82,7 +82,7 @@ Gestiona catálogo, detalle de producto y administración de productos. Permite 
 
 Ubicacion: `src/domains/carrito`
 
-Gestiona carrito de compras, cantidades, seleccion de talla/color y checkout. El carrito del cliente vive en `localStorage` (por usuario autenticado); los pedidos se crean vía BFF hacia Supabase.
+Gestiona carrito de compras, cantidades, seleccion de talla/color y checkout. El carrito del cliente vive en `sessionStorage` (`calzatura_cart:guest` / `calzatura_cart:auth`, sin UID en la clave); se migran y borran claves legacy en `localStorage` al cargar o cerrar sesión. Los pedidos se crean vía BFF hacia Supabase.
 
 ### 5.4 Módulo Clientes
 

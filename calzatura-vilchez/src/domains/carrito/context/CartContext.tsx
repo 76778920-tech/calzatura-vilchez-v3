@@ -35,21 +35,47 @@ const CartContext = createContext<CartContextType>({
 });
 
 const CART_STORAGE_KEY = "calzatura_cart";
+const CART_GUEST_SESSION_KEY = "calzatura_cart:guest";
+const CART_AUTH_SESSION_KEY = "calzatura_cart:auth";
 const ENVIO = 0;
 
-function cartStorageKey(userUid?: string | null) {
-  if (userUid) {
-    return `${CART_STORAGE_KEY}:${userUid}`;
-  }
-  return CART_STORAGE_KEY;
+function activeCartStorageKey(userUid?: string | null) {
+  return userUid ? CART_AUTH_SESSION_KEY : CART_GUEST_SESSION_KEY;
 }
 
-function readCartFromStorage(key: string): CartItem[] {
+function legacyCartStorageKey(userUid?: string | null) {
+  return userUid ? `${CART_STORAGE_KEY}:${userUid}` : CART_STORAGE_KEY;
+}
+
+function readCartFromStorage(storage: Storage, key: string): CartItem[] {
   try {
-    const stored = localStorage.getItem(key);
+    const stored = storage.getItem(key);
     return stored ? (JSON.parse(stored) as CartItem[]) : [];
   } catch {
     return [];
+  }
+}
+
+function writeSessionCart(key: string, items: CartItem[]) {
+  try {
+    if (items.length === 0) {
+      sessionStorage.removeItem(key);
+      return;
+    }
+    sessionStorage.setItem(key, JSON.stringify(items));
+  } catch {
+    // Si el navegador bloquea storage, el estado en memoria sigue funcionando.
+  }
+}
+
+function removeLegacyCartKeys(userUid?: string | null) {
+  try {
+    localStorage.removeItem(CART_STORAGE_KEY);
+    if (userUid) {
+      localStorage.removeItem(legacyCartStorageKey(userUid));
+    }
+  } catch {
+    // ignorar
   }
 }
 
@@ -59,6 +85,7 @@ export function CartProvider({ children }: CartProviderProps) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const userUidRef = useRef<string | null>(null);
+  const prevCartUidRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
     userUidRef.current = userUid;
@@ -66,30 +93,56 @@ export function CartProvider({ children }: CartProviderProps) {
 
   useEffect(() => {
     queueMicrotask(() => {
+      const prevUid = prevCartUidRef.current;
+      prevCartUidRef.current = userUid;
+      if (prevUid !== undefined && prevUid !== userUid) {
+        try {
+          sessionStorage.removeItem(CART_AUTH_SESSION_KEY);
+        } catch {
+          // ignorar
+        }
+      }
+
+      const sessionKey = activeCartStorageKey(userUid);
+      const sessionItems = readCartFromStorage(sessionStorage, sessionKey);
+      if (sessionItems.length > 0) {
+        setItems(sessionItems);
+        removeLegacyCartKeys(userUid);
+        return;
+      }
+
       if (!userUid) {
-        setItems(readCartFromStorage(cartStorageKey()));
+        const legacyGuestItems = readCartFromStorage(localStorage, legacyCartStorageKey());
+        setItems(legacyGuestItems);
+        if (legacyGuestItems.length > 0) {
+          writeSessionCart(sessionKey, legacyGuestItems);
+        }
+        removeLegacyCartKeys();
         return;
       }
 
-      const userKey = cartStorageKey(userUid);
-      const userItems = readCartFromStorage(userKey);
-      if (userItems.length > 0) {
-        setItems(userItems);
-        return;
+      const legacyUserItems = readCartFromStorage(localStorage, legacyCartStorageKey(userUid));
+      const sessionGuestItems = readCartFromStorage(sessionStorage, CART_GUEST_SESSION_KEY);
+      const legacyGuestItems = readCartFromStorage(localStorage, legacyCartStorageKey());
+      const guestItems = sessionGuestItems.length > 0 ? sessionGuestItems : legacyGuestItems;
+      const nextItems = legacyUserItems.length > 0 ? legacyUserItems : guestItems;
+      setItems(nextItems);
+      if (nextItems.length > 0) {
+        writeSessionCart(sessionKey, nextItems);
       }
-
-      const guestItems = readCartFromStorage(CART_STORAGE_KEY);
-      setItems(guestItems);
-      if (guestItems.length > 0) {
-        localStorage.setItem(userKey, JSON.stringify(guestItems));
-        localStorage.removeItem(CART_STORAGE_KEY);
+      try {
+        sessionStorage.removeItem(CART_GUEST_SESSION_KEY);
+      } catch {
+        // ignorar
       }
+      removeLegacyCartKeys(userUid);
     });
   }, [userUid]);
 
   const persistItems = useCallback((newItems: CartItem[]) => {
     const uid = userUidRef.current;
-    localStorage.setItem(cartStorageKey(uid), JSON.stringify(newItems));
+    writeSessionCart(activeCartStorageKey(uid), newItems);
+    removeLegacyCartKeys(uid);
   }, []);
 
   const addItem = useCallback(

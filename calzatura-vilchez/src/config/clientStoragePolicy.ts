@@ -2,8 +2,8 @@
  * Política de almacenamiento en el navegador (ISO 27001 A.8.11 / A.8.24).
  *
  * - No guardar JWT, contraseñas ni PII persistente en localStorage.
- * - Preferencias de UI y carrito invitado: localStorage (no sensibles).
- * - Datos de flujo breve (p. ej. correo pendiente de verificación): sessionStorage.
+ * - Preferencias de UI: localStorage (no sensibles).
+ * - Datos de flujo breve (carrito y correo pendiente de verificación): sessionStorage.
  * - Sesión Firebase: IndexedDB vía SDK (no tokens propios en cookies).
  *
  * Cookies propias de autenticación: no usadas; __cf_bm es de Cloudflare (bot management).
@@ -11,8 +11,8 @@
 
 export const CLIENT_STORAGE = {
   theme: { key: "calzatura_theme", backend: "localStorage", sensitivity: "none" },
-  cartGuest: { key: "calzatura_cart", backend: "localStorage", sensitivity: "none" },
-  cartUser: { key: "calzatura_cart:*", backend: "localStorage", sensitivity: "none" },
+  cartGuest: { key: "calzatura_cart:guest", backend: "sessionStorage", sensitivity: "transient" },
+  cartUser: { key: "calzatura_cart:auth", backend: "sessionStorage", sensitivity: "transient" },
   adminSidebar: { key: "adminSidebarCollapsed", backend: "localStorage", sensitivity: "none" },
   predPrefs: { key: "pred_*", backend: "localStorage", sensitivity: "none" },
   receiptFlag: { key: "receipt_downloaded_*", backend: "localStorage", sensitivity: "none" },
@@ -33,7 +33,7 @@ const LOCAL_KEY_PREFIXES = [
   "e2e_",
 ] as const;
 
-const SESSION_KEY_PREFIXES = ["calzatura.", "cv_"] as const;
+const SESSION_KEY_PREFIXES = ["calzatura.", "calzatura_", "cv_"] as const;
 
 const FORBIDDEN_KEY_RE = /password|passwd|secret|bearer|api[_-]?key|jwt|refresh[_-]?token|id[_-]?token/i;
 const JWT_VALUE_RE = /^eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\./;

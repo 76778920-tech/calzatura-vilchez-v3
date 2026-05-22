@@ -78,6 +78,8 @@ Matriz detallada: `supabase/RLS-MATRIX.md`. Hallazgos: `security-audit.md`.
 | **Fiabilidad** | Fallback admin vía BFF; staff sin fallback inseguro en ventas |
 | **Mantenibilidad** | `PanelFetchScope`, servicios `finance` / `orders` / `products` |
 | **Usabilidad** | UI sin columnas financieras; estados carga/error en paneles staff |
+| **Usabilidad (catálogo)** | `ProductCard`: selector de tallas como `dialog` con `aria-modal`, Escape, foco y botón cerrar; sin enlaces anidados |
+| **Privacidad cliente (A.8.11)** | Carrito en `sessionStorage` (`calzatura_cart:guest` / `:auth`); migración y borrado de claves `localStorage` legacy; guards `catalogAccessibilityGuards` / `cartStorageGuards` |
 
 ---
 

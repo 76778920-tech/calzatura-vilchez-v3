@@ -14,6 +14,15 @@ describe("client storage guard", () => {
     expect(() => assertAllowedBrowserStorageWrite("calzatura_theme", "dark", "local")).not.toThrow();
   });
 
+  it("permite claves de carrito en sessionStorage", () => {
+    expect(() =>
+      assertAllowedBrowserStorageWrite("calzatura_cart:guest", "[]", "session"),
+    ).not.toThrow();
+    expect(() =>
+      assertAllowedBrowserStorageWrite("calzatura_cart:auth", "[]", "session"),
+    ).not.toThrow();
+  });
+
   it("bloquea claves con jwt en el nombre", () => {
     expect(() => assertAllowedBrowserStorageWrite("my_jwt_token", "x", "local")).toThrow();
   });

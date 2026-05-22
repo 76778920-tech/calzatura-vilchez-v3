@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useLayoutEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Heart, ShoppingCart } from "lucide-react";
+import { Heart, ShoppingCart, X } from "lucide-react";
 import toast from "react-hot-toast";
 import type { Product } from "@/types";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
@@ -25,6 +25,10 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   const { favoriteIds, toggle } = useFavorites();
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const [showSizePicker, setShowSizePicker] = useState(false);
+  const sizePickerTitleId = useId();
+  const openSizePickerButtonRef = useRef<HTMLButtonElement | null>(null);
+  const closeSizePickerButtonRef = useRef<HTMLButtonElement | null>(null);
+  const firstSizeButtonRef = useRef<HTMLButtonElement | null>(null);
   const colors = getProductColors(product);
   const availableSizes = getAvailableSizes(product);
   const images = (product.imagenes?.length ? product.imagenes : [product.imagen]).filter(Boolean);
@@ -39,6 +43,11 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   const isLiked = Boolean(user) && favoriteIds.has(product.id);
   const productHref = `/producto/${product.id}`;
 
+  useLayoutEffect(() => {
+    if (!showSizePicker) return;
+    firstSizeButtonRef.current?.focus();
+  }, [showSizePicker]);
+
   const handleOpenSizePicker = (event: React.MouseEvent) => {
     event.stopPropagation();
     setShowSizePicker(true);
@@ -48,10 +57,36 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
     event.stopPropagation();
     addItem(product, 1, size, product.color || undefined);
     toast.success(`${product.nombre} - talla ${size} agregado`);
-    setShowSizePicker(false);
+    handleCloseSizePicker();
   };
 
-  const handleCloseSizePicker = () => setShowSizePicker(false);
+  const handleCloseSizePicker = () => {
+    setShowSizePicker(false);
+    queueMicrotask(() => openSizePickerButtonRef.current?.focus());
+  };
+
+  const handleSizePickerKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
+      event.stopPropagation();
+      handleCloseSizePicker();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusables = Array.from(
+      event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")
+    );
+    if (focusables.length === 0) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   const handleLike = async (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -74,7 +109,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   };
 
   return (
-    <article className="product-card" style={{ position: "relative" }} onMouseLeave={handleCloseSizePicker}>
+    <article className="product-card" style={{ position: "relative" }}>
       <Link to={productHref} className="product-card-image-link" aria-label={`Ver detalle de ${product.nombre}`}>
         <div className="product-card-img-wrapper">
           <img
@@ -172,6 +207,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
 
       {product.stock > 0 && (
         <button
+          ref={openSizePickerButtonRef}
           type="button"
           onClick={handleOpenSizePicker}
           className="add-to-cart-btn"
@@ -191,14 +227,26 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
         <div
           className="product-size-picker"
           role="dialog"
-          aria-label="Selecciona tu talla"
+          aria-modal="true"
+          aria-labelledby={sizePickerTitleId}
+          onKeyDown={handleSizePickerKeyDown}
           style={{ bottom: "auto", aspectRatio: "1 / 1" }}
         >
-          <p className="product-size-picker-label">Selecciona tu talla</p>
+          <button
+            ref={closeSizePickerButtonRef}
+            type="button"
+            className="product-size-picker-close"
+            onClick={handleCloseSizePicker}
+            aria-label="Cerrar selector de talla"
+          >
+            <X size={14} aria-hidden="true" />
+          </button>
+          <p id={sizePickerTitleId} className="product-size-picker-label">Selecciona tu talla</p>
           <div className="product-size-picker-grid">
-            {availableSizes.map((size) => (
+            {availableSizes.map((size, index) => (
               <button
                 key={size}
+                ref={index === 0 ? firstSizeButtonRef : undefined}
                 type="button"
                 className="product-size-picker-chip"
                 onClick={(event) => handleSelectSize(event, size)}
