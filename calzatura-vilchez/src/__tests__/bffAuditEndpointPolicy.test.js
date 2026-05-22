@@ -99,8 +99,10 @@ describe("BFF /audit policy guards", () => {
   });
 
   it("no permite deploy productivo sin CI completo ni secrets criticos", () => {
-    expect(deployWorkflowSource).toContain("Exigir CI + CI Integration en success");
-    expect(deployWorkflowSource).not.toContain("if: github.event_name == 'workflow_call'");
+    expect(deployWorkflowSource).toContain("Exigir CI base en success para deploy llamado por CI Integration");
+    expect(deployWorkflowSource).toContain("if: github.event_name == 'workflow_call'");
+    expect(deployWorkflowSource).toContain("Exigir CI + CI Integration en success para deploy manual");
+    expect(deployWorkflowSource).toContain("if: github.event_name == 'workflow_dispatch'");
     expect(deployWorkflowSource).toContain("RENDER_BFF_DEPLOY_HOOK_URL:");
     expect(deployWorkflowSource).toContain("required: true");
     expect(deployWorkflowSource).toContain("VITE_BACKEND_API_URL:");

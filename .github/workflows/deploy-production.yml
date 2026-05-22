@@ -112,7 +112,16 @@ jobs:
           DEPLOY_SHA: ${{ steps.sha.outputs.head_sha }}
         run: bash scripts/verify-deploy-checkout-sha.sh "$DEPLOY_SHA"
 
-      - name: Exigir CI + CI Integration en success
+      - name: Exigir CI base en success para deploy llamado por CI Integration
+        if: github.event_name == 'workflow_call'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
+          REQUIRED_WORKFLOWS: ${{ env.CI_WORKFLOW_NAME }}
+        run: node scripts/github-verify-workflows-for-sha.mjs
+
+      - name: Exigir CI + CI Integration en success para deploy manual
+        if: github.event_name == 'workflow_dispatch'
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
