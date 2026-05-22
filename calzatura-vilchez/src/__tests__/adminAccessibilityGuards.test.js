@@ -94,7 +94,7 @@ describe("Admin ventas/productos accessibility guards", () => {
     expect(adminSalesLoadedSource).toContain("Confirmar devolución");
     expect(adminOrdersSource).toContain("<AccessibleConfirmDialog");
     expect(adminOrdersSource).not.toContain("confirm(");
-    expect(cartSidebarSource).toContain('role="dialog"');
+    expect(cartSidebarSource).toContain("<dialog");
     expect(cartSidebarSource).toContain('aria-modal="true"');
     expect(cartSidebarSource).toContain("event.key === \"Escape\"");
     expect(checkoutPageSource).toContain("<fieldset");

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -207,6 +207,96 @@ const HOME_CYBER_VERTICAL_CAMPAIGNS = [
   },
 ] as const;
 
+type HomeSpotlightRenderArgs = {
+  loading: boolean;
+  error: string | null;
+  featuredProducts: Product[];
+  spotlightPages: Product[][];
+  spotlightTotalPages: number;
+  effectiveSpotlightPage: number;
+  setSpotlightPage: Dispatch<SetStateAction<number>>;
+};
+
+function renderHomeSpotlightSection({
+  loading,
+  error,
+  featuredProducts,
+  spotlightPages,
+  spotlightTotalPages,
+  effectiveSpotlightPage,
+  setSpotlightPage,
+}: HomeSpotlightRenderArgs) {
+  if (loading) {
+    return (
+      <div className="products-skeleton-grid home-spotlight-grid">
+        {[...Array(4)].map((_, index) => <div key={index} className="skeleton-card" />)}
+      </div>
+    );
+  }
+  if (featuredProducts.length === 0) {
+    return (
+      <div className="home-empty-catalog">
+        <p>{error ?? "Estamos preparando una nueva selección de productos destacados para mostrar aquí."}</p>
+        <Link to={buildCatalogHref({})} className="btn-primary">
+          Ver catálogo
+        </Link>
+      </div>
+    );
+  }
+  if (spotlightTotalPages > 1) {
+    return (
+      <div className="home-spotlight-carousel">
+        <div
+          className="home-spotlight-track"
+          style={{ transform: `translateX(-${effectiveSpotlightPage * 100}%)` }}
+        >
+          {spotlightPages.map((page, pi) => (
+            <div key={pi} className="home-spotlight-page products-grid home-spotlight-grid">
+              {page.map((product) => <ProductCard key={product.id} product={product} />)}
+            </div>
+          ))}
+        </div>
+        <div className="home-spotlight-nav">
+          <button
+            type="button"
+            className="home-spotlight-nav-btn"
+            onClick={() => setSpotlightPage((p) => Math.max(0, p - 1))}
+            disabled={effectiveSpotlightPage === 0}
+            aria-label="Página anterior"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <div className="home-spotlight-dots">
+            {spotlightPages.map((_, pi) => (
+              <button
+                key={pi}
+                type="button"
+                className={`home-spotlight-dot${pi === effectiveSpotlightPage ? " is-active" : ""}`}
+                onClick={() => setSpotlightPage(pi)}
+                aria-label={`Página ${pi + 1}`}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="home-spotlight-nav-btn"
+            onClick={() => setSpotlightPage((p) => Math.min(spotlightTotalPages - 1, p + 1))}
+            disabled={effectiveSpotlightPage === spotlightTotalPages - 1}
+            aria-label="Página siguiente"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="products-grid home-spotlight-grid">
+      {featuredProducts.map((product) => <ProductCard key={product.id} product={product} />)}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -259,7 +349,11 @@ export default function HomePage() {
   }, [prefersReducedMotion]);
 
   const productCount = products.length;
-  const productCountLabel = error ? "--" : productCount ? String(productCount) : "Nuevo";
+  const productCountLabel = (() => {
+    if (error) return "--";
+    if (productCount > 0) return String(productCount);
+    return "Nuevo";
+  })();
   const featuredProducts = useMemo(() => {
     const inStock = products.filter((product) => product.stock > 0);
     const selected = inStock.filter((product) => product.destacado);
@@ -355,68 +449,15 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {loading ? (
-            <div className="products-skeleton-grid home-spotlight-grid">
-              {[...Array(4)].map((_, index) => <div key={index} className="skeleton-card" />)}
-            </div>
-          ) : featuredProducts.length > 0 ? (
-            spotlightTotalPages > 1 ? (
-              <div className="home-spotlight-carousel">
-                <div
-                  className="home-spotlight-track"
-                  style={{ transform: `translateX(-${effectiveSpotlightPage * 100}%)` }}
-                >
-                  {spotlightPages.map((page, pi) => (
-                    <div key={pi} className="home-spotlight-page products-grid home-spotlight-grid">
-                      {page.map((product) => <ProductCard key={product.id} product={product} />)}
-                    </div>
-                  ))}
-                </div>
-                <div className="home-spotlight-nav">
-                  <button
-                    type="button"
-                    className="home-spotlight-nav-btn"
-                    onClick={() => setSpotlightPage((p) => Math.max(0, p - 1))}
-                    disabled={effectiveSpotlightPage === 0}
-                    aria-label="Página anterior"
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  <div className="home-spotlight-dots">
-                    {spotlightPages.map((_, pi) => (
-                      <button
-                        key={pi}
-                        type="button"
-                        className={`home-spotlight-dot${pi === effectiveSpotlightPage ? " is-active" : ""}`}
-                        onClick={() => setSpotlightPage(pi)}
-                        aria-label={`Página ${pi + 1}`}
-                      />
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    className="home-spotlight-nav-btn"
-                    onClick={() => setSpotlightPage((p) => Math.min(spotlightTotalPages - 1, p + 1))}
-                    disabled={effectiveSpotlightPage === spotlightTotalPages - 1}
-                    aria-label="Página siguiente"
-                  >
-                    <ChevronRight size={20} />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="products-grid home-spotlight-grid">
-                {featuredProducts.map((product) => <ProductCard key={product.id} product={product} />)}
-              </div>
-            )
-          ) : (
-            <div className="home-empty-catalog">
-              <p>{error ?? "Estamos preparando una nueva selección de productos destacados para mostrar aquí."}</p>
-              <Link to={buildCatalogHref({})} className="btn-primary">
-                Ver catálogo
-              </Link>
-            </div>
-          )}
+          {renderHomeSpotlightSection({
+            loading,
+            error,
+            featuredProducts,
+            spotlightPages,
+            spotlightTotalPages,
+            effectiveSpotlightPage,
+            setSpotlightPage,
+          })}
         </div>
       </section>
 

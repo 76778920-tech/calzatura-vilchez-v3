@@ -57,7 +57,7 @@ export async function createOrder(data: {
 
 export async function fetchOrdersByUser(userId: string): Promise<Order[]> {
   const user = auth.currentUser;
-  if (!user || user.uid !== userId) {
+  if (user?.uid !== userId) {
     throw new Error("No autorizado para consultar estos pedidos");
   }
   const { orders } = await bffFetch<{ orders: Order[] }>("/myOrders");

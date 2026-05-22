@@ -26,6 +26,24 @@ function currency(value: number) {
   return `S/ ${value.toFixed(2)}`;
 }
 
+function renderStaffOrderList(loading: boolean, latestOrders: Order[]) {
+  if (loading) {
+    return <p className="staff-empty-state">Cargando actividad...</p>;
+  }
+  if (latestOrders.length === 0) {
+    return <p className="staff-empty-state">No hay pedidos activos por atender.</p>;
+  }
+  return latestOrders.map((order) => (
+    <div key={order.id} className="staff-order-item">
+      <span className="staff-order-status">{order.estado}</span>
+      <div>
+        <strong>Pedido {order.id.slice(-6).toUpperCase()}</strong>
+        <small>{order.items.length} item(s) · {currency(order.total)}</small>
+      </div>
+    </div>
+  ));
+}
+
 export default function StaffHomePage() {
   const [state, setState] = useState<StaffHomeState>({
     orders: [],
@@ -133,21 +151,7 @@ export default function StaffHomePage() {
           </div>
 
           <div className="staff-order-list">
-            {state.loading ? (
-              <p className="staff-empty-state">Cargando actividad...</p>
-            ) : summary.latestOrders.length > 0 ? (
-              summary.latestOrders.map((order) => (
-                <div key={order.id} className="staff-order-item">
-                  <span className="staff-order-status">{order.estado}</span>
-                  <div>
-                    <strong>Pedido {order.id.slice(-6).toUpperCase()}</strong>
-                    <small>{order.items.length} item(s) · {currency(order.total)}</small>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="staff-empty-state">No hay pedidos activos por atender.</p>
-            )}
+            {renderStaffOrderList(state.loading, summary.latestOrders)}
           </div>
         </div>
 

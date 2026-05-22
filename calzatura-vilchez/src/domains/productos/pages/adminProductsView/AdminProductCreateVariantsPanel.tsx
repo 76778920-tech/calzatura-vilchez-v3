@@ -1,4 +1,4 @@
-import type { ChangeEvent, MouseEvent, RefObject } from "react";
+import type { ChangeEvent, RefObject } from "react";
 import type { VariantSlot } from "../adminProductsInternals";
 import { AdminProductVariantCarouselCard } from "./AdminProductVariantCarouselCard";
 
@@ -7,9 +7,6 @@ type Props = Readonly<{
   compressing: boolean;
   isDraggingVariants: boolean;
   variantsCarouselRef: RefObject<HTMLDivElement | null>;
-  handleVariantsMouseDown: (event: MouseEvent<HTMLDivElement>) => void;
-  handleVariantsMouseMove: (event: MouseEvent<HTMLDivElement>) => void;
-  stopVariantsDrag: () => void;
   handleVariantFileChange: (event: ChangeEvent<HTMLInputElement>, slotIndex: number, imageIndex: number) => void;
   updateVariantSlotImageUrl: (slotIndex: number, imageIndex: number, value: string) => void;
   validateVariantSlotImageUrl: (slotIndex: number, imageIndex: number, value: string) => void;
@@ -22,9 +19,6 @@ export function AdminProductCreateVariantsPanel({
   compressing,
   isDraggingVariants,
   variantsCarouselRef,
-  handleVariantsMouseDown,
-  handleVariantsMouseMove,
-  stopVariantsDrag,
   handleVariantFileChange,
   updateVariantSlotImageUrl,
   validateVariantSlotImageUrl,
@@ -44,20 +38,16 @@ export function AdminProductCreateVariantsPanel({
     <section className="admin-variants-panel">
       <div
         ref={variantsCarouselRef}
-        role="application"
-        tabIndex={0}
-        aria-label="Carrusel de variantes. Arrastra para desplazar. Escape suelta el arrastre."
+        role="region"
+        aria-label="Carrusel de variantes. Arrastra para desplazar."
         className={`admin-variants-carousel${isDraggingVariants ? " dragging" : ""}`}
-        onMouseDown={handleVariantsMouseDown}
-        onMouseMove={handleVariantsMouseMove}
-        onMouseUp={stopVariantsDrag}
-        onMouseLeave={stopVariantsDrag}
       >
         {variantSlots.map((slot, slotIndex) => {
           if (!slot.color) return null;
+          const slotKey = slot.color || `slot-${slotIndex}`;
           return (
             <AdminProductVariantCarouselCard
-              key={`variant-slot-${slotIndex}`}
+              key={slotKey}
               slot={slot}
               slotIndex={slotIndex}
               compressing={compressing}

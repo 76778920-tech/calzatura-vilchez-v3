@@ -5,7 +5,38 @@ import { AdminSalesHistorialTable } from "./AdminSalesHistorialTable";
 import type { AdminSalesPageModel } from "./useAdminSalesPage";
 import { saleLineTotal } from "./adminSalesRegisterLogic";
 
-export type AdminSalesLoadedViewProps = Omit<AdminSalesPageModel, "loading">;
+export type AdminSalesLoadedViewProps = Readonly<Omit<AdminSalesPageModel, "loading">>;
+
+function renderSaleSizePicker(p: AdminSalesLoadedViewProps) {
+  if (p.availableColors.length > 0 && !p.selectedColor) {
+    return <p className="admin-empty">Selecciona un color para ver sus tallas disponibles.</p>;
+  }
+  if (p.availableSizes.length === 0) {
+    return <p className="admin-empty">No hay tallas disponibles para esta seleccion.</p>;
+  }
+  return (
+    <div className="form-group">
+      <span className="form-label">Talla</span>
+      <div className="admin-size-picker">
+        {p.availableSizes.map((size) => {
+          const stock = p.availableForSize(size);
+          return (
+            <button
+              key={size}
+              type="button"
+              disabled={stock <= 0}
+              onClick={() => p.setSelectedTalla(size)}
+              className={`admin-size-choice ${p.selectedTalla === size ? "active" : ""}`}
+            >
+              <strong>{size}</strong>
+              <span>{stock} disp.</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
   return (
@@ -160,32 +191,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
                 </div>
               )}
 
-              {p.availableColors.length > 0 && !p.selectedColor ? (
-                <p className="admin-empty">Selecciona un color para ver sus tallas disponibles.</p>
-              ) : p.availableSizes.length > 0 ? (
-                <div className="form-group">
-                  <span className="form-label">Talla</span>
-                  <div className="admin-size-picker">
-                    {p.availableSizes.map((size) => {
-                      const stock = p.availableForSize(size);
-                      return (
-                        <button
-                          key={size}
-                          type="button"
-                          disabled={stock <= 0}
-                          onClick={() => p.setSelectedTalla(size)}
-                          className={`admin-size-choice ${p.selectedTalla === size ? "active" : ""}`}
-                        >
-                          <strong>{size}</strong>
-                          <span>{stock} disp.</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ) : (
-                <p className="admin-empty">No hay tallas disponibles para esta seleccion.</p>
-              )}
+              {renderSaleSizePicker(p)}
             </div>
 
             <div className="admin-sale-section">
@@ -331,7 +337,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
                       placeholder="12345678"
                     />
                   </div>
-                  <button type="button" onClick={() => void p.validateCustomerDni()} disabled={p.lookingUpDni} className="btn-outline admin-sale-dni-btn">
+                  <button type="button" onClick={() => { p.validateCustomerDni(); }} disabled={p.lookingUpDni} className="btn-outline admin-sale-dni-btn">
                     <IdCard size={16} /> {p.lookingUpDni ? "Validando..." : "Validar DNI"}
                   </button>
                 </div>
@@ -383,7 +389,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
           loadingLabel="Procesando..."
           loading={p.returning}
           onCancel={p.cancelReturnConfirm}
-          onConfirm={() => void p.confirmReturn()}
+          onConfirm={p.confirmReturn}
         />
       )}
 

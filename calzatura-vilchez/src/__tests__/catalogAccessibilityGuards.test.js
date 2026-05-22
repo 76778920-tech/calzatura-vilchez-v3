@@ -19,7 +19,7 @@ describe("Catálogo ProductCard accessibility guards", () => {
   });
 
   it("el selector de tallas es un dialog modal accesible", () => {
-    expect(productCardSource).toContain('role="dialog"');
+    expect(productCardSource).toContain("<dialog");
     expect(productCardSource).toContain('aria-modal="true"');
     expect(productCardSource).toContain("aria-labelledby={sizePickerTitleId}");
     expect(productCardSource).toContain('aria-label="Cerrar selector de talla"');

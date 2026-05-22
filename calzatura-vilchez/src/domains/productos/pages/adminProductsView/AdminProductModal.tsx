@@ -20,7 +20,7 @@ function submitButtonLabel(m: Pick<AdminProductsViewModel, "saving" | "compressi
   return "Crear producto";
 }
 
-export function AdminProductModal(props: AdminProductsViewModel) {
+export function AdminProductModal(props: Readonly<AdminProductsViewModel>) {
   const {
     modalRef,
     fileInputRefs,
@@ -41,7 +41,7 @@ export function AdminProductModal(props: AdminProductsViewModel) {
         open
         aria-modal="true"
         aria-labelledby="product-modal-title"
-        className={`modal product-modal${!s.editingId ? " product-modal--create" : ""}`}
+        className={`modal product-modal${s.editingId ? "" : " product-modal--create"}`}
         onKeyDown={s.trapFocus}
       >
         <div className="modal-header">
@@ -70,9 +70,6 @@ export function AdminProductModal(props: AdminProductsViewModel) {
               updateImageUrl={s.updateImageUrl}
               validateImageUrl={s.validateImageUrl}
               clearImage={s.clearImage}
-              handleVariantsMouseDown={s.handleVariantsMouseDown}
-              handleVariantsMouseMove={s.handleVariantsMouseMove}
-              stopVariantsDrag={s.stopVariantsDrag}
               handleVariantFileChange={s.handleVariantFileChange}
               updateVariantSlotImageUrl={s.updateVariantSlotImageUrl}
               validateVariantSlotImageUrl={s.validateVariantSlotImageUrl}

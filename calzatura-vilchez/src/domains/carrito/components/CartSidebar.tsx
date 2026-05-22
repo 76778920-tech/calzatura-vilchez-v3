@@ -8,7 +8,7 @@ import { getSizeStock } from "@/utils/stock";
 
 export default function CartSidebar() {
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, subtotal, total, itemCount } = useCart();
-  const dialogRef = useRef<HTMLElement | null>(null);
+  const dialogRef = useRef<HTMLDialogElement | null>(null);
   const titleId = "cart-sidebar-title";
 
   useEffect(() => {
@@ -16,7 +16,7 @@ export default function CartSidebar() {
     dialogRef.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
   }, [isOpen]);
 
-  const trapFocus = (event: ReactKeyboardEvent<HTMLElement>) => {
+  const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
     if (event.key === "Escape") {
       event.preventDefault();
       setIsOpen(false);
@@ -51,9 +51,9 @@ export default function CartSidebar() {
         onClick={() => setIsOpen(false)}
         aria-label="Cerrar carrito"
       />
-      <aside
+      <dialog
         ref={dialogRef}
-        role="dialog"
+        open
         aria-modal="true"
         aria-label="Carrito de compras"
         aria-labelledby={titleId}
@@ -141,7 +141,7 @@ export default function CartSidebar() {
             </button>
           </div>
         )}
-      </aside>
+      </dialog>
     </div>
   );
 }

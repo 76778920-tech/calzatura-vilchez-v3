@@ -108,7 +108,7 @@ export async function fetchDailySales(
 }
 
 export async function addDailySale(data: Omit<DailySale, "id" | "creadoEn">): Promise<string> {
-  const ids = await registerDailySalesAtomic([data as DailySaleAtomicInput], "admin");
+  const ids = await registerDailySalesAtomic([{ ...data }], "admin");
   return ids[0] ?? "";
 }
 
@@ -118,11 +118,8 @@ export type DailySaleAtomicInput = Omit<DailySale, "id" | "creadoEn" | "devuelto
 export type StaffDailySaleAtomicInput = Omit<DailySaleAtomicInput, "costoUnitario" | "costoTotal" | "ganancia">;
 
 function stripClientFinancialFieldsFromSale(sale: DailySaleAtomicInput): StaffDailySaleAtomicInput {
-  const copy = { ...sale };
-  delete (copy as Partial<DailySaleAtomicInput>).costoUnitario;
-  delete (copy as Partial<DailySaleAtomicInput>).costoTotal;
-  delete (copy as Partial<DailySaleAtomicInput>).ganancia;
-  return copy as StaffDailySaleAtomicInput;
+  const { costoUnitario: _cu, costoTotal: _ct, ganancia: _g, ...staffSale } = sale;
+  return staffSale;
 }
 
 async function registerDailySalesViaBff(

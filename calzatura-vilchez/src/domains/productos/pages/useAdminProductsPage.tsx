@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
+
+function isInteractiveVariantsDragTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return Boolean(target.closest("button, input, textarea, select, a, label, [role='button']"));
+}
 import {
   calculatePriceRange,
   fetchProductFinancials,
@@ -254,6 +259,48 @@ export function useAdminProductsPage() {
   }, [isDraggingVariants]);
 
   useEffect(() => {
+    const carousel = variantsCarouselRef.current;
+    if (!carousel) return undefined;
+
+    const onMouseDown = (event: MouseEvent) => {
+      if (isInteractiveVariantsDragTarget(event.target)) return;
+      variantsDragStateRef.current = {
+        active: true,
+        startX: event.clientX,
+        startY: event.clientY,
+        scrollLeft: carousel.scrollLeft,
+        scrollTop: carousel.scrollTop,
+      };
+      setIsDraggingVariants(true);
+      event.preventDefault();
+    };
+
+    const onMouseMove = (event: MouseEvent) => {
+      const drag = variantsDragStateRef.current;
+      if (!drag.active) return;
+      carousel.scrollTop = drag.scrollTop - (event.clientY - drag.startY);
+      carousel.scrollLeft = drag.scrollLeft - (event.clientX - drag.startX);
+    };
+
+    const onMouseUp = () => {
+      if (!variantsDragStateRef.current.active) return;
+      variantsDragStateRef.current.active = false;
+      setIsDraggingVariants(false);
+    };
+
+    carousel.addEventListener("mousedown", onMouseDown);
+    carousel.addEventListener("mousemove", onMouseMove);
+    carousel.addEventListener("mouseup", onMouseUp);
+    carousel.addEventListener("mouseleave", onMouseUp);
+    return () => {
+      carousel.removeEventListener("mousedown", onMouseDown);
+      carousel.removeEventListener("mousemove", onMouseMove);
+      carousel.removeEventListener("mouseup", onMouseUp);
+      carousel.removeEventListener("mouseleave", onMouseUp);
+    };
+  }, [showModal]);
+
+  useEffect(() => {
     if (!showModal || !modalRef.current) return;
     const first = modalRef.current.querySelector<HTMLElement>(
       "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])"
@@ -284,42 +331,6 @@ export function useAdminProductsPage() {
     } else if (!event.shiftKey && document.activeElement === last) {
       event.preventDefault(); first.focus();
     }
-  };
-
-  const isInteractiveDragTarget = (target: EventTarget | null): boolean => {
-    if (!(target instanceof Element)) return false;
-    return Boolean(target.closest("button, input, textarea, select, a, label, [role='button']"));
-  };
-
-  const handleVariantsMouseDown = (event: ReactMouseEvent<HTMLDivElement>) => {
-    if (isInteractiveDragTarget(event.target)) return;
-    const carousel = variantsCarouselRef.current;
-    if (!carousel) return;
-    variantsDragStateRef.current = {
-      active: true,
-      startX: event.clientX,
-      startY: event.clientY,
-      scrollLeft: carousel.scrollLeft,
-      scrollTop: carousel.scrollTop,
-    };
-    setIsDraggingVariants(true);
-    event.preventDefault();
-  };
-
-  const handleVariantsMouseMove = (event: ReactMouseEvent<HTMLDivElement>) => {
-    const carousel = variantsCarouselRef.current;
-    const drag = variantsDragStateRef.current;
-    if (!carousel || !drag.active) return;
-    const deltaY = event.clientY - drag.startY;
-    const deltaX = event.clientX - drag.startX;
-    carousel.scrollTop = drag.scrollTop - deltaY;
-    carousel.scrollLeft = drag.scrollLeft - deltaX;
-  };
-
-  const stopVariantsDrag = () => {
-    if (!variantsDragStateRef.current.active) return;
-    variantsDragStateRef.current.active = false;
-    setIsDraggingVariants(false);
   };
 
   const stats = useMemo(
@@ -713,8 +724,6 @@ export function useAdminProductsPage() {
     handleFileChange,
     handleSave,
     handleVariantFileChange,
-    handleVariantsMouseDown,
-    handleVariantsMouseMove,
     hasActiveFilters,
     isDraggingVariants,
     isMultiColorCreate,
@@ -743,7 +752,6 @@ export function useAdminProductsPage() {
     showModal,
     stats,
     stockFilter,
-    stopVariantsDrag,
     toggleEstiloOption,
     trapFocus,
     updateCategory,

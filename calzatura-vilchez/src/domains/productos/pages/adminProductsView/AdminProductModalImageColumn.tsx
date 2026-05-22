@@ -1,4 +1,4 @@
-import type { ChangeEvent, MouseEvent, RefObject } from "react";
+import type { ChangeEvent, RefObject } from "react";
 import type { ProductForm, VariantSlot } from "../adminProductsInternals";
 import { AdminProductCreateVariantsPanel } from "./AdminProductCreateVariantsPanel";
 import { AdminProductEditGallery } from "./AdminProductEditGallery";
@@ -20,9 +20,6 @@ type Props = Readonly<{
   updateImageUrl: (index: number, value: string) => void;
   validateImageUrl: (index: number, value: string) => void;
   clearImage: (index: number) => void;
-  handleVariantsMouseDown: (event: MouseEvent<HTMLDivElement>) => void;
-  handleVariantsMouseMove: (event: MouseEvent<HTMLDivElement>) => void;
-  stopVariantsDrag: () => void;
   handleVariantFileChange: (event: ChangeEvent<HTMLInputElement>, slotIndex: number, imageIndex: number) => void;
   updateVariantSlotImageUrl: (slotIndex: number, imageIndex: number, value: string) => void;
   validateVariantSlotImageUrl: (slotIndex: number, imageIndex: number, value: string) => void;
@@ -58,9 +55,6 @@ export function AdminProductModalImageColumn(p: Props) {
           compressing={p.compressing}
           isDraggingVariants={p.isDraggingVariants}
           variantsCarouselRef={p.variantsCarouselRef}
-          handleVariantsMouseDown={p.handleVariantsMouseDown}
-          handleVariantsMouseMove={p.handleVariantsMouseMove}
-          stopVariantsDrag={p.stopVariantsDrag}
           handleVariantFileChange={p.handleVariantFileChange}
           updateVariantSlotImageUrl={p.updateVariantSlotImageUrl}
           validateVariantSlotImageUrl={p.validateVariantSlotImageUrl}

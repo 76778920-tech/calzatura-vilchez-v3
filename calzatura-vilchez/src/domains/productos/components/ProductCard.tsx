@@ -37,9 +37,11 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const [failedHoverImage, setFailedHoverImage] = useState<string | null>(null);
   const imageSrc = failedImage === primaryImage ? FALLBACK_PRODUCT_IMAGE : primaryImage;
-  const hoverImageSrc = secondaryImage
-    ? failedHoverImage === secondaryImage ? imageSrc : secondaryImage
-    : null;
+  const hoverImageSrc = (() => {
+    if (!secondaryImage) return null;
+    if (failedHoverImage === secondaryImage) return imageSrc;
+    return secondaryImage;
+  })();
   const isLiked = Boolean(user) && favoriteIds.has(product.id);
   const productHref = `/producto/${product.id}`;
 
@@ -65,7 +67,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
     queueMicrotask(() => openSizePickerButtonRef.current?.focus());
   };
 
-  const handleSizePickerKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleSizePickerKeyDown = (event: React.KeyboardEvent<HTMLDialogElement>) => {
     if (event.key === "Escape") {
       event.stopPropagation();
       handleCloseSizePicker();
@@ -78,7 +80,8 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
     );
     if (focusables.length === 0) return;
     const first = focusables[0];
-    const last = focusables[focusables.length - 1];
+    const last = focusables.at(-1);
+    if (!last) return;
     if (event.shiftKey && document.activeElement === first) {
       event.preventDefault();
       last.focus();
@@ -224,9 +227,9 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
       )}
 
       {showSizePicker && (
-        <div
+        <dialog
+          open
           className="product-size-picker"
-          role="dialog"
           aria-modal="true"
           aria-labelledby={sizePickerTitleId}
           onKeyDown={handleSizePickerKeyDown}
@@ -255,7 +258,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
               </button>
             ))}
           </div>
-        </div>
+        </dialog>
       )}
     </article>
   );

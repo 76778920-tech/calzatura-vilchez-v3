@@ -108,16 +108,19 @@ export function messageForInvalidAddSaleLine({
   return null;
 }
 
-function buildDailySalePayload(
-  pendingLines: PendingSaleLine[],
-  products: SaleProduct[],
-  date: string,
-  documentType: SaleDocumentType,
-  docNumber: string | undefined,
-  saleCustomer: SaleCustomer | undefined,
-  operator: SaleOperator,
-  scope: FinanceFetchScope,
-): DailySaleAtomicInput[] | StaffDailySaleAtomicInput[] {
+type BuildDailySalePayloadInput = {
+  pendingLines: PendingSaleLine[];
+  products: SaleProduct[];
+  date: string;
+  documentType: SaleDocumentType;
+  docNumber?: string;
+  saleCustomer?: SaleCustomer;
+  operator: SaleOperator;
+  scope: FinanceFetchScope;
+};
+
+function buildDailySalePayload(input: BuildDailySalePayloadInput): DailySaleAtomicInput[] | StaffDailySaleAtomicInput[] {
+  const { pendingLines, products, date, documentType, docNumber, saleCustomer, operator, scope } = input;
   return pendingLines.map((line) => {
     const product = products.find((p) => p.id === line.productId);
     if (!product?.finanzas) throw new Error("Producto sin finanzas");
@@ -276,7 +279,7 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     );
     if (requiresCustomer && !saleCustomer) return;
 
-    const salesPayload = buildDailySalePayload(
+    const salesPayload = buildDailySalePayload({
       pendingLines,
       products,
       date,
@@ -284,8 +287,8 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
       docNumber,
       saleCustomer,
       operator,
-      financeScope,
-    );
+      scope: financeScope,
+    });
     const saleIds = await registerDailySalesAtomic(
       salesPayload as DailySaleAtomicInput[],
       financeScope,

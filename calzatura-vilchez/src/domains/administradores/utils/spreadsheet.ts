@@ -4,6 +4,18 @@ export const MAX_XLSX_IMPORT_BYTES = 5 * 1024 * 1024;
 
 export type SpreadsheetRow = Record<string, unknown>;
 
+function formatHeaderCell(value: ExcelJS.CellValue): string {
+  if (value == null) return "";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object") {
+    const rich = value as { text?: string; result?: string | number };
+    if (typeof rich.text === "string") return rich.text.trim();
+    if (rich.result != null) return String(rich.result).trim();
+    return "";
+  }
+  return String(value).trim();
+}
+
 export async function readXlsxFirstSheet(buffer: ArrayBuffer): Promise<SpreadsheetRow[]> {
   if (buffer.byteLength > MAX_XLSX_IMPORT_BYTES) {
     throw new Error("El archivo supera el limite de 5 MB");
@@ -19,7 +31,7 @@ export async function readXlsxFirstSheet(buffer: ArrayBuffer): Promise<Spreadshe
   sheet.eachRow((row, rowNumber) => {
     if (rowNumber === 1) {
       row.eachCell((cell, col) => {
-        headers[col - 1] = String(cell.value ?? "").trim();
+        headers[col - 1] = formatHeaderCell(cell.value);
       });
       return;
     }

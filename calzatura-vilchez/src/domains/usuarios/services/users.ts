@@ -5,7 +5,7 @@ import type { UserProfile, UserRole } from "@/types";
 
 export async function saveUserProfile(user: UserProfile): Promise<void> {
   const current = auth.currentUser;
-  if (!current || current.uid !== user.uid) {
+  if (current?.uid !== user.uid) {
     throw new Error("No autorizado para guardar este perfil");
   }
   await bffFetch("/users/me", {
@@ -16,7 +16,7 @@ export async function saveUserProfile(user: UserProfile): Promise<void> {
 
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   const current = auth.currentUser;
-  if (!current || current.uid !== uid) {
+  if (current?.uid !== uid) {
     return null;
   }
   try {
@@ -37,7 +37,7 @@ export async function updateUserProfile(
   data: Partial<Pick<UserProfile, "telefono" | "direcciones">>,
 ): Promise<void> {
   const current = auth.currentUser;
-  if (!current || current.uid !== uid) {
+  if (current?.uid !== uid) {
     throw new Error("No autorizado");
   }
   await bffFetch("/users/me", {

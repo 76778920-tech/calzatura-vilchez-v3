@@ -617,6 +617,68 @@ async function handleCreateCheckoutSession(req, res) {
   }
 }
 
+async function applyStripeCheckoutCompleted(supabase, event) {
+  const session = event.data.object;
+  const orderId = session.metadata?.orderId;
+  if (!orderId) return;
+
+  const order = await fetchOrderOrThrow(supabase, orderId);
+  if (order.estado === "pagado") return;
+
+  const fromEstado = assertOrderStatusTransition(order, "pagado");
+  let stockDescontadoEn = order.stockDescontadoEn || null;
+  if (!stockDescontadoEn) {
+    try {
+      await discountOrderStockRpc(supabase, order);
+      stockDescontadoEn = new Date().toISOString();
+    } catch (discountError) {
+      console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
+      const err = new Error("STOCK_DISCOUNT_FAILED");
+      err.statusCode = 500;
+      throw err;
+    }
+  }
+  await updateOrder(supabase, orderId, {
+    estado: "pagado",
+    stripeSessionId: session.id,
+    pagadoEn: new Date().toISOString(),
+    stockDescontadoEn,
+  });
+  await logAuditFn({
+    supabase,
+    accion: "cambiar_estado",
+    entidad: "pedido",
+    entidadId: orderId,
+    entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
+    usuarioUid: session.metadata?.userId ?? null,
+    usuarioEmail: order.userEmail ?? null,
+    detalle: {
+      from: fromEstado,
+      to: "pagado",
+      source: "stripe_webhook",
+      stripeEventId: event.id,
+      stripeSessionId: session.id,
+    },
+  });
+}
+
+async function handleStripeCheckoutSessionCompleted(supabase, event, res) {
+  try {
+    await applyStripeCheckoutCompleted(supabase, event);
+  } catch (error) {
+    if (error.message === "STOCK_DISCOUNT_FAILED") {
+      res.status(500).json({
+        error: "No se pudo descontar stock. Stripe reintentara el webhook.",
+      });
+      return false;
+    }
+    console.error("Stripe webhook order error:", error);
+    res.status(errorStatus(error)).json({ error: publicError(error) });
+    return false;
+  }
+  return true;
+}
+
 exports.createCheckoutSession = onRequest(
   { secrets: [STRIPE_SECRET, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY] },
   (req, res) => {
@@ -640,57 +702,8 @@ exports.stripeWebhook = onRequest(
     }
 
     if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      const orderId = session.metadata?.orderId;
-
-      if (orderId) {
-        try {
-          const order = await fetchOrderOrThrow(supabase, orderId);
-
-          if (order.estado !== "pagado") {
-            const fromEstado = assertOrderStatusTransition(order, "pagado");
-            let stockDescontadoEn = order.stockDescontadoEn || null;
-            if (!stockDescontadoEn) {
-              try {
-                await discountOrderStockRpc(supabase, order);
-                stockDescontadoEn = new Date().toISOString();
-              } catch (discountError) {
-                console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
-                return res.status(500).json({
-                  error: "No se pudo descontar stock. Stripe reintentara el webhook.",
-                });
-              }
-            }
-            await updateOrder(supabase, orderId, {
-              estado: "pagado",
-              stripeSessionId: session.id,
-              pagadoEn: new Date().toISOString(),
-              stockDescontadoEn,
-            });
-            await logAuditFn({
-              supabase,
-              accion: "cambiar_estado",
-              entidad: "pedido",
-              entidadId: orderId,
-              entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
-              usuarioUid: session.metadata?.userId ?? null,
-              usuarioEmail: order.userEmail ?? null,
-              detalle: {
-                from: fromEstado,
-                to: "pagado",
-                source: "stripe_webhook",
-                stripeEventId: event.id,
-                stripeSessionId: session.id,
-              },
-            });
-          }
-          // Si order.estado === "pagado": Stripe está reintentando un evento ya procesado.
-          // No actualizamos ni auditamos de nuevo para evitar duplicados.
-        } catch (error) {
-          console.error("Stripe webhook order error:", error);
-          return res.status(errorStatus(error)).json({ error: publicError(error) });
-        }
-      }
+      const stockDiscountFailed = await handleStripeCheckoutSessionCompleted(supabase, event, res);
+      if (stockDiscountFailed === false) return;
     }
 
     return res.json({ received: true });

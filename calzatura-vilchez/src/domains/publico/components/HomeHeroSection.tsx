@@ -34,10 +34,10 @@ function shouldResumeHeroCarouselAutoplay(container: HTMLElement, relatedTarget:
   return !(relatedTarget instanceof Node) || !container.contains(relatedTarget);
 }
 
-type Props = {
+type Props = Readonly<{
   slides: HomeHeroSlide[];
   productCountLabel: string;
-};
+}>;
 
 export default function HomeHeroSection({ slides: heroSlides, productCountLabel }: Props) {
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
@@ -251,7 +251,7 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
     <section className="home-hero" aria-roledescription="carousel" aria-label="Promociones destacadas">
       <div
         ref={heroCarouselRef}
-        role="group"
+        role="region"
         aria-label="Carrusel de promociones destacadas"
         aria-describedby="home-hero-carousel-keyboard-help"
         className={`home-hero-carousel ${isHeroDragging ? "is-dragging" : ""}`}

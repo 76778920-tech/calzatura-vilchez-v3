@@ -5,14 +5,28 @@ import { filterDailySalesBySearch } from "./adminSalesHistorialFilter";
 import { maskDniForDisplay, maskEmailForDisplay } from "@/utils/maskEmail";
 import { maskPersonName } from "@/security/orderPrivacy";
 
-type AdminSalesHistorialTableProps = {
+type AdminSalesHistorialTableProps = Readonly<{
   sales: DailySale[];
   historialSearch: string;
   onHistorialSearchChange: (value: string) => void;
   onClearHistorialSearch: () => void;
   onSelectSale: (sale: DailySale) => void;
   showFinancialDetails?: boolean;
-};
+}>;
+
+function saleDocumentSecondaryContent(sale: DailySale) {
+  if (sale.devuelto) {
+    return <span className="sale-devuelto-badge">Devuelto</span>;
+  }
+  if (sale.cliente) {
+    return (
+      <span>
+        {maskDniForDisplay(sale.cliente.dni)} - {maskPersonName(sale.cliente.nombres)}
+      </span>
+    );
+  }
+  return <span>Venta simple</span>;
+}
 
 export function AdminSalesHistorialTable({
   sales,
@@ -108,15 +122,7 @@ export function AdminSalesHistorialTable({
               <td>
                 <div className="admin-sale-document-cell">
                   <strong>{SALE_DOCUMENT_LABELS[sale.documentoTipo ?? "ninguno"]}</strong>
-                  {sale.devuelto ? (
-                    <span className="sale-devuelto-badge">Devuelto</span>
-                  ) : sale.cliente ? (
-                    <span>
-                      {maskDniForDisplay(sale.cliente.dni)} - {maskPersonName(sale.cliente.nombres)}
-                    </span>
-                  ) : (
-                    <span>Venta simple</span>
-                  )}
+                  {saleDocumentSecondaryContent(sale)}
                 </div>
               </td>
             </tr>

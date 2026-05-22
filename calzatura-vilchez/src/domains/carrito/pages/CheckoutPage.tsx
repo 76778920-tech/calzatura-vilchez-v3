@@ -21,6 +21,12 @@ import { checkoutEnvioSummaryLabel } from "@/domains/carrito/utils/checkoutEnvio
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? "";
 const STRIPE_CONFIGURED = Boolean(String(STRIPE_PK).trim());
 
+function placeOrderButtonLabel(loading: boolean, orderError: string | null, total: number): string {
+  if (loading) return "Procesando...";
+  const action = orderError ? "Reintentar pedido" : "Confirmar Pedido";
+  return `${action} — S/ ${total.toFixed(2)}`;
+}
+
 function comparable(value?: string) {
   return String(value || "")
     .normalize("NFD")
@@ -388,7 +394,7 @@ export default function CheckoutPage() {
                 </legend>
 
               <div className="payment-options">
-                <label className={`payment-option ${metodoPago === "stripe" ? "selected" : ""} ${!STRIPE_CONFIGURED ? "is-disabled" : ""}`}>
+                <label className={`payment-option ${metodoPago === "stripe" ? "selected" : ""} ${STRIPE_CONFIGURED ? "" : "is-disabled"}`}>
                   <input
                     type="radio"
                     name="pago"
@@ -464,7 +470,7 @@ export default function CheckoutPage() {
                 disabled={loading || pagoDisabledByDelivery}
                 className="btn-primary btn-full"
               >
-                {loading ? "Procesando..." : `${orderError ? "Reintentar pedido" : "Confirmar Pedido"} — S/ ${checkoutTotal.toFixed(2)}`}
+                {placeOrderButtonLabel(loading, orderError, checkoutTotal)}
               </button>
             </div>
           )}
