@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { ShoppingBag, CreditCard, Truck, ChevronRight } from "lucide-react";
+import { ShoppingBag, CreditCard, Truck, ChevronRight, AlertCircle } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { createOrder } from "@/domains/pedidos/services/orders";
@@ -19,6 +19,7 @@ import {
 import { checkoutEnvioSummaryLabel } from "@/domains/carrito/utils/checkoutEnvioSummaryLabel";
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? "";
+const STRIPE_CONFIGURED = Boolean(String(STRIPE_PK).trim());
 
 function comparable(value?: string) {
   return String(value || "")
@@ -83,7 +84,10 @@ export default function CheckoutPage() {
 
   const [step, setStep] = useState<"direccion" | "pago">("direccion");
   const [loading, setLoading] = useState(false);
-  const [metodoPago, setMetodoPago] = useState<"stripe" | "contraentrega">("stripe");
+  const [metodoPago, setMetodoPago] = useState<"stripe" | "contraentrega">(
+    STRIPE_CONFIGURED ? "stripe" : "contraentrega",
+  );
+  const [orderError, setOrderError] = useState("");
   const submittingRef = useRef(false);
   const idempotencyKeyRef = useRef<string | null>(null);
 
@@ -182,8 +186,10 @@ export default function CheckoutPage() {
 
   const handlePlaceOrder = async () => {
     if (submittingRef.current || loading) return;
-    if (metodoPago === "stripe" && !STRIPE_PK.trim()) {
+    setOrderError("");
+    if (metodoPago === "stripe" && !STRIPE_CONFIGURED) {
       toast.error("El pago con tarjeta no está configurado (falta VITE_STRIPE_PUBLIC_KEY). Usa contra entrega o contacta a la tienda.");
+      setOrderError("El pago con tarjeta no esta configurado. Selecciona pago contra entrega e intenta nuevamente.");
       return;
     }
     submittingRef.current = true;
@@ -201,7 +207,7 @@ export default function CheckoutPage() {
         idempotencyKey,
       });
 
-      if (metodoPago === "stripe" && STRIPE_PK) {
+      if (metodoPago === "stripe" && STRIPE_CONFIGURED) {
         await redirectStripeCheckoutForOrder(user, orderId);
       } else {
         clearCart();
@@ -210,6 +216,7 @@ export default function CheckoutPage() {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error desconocido";
       toast.error("Error al procesar el pedido: " + message);
+      setOrderError(`No pudimos procesar el pedido. ${message}`);
       submittingRef.current = false;
       setLoading(false);
     }
@@ -373,19 +380,24 @@ export default function CheckoutPage() {
               </h2>
 
               <div className="payment-options">
-                <label className={`payment-option ${metodoPago === "stripe" ? "selected" : ""}`}>
+                <label className={`payment-option ${metodoPago === "stripe" ? "selected" : ""} ${!STRIPE_CONFIGURED ? "is-disabled" : ""}`}>
                   <input
                     type="radio"
                     name="pago"
                     value="stripe"
                     checked={metodoPago === "stripe"}
+                    disabled={!STRIPE_CONFIGURED}
                     onChange={() => setMetodoPago("stripe")}
                   />
                   <div className="payment-option-content">
                     <CreditCard size={20} />
                     <div>
                       <strong>Tarjeta de Crédito / Débito</strong>
-                      <p>Visa, Mastercard, American Express</p>
+                      <p>
+                        {STRIPE_CONFIGURED
+                          ? "Visa, Mastercard, American Express"
+                          : "No disponible: falta configurar Stripe en produccion"}
+                      </p>
                     </div>
                   </div>
                 </label>
@@ -423,12 +435,27 @@ export default function CheckoutPage() {
                 </button>
               </div>
 
+              <p className="checkout-validation-note">
+                Precios, stock y disponibilidad se validan nuevamente contra el catalogo vivo al confirmar.
+              </p>
+
+              {orderError ? (
+                <div className="checkout-error-state" role="alert">
+                  <AlertCircle size={18} aria-hidden="true" />
+                  <div>
+                    <strong>No se pudo confirmar el pedido</strong>
+                    <p>{orderError}</p>
+                  </div>
+                </div>
+              ) : null}
+
               <button
+                type="button"
                 onClick={handlePlaceOrder}
                 disabled={loading || pagoDisabledByDelivery}
                 className="btn-primary btn-full"
               >
-                {loading ? "Procesando..." : `Confirmar Pedido — S/ ${checkoutTotal.toFixed(2)}`}
+                {loading ? "Procesando..." : `${orderError ? "Reintentar pedido" : "Confirmar Pedido"} — S/ ${checkoutTotal.toFixed(2)}`}
               </button>
             </div>
           )}

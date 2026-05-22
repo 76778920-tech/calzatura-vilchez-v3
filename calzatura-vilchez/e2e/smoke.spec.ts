@@ -52,6 +52,18 @@ test.describe("smoke tienda publica", () => {
       page.getByRole("heading", { name: /carrito/i }).or(page.getByRole("heading", { name: /Mi Carrito/i })),
     ).toBeVisible({ timeout: 15_000 });
   });
+
+  test("carrito lateral vacio enlaza al catalogo", async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => localStorage.removeItem("calzatura_cart"));
+
+    await page.getByRole("button", { name: /abrir carrito/i }).click();
+    await expect(page.getByLabel(/carrito de compras/i)).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole("link", { name: /ver productos/i }).click();
+    await expect(page).toHaveURL(/\/productos/);
+    await expect(page.locator("main.products-page")).toBeVisible({ timeout: 30_000 });
+  });
 });
 
 test.describe("smoke admin (sin sesion)", () => {

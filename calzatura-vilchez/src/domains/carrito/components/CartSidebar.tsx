@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { CartSummaryRows, CartItemQtyControls } from "@/domains/carrito/components/cartShared";
 import { handleProductImageError } from "@/utils/imgUtils";
+import { getSizeStock } from "@/utils/stock";
 
 export default function CartSidebar() {
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, subtotal, total, itemCount } = useCart();
@@ -17,27 +18,25 @@ export default function CartSidebar() {
         onClick={() => setIsOpen(false)}
         aria-label="Cerrar carrito"
       />
-      <aside className="cart-sidebar">
-        {/* Header */}
+      <aside className="cart-sidebar" aria-label="Carrito de compras">
         <div className="cart-header">
           <div className="cart-header-title">
-            <ShoppingBag size={20} />
+            <ShoppingBag size={20} aria-hidden="true" />
             <span>Mi Carrito ({itemCount})</span>
           </div>
-          <button onClick={() => setIsOpen(false)} className="cart-close-btn">
-            <X size={20} />
+          <button type="button" onClick={() => setIsOpen(false)} className="cart-close-btn" aria-label="Cerrar carrito">
+            <X size={20} aria-hidden="true" />
           </button>
         </div>
 
-        {/* Items */}
         <div className="cart-items">
           {items.length === 0 ? (
             <div className="cart-empty">
-              <ShoppingBag size={48} className="cart-empty-icon" />
-              <p>Tu carrito está vacío</p>
-              <button onClick={() => setIsOpen(false)} className="btn-primary">
+              <ShoppingBag size={48} className="cart-empty-icon" aria-hidden="true" />
+              <p>Tu carrito esta vacio</p>
+              <Link to="/productos" onClick={() => setIsOpen(false)} className="btn-primary">
                 Ver Productos
-              </button>
+              </Link>
             </div>
           ) : (
             items.map((item) => (
@@ -62,12 +61,16 @@ export default function CartSidebar() {
                       talla={item.talla}
                       color={item.color}
                       onUpdate={updateQuantity}
+                      maxQuantity={getSizeStock(item.product, item.talla, item.color)}
+                      productName={item.product.nombre}
                     />
                     <button
+                      type="button"
                       onClick={() => removeItem(item.product.id, item.talla, item.color)}
                       className="remove-btn"
+                      aria-label={`Quitar ${item.product.nombre} del carrito`}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={14} aria-hidden="true" />
                     </button>
                   </div>
                 </div>
@@ -76,7 +79,6 @@ export default function CartSidebar() {
           )}
         </div>
 
-        {/* Summary */}
         {items.length > 0 && (
           <div className="cart-footer">
             <div className="cart-summary">
@@ -90,6 +92,7 @@ export default function CartSidebar() {
               Proceder al Pago
             </Link>
             <button
+              type="button"
               onClick={() => setIsOpen(false)}
               className="btn-continue"
             >

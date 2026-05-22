@@ -3,6 +3,7 @@ import { ShoppingBag, Trash2, ArrowRight } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { CartSummaryRows, CartItemQtyControls } from "@/domains/carrito/components/cartShared";
 import { handleProductImageError } from "@/utils/imgUtils";
+import { getSizeStock } from "@/utils/stock";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal, total, clearCart } = useCart();
@@ -24,8 +25,8 @@ export default function CartPage() {
     <main className="cart-page">
       <div className="cart-page-header">
         <h1>Mi Carrito</h1>
-        <button onClick={clearCart} className="clear-cart-btn">
-          <Trash2 size={14} /> Vaciar carrito
+        <button type="button" onClick={clearCart} className="clear-cart-btn">
+          <Trash2 size={14} aria-hidden="true" /> Vaciar carrito
         </button>
       </div>
 
@@ -54,14 +55,18 @@ export default function CartPage() {
                     talla={item.talla}
                     color={item.color}
                     onUpdate={updateQuantity}
+                    maxQuantity={getSizeStock(item.product, item.talla, item.color)}
+                    productName={item.product.nombre}
                   />
                 </div>
                 <p className="item-subtotal">S/ {(item.product.precio * item.quantity).toFixed(2)}</p>
                 <button
+                  type="button"
                   onClick={() => removeItem(item.product.id, item.talla, item.color)}
                   className="remove-item-btn"
+                  aria-label={`Quitar ${item.product.nombre} del carrito`}
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={16} aria-hidden="true" />
                 </button>
               </div>
             </div>
