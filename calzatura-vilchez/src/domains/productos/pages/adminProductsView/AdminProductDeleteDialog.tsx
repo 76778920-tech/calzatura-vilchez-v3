@@ -51,14 +51,15 @@ export function AdminProductDeleteDialog({ product, deleting, onCancel, onConfir
 
         <div className="product-delete-dialog__body">
           <p id="product-delete-description">
-            ¿Eliminar <strong>{product.nombre}</strong> ({product.codigo})? Esta acción no se puede deshacer.
+            Esta accion eliminara <strong>{product.nombre}</strong>
+            {product.codigo ? ` (${product.codigo})` : ""} del catalogo. No se puede deshacer.
           </p>
           <div className="product-delete-dialog__actions">
             <button type="button" className="btn-outline" onClick={onCancel} disabled={deleting}>
               Cancelar
             </button>
             <button type="button" className="btn-danger" onClick={onConfirm} disabled={deleting}>
-              {deleting ? "Eliminando..." : "Eliminar"}
+              {deleting ? "Eliminando..." : "Eliminar producto"}
             </button>
           </div>
         </div>
