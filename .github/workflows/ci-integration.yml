@@ -208,6 +208,8 @@ jobs:
             --max-mape-pct 150 \
             --min-wins-mape-ratio 0.34 \
             --min-folds 3 \
+            --min-density-pct 0.5 \
+            --min-comparison-density-pct 5 \
             --output artifacts/ai-backtesting/integration-summary.json
 
       - name: Restore drill - evidencia operativa versionada

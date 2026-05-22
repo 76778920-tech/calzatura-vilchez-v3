@@ -32,6 +32,8 @@ describe("IA/DevOps measurable controls workflow guard", () => {
     expect(integration).toContain("--run");
     expect(integration).toContain("--max-mape-pct 150");
     expect(integration).toContain("--min-wins-mape-ratio 0.34");
+    expect(integration).toContain("--min-density-pct 0.5");
+    expect(integration).toContain("--min-comparison-density-pct 5");
     expect(integration).toContain("Restore drill - evidencia operativa versionada");
     expect(integration).toContain("needs: [quality, ai-service, ai-service-docker, ops-controls-real, e2e]");
 

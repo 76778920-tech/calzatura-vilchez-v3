@@ -41,7 +41,7 @@ Ejecutar backtesting real si existen `SUPABASE_URL` y `SUPABASE_SERVICE_KEY`:
 node scripts/ai-backtest-gate.mjs --run --history 180 --folds 6 --allow-missing-secrets --warn-only
 ```
 
-Medidas producidas: MAPE promedio RF, MAPE baseline, folds evaluados, ratio de folds ganados por MAPE, densidad del dataset y evidencia JSON. En CI el modo recomendado inicial es `--warn-only`; cuando el dataset sea estable se puede quitar para endurecer el gate.
+Medidas producidas: MAPE promedio RF, MAPE baseline, folds evaluados, ratio de folds ganados por MAPE, densidad del dataset y evidencia JSON. En CI Integration el gate es bloqueante: exige datos minimos y MAPE finito. La comparacion RF vs baseline solo bloquea cuando la densidad supera `--min-comparison-density-pct`; si el historial es demasiado escaso, el resultado queda como advertencia medible y no como validacion falsa del modelo.
 
 ## 3. Restore drill
 

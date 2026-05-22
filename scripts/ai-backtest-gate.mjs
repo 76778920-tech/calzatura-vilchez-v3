@@ -19,6 +19,7 @@ function parseArgs(argv) {
     minWinsMapeRatio: Number(process.env.AI_BACKTEST_MIN_WINS_MAPE_RATIO || 0.5),
     minFolds: Number(process.env.AI_BACKTEST_MIN_FOLDS || 3),
     minDensityPct: Number(process.env.AI_BACKTEST_MIN_DENSITY_PCT || 0),
+    minComparisonDensityPct: Number(process.env.AI_BACKTEST_MIN_COMPARISON_DENSITY_PCT || 0),
     warnOnly: false,
     allowMissingSecrets: false,
     envFile: "",
@@ -43,6 +44,7 @@ function parseArgs(argv) {
     else if (arg === "--min-wins-mape-ratio") args.minWinsMapeRatio = Number(next());
     else if (arg === "--min-folds") args.minFolds = Number(next());
     else if (arg === "--min-density-pct") args.minDensityPct = Number(next());
+    else if (arg === "--min-comparison-density-pct") args.minComparisonDensityPct = Number(next());
     else if (arg === "--env-file") args.envFile = next();
     else if (arg === "--warn-only") args.warnOnly = true;
     else if (arg === "--allow-missing-secrets") args.allowMissingSecrets = true;
@@ -64,6 +66,7 @@ function parseArgs(argv) {
     minWinsMapeRatio: args.minWinsMapeRatio,
     minFolds: args.minFolds,
     minDensityPct: args.minDensityPct,
+    minComparisonDensityPct: args.minComparisonDensityPct,
   })) {
     if (!Number.isFinite(value)) throw new Error(`${name} must be numeric`);
   }
@@ -84,6 +87,7 @@ Options:
   --min-wins-mape-ratio N       Required RF MAPE win ratio. Default: 0.5.
   --min-folds N                 Minimum evaluated folds. Default: 3.
   --min-density-pct N           Minimum dataset density. Default: 0.
+  --min-comparison-density-pct N Minimum density required to gate RF-vs-baseline wins. Default: 0.
   --warn-only                   Report failures but exit 0.
   --allow-missing-secrets       Skip --run when Supabase env vars are absent.
   --env-file <file>             Load simple KEY=VALUE env file before --run.
@@ -192,7 +196,14 @@ function evaluateThresholds(metrics, args) {
     failures.push(`nFolds ${metrics.nFolds} < min ${args.minFolds}`);
   }
 
-  if (metrics.winsMapeRatio === undefined || metrics.winsMapeRatio === null) {
+  const densityForComparison = metrics.densityPct === undefined
+    || metrics.densityPct >= args.minComparisonDensityPct;
+  if (!densityForComparison) {
+    warnings.push(
+      `densityPct ${metrics.densityPct} < comparison min ${args.minComparisonDensityPct}; ` +
+      "RF-vs-baseline win ratio is recorded but not used as a blocking gate",
+    );
+  } else if (metrics.winsMapeRatio === undefined || metrics.winsMapeRatio === null) {
     failures.push("winsMapeRatio not found in report");
   } else if (metrics.winsMapeRatio < args.minWinsMapeRatio) {
     failures.push(`winsMapeRatio ${metrics.winsMapeRatio.toFixed(3)} < min ${args.minWinsMapeRatio}`);
@@ -251,6 +262,7 @@ function main() {
       minWinsMapeRatio: args.minWinsMapeRatio,
       minFolds: args.minFolds,
       minDensityPct: args.minDensityPct,
+      minComparisonDensityPct: args.minComparisonDensityPct,
     },
     metrics,
     failures: thresholdResult.failures,
