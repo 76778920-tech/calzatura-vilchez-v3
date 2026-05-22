@@ -29,7 +29,12 @@ describe("Carrito sessionStorage guards", () => {
     expect(cartContextSource).toContain("removeLegacyCartKeys");
     expect(cartContextSource).toContain("legacyCartStorageKey(userUid)");
     expect(cartContextSource).toContain("readCartFromStorage(localStorage");
-    expect(cartContextSource).toContain("writeSessionCart(sessionKey, legacyGuestItems)");
+    expect(cartContextSource).toContain("writeSessionCart(CART_GUEST_SESSION_KEY, guestItems)");
+  });
+
+  it("antes de resolver uid lee carrito auth si guest esta vacio", () => {
+    expect(cartContextSource).toContain("CART_AUTH_SESSION_KEY");
+    expect(cartContextSource).toMatch(/if \(!userUid\)[\s\S]*sessionAuthItems/);
   });
 
   it("limpia carrito de sesion auth solo al cambiar entre dos cuentas", () => {

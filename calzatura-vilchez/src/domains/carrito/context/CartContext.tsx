@@ -114,9 +114,17 @@ export function CartProvider({ children }: CartProviderProps) {
 
       if (!userUid) {
         const legacyGuestItems = readCartFromStorage(localStorage, legacyCartStorageKey());
-        setItems(legacyGuestItems);
-        if (legacyGuestItems.length > 0) {
-          writeSessionCart(sessionKey, legacyGuestItems);
+        const sessionGuestItems = readCartFromStorage(sessionStorage, CART_GUEST_SESSION_KEY);
+        const sessionAuthItems = readCartFromStorage(sessionStorage, CART_AUTH_SESSION_KEY);
+        const guestItems =
+          sessionGuestItems.length > 0
+            ? sessionGuestItems
+            : sessionAuthItems.length > 0
+              ? sessionAuthItems
+              : legacyGuestItems;
+        setItems(guestItems);
+        if (guestItems.length > 0) {
+          writeSessionCart(CART_GUEST_SESSION_KEY, guestItems);
         }
         removeLegacyCartKeys();
         return;

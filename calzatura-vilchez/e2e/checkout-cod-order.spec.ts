@@ -10,6 +10,7 @@ import {
   mockSupabasePublicProductos,
   storageStateForUser,
 } from "./helpers/mockClientAuth";
+import { waitForCheckoutHydrated } from "./helpers/checkoutTestUtils";
 
 const CHECKOUT_USER: E2EClientUser = {
   uid: "e2e-checkout-client",
@@ -90,8 +91,7 @@ test.describe("checkout COD → createOrder BFF", () => {
     const { context, page } = await openCheckoutPage(browser, url);
 
     try {
-      await expect(page.locator("main.checkout-page")).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByText(CHECKOUT_PRODUCT.nombre)).toBeVisible({ timeout: 10_000 });
+      await waitForCheckoutHydrated(page, CHECKOUT_PRODUCT.nombre);
 
       await page.locator("#checkout-nombre").fill("Ana");
       await page.locator("#checkout-apellido").fill("García");

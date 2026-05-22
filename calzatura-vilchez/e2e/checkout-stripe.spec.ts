@@ -10,6 +10,7 @@ import {
   mockSupabasePublicProductos,
   storageStateForUser,
 } from "./helpers/mockClientAuth";
+import { waitForCheckoutHydrated } from "./helpers/checkoutTestUtils";
 
 const CHECKOUT_USER: E2EClientUser = {
   uid: "e2e-stripe-client",
@@ -94,8 +95,7 @@ test.describe("Checkout Stripe (mock BFF)", () => {
     await setupStripeCheckoutMocks(page);
 
     await page.goto("/checkout");
-    await expect(page.locator("main.checkout-page")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(CHECKOUT_PRODUCT.nombre)).toBeVisible({ timeout: 10_000 });
+    await waitForCheckoutHydrated(page, CHECKOUT_PRODUCT.nombre);
 
     await page.locator("#checkout-nombre").fill("Ana");
     await page.locator("#checkout-apellido").fill("García");
