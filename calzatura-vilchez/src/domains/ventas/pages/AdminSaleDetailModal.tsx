@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Eye, RotateCcw, X } from "lucide-react";
 import type { DailySale } from "@/types";
 import { SALE_DOCUMENT_LABELS } from "./adminSaleDocumentLabels";
@@ -25,13 +27,54 @@ export function AdminSaleDetailModal({
   onViewDocument,
   showFinancialDetails = true,
 }: AdminSaleDetailModalProps) {
+  const modalRef = useRef<HTMLDialogElement | null>(null);
+
+  useEffect(() => {
+    const first = modalRef.current?.querySelector<HTMLElement>(
+      "button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])"
+    );
+    first?.focus();
+  }, []);
+
+  const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab" || !modalRef.current) return;
+    const focusable = Array.from(
+      modalRef.current.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])"
+      )
+    ).filter((el) => el.offsetParent !== null);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div className="sale-modal-overlay">
       <button type="button" className="manufacturer-modal-backdrop" aria-label="Cerrar" onClick={onClose} />
-      <div className="sale-modal">
+      <dialog
+        ref={modalRef}
+        open
+        aria-modal="true"
+        aria-labelledby="sale-detail-title"
+        className="sale-modal"
+        onKeyDown={trapFocus}
+      >
         <div className="sale-modal-header">
           <div>
-            <h2>Detalle de venta</h2>
+            <h2 id="sale-detail-title">Detalle de venta</h2>
             {sale.devuelto && <span className="sale-devuelto-badge">Devuelto</span>}
           </div>
           <button type="button" className="sale-modal-close" onClick={onClose} aria-label="Cerrar">
@@ -134,7 +177,7 @@ export function AdminSaleDetailModal({
             </div>
           )}
         </div>
-      </div>
+      </dialog>
     </div>
   );
 }

@@ -212,8 +212,9 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await goToSales(page);
 
     // Abrir modal de la venta existente
-    await page.locator(".sale-row-clickable").first().click();
+    await page.getByRole("button", { name: /ver detalle de venta/i }).first().click();
     await expect(page.locator(".sale-modal")).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByRole("dialog", { name: /detalle de venta/i })).toBeVisible();
 
     // No escribir motivo — hacer clic directo en "Confirmar devolución"
     await page.getByRole("button", { name: /confirmar devolución/i }).click();
@@ -245,8 +246,9 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await goToSales(page);
 
     // Abrir modal y completar devolución
-    await page.locator(".sale-row-clickable").first().click();
+    await page.getByRole("button", { name: /ver detalle de venta/i }).first().click();
     await expect(page.locator(".sale-modal")).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByRole("dialog", { name: /detalle de venta/i })).toBeVisible();
 
     await page.getByPlaceholder(/talla equivocada/i).fill("Talla equivocada, el cliente pidió una 42");
     await page.getByRole("button", { name: /confirmar devolución/i }).click();

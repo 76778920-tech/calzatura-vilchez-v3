@@ -9322,13 +9322,22 @@ dialog.document-preview-modal {
 /* ============================================================
    SALE DETAIL MODAL
    ============================================================ */
-.sale-row-clickable { cursor: pointer; transition: background 0.12s; }
+.sale-row-clickable { transition: background 0.12s; }
 .sale-row-clickable:hover td { background: var(--surface-accent); }
+.sale-row-detail-button {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.sale-row-detail-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
 .sale-row-devuelto td { opacity: 0.45; }
 .sale-devuelto-badge { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 100px; text-transform: uppercase; letter-spacing: 0.5px; }
 
 .sale-modal-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.52); display: flex; align-items: center; justify-content: center; padding: 1rem; }
-.sale-modal { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-md); width: min(500px, 100%); max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-md); }
+.sale-modal { background: var(--white); border: 1.5px solid var(--border); border-radius: var(--radius-md); width: min(500px, 100%); max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow-md); margin: 0; padding: 0; color: inherit; }
 .sale-modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 1.25rem 1.25rem 1rem; border-bottom: 1px solid var(--border); gap: 1rem; }
 .sale-modal-header h2 { font-size: 1rem; font-weight: 700; margin: 0 0 4px; }
 .sale-modal-close { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 4px; border-radius: var(--radius-sm); line-height: 1; }
@@ -9361,6 +9370,31 @@ dialog.document-preview-modal {
 .sale-modal-return-info strong { font-size: 13px; font-weight: 700; color: #9a3412; }
 .sale-modal-return-info span { font-size: 12px; color: #c2410c; }
 .sale-modal-return-info p { margin: 4px 0 0; font-size: 13px; color: #7c3200; }
+.product-delete-dialog {
+  width: min(430px, calc(100vw - 2rem));
+}
+.product-delete-dialog .modal-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.product-delete-dialog__body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.product-delete-dialog__body p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+.product-delete-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
 
 .btn-danger { background: #dc2626; color: #fff; border: none; border-radius: var(--radius-sm); padding: 0.6rem 1.2rem; font-size: 14px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.15s; }
 .btn-danger:hover { background: #b91c1c; }

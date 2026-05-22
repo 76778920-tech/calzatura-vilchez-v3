@@ -1,0 +1,51 @@
+import fs from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+const productsHookSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/productos/pages/useAdminProductsPage.tsx"),
+  "utf8",
+);
+const productDeleteDialogSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/productos/pages/adminProductsView/AdminProductDeleteDialog.tsx"),
+  "utf8",
+);
+const stockEntryModalSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/productos/pages/adminProductsView/AdminProductStockEntryModal.tsx"),
+  "utf8",
+);
+const salesTableSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/ventas/pages/AdminSalesHistorialTable.tsx"),
+  "utf8",
+);
+const saleDetailModalSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/ventas/pages/AdminSaleDetailModal.tsx"),
+  "utf8",
+);
+
+describe("Admin ventas/productos accessibility guards", () => {
+  it("no usa confirm nativo para eliminar productos", () => {
+    expect(productsHookSource).not.toContain("confirm(");
+    expect(productsHookSource).toContain("setDeleteCandidate(product)");
+    expect(productDeleteDialogSource).toContain("aria-modal=\"true\"");
+    expect(productDeleteDialogSource).toContain("aria-describedby=\"product-delete-description\"");
+    expect(productDeleteDialogSource).toContain("onKeyDown={trapFocus}");
+  });
+
+  it("el modal de ingreso de stock gestiona foco, Escape y Tab", () => {
+    expect(stockEntryModalSource).toContain("ref={modalRef}");
+    expect(stockEntryModalSource).toContain("aria-modal=\"true\"");
+    expect(stockEntryModalSource).toContain("event.key === \"Escape\"");
+    expect(stockEntryModalSource).toContain("event.key !== \"Tab\"");
+    expect(stockEntryModalSource).toContain("first?.focus()");
+  });
+
+  it("historial de ventas usa boton accesible y modal dialog, no tr onClick", () => {
+    expect(salesTableSource).not.toContain("onClick={() => {\n                onSelectSale(sale);");
+    expect(salesTableSource).toContain("sale-row-detail-button");
+    expect(salesTableSource).toContain("aria-label={`Ver detalle de venta ${sale.codigo}`}");
+    expect(saleDetailModalSource).toContain("aria-modal=\"true\"");
+    expect(saleDetailModalSource).toContain("aria-labelledby=\"sale-detail-title\"");
+    expect(saleDetailModalSource).toContain("onKeyDown={trapFocus}");
+  });
+});

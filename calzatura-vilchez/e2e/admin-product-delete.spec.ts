@@ -1,12 +1,12 @@
 /**
- * E2E: AdminProducts — borrado de producto con confirmación nativa.
+ * E2E: AdminProducts — borrado de producto con dialogo accesible.
  *
  * Cubre:
- * 1. Aceptar el confirm() elimina el producto: estado vacío en UI + producto ausente (TC-PROD-DEL01).
+ * 1. Confirmar el dialogo elimina el producto: estado vacío en UI + producto ausente (TC-PROD-DEL01).
  *    (El estado vacío es un <tr> en <tbody>, no usar toHaveCount(0) sobre filas.)
- * 2. Rechazar el confirm() no llama al RPC y el producto permanece (TC-PROD-DEL02).
+ * 2. Cancelar el dialogo no llama al RPC y el producto permanece (TC-PROD-DEL02).
  *
- * handleDelete usa window.confirm(); Playwright lo intercepta con page.on("dialog").
+ * handleDelete abre un dialogo propio con nombre accesible.
  * El borrado se mockea como RPC atómico `delete_product_atomic`.
  */
 import { expect, test, type Page } from "@playwright/test";
@@ -91,16 +91,16 @@ async function goToProducts(page: Page) {
 
 // ─── Suite ────────────────────────────────────────────────────────────────────
 
-test.describe("admin productos → borrado con confirmación", () => {
+test.describe("admin productos → borrado con dialogo accesible", () => {
   test.beforeEach(async ({ page }) => {
     page.on("pageerror", (err) => console.log(`[product-delete] pageerror: ${err.message}`));
     await injectFakeAdminAuth(page);
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // TC-PROD-DEL01: aceptar confirm → DELETE en las 3 tablas + estado vacío (texto) + producto ausente
+  // TC-PROD-DEL01: confirmar dialogo -> DELETE en las 3 tablas + estado vacio (texto) + producto ausente
   // ──────────────────────────────────────────────────────────────────────────
-  test("aceptar el confirm elimina el producto y deja la lista vacía (TC-PROD-DEL01)", async ({ page }) => {
+  test("confirmar el dialogo elimina el producto y deja la lista vacia (TC-PROD-DEL01)", async ({ page }) => {
     await goToProducts(page);
     const counters = await setupMocks(page);
 
@@ -108,10 +108,11 @@ test.describe("admin productos → borrado con confirmación", () => {
     await expect(page.locator("table tbody tr")).toHaveCount(1);
     await expect(page.locator("table tbody tr").first()).toContainText("Bota Borrable E2E");
 
-    // Interceptar el confirm nativo y aceptar
-    page.once("dialog", (dialog) => dialog.accept());
-
     await page.locator(".action-btn.delete-btn").first().click();
+    const dialog = page.getByRole("dialog", { name: /eliminar producto/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("Bota Borrable E2E");
+    await dialog.getByRole("button", { name: /^eliminar producto$/i }).click();
 
     // Toast de éxito
     await expect(page.getByText(/producto eliminado/i)).toBeVisible({ timeout: 8_000 });
@@ -125,18 +126,19 @@ test.describe("admin productos → borrado con confirmación", () => {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
-  // TC-PROD-DEL02: rechazar el confirm → no llama RPC, producto permanece
+  // TC-PROD-DEL02: cancelar dialogo -> no llama RPC, producto permanece
   // ──────────────────────────────────────────────────────────────────────────
-  test("rechazar el confirm no llama al RPC y el producto permanece (TC-PROD-DEL02)", async ({ page }) => {
+  test("cancelar el dialogo no llama al RPC y el producto permanece (TC-PROD-DEL02)", async ({ page }) => {
     await goToProducts(page);
     const counters = await setupMocks(page);
 
     await expect(page.locator("table tbody tr")).toHaveCount(1);
 
-    // Interceptar el confirm nativo y rechazar
-    page.once("dialog", (dialog) => dialog.dismiss());
-
     await page.locator(".action-btn.delete-btn").first().click();
+    const dialog = page.getByRole("dialog", { name: /eliminar producto/i });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: /^cancelar$/i }).click();
+    await expect(dialog).toBeHidden();
 
     // El producto debe seguir en la tabla (sin recarga)
     await expect(page.locator("table tbody tr")).toHaveCount(1);

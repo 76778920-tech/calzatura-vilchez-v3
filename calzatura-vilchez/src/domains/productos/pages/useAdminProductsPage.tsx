@@ -113,6 +113,8 @@ export function useAdminProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [showStockModal, setShowStockModal] = useState(false);
   const [stockModalProduct, setStockModalProduct] = useState<AdminProduct | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<AdminProduct | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>({ ...EMPTY_FORM });
   const [variantSlots, setVariantSlots] = useState<VariantSlot[]>(() => createVariantSlots(EMPTY_FORM.categoria));
@@ -650,15 +652,28 @@ export function useAdminProductsPage() {
   };
 
   const handleDelete = async (product: AdminProduct) => {
-    if (!confirm(`¿Eliminar "${product.nombre}"?`)) return;
+    setDeleteCandidate(product);
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleteSaving) return;
+    setDeleteCandidate(null);
+  };
+
+  const confirmDeleteProduct = async () => {
+    if (!deleteCandidate) return;
+    setDeleteSaving(true);
     try {
-      await deleteProductAtomic(product.id, product.nombre);
+      await deleteProductAtomic(deleteCandidate.id, deleteCandidate.nombre);
       toast.success("Producto eliminado");
       void invalidateAICache("product_deleted");
+      setDeleteCandidate(null);
       pendingRealtimeRef.current = false;
       load();
     } catch (err) {
       toast.error(toastFromSaveError(err));
+    } finally {
+      setDeleteSaving(false);
     }
   };
   return {
@@ -680,6 +695,8 @@ export function useAdminProductsPage() {
     currentImages,
     currentSizes,
     currentStock,
+    deleteCandidate,
+    deleteSaving,
     editingId,
     estiloChipTokens,
     estiloSelectOpen,
@@ -691,6 +708,8 @@ export function useAdminProductsPage() {
     form,
     formPriceRange,
     handleDelete,
+    closeDeleteDialog,
+    confirmDeleteProduct,
     handleFileChange,
     handleSave,
     handleVariantFileChange,

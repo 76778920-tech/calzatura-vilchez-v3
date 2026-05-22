@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { X, PackagePlus } from "lucide-react";
 import { sizesForCategory } from "@/domains/productos/utils/commercialRules";
 import type { AdminProduct } from "../adminProductsInternals";
@@ -26,6 +27,7 @@ function stockSubmitButtonLabel(saving: boolean, totalNuevo: number): string {
 }
 
 export function AdminProductStockEntryModal({ product, onClose, onSubmit }: Props) {
+  const modalRef = useRef<HTMLDialogElement | null>(null);
   const sizes = sizesForCategory(product.categoria);
   const [delta, setDelta] = useState<Record<string, number>>(
     Object.fromEntries(sizes.map((s) => [s, 0]))
@@ -54,10 +56,49 @@ export function AdminProductStockEntryModal({ product, onClose, onSubmit }: Prop
     }
   };
 
+  useEffect(() => {
+    const first = modalRef.current?.querySelector<HTMLElement>(
+      "input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex='-1'])"
+    );
+    first?.focus();
+  }, []);
+
+  const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab" || !modalRef.current) return;
+    const focusable = Array.from(
+      modalRef.current.querySelectorAll<HTMLElement>(
+        "input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex='-1'])"
+      )
+    ).filter((el) => el.offsetParent !== null);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
+
   return (
     <div className="product-modal-host">
       <button type="button" className="product-modal-backdrop" aria-label="Cerrar" onClick={onClose} />
-      <dialog open aria-modal="true" aria-labelledby="stock-modal-title" className="modal product-modal">
+      <dialog
+        ref={modalRef}
+        open
+        aria-modal="true"
+        aria-labelledby="stock-modal-title"
+        className="modal product-modal"
+        onKeyDown={trapFocus}
+      >
         <div className="modal-header">
           <h2 id="stock-modal-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
             <PackagePlus size={18} />

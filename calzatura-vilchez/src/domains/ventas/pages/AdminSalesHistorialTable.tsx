@@ -77,12 +77,16 @@ export function AdminSalesHistorialTable({
             <tr
               key={sale.id}
               className={`sale-row-clickable${sale.devuelto ? " sale-row-devuelto" : ""}`}
-              onClick={() => {
-                onSelectSale(sale);
-              }}
             >
               <td>
-                <span className="admin-code-badge">{sale.codigo}</span>
+                <button
+                  type="button"
+                  className="admin-code-badge sale-row-detail-button"
+                  onClick={() => onSelectSale(sale)}
+                  aria-label={`Ver detalle de venta ${sale.codigo}`}
+                >
+                  {sale.codigo}
+                </button>
               </td>
               <td>{sale.nombre}</td>
               <td>{sale.color || "-"}</td>

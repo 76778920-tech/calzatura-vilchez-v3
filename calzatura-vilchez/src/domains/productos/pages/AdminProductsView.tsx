@@ -1,5 +1,6 @@
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import type { AdminProductsViewModel } from "./useAdminProductsPage";
+import { AdminProductDeleteDialog } from "./adminProductsView/AdminProductDeleteDialog";
 import { AdminProductModal } from "./adminProductsView/AdminProductModal";
 import { AdminProductsCatalogBody } from "./adminProductsView/AdminProductsCatalogBody";
 import { AdminProductStockEntryModal } from "./adminProductsView/AdminProductStockEntryModal";
@@ -67,6 +68,15 @@ export function AdminProductsView(p: Readonly<AdminProductsViewModel>) {
           product={p.stockModalProduct}
           onClose={p.closeStockModal}
           onSubmit={p.handleStockEntry}
+        />
+      )}
+
+      {p.deleteCandidate && (
+        <AdminProductDeleteDialog
+          product={p.deleteCandidate}
+          deleting={p.deleteSaving}
+          onCancel={p.closeDeleteDialog}
+          onConfirm={() => void p.confirmDeleteProduct()}
         />
       )}
 
