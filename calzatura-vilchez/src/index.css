@@ -6282,16 +6282,25 @@ button.order-card-header {
   margin: 0;
   color: var(--text);
 }
-.hr-modal-backdrop {
+.hr-modal-host {
   position: fixed;
   inset: 0;
   z-index: 120;
   display: grid;
   place-items: center;
   padding: 1rem;
+}
+.hr-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
   background: rgba(15, 23, 42, 0.45);
+  cursor: default;
 }
 .hr-modal {
+  position: relative;
+  z-index: 1;
   width: min(920px, 100%);
   max-height: min(88vh, 900px);
   overflow: auto;

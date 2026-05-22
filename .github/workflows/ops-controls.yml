@@ -65,13 +65,14 @@ jobs:
       - name: Readiness BFF/IA
         env:
           READINESS_TARGETS: ${{ inputs.readiness_targets }}
+          RUN_LIVE_READINESS: ${{ inputs.run_live_readiness }}
           BFF_BASE_URL: ${{ secrets.VITE_BACKEND_API_URL }}
           AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
         run: |
           set -euo pipefail
           config_flag="--config docs/ops/readiness.sample.json"
           plan_flag="--plan-only"
-          if [ "${{ inputs.run_live_readiness }}" = "true" ]; then
+          if [ "$RUN_LIVE_READINESS" = "true" ]; then
             config_flag=""
             plan_flag=""
           fi
@@ -85,10 +86,13 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          MAX_MAPE_PCT: ${{ inputs.max_mape_pct }}
+          MIN_WINS_MAPE_RATIO: ${{ inputs.min_wins_mape_ratio }}
+          BACKTEST_WARN_ONLY: ${{ inputs.backtest_warn_only }}
         run: |
           set -euo pipefail
           warn_flag=""
-          if [ "${{ inputs.backtest_warn_only }}" = "true" ]; then
+          if [ "$BACKTEST_WARN_ONLY" = "true" ]; then
             warn_flag="--warn-only"
           fi
           node scripts/ai-backtest-gate.mjs \
@@ -96,8 +100,8 @@ jobs:
             --allow-missing-secrets \
             --history 180 \
             --folds 6 \
-            --max-mape-pct "${{ inputs.max_mape_pct }}" \
-            --min-wins-mape-ratio "${{ inputs.min_wins_mape_ratio }}" \
+            --max-mape-pct "$MAX_MAPE_PCT" \
+            --min-wins-mape-ratio "$MIN_WINS_MAPE_RATIO" \
             $warn_flag \
             --output artifacts/ai-backtesting/summary.json
 

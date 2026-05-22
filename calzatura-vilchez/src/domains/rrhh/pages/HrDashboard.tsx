@@ -568,8 +568,14 @@ export default function HrDashboard() {
       </section>
 
       {historyWorker && (
-        <div className="hr-modal-backdrop" role="presentation" onClick={() => setHistoryWorker(null)}>
-          <div className="hr-modal" role="dialog" aria-labelledby="history-title" onClick={(event) => event.stopPropagation()}>
+        <div className="hr-modal-host">
+          <button
+            type="button"
+            className="hr-modal-backdrop"
+            aria-label="Cerrar"
+            onClick={() => setHistoryWorker(null)}
+          />
+          <div className="hr-modal" role="dialog" aria-labelledby="history-title">
             <div className="staff-section-heading">
               <div>
                 <p>Historial de ventas</p>

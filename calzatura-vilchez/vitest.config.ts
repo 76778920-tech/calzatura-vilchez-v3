@@ -15,7 +15,6 @@ export default defineConfig({
       include: [
         "src/domains/**/utils/*.ts",
         "src/domains/**/services/*.ts",
-        "src/domains/**/predictions/adminPredictionsTypes.ts",
         "src/routes/*.ts",
         "src/utils/*.ts",
         "src/security/*.ts",

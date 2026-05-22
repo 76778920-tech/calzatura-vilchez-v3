@@ -54,4 +54,18 @@ describe("IA/DevOps measurable controls workflow guard", () => {
     expect(ops).toContain("node scripts/ai-backtest-gate.mjs");
     expect(ops).toContain("node scripts/restore-drill-check.mjs");
   });
+
+  it("no interpola workflow inputs dentro de run (Sonar githubactions:S7630)", () => {
+    const ops = readWorkflow("ops-controls.yml");
+    const runBlocks = [...ops.matchAll(/run:\s*\|\s*\n([\s\S]*?)(?=\n\s{6}-\sname:|\n\s{4}[a-z])/g)].map(
+      (m) => m[1],
+    );
+    expect(runBlocks.length).toBeGreaterThan(0);
+    for (const block of runBlocks) {
+      expect(block).not.toMatch(/\$\{\{\s*inputs\./);
+    }
+    expect(ops).toContain("RUN_LIVE_READINESS: ${{ inputs.run_live_readiness }}");
+    expect(ops).toContain("MAX_MAPE_PCT: ${{ inputs.max_mape_pct }}");
+    expect(ops).toContain('"$MAX_MAPE_PCT"');
+  });
 });

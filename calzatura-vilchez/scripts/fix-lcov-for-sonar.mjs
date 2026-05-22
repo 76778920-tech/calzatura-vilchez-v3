@@ -16,21 +16,36 @@ if (!fs.existsSync(lcovPath)) {
   process.exit(1);
 }
 
+/** Rutas que Sonar excluye de cobertura (evita WARN de LCOV huérfano). */
+function shouldDropSf(normalizedSf) {
+  if (normalizedSf.includes("/predictions/")) return true;
+  if (normalizedSf.includes("/pages/")) return true;
+  if (normalizedSf.startsWith("calzatura-vilchez/src/components/")) return true;
+  return false;
+}
+
 const lines = fs.readFileSync(lcovPath, "utf8").split(/\r?\n/);
 const out = [];
+let skipRecord = false;
 for (const line of lines) {
   if (line.startsWith("SF:")) {
-    const rel = line.slice(3).replace(/\\/g, "/").trim();
+    let rel = line.slice(3).replace(/\\/g, "/").trim();
     if (rel.startsWith("calzatura-vilchez/")) {
-      out.push(`SF:${rel}`);
+      // keep
     } else if (rel.startsWith("src/")) {
-      out.push(`SF:calzatura-vilchez/${rel}`);
-    } else {
-      out.push(line);
+      rel = `calzatura-vilchez/${rel}`;
     }
-  } else {
-    out.push(line);
+    skipRecord = shouldDropSf(rel);
+    if (!skipRecord) {
+      out.push(`SF:${rel}`);
+    }
+    continue;
   }
+  if (skipRecord) {
+    if (line === "end_of_record") skipRecord = false;
+    continue;
+  }
+  out.push(line);
 }
 
 fs.writeFileSync(lcovPath, out.join("\n"), "utf8");
