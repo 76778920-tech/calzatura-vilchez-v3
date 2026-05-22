@@ -12,7 +12,7 @@
 
 ## Alcance del módulo
 
-Import/export masivo de colecciones (`ventasDiarias`, `productoFinanzas`, `fabricantes`, `productos`) vía archivos `.xlsx` (librería `xlsx`). Cada colección tiene configuración de cabeceras, transformación de filas, validación de campos e ID de documento. Registra `logAudit("importar", ...)` con contexto de lote y escenario. Incluye borrado de datos de prueba y limpieza de `ventasDiarias` por fecha. Cache IA se invalida tras importar.
+Import/export masivo de colecciones (`ventasDiarias`, `productoFinanzas`, `fabricantes`, `productos`) vía archivos `.xlsx` procesados con `exceljs`. Cada colección tiene configuración de cabeceras, transformación de filas, validación de campos e ID de documento. Registra `logAudit("importar", ...)` con contexto de lote y escenario. Incluye borrado de datos de prueba y limpieza de `ventasDiarias` por fecha. Cache IA se invalida tras importar.
 
 ---
 

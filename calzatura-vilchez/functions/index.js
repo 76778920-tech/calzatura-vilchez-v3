@@ -23,6 +23,7 @@ const {
   resolveAiAdminUpstreamRequest, sendUpstreamToClient,
   aiAdminProxyErrorStatus, aiAdminProxyErrorMessage,
 } = require("./fnUtils");
+const { ORDER_STATUSES, assertOrderStatusTransition } = require("./orderStatusPolicy");
 
 /** Misma clave pública del cliente; solo la usa el servidor para REST Identity Toolkit (login vía BFF). */
 const FIREBASE_WEB_API_KEY = defineString("FIREBASE_WEB_API_KEY", { default: "" });
@@ -105,8 +106,6 @@ async function assertStaffRole(supabase, uid) {
   }
   throw Object.assign(new Error("Sin permisos para gestionar pedidos"), { status: 403 });
 }
-
-const ORDER_STATUSES = new Set(["pendiente", "pagado", "enviado", "entregado", "cancelado"]);
 
 // Inserta en la tabla auditoria desde el contexto de Cloud Functions.
 // No lanza: un fallo de auditoría nunca interrumpe la operación principal.
@@ -414,6 +413,10 @@ exports.updateOrderStatus = onRequest(
         }
 
         const order = await fetchOrderOrThrow(supabase, orderId);
+        const currentEstado = assertOrderStatusTransition(order, estado);
+        if (currentEstado === estado) {
+          return res.status(200).json({ ok: true, unchanged: true });
+        }
         if (order.metodoPago === "stripe" && estado === "pagado") {
           return res.status(409).json({
             error: "Los pedidos Stripe solo se marcan como pagados desde el webhook de pago.",
@@ -438,6 +441,8 @@ exports.updateOrderStatus = onRequest(
               usuarioUid: decodedToken.uid,
               usuarioEmail: strOr(decodedToken.email),
               detalle: {
+                from: currentEstado,
+                to: estado,
                 source: stockFx.audit.source,
                 metodoPago: order.metodoPago,
               },
@@ -463,7 +468,7 @@ exports.updateOrderStatus = onRequest(
           entidadNombre: `#${orderId.slice(-8).toUpperCase()}`,
           usuarioUid: decodedToken.uid,
           usuarioEmail: strOr(decodedToken.email),
-          detalle: { estado, source: "updateOrderStatus" },
+          detalle: { from: currentEstado, to: estado, source: "updateOrderStatus" },
         });
 
         return res.status(200).json({ orderId, estado });
@@ -643,6 +648,7 @@ exports.stripeWebhook = onRequest(
           const order = await fetchOrderOrThrow(supabase, orderId);
 
           if (order.estado !== "pagado") {
+            const fromEstado = assertOrderStatusTransition(order, "pagado");
             let stockDescontadoEn = order.stockDescontadoEn || null;
             if (!stockDescontadoEn) {
               try {
@@ -670,7 +676,8 @@ exports.stripeWebhook = onRequest(
               usuarioUid: session.metadata?.userId ?? null,
               usuarioEmail: order.userEmail ?? null,
               detalle: {
-                estado: "pagado",
+                from: fromEstado,
+                to: "pagado",
                 source: "stripe_webhook",
                 stripeEventId: event.id,
                 stripeSessionId: session.id,

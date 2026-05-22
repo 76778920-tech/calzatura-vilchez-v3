@@ -15,6 +15,13 @@ import { maskEmailForDisplay } from "@/utils/maskEmail";
 import { AccessibleConfirmDialog } from "@/components/common/AccessibleConfirmDialog";
 
 const ESTADOS: OrderStatus[] = ["pendiente", "pagado", "enviado", "entregado", "cancelado"];
+const ESTADO_TRANSICIONES: Record<OrderStatus, OrderStatus[]> = {
+  pendiente: ["pagado", "cancelado"],
+  pagado: ["enviado", "cancelado"],
+  enviado: ["entregado"],
+  entregado: [],
+  cancelado: [],
+};
 
 const ESTADO_LABEL = ORDER_STATUS_LABELS as Record<OrderStatus, string>;
 
@@ -75,6 +82,10 @@ export default function AdminOrders() {
 
   const requestStatusChange = (order: Order, estado: OrderStatus) => {
     if (estado === order.estado || savingStatusIds.has(order.id)) return;
+    if (!ESTADO_TRANSICIONES[order.estado]?.includes(estado)) {
+      toast.error("Transicion de estado no permitida");
+      return;
+    }
     setStatusChangePending({
       orderId: order.id,
       orderLabel: order.id.slice(-8).toUpperCase(),
@@ -180,7 +191,13 @@ export default function AdminOrders() {
                     aria-label={`Estado del pedido ${order.id.slice(-8).toUpperCase()}`}
                   >
                     {ESTADOS.map((s) => (
-                      <option key={s} value={s}>{ESTADO_LABEL[s]}</option>
+                      <option
+                        key={s}
+                        value={s}
+                        disabled={s !== order.estado && !ESTADO_TRANSICIONES[order.estado]?.includes(s)}
+                      >
+                        {ESTADO_LABEL[s]}
+                      </option>
                     ))}
                   </select>
                 </div>

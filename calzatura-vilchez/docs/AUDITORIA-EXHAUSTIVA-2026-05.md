@@ -24,13 +24,13 @@ Si el `.docx` o el `.pdf` están abiertos en Word/Adobe y el script falla al gua
 |------|--------|------------|
 | **TypeScript** | Verde | `npm run typecheck` — sin errores (evidencia en esta auditoría). |
 | **ESLint** | Verde | `npm run lint` — sin errores. |
-| **Dependencias** | Ámbar | `npm audit`: **1 vulnerabilidad alta** en `xlsx` (SheetJS); sin fix disponible vía npm según reporte. |
+| **Dependencias** | Verde | `npm audit` y `npm audit --omit=dev`: 0 vulnerabilidades tras migrar import/export a `exceljs` y aplicar overrides de dependencias transitivas. |
 | **CI GitHub** | Verde ★ | Actualizado 2026-05-03: job `Lint + Tests + Build` (ESLint + Vitest + typecheck + build) + job paralelo `E2E Playwright` con caché de browsers. Ver §5. |
 | **Panel `/admin`** | Verde documental | Informes `*-auditoria.md` en `docs/15-modulos/`; E2E admin + smoke; checklist §11 actualizado. |
 | **Migraciones Supabase** | Verde operativo (post-repair) | Usuario verificó `migration list` local/remoto alineados (10 versiones). |
 | **Mantenibilidad (A6)** | Ámbar | Archivos muy grandes: `AdminPredictions.tsx` ~2458 líneas, `AdminProducts.tsx` ~1623, `AdminData.tsx` ~1246 (conteo PowerShell en auditoría). |
 
-**Conclusión:** el proyecto está en **buen estado de entrega** para la fase de auditoría/calidad descrita en documentación interna; **no** existe certificación de “cero defectos futuros”. El riesgo residual principal es **supply chain (`xlsx`)** y **deuda A6/A1/A2** ya explícita en informes de módulo. El CI ahora incluye lint y E2E Playwright (★ actualizado).
+**Conclusión:** el proyecto está en **buen estado de entrega** para la fase de auditoría/calidad descrita en documentación interna; **no** existe certificación de “cero defectos futuros”. El riesgo supply chain por `xlsx` quedó cerrado; el riesgo residual principal es **deuda A6/A1/A2** ya explícita en informes de módulo. El CI ahora incluye lint y E2E Playwright (★ actualizado).
 
 ---
 
@@ -43,7 +43,7 @@ Si el `.docx` o el `.pdf` están abiertos en Word/Adobe y el script falla al gua
 | Datos | Supabase (PostgREST + Postgres), migraciones versionadas en `supabase/migrations/` |
 | Identidad | Firebase Auth |
 | Pagos / medios | Stripe (cliente), Cloudinary (subidas) |
-| Excel | `xlsx` (SheetJS) — ver sección dependencias |
+| Excel | `exceljs` — import/export con límite de tamaño y sin dependencia `xlsx` |
 | 3D tienda | Three.js + React Three Fiber |
 | Pruebas | Vitest + Testing Library; Playwright (Chromium) |
 | Backend Google | Firebase Cloud Functions (`functions/`, Node 20) |
@@ -107,7 +107,7 @@ Comandos ejecutados en `calzatura-vilchez` el 2026-05-03:
 |---------|-----------|
 | `npm run typecheck` | **OK** (salida sin errores). |
 | `npm run lint` | **OK** (salida sin errores). |
-| `npm audit` | **1 high** en paquete `xlsx` (*Prototype Pollution*, *ReDoS*); mensaje npm: *No fix available*. |
+| `npm audit` | **OK**: 0 vulnerabilidades en dependencias de producción y desarrollo tras overrides (`protobufjs`, `@protobufjs/utf8`, `ws`, `retry-request`, `teeny-request`, `uuid`, `brace-expansion`). |
 
 ---
 
@@ -154,10 +154,10 @@ Total **21** archivos: admin (layout, dashboard, productos filtros/código/campa
 
 | Prioridad | Ítem |
 |-----------|------|
-| P0 | Sustituir o acotar **riesgo `xlsx`**: valorar `exceljs`, import dinámico, procesamiento solo server-side, o aceptación formal del riesgo con compensación (archivos de confianza, tamaño máximo). |
+| ~~P0~~ ✅ | **Supply chain Excel:** riesgo `xlsx` cerrado con `exceljs`; `npm audit` queda en 0 vulnerabilidades. |
 | ~~P0~~ ✅ | **CI:** `npm run lint` + Playwright E2E añadidos en job paralelo (2026-05-03). Brecha residual: lint de `functions/` (ver §7). |
 | P1 | **Proxy IA** en todos los entornos de producción; retirar bearer del bundle. |
-| P1 | **Pedidos:** reglas de transición si negocio lo exige. |
+| ~~P1~~ ✅ | **Pedidos:** reglas de transición centralizadas para BFF y Cloud Functions; Stripe webhook respeta la misma máquina de estados. |
 | P2 | **Refactor A6** en `AdminPredictions`, `AdminProducts`, `AdminData`. |
 | P2 | **Lighthouse/axe** accesibilidad (modo oscuro, foco). |
 | P3 | **Renombrar** carpeta padre Windows si el typo `CAZATURA` genera confusión (coordinar rutas y accesos). |

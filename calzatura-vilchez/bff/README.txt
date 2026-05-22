@@ -20,18 +20,19 @@ Rutas (igual que antes en Firebase):
   DELETE /admin/users/:uid
   ALL  /favorites
   ALL  /aiAdminProxy
-  GET  /delivery/geocode   (Nominatim; sin ORS geocoding)
+  GET  /delivery/geocode   (Nominatim)
   GET  /delivery/reverse
-  GET  /delivery/route      (OSRM; ORS si la clave lo permite)
-  GET  /delivery/distance
-  ALL  /ors/*   (proxy OpenRouteService legado; preferir /delivery/*)
+  GET  /delivery/route      (Google Directions si GOOGLE_MAPS_API_KEY; si no, ORS → OSRM)
+  GET  /delivery/distance   (misma prioridad que /delivery/route)
+  ALL  /ors/*   (proxy OpenRouteService legado; opcional)
   GET  /health
 
 Despliegue ejemplo (Render.com):
   1. Nuevo "Web Service", conectar repo, root: calzatura-vilchez/bff
   2. Build: npm install   Start: npm start
   3. Copiar variables desde env.example (valores reales desde Firebase Console, Supabase, Stripe)
-     Para checkout con ruta en mapa: ORS_API_KEY (misma clave que OpenRouteService)
+     Para checkout con ruta y tarifa de envío: GOOGLE_MAPS_API_KEY (Directions API en Google Cloud)
+     Respaldo opcional: ORS_API_KEY
   4. En Stripe Dashboard → Webhooks, apuntar a https://TU-SERVICIO.onrender.com/stripeWebhook
   5. En el build del frontend (Firebase Hosting u otro), definir:
        VITE_BACKEND_API_URL=https://TU-SERVICIO.onrender.com

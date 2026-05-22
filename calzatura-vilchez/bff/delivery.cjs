@@ -1,10 +1,11 @@
 /**
- * Geocodificación (Nominatim) y rutas/distancia (OSRM, con ORS opcional si la clave lo permite).
- * Evita 403 de Pelias cuando la clave ORS no incluye geocoding.
+ * Geocodificación (Nominatim) y rutas/distancia por carretera.
+ * Prioridad distancia/ruta: Google Directions (GOOGLE_MAPS_API_KEY) → ORS → OSRM público.
  */
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
 const OSRM_BASE = "https://router.project-osrm.org";
 const ORS_BASE = "https://api.openrouteservice.org";
+const GOOGLE_DIRECTIONS_BASE = "https://maps.googleapis.com/maps/api/directions/json";
 const DELIVERY_UA =
   "CalzaturaVilchez/1.0 (checkout; https://calzaturavilchez-ab17f.web.app)";
 
@@ -21,6 +22,102 @@ function stripEnvKey(value) {
 
 function getOrsApiKey() {
   return stripEnvKey(process.env.ORS_API_KEY) || stripEnvKey(process.env.VITE_ORS_API_KEY);
+}
+
+function getGoogleMapsApiKey() {
+  return (
+    stripEnvKey(process.env.GOOGLE_MAPS_API_KEY) ||
+    stripEnvKey(process.env.GOOGLE_DIRECTIONS_API_KEY)
+  );
+}
+
+/** Decodifica overview_polyline de Google Directions → [[lat, lng], ...] (Leaflet). */
+function decodeGooglePolyline(encoded) {
+  if (!encoded || typeof encoded !== "string") return [];
+  let index = 0;
+  const len = encoded.length;
+  let lat = 0;
+  let lng = 0;
+  const coordinates = [];
+  while (index < len) {
+    let shift = 0;
+    let result = 0;
+    let b;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
+    lat += dlat;
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = (result & 1) !== 0 ? ~(result >> 1) : result >> 1;
+    lng += dlng;
+    coordinates.push([lat / 1e5, lng / 1e5]);
+  }
+  return coordinates;
+}
+
+/**
+ * @returns {{ positions: [number, number][], distanceKm: number | null, provider: string } | null}
+ */
+async function googleDrivingRoute(storeLng, storeLat, destLng, destLat) {
+  const apiKey = getGoogleMapsApiKey();
+  if (!apiKey) return null;
+
+  const url = new URL(GOOGLE_DIRECTIONS_BASE);
+  url.searchParams.set("origin", `${storeLat},${storeLng}`);
+  url.searchParams.set("destination", `${destLat},${destLng}`);
+  url.searchParams.set("mode", "driving");
+  url.searchParams.set("region", "pe");
+  url.searchParams.set("key", apiKey);
+
+  const res = await fetch(url.toString(), { headers: { Accept: "application/json" } });
+  if (!res.ok) return null;
+
+  const data = await res.json();
+  if (data.status !== "OK" || !Array.isArray(data.routes) || data.routes.length === 0) {
+    if (data.status && data.status !== "OK") {
+      console.warn("Google Directions:", data.status, data.error_message || "");
+    }
+    return null;
+  }
+
+  const route = data.routes[0];
+  const leg = route.legs?.[0];
+  let distanceKm = null;
+  if (typeof leg?.distance?.value === "number" && Number.isFinite(leg.distance.value)) {
+    distanceKm = leg.distance.value / 1000;
+  }
+
+  const encoded = route.overview_polyline?.points;
+  let positions = decodeGooglePolyline(encoded);
+  if (positions.length < 3 && Array.isArray(leg?.steps)) {
+    positions = [];
+    for (const step of leg.steps) {
+      const stepPoints = decodeGooglePolyline(step.polyline?.points);
+      if (stepPoints.length === 0) continue;
+      if (positions.length > 0) {
+        const last = positions.at(-1);
+        const first = stepPoints[0];
+        if (last && first && last[0] === first[0] && last[1] === first[1]) {
+          positions.push(...stepPoints.slice(1));
+        } else {
+          positions.push(...stepPoints);
+        }
+      } else {
+        positions.push(...stepPoints);
+      }
+    }
+  }
+
+  return { positions, distanceKm, provider: "google" };
 }
 
 /** @type {boolean | null} */
@@ -170,6 +267,16 @@ async function orsDrivingRoute(storeLng, storeLat, destLng, destLat) {
 }
 
 async function drivingRoute(storeLng, storeLat, destLng, destLat) {
+  const google = await googleDrivingRoute(storeLng, storeLat, destLng, destLat);
+  if (google && google.positions.length >= 3) {
+    return { positions: google.positions, distanceKm: google.distanceKm };
+  }
+  if (google?.distanceKm != null && (!google.positions || google.positions.length < 3)) {
+    const osrm = await osrmDrivingRoute(storeLng, storeLat, destLng, destLat);
+    if (osrm.positions.length >= 3) {
+      return { positions: osrm.positions, distanceKm: google.distanceKm };
+    }
+  }
   if (await probeOrsRouting()) {
     const ors = await orsDrivingRoute(storeLng, storeLat, destLng, destLat);
     if (ors.positions.length >= 3) return ors;
@@ -178,6 +285,9 @@ async function drivingRoute(storeLng, storeLat, destLng, destLat) {
 }
 
 async function drivingDistanceKm(storeLng, storeLat, destLng, destLat) {
+  const google = await googleDrivingRoute(storeLng, storeLat, destLng, destLat);
+  if (google?.distanceKm != null) return google.distanceKm;
+
   if (await probeOrsRouting()) {
     const apiKey = getOrsApiKey();
     const res = await fetch(`${ORS_BASE}/v2/matrix/driving-car`, {
@@ -232,4 +342,7 @@ module.exports = {
   drivingRoute,
   drivingDistanceKm,
   stripEnvKey,
+  getGoogleMapsApiKey,
+  decodeGooglePolyline,
+  googleDrivingRoute,
 };

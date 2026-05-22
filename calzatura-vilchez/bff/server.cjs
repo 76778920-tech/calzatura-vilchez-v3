@@ -7,6 +7,7 @@ const express = require("express");
 const { createClient } = require("@supabase/supabase-js");
 const admin = require("firebase-admin");
 const { discountOrderStockRpc, applyOrderStatusStockSideEffects } = require("../functions/fnUtils");
+const { ORDER_STATUSES, assertOrderStatusTransition } = require("../functions/orderStatusPolicy");
 
 function loadAllowedOrigins() {
   const defaults = [
@@ -366,7 +367,6 @@ async function assertHrRole(supabase, uid) {
   throw Object.assign(new Error("Sin permisos para recursos humanos"), { status: 403 });
 }
 
-const ORDER_STATUSES = new Set(["pendiente", "pagado", "enviado", "entregado", "cancelado"]);
 const USER_ROLES = new Set(["cliente", "trabajador", "psicologo", "rrhh", "admin"]);
 
 function profileString(value) {
@@ -1731,6 +1731,10 @@ app.post("/updateOrderStatus", (req, res) => {
       }
 
       const order = await fetchOrderOrThrow(supabase, orderId);
+      const currentEstado = assertOrderStatusTransition(order, estado);
+      if (currentEstado === estado) {
+        return res.status(200).json({ ok: true, unchanged: true });
+      }
       if (order.metodoPago === "stripe" && estado === "pagado") {
         return res.status(409).json({
           error: "Los pedidos Stripe solo se marcan como pagados desde el webhook de pago.",
@@ -1754,7 +1758,12 @@ app.post("/updateOrderStatus", (req, res) => {
             `#${orderId.slice(-8).toUpperCase()}`,
             decodedToken.uid,
             decodedToken.email || "",
-            { source: stockFx.audit.source, metodoPago: order.metodoPago },
+            {
+              from: currentEstado,
+              to: estado,
+              source: stockFx.audit.source,
+              metodoPago: order.metodoPago,
+            },
           );
         }
       } catch (stockErr) {
@@ -1777,7 +1786,7 @@ app.post("/updateOrderStatus", (req, res) => {
         `#${orderId.slice(-8).toUpperCase()}`,
         decodedToken.uid,
         decodedToken.email || "",
-        { estado, source: "updateOrderStatus" },
+        { from: currentEstado, to: estado, source: "updateOrderStatus" },
       );
 
       return res.status(200).json({ orderId, estado });
@@ -3931,6 +3940,7 @@ app.post("/stripeWebhook", async (req, res) => {
           const order = await fetchOrderOrThrow(supabase, orderId);
 
           if (order.estado !== "pagado") {
+            const fromEstado = assertOrderStatusTransition(order, "pagado");
             let stockDescontadoEn = order.stockDescontadoEn || null;
             if (!stockDescontadoEn) {
               try {
@@ -3958,7 +3968,8 @@ app.post("/stripeWebhook", async (req, res) => {
               session.metadata?.userId ?? null,
               order.userEmail ?? null,
               {
-                estado: "pagado",
+                from: fromEstado,
+                to: "pagado",
                 source: "stripe_webhook",
                 stripeEventId: event.id,
                 stripeSessionId: session.id,

@@ -74,7 +74,7 @@ function deliveryDegradedNotice(geo: ReturnType<typeof useCheckoutGeocodingEffec
   if (!geo.mapDegraded) return "";
   if (geo.geocodeUnavailable) return geo.geocodeUnavailable;
   if (geo.orsConfigured) return "";
-  return "Falta configurar mapas: VITE_BACKEND_API_URL + ORS_API_KEY en el BFF, o VITE_ORS_API_KEY en el build.";
+  return "Falta configurar mapas: VITE_BACKEND_API_URL y GOOGLE_MAPS_API_KEY (Directions) en el BFF.";
 }
 
 export default function CheckoutPage() {
