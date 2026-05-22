@@ -162,7 +162,7 @@ El cliente puede consultar el historial de todos sus pedidos con: fecha, product
 ### 3.3 Módulo de carrito y checkout
 
 **RF-11 — Gestión del carrito**
-El sistema mantiene un carrito de compras en el estado de la aplicación React. Permite: agregar productos con talla y color seleccionados, modificar cantidades (validadas contra stock disponible), eliminar productos y vaciar el carrito. El carrito persiste en `sessionStorage` durante la pestaña/sesión del navegador (`calzatura_cart:guest` o `calzatura_cart:auth`); no usa claves por UID en almacenamiento persistente.
+El sistema mantiene un carrito de compras en el estado de la aplicación React. Permite: agregar productos con talla y color seleccionados, modificar cantidades (validadas contra stock disponible), eliminar productos y vaciar el carrito. El carrito persiste en `sessionStorage` durante la pestaña/sesión del navegador (`calzatura_cart:guest` o `calzatura_cart:auth:<hash>`); no usa claves por UID en almacenamiento persistente.
 
 *Fundamento ISO/IEC 25010:* Usabilidad — Protección contra errores del usuario (evitar agregar más unidades que el stock disponible).
 

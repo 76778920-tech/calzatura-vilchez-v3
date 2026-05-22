@@ -34,7 +34,7 @@ const CHECKOUT_PRODUCT = {
   activo: true,
 };
 
-const CART_SESSION_KEY = "calzatura_cart:auth";
+const CART_SESSION_KEY = "calzatura_cart:auth:1v0rque";
 
 const CART_ITEMS = [
   {

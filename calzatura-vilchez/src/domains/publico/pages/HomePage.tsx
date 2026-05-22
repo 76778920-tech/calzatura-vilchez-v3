@@ -217,6 +217,8 @@ type HomeSpotlightRenderArgs = {
   setSpotlightPage: Dispatch<SetStateAction<number>>;
 };
 
+const HOME_SPOTLIGHT_SKELETON_KEYS = ["spotlight-skeleton-1", "spotlight-skeleton-2", "spotlight-skeleton-3", "spotlight-skeleton-4"];
+
 function renderHomeSpotlightSection({
   loading,
   error,
@@ -229,7 +231,7 @@ function renderHomeSpotlightSection({
   if (loading) {
     return (
       <div className="products-skeleton-grid home-spotlight-grid">
-        {[...Array(4)].map((_, index) => <div key={index} className="skeleton-card" />)}
+        {HOME_SPOTLIGHT_SKELETON_KEYS.map((key) => <div key={key} className="skeleton-card" />)}
       </div>
     );
   }
@@ -250,11 +252,14 @@ function renderHomeSpotlightSection({
           className="home-spotlight-track"
           style={{ transform: `translateX(-${effectiveSpotlightPage * 100}%)` }}
         >
-          {spotlightPages.map((page, pi) => (
-            <div key={pi} className="home-spotlight-page products-grid home-spotlight-grid">
+          {spotlightPages.map((page) => {
+            const pageKey = page.map((product) => product.id).join("-");
+            return (
+            <div key={pageKey} className="home-spotlight-page products-grid home-spotlight-grid">
               {page.map((product) => <ProductCard key={product.id} product={product} />)}
             </div>
-          ))}
+            );
+          })}
         </div>
         <div className="home-spotlight-nav">
           <button
@@ -267,9 +272,9 @@ function renderHomeSpotlightSection({
             <ChevronLeft size={20} />
           </button>
           <div className="home-spotlight-dots">
-            {spotlightPages.map((_, pi) => (
+            {spotlightPages.map((page, pi) => (
               <button
-                key={pi}
+                key={`spotlight-dot-${page.map((product) => product.id).join("-")}`}
                 type="button"
                 className={`home-spotlight-dot${pi === effectiveSpotlightPage ? " is-active" : ""}`}
                 onClick={() => setSpotlightPage(pi)}

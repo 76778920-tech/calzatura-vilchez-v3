@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   buildCanonicalCatalogLocation,
@@ -54,6 +54,16 @@ import {
 import { usePopoverDockEffect } from "@/hooks/usePopoverDockEffect";
 
 const CATALOG_CAMPAIGN_ROTATION_MS = 9000;
+const PRODUCTS_GRID_SKELETON_KEYS = [
+  "product-skeleton-1",
+  "product-skeleton-2",
+  "product-skeleton-3",
+  "product-skeleton-4",
+  "product-skeleton-5",
+  "product-skeleton-6",
+  "product-skeleton-7",
+  "product-skeleton-8",
+];
 
 type FilterOption = {
   label: string;
@@ -126,6 +136,7 @@ const COLOR_SWATCH_ORDER = [
 ] as const;
 
 export default function ProductsPage() {
+  const catalogDescriptionId = useId();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -152,32 +163,32 @@ export default function ProductsPage() {
   const [pricePopoverStyle, setPricePopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
   const filterRailRef = useRef<HTMLDivElement | null>(null);
   const priceTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const pricePopoverRef = useRef<HTMLDivElement | null>(null);
+  const pricePopoverRef = useRef<HTMLDialogElement | null>(null);
   const pricePopoverFrameRef = useRef<number | null>(null);
   const [draftSelectedSizes, setDraftSelectedSizes] = useState<string[]>([]);
   const [sizePopoverStyle, setSizePopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
   const sizeTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const sizePopoverRef = useRef<HTMLDivElement | null>(null);
+  const sizePopoverRef = useRef<HTMLDialogElement | null>(null);
   const sizePopoverFrameRef = useRef<number | null>(null);
   const [draftSelectedColors, setDraftSelectedColors] = useState<string[]>([]);
   const [colorPopoverStyle, setColorPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
   const colorTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const colorPopoverRef = useRef<HTMLDivElement | null>(null);
+  const colorPopoverRef = useRef<HTMLDialogElement | null>(null);
   const colorPopoverFrameRef = useRef<number | null>(null);
   const [draftSelectedMaterials, setDraftSelectedMaterials] = useState<string[]>([]);
   const [materialPopoverStyle, setMaterialPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
   const materialTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const materialPopoverRef = useRef<HTMLDivElement | null>(null);
+  const materialPopoverRef = useRef<HTMLDialogElement | null>(null);
   const materialPopoverFrameRef = useRef<number | null>(null);
   const [draftSelectedDiscounts, setDraftSelectedDiscounts] = useState<string[]>([]);
   const [discountPopoverStyle, setDiscountPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
   const discountTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const discountPopoverRef = useRef<HTMLDivElement | null>(null);
+  const discountPopoverRef = useRef<HTMLDialogElement | null>(null);
   const discountPopoverFrameRef = useRef<number | null>(null);
   const [draftSelectedMarcas, setDraftSelectedMarcas] = useState<string[]>([]);
   const [marcaPopoverStyle, setMarcaPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
   const marcaTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const marcaPopoverRef = useRef<HTMLDivElement | null>(null);
+  const marcaPopoverRef = useRef<HTMLDialogElement | null>(null);
   const marcaPopoverFrameRef = useRef<number | null>(null);
 
   const categoria = toPublicCategorySlug(effectiveParams.get("categoria") ?? "todos");
@@ -380,11 +391,11 @@ export default function ProductsPage() {
   const availableSizes = useMemo(() => {
     const numericSizes = routeFiltered
       .flatMap((product) => getProductSizes(product))
-      .map((size) => Number(size))
+      .map(Number)
       .filter(Number.isFinite);
     return Array.from(new Set(numericSizes))
       .sort((left, right) => left - right)
-      .map((size) => String(size));
+      .map(String);
   }, [routeFiltered]);
 
   const availableMaterials = useMemo(() => {
@@ -537,7 +548,7 @@ export default function ProductsPage() {
     const routeOk = CATALOG_ROUTE_PARAM_KEYS.every(
       (key) => (effectiveParams.get(key) ?? "") === (params[key] ?? "")
     );
-    if (!Object.prototype.hasOwnProperty.call(params, "descuento")) return routeOk;
+    if (!Object.hasOwn(params, "descuento")) return routeOk;
     return routeOk && (effectiveParams.get("descuento") ?? "") === (params.descuento ?? "");
   };
 
@@ -734,8 +745,11 @@ export default function ProductsPage() {
       <section
         className="catalog-campaign-shell"
         aria-label={pageTitle}
-        aria-description={`${pageSubtitle} ${sectionLabel}. ${visibleBrandCount || 0} marcas visibles.`}
+        aria-describedby={catalogDescriptionId}
       >
+        <p id={catalogDescriptionId} className="sr-only">
+          {`${pageSubtitle} ${sectionLabel}. ${visibleBrandCount || 0} marcas visibles.`}
+        </p>
         <div
           ref={campaignTrackRef}
           className={`catalog-campaign-track ${isCampaignDragging ? "is-dragging" : ""}`}
@@ -762,19 +776,12 @@ export default function ProductsPage() {
           ))}
         </div>
 
-        <div
+        <progress
           className="catalog-campaign-progress"
-          role="progressbar"
           aria-label="Progreso de campañas"
-          aria-valuemin={1}
-          aria-valuemax={catalogCampaignSlides.length}
-          aria-valuenow={activeCampaignSlide + 1}
-          aria-valuetext={`${activeCampaignSlide + 1} de ${catalogCampaignSlides.length}`}
-        >
-          <span className="catalog-campaign-progress-track">
-            <span key={`campaign-progress-${activeCampaignSlide}`} className="catalog-campaign-progress-fill" />
-          </span>
-        </div>
+          value={activeCampaignSlide + 1}
+          max={catalogCampaignSlides.length}
+        />
       </section>
 
       {breadcrumbs.length > 1 && (
@@ -870,11 +877,11 @@ export default function ProductsPage() {
         />
 
         {activeMenu === "precio" && pricePopoverStyle && (
-          <div
+          <dialog
+            open
             id="catalog-price-popover"
             ref={pricePopoverRef}
             className="catalog-price-popover"
-            role="dialog"
             aria-label="Filtro de precio"
             style={{
               top: `${pricePopoverStyle.top}px`,
@@ -964,15 +971,15 @@ export default function ProductsPage() {
                 Mostrar resultados
               </button>
             </div>
-          </div>
+          </dialog>
         )}
 
         {activeMenu === "talla" && sizePopoverStyle && (
-          <div
+          <dialog
+            open
             id="catalog-size-popover"
             ref={sizePopoverRef}
             className="catalog-price-popover"
-            role="dialog"
             aria-label="Filtro de talla"
             style={{
               top: `${sizePopoverStyle.top}px`,
@@ -981,7 +988,8 @@ export default function ProductsPage() {
             }}
           >
             <div className="catalog-filter-menu catalog-filter-menu-price">
-              <div className="catalog-size-grid" role="group" aria-label="Tallas disponibles">
+              <fieldset className="catalog-size-grid">
+                <legend className="sr-only">Tallas disponibles</legend>
                 {availableSizes.length === 0 ? (
                   <p className="catalog-size-empty">No hay tallas disponibles para los filtros actuales.</p>
                 ) : (
@@ -1003,7 +1011,7 @@ export default function ProductsPage() {
                     );
                   })
                 )}
-              </div>
+              </fieldset>
 
               <button
                 type="button"
@@ -1016,15 +1024,15 @@ export default function ProductsPage() {
                 Mostrar resultados
               </button>
             </div>
-          </div>
+          </dialog>
         )}
 
         {activeMenu === "color" && colorPopoverStyle && (
-          <div
+          <dialog
+            open
             id="catalog-color-popover"
             ref={colorPopoverRef}
             className="catalog-price-popover"
-            role="dialog"
             aria-label="Filtro de color"
             style={{
               top: `${colorPopoverStyle.top}px`,
@@ -1033,7 +1041,8 @@ export default function ProductsPage() {
             }}
           >
             <div className="catalog-filter-menu catalog-filter-menu-price">
-              <div className="catalog-color-grid" role="group" aria-label="Colores disponibles">
+              <fieldset className="catalog-color-grid">
+                <legend className="sr-only">Colores disponibles</legend>
                 {availableColors.length === 0 ? (
                   <p className="catalog-size-empty">No hay colores disponibles para los filtros actuales.</p>
                 ) : (
@@ -1060,7 +1069,7 @@ export default function ProductsPage() {
                     );
                   })
                 )}
-              </div>
+              </fieldset>
 
               <button
                 type="button"
@@ -1073,15 +1082,15 @@ export default function ProductsPage() {
                 Mostrar resultados
               </button>
             </div>
-          </div>
+          </dialog>
         )}
 
         {activeMenu === "material" && materialPopoverStyle && (
-          <div
+          <dialog
+            open
             id="catalog-material-popover"
             ref={materialPopoverRef}
             className="catalog-price-popover"
-            role="dialog"
             aria-label="Filtro de material"
             style={{
               top: `${materialPopoverStyle.top}px`,
@@ -1090,7 +1099,8 @@ export default function ProductsPage() {
             }}
           >
             <div className="catalog-filter-menu catalog-filter-menu-price catalog-filter-menu-material">
-              <div className="catalog-material-grid" role="group" aria-label="Materiales disponibles">
+              <fieldset className="catalog-material-grid">
+                <legend className="sr-only">Materiales disponibles</legend>
                 {availableMaterials.length === 0 ? (
                   <p className="catalog-size-empty">No hay materiales disponibles para los filtros actuales.</p>
                 ) : (
@@ -1112,7 +1122,7 @@ export default function ProductsPage() {
                     );
                   })
                 )}
-              </div>
+              </fieldset>
 
               <button
                 type="button"
@@ -1125,15 +1135,15 @@ export default function ProductsPage() {
                 Mostrar resultados
               </button>
             </div>
-          </div>
+          </dialog>
         )}
 
         {activeMenu === "descuento" && discountPopoverStyle && (
-          <div
+          <dialog
+            open
             id="catalog-discount-popover"
             ref={discountPopoverRef}
             className="catalog-price-popover"
-            role="dialog"
             aria-label="Filtro de descuento"
             style={{
               top: `${discountPopoverStyle.top}px`,
@@ -1142,7 +1152,8 @@ export default function ProductsPage() {
             }}
           >
             <div className="catalog-filter-menu catalog-filter-menu-price">
-              <div className="catalog-checklist-vertical" role="group" aria-label="Descuentos disponibles">
+              <fieldset className="catalog-checklist-vertical">
+                <legend className="sr-only">Descuentos disponibles</legend>
                 {DISCOUNT_OPTIONS.map((discountOption) => {
                   const checked = draftSelectedDiscounts.includes(discountOption.value);
                   return (
@@ -1160,7 +1171,7 @@ export default function ProductsPage() {
                     </label>
                   );
                 })}
-              </div>
+              </fieldset>
 
               <button
                 type="button"
@@ -1173,15 +1184,15 @@ export default function ProductsPage() {
                 Mostrar resultados
               </button>
             </div>
-          </div>
+          </dialog>
         )}
 
         {activeMenu === "marcaSlug" && marcaPopoverStyle && (
-          <div
+          <dialog
+            open
             id="catalog-marca-popover"
             ref={marcaPopoverRef}
             className="catalog-price-popover"
-            role="dialog"
             aria-label="Filtro de marca"
             style={{
               top: `${marcaPopoverStyle.top}px`,
@@ -1190,7 +1201,8 @@ export default function ProductsPage() {
             }}
           >
             <div className="catalog-filter-menu catalog-filter-menu-price">
-              <div className="catalog-checklist-vertical" role="group" aria-label="Marcas disponibles">
+              <fieldset className="catalog-checklist-vertical">
+                <legend className="sr-only">Marcas disponibles</legend>
                 {marcas.length === 0 ? (
                   <p className="catalog-size-empty">No hay marcas disponibles.</p>
                 ) : (
@@ -1211,7 +1223,7 @@ export default function ProductsPage() {
                     );
                   })
                 )}
-              </div>
+              </fieldset>
 
               <button
                 type="button"
@@ -1224,7 +1236,7 @@ export default function ProductsPage() {
                 Mostrar resultados
               </button>
             </div>
-          </div>
+          </dialog>
         )}
 
         {activeFacets.length > 0 && (
@@ -1242,8 +1254,8 @@ export default function ProductsPage() {
       <div className="products-main">
         {loading ? (
           <div className="products-grid">
-            {[...Array(8)].map((_, index) => (
-              <div key={index} className="skeleton-card" />
+            {PRODUCTS_GRID_SKELETON_KEYS.map((key) => (
+              <div key={key} className="skeleton-card" />
             ))}
           </div>
         ) : error ? (

@@ -37,10 +37,19 @@ const CartContext = createContext<CartContextType>({
 const CART_STORAGE_KEY = "calzatura_cart";
 const CART_GUEST_SESSION_KEY = "calzatura_cart:guest";
 const CART_AUTH_SESSION_KEY = "calzatura_cart:auth";
+const CART_AUTH_SESSION_PREFIX = `${CART_AUTH_SESSION_KEY}:`;
 const ENVIO = 0;
 
+function cartSessionHash(value: string) {
+  let hash = 5381;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) + hash) ^ value.charCodeAt(index);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 function activeCartStorageKey(userUid?: string | null) {
-  return userUid ? CART_AUTH_SESSION_KEY : CART_GUEST_SESSION_KEY;
+  return userUid ? `${CART_AUTH_SESSION_PREFIX}${cartSessionHash(userUid)}` : CART_GUEST_SESSION_KEY;
 }
 
 function legacyCartStorageKey(userUid?: string | null) {
@@ -71,6 +80,7 @@ function writeSessionCart(key: string, items: CartItem[]) {
 function removeLegacyCartKeys(userUid?: string | null) {
   try {
     localStorage.removeItem(CART_STORAGE_KEY);
+    sessionStorage.removeItem(CART_AUTH_SESSION_KEY);
     if (userUid) {
       localStorage.removeItem(legacyCartStorageKey(userUid));
     }
@@ -98,7 +108,7 @@ export function CartProvider({ children }: CartProviderProps) {
       // Solo al cambiar entre dos cuentas distintas (no en login inicial null → uid).
       if (prevUid && userUid && prevUid !== userUid) {
         try {
-          sessionStorage.removeItem(CART_AUTH_SESSION_KEY);
+          sessionStorage.removeItem(activeCartStorageKey(prevUid));
         } catch {
           // ignorar
         }
@@ -116,12 +126,13 @@ export function CartProvider({ children }: CartProviderProps) {
         const legacyGuestItems = readCartFromStorage(localStorage, legacyCartStorageKey());
         const sessionGuestItems = readCartFromStorage(sessionStorage, CART_GUEST_SESSION_KEY);
         const sessionAuthItems = readCartFromStorage(sessionStorage, CART_AUTH_SESSION_KEY);
-        const guestItems =
-          sessionGuestItems.length > 0
-            ? sessionGuestItems
-            : sessionAuthItems.length > 0
-              ? sessionAuthItems
-              : legacyGuestItems;
+        let guestItems = legacyGuestItems;
+        if (sessionAuthItems.length > 0) {
+          guestItems = sessionAuthItems;
+        }
+        if (sessionGuestItems.length > 0) {
+          guestItems = sessionGuestItems;
+        }
         setItems(guestItems);
         if (guestItems.length > 0) {
           writeSessionCart(CART_GUEST_SESSION_KEY, guestItems);

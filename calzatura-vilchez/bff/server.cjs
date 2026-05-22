@@ -960,7 +960,7 @@ function effectiveTallaStock(raw) {
 function findTallaKeyInMap(stockBySize, talla) {
   if (!stockBySize || !talla) return null;
   const want = String(talla).trim();
-  if (Object.prototype.hasOwnProperty.call(stockBySize, want)) return want;
+  if (Object.hasOwn(stockBySize, want)) return want;
   for (const k of Object.keys(stockBySize)) {
     const ks = String(k).trim();
     if (ks === want) return k;

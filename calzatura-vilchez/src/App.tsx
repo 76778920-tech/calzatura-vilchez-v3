@@ -44,7 +44,6 @@ const FavoritesPage = lazy(() => import("@/domains/clientes/pages/FavoritesPage"
 const Login = lazy(() => import("@/domains/publico/pages/Login"));
 const Register = lazy(() => import("@/domains/publico/pages/Register"));
 const VerifyEmail = lazy(() => import("@/domains/publico/pages/VerifyEmail"));
-const Logo3DPage = lazy(() => import("@/domains/publico/pages/Logo3DPage"));
 const InfoPage = lazy(() => import("@/domains/publico/pages/InfoPage"));
 const ThesisIsoPage = lazy(() => import("@/domains/publico/pages/ThesisIsoPage"));
 const CyberWowLandingPage = lazy(() => import("@/domains/publico/pages/CyberWowLandingPage"));
@@ -79,7 +78,6 @@ function Storefront() {
             <Route path={PUBLIC_ROUTES.login} element={<Login />} />
             <Route path={PUBLIC_ROUTES.register} element={<Register />} />
             <Route path={PUBLIC_ROUTES.verifyEmail} element={<VerifyEmail />} />
-            <Route path="/logo-3d-preview" element={<Logo3DPage />} />
             <Route path={INFO_ROUTES.corporativoQuienesSomos} element={<InfoPage pageKey="quienesSomos" />} />
             <Route path={INFO_ROUTES.corporativoNuestraHistoria} element={<InfoPage pageKey="nuestraHistoria" />} />
             <Route path={INFO_ROUTES.corporativoMundoVilchez} element={<InfoPage pageKey="mundoVilchez" />} />

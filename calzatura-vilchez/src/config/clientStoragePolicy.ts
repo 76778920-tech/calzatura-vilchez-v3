@@ -12,7 +12,7 @@
 export const CLIENT_STORAGE = {
   theme: { key: "calzatura_theme", backend: "localStorage", sensitivity: "none" },
   cartGuest: { key: "calzatura_cart:guest", backend: "sessionStorage", sensitivity: "transient" },
-  cartUser: { key: "calzatura_cart:auth", backend: "sessionStorage", sensitivity: "transient" },
+  cartUser: { key: "calzatura_cart:auth:*", backend: "sessionStorage", sensitivity: "transient" },
   adminSidebar: { key: "adminSidebarCollapsed", backend: "localStorage", sensitivity: "none" },
   predPrefs: { key: "pred_*", backend: "localStorage", sensitivity: "none" },
   receiptFlag: { key: "receipt_downloaded_*", backend: "localStorage", sensitivity: "none" },
