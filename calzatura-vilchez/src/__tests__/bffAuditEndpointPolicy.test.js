@@ -92,6 +92,11 @@ describe("BFF /audit policy guards", () => {
     expect(deployWorkflowSource).toContain("VITE_FIREBASE_APPCHECK_SITE_KEY:");
   });
 
+  it("permite cabecera X-Firebase-AppCheck en CORS del BFF", () => {
+    expect(serverSource).toContain("X-Firebase-AppCheck");
+    expect(serverSource).toContain('"X-Calzatura-Client"');
+  });
+
   it("prioriza APIsPERU (dniruc.apisperu.com) para consulta DNI de personas naturales", () => {
     expect(lookupDniSource).toContain('name: "apisperu"');
     expect(lookupDniSource).toContain("dniruc.apisperu.com/api/v1/dni/");

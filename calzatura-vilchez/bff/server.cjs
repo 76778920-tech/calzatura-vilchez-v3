@@ -104,7 +104,10 @@ function applyCorsHeaders(req, res, next) {
       res.setHeader("Vary", "Origin");
     }
     res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,PATCH,OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Authorization, Content-Type, Idempotency-Key, X-Firebase-AppCheck, X-Calzatura-Client",
+    );
     res.setHeader("Access-Control-Max-Age", "86400");
   }
   if (req.method === "OPTIONS") {
@@ -122,7 +125,13 @@ const cors = require("cors")({
     callback(new Error("Origen no permitido"));
   },
   methods: ["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Authorization", "Content-Type", "Idempotency-Key"],
+  allowedHeaders: [
+    "Authorization",
+    "Content-Type",
+    "Idempotency-Key",
+    "X-Firebase-AppCheck",
+    "X-Calzatura-Client",
+  ],
 });
 
 const {
