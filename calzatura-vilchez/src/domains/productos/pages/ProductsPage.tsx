@@ -779,6 +779,7 @@ export default function ProductsPage() {
         <progress
           className="catalog-campaign-progress"
           aria-label="Progreso de campañas"
+          aria-valuenow={activeCampaignSlide + 1}
           value={activeCampaignSlide + 1}
           max={catalogCampaignSlides.length}
         />
