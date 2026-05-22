@@ -95,7 +95,8 @@ export function CartProvider({ children }: CartProviderProps) {
     queueMicrotask(() => {
       const prevUid = prevCartUidRef.current;
       prevCartUidRef.current = userUid;
-      if (prevUid !== undefined && prevUid !== userUid) {
+      // Solo al cambiar entre dos cuentas distintas (no en login inicial null → uid).
+      if (prevUid && userUid && prevUid !== userUid) {
         try {
           sessionStorage.removeItem(CART_AUTH_SESSION_KEY);
         } catch {

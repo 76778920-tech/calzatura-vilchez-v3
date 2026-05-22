@@ -32,8 +32,9 @@ describe("Carrito sessionStorage guards", () => {
     expect(cartContextSource).toContain("writeSessionCart(sessionKey, legacyGuestItems)");
   });
 
-  it("limpia carrito de sesion auth al cambiar de cuenta", () => {
+  it("limpia carrito de sesion auth solo al cambiar entre dos cuentas", () => {
     expect(cartContextSource).toContain("prevCartUidRef");
+    expect(cartContextSource).toMatch(/if \(prevUid && userUid && prevUid !== userUid\)/);
     expect(cartContextSource).toContain("sessionStorage.removeItem(CART_AUTH_SESSION_KEY)");
   });
 
