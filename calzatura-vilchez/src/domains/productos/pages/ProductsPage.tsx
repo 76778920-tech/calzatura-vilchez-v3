@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -248,7 +249,7 @@ export default function ProductsPage() {
 
     Promise.all([
       fetchPublicProducts(),
-      fetchProductFamilyGroupCounts().catch(() => ({} as Record<string, number>)),
+      fetchProductFamilyGroupCounts().catch((): Record<string, number> => ({})),
     ])
       .then(([nextProducts, counts]) => {
         if (!isMounted) return;
@@ -270,19 +271,24 @@ export default function ProductsPage() {
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
-      if (pricePopoverRef.current?.contains(event.target as Node)) return;
-      if (priceTriggerRef.current?.contains(event.target as Node)) return;
-      if (sizePopoverRef.current?.contains(event.target as Node)) return;
-      if (sizeTriggerRef.current?.contains(event.target as Node)) return;
-      if (colorPopoverRef.current?.contains(event.target as Node)) return;
-      if (colorTriggerRef.current?.contains(event.target as Node)) return;
-      if (materialPopoverRef.current?.contains(event.target as Node)) return;
-      if (materialTriggerRef.current?.contains(event.target as Node)) return;
-      if (discountPopoverRef.current?.contains(event.target as Node)) return;
-      if (discountTriggerRef.current?.contains(event.target as Node)) return;
-      if (marcaPopoverRef.current?.contains(event.target as Node)) return;
-      if (marcaTriggerRef.current?.contains(event.target as Node)) return;
-      if (filterRailRef.current?.contains(event.target as Node)) {
+      const target = event.target;
+      if (!(target instanceof Node)) {
+        setActiveMenu(null);
+        return;
+      }
+      if (pricePopoverRef.current?.contains(target)) return;
+      if (priceTriggerRef.current?.contains(target)) return;
+      if (sizePopoverRef.current?.contains(target)) return;
+      if (sizeTriggerRef.current?.contains(target)) return;
+      if (colorPopoverRef.current?.contains(target)) return;
+      if (colorTriggerRef.current?.contains(target)) return;
+      if (materialPopoverRef.current?.contains(target)) return;
+      if (materialTriggerRef.current?.contains(target)) return;
+      if (discountPopoverRef.current?.contains(target)) return;
+      if (discountTriggerRef.current?.contains(target)) return;
+      if (marcaPopoverRef.current?.contains(target)) return;
+      if (marcaTriggerRef.current?.contains(target)) return;
+      if (filterRailRef.current?.contains(target)) {
         setActiveMenu(null);
         return;
       }
@@ -548,8 +554,10 @@ export default function ProductsPage() {
     const routeOk = CATALOG_ROUTE_PARAM_KEYS.every(
       (key) => (effectiveParams.get(key) ?? "") === (params[key] ?? "")
     );
-    if (!Object.hasOwn(params, "descuento")) return routeOk;
-    return routeOk && (effectiveParams.get("descuento") ?? "") === (params.descuento ?? "");
+    if (Object.hasOwn(params, "descuento")) {
+      return routeOk && (effectiveParams.get("descuento") ?? "") === (params.descuento ?? "");
+    }
+    return routeOk;
   };
 
   const applySectionFilter = useCallback(
@@ -573,10 +581,10 @@ export default function ProductsPage() {
       const params = new URLSearchParams(effectiveParams);
 
       Object.entries(next).forEach(([key, value]) => {
-        if (!value) {
-          params.delete(key);
-        } else {
+        if (value) {
           params.set(key, value);
+        } else {
+          params.delete(key);
         }
       });
 
@@ -740,6 +748,61 @@ export default function ProductsPage() {
     const r = (draftPriceMax - priceBounds.min) / (priceBounds.max - priceBounds.min);
     return `calc(${((1 - r) * 100).toFixed(2)}% + ${(r * 20 - 10).toFixed(2)}px)`;
   })();
+
+  let productsMainContent: ReactNode;
+  if (loading) {
+    productsMainContent = (
+      <div className="products-grid">
+        {PRODUCTS_GRID_SKELETON_KEYS.map((key) => (
+          <div key={key} className="skeleton-card" />
+        ))}
+      </div>
+    );
+  } else if (error) {
+    productsMainContent = (
+      <div className="empty-state" role="status" aria-live="polite">
+        <AlertTriangle size={28} />
+        <p>{error} Revisa tu conexión y vuelve a intentarlo.</p>
+        <button
+          type="button"
+          onClick={() => {
+            setLoading(true);
+            setError(null);
+            setReloadToken((current) => current + 1);
+          }}
+          className="btn-primary"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  } else if (hasAnyProducts) {
+    productsMainContent = (
+      <div className="products-grid">
+        {filtered.map((product) => (
+          <ProductCard
+            key={product.id}
+            product={product}
+            familyGroupSize={familyGroupCounts[effectiveFamiliaKey(product)] ?? 1}
+          />
+        ))}
+      </div>
+    );
+  } else {
+    const emptyMessage = trimmedQuery
+      ? `No encontramos resultados para "${trimmedQuery}" con los filtros actuales.`
+      : "No encontramos productos con la combinación actual de filtros.";
+
+    productsMainContent = (
+      <div className="empty-state">
+        <p>{emptyMessage}</p>
+        <button type="button" onClick={() => navigate(CATALOG_SHELF.products)} className="btn-primary">
+          Ver todo el catálogo
+        </button>
+      </div>
+    );
+  }
+
   return (
     <main className="products-page products-page-modern">
       <section
@@ -892,10 +955,11 @@ export default function ProductsPage() {
           >
             <div className="catalog-filter-menu catalog-filter-menu-price">
               <div className="catalog-price-fields">
-                <label className="catalog-price-field">
+                <label className="catalog-price-field" aria-label="Precio mínimo">
                   <div className="catalog-price-input-shell">
                     <span className="catalog-price-input-label">Mínimo</span>
                     <input
+                      aria-label="Precio mínimo"
                       type="number"
                       min={priceBounds.min}
                       max={draftPriceMax}
@@ -910,10 +974,11 @@ export default function ProductsPage() {
                   </div>
                 </label>
 
-                <label className="catalog-price-field">
+                <label className="catalog-price-field" aria-label="Precio máximo">
                   <div className="catalog-price-input-shell">
                     <span className="catalog-price-input-label">Máximo</span>
                     <input
+                      aria-label="Precio máximo"
                       type="number"
                       min={draftPriceMin}
                       max={priceBounds.max}
@@ -1252,52 +1317,7 @@ export default function ProductsPage() {
         )}
       </section>
 
-      <div className="products-main">
-        {loading ? (
-          <div className="products-grid">
-            {PRODUCTS_GRID_SKELETON_KEYS.map((key) => (
-              <div key={key} className="skeleton-card" />
-            ))}
-          </div>
-        ) : error ? (
-          <div className="empty-state" role="status" aria-live="polite">
-            <AlertTriangle size={28} />
-            <p>{error} Revisa tu conexión y vuelve a intentarlo.</p>
-            <button
-              type="button"
-              onClick={() => {
-                setLoading(true);
-                setError(null);
-                setReloadToken((current) => current + 1);
-              }}
-              className="btn-primary"
-            >
-              Reintentar
-            </button>
-          </div>
-        ) : !hasAnyProducts ? (
-          <div className="empty-state">
-            <p>
-              {trimmedQuery
-                ? `No encontramos resultados para "${trimmedQuery}" con los filtros actuales.`
-                : "No encontramos productos con la combinación actual de filtros."}
-            </p>
-            <button type="button" onClick={() => navigate(CATALOG_SHELF.products)} className="btn-primary">
-              Ver todo el catálogo
-            </button>
-          </div>
-        ) : (
-          <div className="products-grid">
-            {filtered.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                familyGroupSize={familyGroupCounts[effectiveFamiliaKey(product)] ?? 1}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      <div className="products-main">{productsMainContent}</div>
     </main>
   );
 }

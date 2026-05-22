@@ -484,6 +484,8 @@ export default function HomePage() {
           {HOME_CATEGORY_CARDS.map((category, index) => {
             const count = categoryCounts[category.slug] ?? 0;
             const fromDir = index === 0 || index === 3 ? "left" : "right";
+            const modelsSuffix = count === 1 ? "" : "s";
+            const categoryCountText = count > 0 ? `${count} modelo${modelsSuffix}` : "Explorar";
 
             return (
               <Link
@@ -506,9 +508,7 @@ export default function HomePage() {
                   <span className="home-category-label">{category.label}</span>
                   <span className="home-category-caption">{category.caption}</span>
                   <span className="home-category-copy">{category.copy}</span>
-                  <span className="home-category-count">
-                    {count > 0 ? `${count} modelo${count === 1 ? "" : "s"}` : "Explorar"}
-                  </span>
+                  <span className="home-category-count">{categoryCountText}</span>
                 </div>
               </Link>
             );

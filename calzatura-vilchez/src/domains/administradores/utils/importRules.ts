@@ -11,8 +11,16 @@ export interface ImportContext {
   escenario: ScenarioKey;
 }
 
+function cellText(value: unknown, fallback = ""): string {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") return String(value);
+  if (value instanceof Date) return value.toISOString();
+  return fallback;
+}
+
 function normalizeImportId(value: unknown): string {
-  return String(value ?? "")
+  return cellText(value)
     .trim()
     .replace(/[\\/]/g, "-")
     .replace(/\s+/g, "-")
@@ -64,15 +72,15 @@ export function validateProducto(row: Row): string | null {
 
 export function transformProducto(row: Row, ctx: ImportContext): Row {
   return {
-    codigo: String(row.codigo ?? "").trim(),
-    nombre: String(row.nombre ?? "").trim(),
+    codigo: cellText(row.codigo).trim(),
+    nombre: cellText(row.nombre).trim(),
     precio: Number(row.precio ?? 0),
     stock: Number(row.stock ?? 0),
-    categoria: String(row.categoria ?? "").trim(),
-    descripcion: String(row.descripcion ?? "").trim(),
-    marca: String(row.marca ?? "").trim(),
-    color: String(row.color ?? "").trim(),
-    destacado: String(row.destacado).toLowerCase() === "true",
+    categoria: cellText(row.categoria).trim(),
+    descripcion: cellText(row.descripcion).trim(),
+    marca: cellText(row.marca).trim(),
+    color: cellText(row.color).trim(),
+    destacado: cellText(row.destacado).toLowerCase() === "true",
     imagen: "",
     imagenes: [],
     esDePrueba: true,
@@ -85,7 +93,7 @@ export function transformProducto(row: Row, ctx: ImportContext): Row {
 // ── Fabricantes ───────────────────────────────────────────────────────────────
 
 export function validateFabricante(row: Row): string | null {
-  const dni = String(row.dni ?? "").replace(/\D/g, "");
+  const dni = cellText(row.dni).replace(/\D/g, "");
   if (dni.length !== 8) return "El DNI debe tener exactamente 8 dígitos";
   if (!row.nombres) return "Falta el campo 'nombres'";
   if (!row.apellidos) return "Falta el campo 'apellidos'";
@@ -95,12 +103,12 @@ export function validateFabricante(row: Row): string | null {
 
 export function transformFabricante(row: Row, ctx: ImportContext): Row {
   return {
-    dni: String(row.dni ?? "").trim(),
-    nombres: String(row.nombres ?? "").trim(),
-    apellidos: String(row.apellidos ?? "").trim(),
-    marca: String(row.marca ?? "").trim(),
-    telefono: String(row.telefono ?? "").trim(),
-    observaciones: String(row.observaciones ?? "").trim(),
+    dni: cellText(row.dni).trim(),
+    nombres: cellText(row.nombres).trim(),
+    apellidos: cellText(row.apellidos).trim(),
+    marca: cellText(row.marca).trim(),
+    telefono: cellText(row.telefono).trim(),
+    observaciones: cellText(row.observaciones).trim(),
     activo: true,
     creadoEn: ctx.importadoEn,
     actualizadoEn: ctx.importadoEn,
@@ -127,20 +135,20 @@ export function validateVentaDiaria(row: Row): string | null {
 
 export function transformVentaDiaria(row: Row, ctx: ImportContext): Row {
   return {
-    productId: String(row.productId ?? "").trim(),
-    codigo: String(row.codigo ?? "").trim(),
-    nombre: String(row.nombre ?? "").trim(),
-    color: String(row.color ?? "").trim(),
-    talla: String(row.talla ?? "").trim(),
-    fecha: String(row.fecha ?? "").trim(),
+    productId: cellText(row.productId).trim(),
+    codigo: cellText(row.codigo).trim(),
+    nombre: cellText(row.nombre).trim(),
+    color: cellText(row.color).trim(),
+    talla: cellText(row.talla).trim(),
+    fecha: cellText(row.fecha).trim(),
     cantidad: Number(row.cantidad ?? 0),
     precioVenta: Number(row.precioVenta ?? 0),
     total: Number(row.total ?? 0),
     costoUnitario: Number(row.costoUnitario ?? 0),
     costoTotal: Number(row.costoTotal ?? 0),
     ganancia: Number(row.ganancia ?? 0),
-    documentoTipo: String(row.documentoTipo ?? "ninguno").trim(),
-    documentoNumero: String(row.documentoNumero ?? "").trim(),
+    documentoTipo: cellText(row.documentoTipo, "ninguno").trim(),
+    documentoNumero: cellText(row.documentoNumero).trim(),
     devuelto: false,
     creadoEn: ctx.importadoEn,
     esDePrueba: true,

@@ -37,6 +37,17 @@ def _class_filename(cls: ET.Element) -> str | None:
     return _normalize_filename(fn) if fn else None
 
 
+def _normalize_or_remove_class(classes_el: ET.Element, cls: ET.Element) -> bool:
+    norm = _class_filename(cls)
+    if norm is None:
+        return False
+    if norm in _OMIT:
+        classes_el.remove(cls)
+        return True
+    cls.set("filename", norm)
+    return False
+
+
 def _strip_package(package: ET.Element) -> int:
     classes_el = package.find("classes")
     if classes_el is None:
@@ -44,14 +55,8 @@ def _strip_package(package: ET.Element) -> int:
 
     removed = 0
     for cls in classes_el.findall("class"):
-        norm = _class_filename(cls)
-        if norm is None:
-            continue
-        if norm in _OMIT:
-            classes_el.remove(cls)
+        if _normalize_or_remove_class(classes_el, cls):
             removed += 1
-            continue
-        cls.set("filename", norm)
     return removed
 
 
