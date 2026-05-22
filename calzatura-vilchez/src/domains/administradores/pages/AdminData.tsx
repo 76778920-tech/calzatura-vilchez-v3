@@ -102,9 +102,10 @@ function scenarioLabel(key: string | null | undefined) {
 function cellString(value: unknown): string {
   if (value == null) return "";
   if (typeof value === "string") return value;
-  const t = typeof value;
-  if (t === "number" || t === "boolean" || t === "bigint") return String(value);
-  if (t !== "object") return "";
+  if (typeof value === "number") return Number.isFinite(value) ? `${value}` : "";
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (typeof value === "bigint") return `${value}`;
+  if (typeof value !== "object") return "";
   if (value instanceof Date) return value.toISOString();
   const maybeTs = value as { toDate?: () => Date };
   if (typeof maybeTs.toDate === "function") {
@@ -118,7 +119,7 @@ function cellString(value: unknown): string {
 }
 
 function normalizeImportId(value: unknown): string {
-  return String(value ?? "")
+  return cellString(value)
     .trim()
     .replace(/[\\/]/g, "-")
     .replace(/\s+/g, "-")
@@ -136,7 +137,7 @@ function deriveProductImportId(row: Row): string | null {
 
 function parseBooleanCell(value: unknown): boolean {
   if (typeof value === "boolean") return value;
-  const normalized = String(value ?? "").trim().toLowerCase();
+  const normalized = cellString(value).trim().toLowerCase();
   return ["true", "1", "si", "sí", "yes"].includes(normalized);
 }
 
@@ -144,7 +145,7 @@ function parseJsonCell<T>(value: unknown, fallback: T): T {
   if (value === undefined || value === null || value === "") return fallback;
   if (typeof value === "object") return value as T;
   try {
-    return JSON.parse(String(value)) as T;
+    return JSON.parse(cellString(value)) as T;
   } catch {
     return fallback;
   }
@@ -153,9 +154,9 @@ function parseJsonCell<T>(value: unknown, fallback: T): T {
 function parseStringArrayCell(value: unknown): string[] {
   const parsed = parseJsonCell<unknown>(value, []);
   if (Array.isArray(parsed)) {
-    return parsed.map((item) => String(item ?? "").trim()).filter(Boolean);
+    return parsed.map((item) => cellString(item).trim()).filter(Boolean);
   }
-  return String(value ?? "")
+  return cellString(value)
     .split(",")
     .map((item) => item.trim())
     .filter(Boolean);
@@ -165,7 +166,7 @@ function parseNumberMapCell(value: unknown): Record<string, number> {
   const parsed = parseJsonCell<Record<string, unknown>>(value, {});
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
   return Object.fromEntries(
-    Object.entries(parsed).map(([key, amount]) => [String(key).trim(), Number(amount ?? 0)])
+    Object.entries(parsed).map(([key, amount]) => [cellString(key).trim(), Number(cellString(amount) || 0)])
   );
 }
 
@@ -194,7 +195,7 @@ const COLLECTIONS: CollectionConfig[] = [
       id: "PRUEBA_CV001",
       codigo: "CV-001",
       nombre: "Zapatilla Deportiva",
-      precio: 89.90,
+      precio: 89.9,
       stock: 10,
       categoria: "Deportivo",
       tipoCalzado: "Zapatillas",
@@ -226,15 +227,15 @@ const COLLECTIONS: CollectionConfig[] = [
       };
     },
     importTransform: (row, context) => ({
-      nombre: String(row.nombre ?? "").trim(),
+      nombre: cellString(row.nombre).trim(),
       precio: Number(row.precio ?? 0),
       stock: Number(row.stock ?? 0),
-      categoria: String(row.categoria ?? "").trim(),
-      tipoCalzado: String(row.tipoCalzado ?? "").trim(),
-      descripcion: String(row.descripcion ?? "").trim(),
-      marca: String(row.marca ?? "").trim(),
-      color: String(row.color ?? "").trim(),
-      familiaId: String(row.familiaId ?? "").trim() || undefined,
+      categoria: cellString(row.categoria).trim(),
+      tipoCalzado: cellString(row.tipoCalzado).trim(),
+      descripcion: cellString(row.descripcion).trim(),
+      marca: cellString(row.marca).trim(),
+      color: cellString(row.color).trim(),
+      familiaId: cellString(row.familiaId).trim() || undefined,
       tallas: parseStringArrayCell(row.tallas),
       tallaStock: parseNumberMapCell(row.tallaStock),
       destacado: parseBooleanCell(row.destacado),
@@ -286,7 +287,7 @@ const COLLECTIONS: CollectionConfig[] = [
       actualizadoEn: cellString(d.actualizadoEn),
     }),
     importTransform: (row, context) => ({
-      productId: String(row.productId ?? "").trim(),
+      productId: cellString(row.productId).trim(),
       costoCompra: Number(row.costoCompra ?? 0),
       margenMinimo: Number(row.margenMinimo ?? 0),
       margenObjetivo: Number(row.margenObjetivo ?? 0),
@@ -339,12 +340,12 @@ const COLLECTIONS: CollectionConfig[] = [
       escenario: cellString(d.escenario),
     }),
     importTransform: (row, context) => ({
-      dni: String(row.dni ?? "").trim(),
-      nombres: String(row.nombres ?? "").trim(),
-      apellidos: String(row.apellidos ?? "").trim(),
-      marca: String(row.marca ?? "").trim(),
-      telefono: String(row.telefono ?? "").trim(),
-      observaciones: String(row.observaciones ?? "").trim(),
+      dni: cellString(row.dni).trim(),
+      nombres: cellString(row.nombres).trim(),
+      apellidos: cellString(row.apellidos).trim(),
+      marca: cellString(row.marca).trim(),
+      telefono: cellString(row.telefono).trim(),
+      observaciones: cellString(row.observaciones).trim(),
       activo: true,
       creadoEn: context.importadoEn,
       actualizadoEn: context.importadoEn,
@@ -354,7 +355,7 @@ const COLLECTIONS: CollectionConfig[] = [
       escenario: context.escenario,
     }),
     importValidate: (row) => {
-      const dni = String(row.dni ?? "").replace(/\D/g, "");
+      const dni = cellString(row.dni).replace(/\D/g, "");
       if (dni.length !== 8) return "El DNI debe tener exactamente 8 dígitos";
       if (!row.nombres) return "Falta el campo 'nombres'";
       if (!row.apellidos) return "Falta el campo 'apellidos'";
@@ -381,11 +382,11 @@ const COLLECTIONS: CollectionConfig[] = [
       talla: "40",
       fecha: "2026-04-20",
       cantidad: 2,
-      precioVenta: 89.90,
-      total: 179.80,
+      precioVenta: 89.9,
+      total: 179.8,
       costoUnitario: 60,
       costoTotal: 120,
-      ganancia: 59.80,
+      ganancia: 59.8,
       documentoTipo: "ninguno",
       documentoNumero: "",
     },
@@ -409,20 +410,20 @@ const COLLECTIONS: CollectionConfig[] = [
       creadoEn: cellString(d.creadoEn),
     }),
     importTransform: (row, context) => ({
-      productId: String(row.productId ?? "").trim(),
-      codigo: String(row.codigo ?? "").trim(),
-      nombre: String(row.nombre ?? "").trim(),
-      color: String(row.color ?? "").trim(),
-      talla: String(row.talla ?? "").trim(),
-      fecha: String(row.fecha ?? "").trim(),
+      productId: cellString(row.productId).trim(),
+      codigo: cellString(row.codigo).trim(),
+      nombre: cellString(row.nombre).trim(),
+      color: cellString(row.color).trim(),
+      talla: cellString(row.talla).trim(),
+      fecha: cellString(row.fecha).trim(),
       cantidad: Number(row.cantidad ?? 0),
       precioVenta: Number(row.precioVenta ?? 0),
       total: Number(row.total ?? 0),
       costoUnitario: Number(row.costoUnitario ?? 0),
       costoTotal: Number(row.costoTotal ?? 0),
       ganancia: Number(row.ganancia ?? 0),
-      documentoTipo: String(row.documentoTipo ?? "ninguno").trim(),
-      documentoNumero: String(row.documentoNumero ?? "").trim(),
+      documentoTipo: (cellString(row.documentoTipo) || "ninguno").trim(),
+      documentoNumero: cellString(row.documentoNumero).trim(),
       devuelto: false,
       creadoEn: context.importadoEn,
       esDePrueba: true,
@@ -514,7 +515,7 @@ async function importRows(
   rows.forEach((row, i) => {
     const err = config.importValidate(row);
     const isVentas = config.id === "ventasDiarias";
-    const productId = isVentas ? String(row.productId ?? "").trim() : "";
+    const productId = isVentas ? cellString(row.productId).trim() : "";
     const productMissingInCatalog = isVentas && productId.length > 0 && !(validProductIds?.has(productId) ?? false);
 
     if (err) {
@@ -538,7 +539,7 @@ async function importRows(
         ? chunk
             .filter(({ source }) => cellString(source.codigo).trim())
             .map(({ data, docId, source }) => ({
-              productoId: String(docId ?? (data as Record<string, unknown>).id ?? ""),
+              productoId: cellString(docId ?? data.id).trim(),
               codigo: cellString(source.codigo).trim(),
             }))
             .filter((row) => row.productoId && row.codigo)
@@ -546,7 +547,7 @@ async function importRows(
 
     await adminDataImport({
       collection: config.id as AdminDataCollection,
-      rows: rowsToInsert as Record<string, unknown>[],
+      rows: rowsToInsert,
       onConflict: config.upsertOnConflict,
       productCodes,
     });
@@ -556,8 +557,7 @@ async function importRows(
 }
 
 async function fetchTestDocs() {
-  const docs = await adminDataListTestDocs();
-  return docs.map(({ colId, data }) => ({ colId, data: data as Row }));
+  return adminDataListTestDocs();
 }
 
 async function listTestBatches(): Promise<TestBatchSummary[]> {
@@ -617,14 +617,14 @@ async function deleteSalesUpToDate(dateStr: string): Promise<number> {
 // ── Escenarios de prueba (≈ 500 filas c/u) ───────────────────────────────────
 
 const BASE_PRODUCTS = [
-  { id: "PRUEBA_CV001", nombre: "Zapatilla Running Pro",  precio: 119.90, costo: 75,   cat: "Deportivo", marca: "Adidas",     color: "Azul",   talla: "40", baseProb: 0.65, minQ: 1, maxQ: 3 },
-  { id: "PRUEBA_CV002", nombre: "Bota de Cuero Casual",   precio: 159.90, costo: 95,   cat: "Casual",    marca: "Clarks",     color: "Marron", talla: "42", baseProb: 0.50, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV003", nombre: "Sandalia Verano",        precio:  49.90, costo: 28,   cat: "Casual",    marca: "Crocs",      color: "Beige",  talla: "38", baseProb: 0.45, minQ: 1, maxQ: 4 },
-  { id: "PRUEBA_CV004", nombre: "Mocasin Ejecutivo",      precio: 129.90, costo: 80,   cat: "Formal",    marca: "Bata",       color: "Negro",  talla: "41", baseProb: 0.55, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV005", nombre: "Zapatilla Escolar",      precio:  79.90, costo: 50,   cat: "Escolar",   marca: "Kolosh",     color: "Blanco", talla: "36", baseProb: 0.60, minQ: 1, maxQ: 3 },
-  { id: "PRUEBA_CV006", nombre: "Bota Urbana Negra",      precio: 189.90, costo: 120,  cat: "Urbano",    marca: "Timberland", color: "Negro",  talla: "43", baseProb: 0.40, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV007", nombre: "Zapato Formal Clasico",  precio: 149.90, costo: 90,   cat: "Formal",    marca: "Bata",       color: "Cafe",   talla: "40", baseProb: 0.45, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV008", nombre: "Chancleta Playera",      precio:  29.90, costo: 15,   cat: "Playa",     marca: "Rider",      color: "Verde",  talla: "39", baseProb: 0.55, minQ: 1, maxQ: 5 },
+  { id: "PRUEBA_CV001", nombre: "Zapatilla Running Pro",  precio: 119.9, costo: 75,   cat: "Deportivo", marca: "Adidas",     color: "Azul",   talla: "40", baseProb: 0.65, minQ: 1, maxQ: 3 },
+  { id: "PRUEBA_CV002", nombre: "Bota de Cuero Casual",   precio: 159.9, costo: 95,   cat: "Casual",    marca: "Clarks",     color: "Marron", talla: "42", baseProb: 0.5,  minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV003", nombre: "Sandalia Verano",        precio:  49.9, costo: 28,   cat: "Casual",    marca: "Crocs",      color: "Beige",  talla: "38", baseProb: 0.45, minQ: 1, maxQ: 4 },
+  { id: "PRUEBA_CV004", nombre: "Mocasin Ejecutivo",      precio: 129.9, costo: 80,   cat: "Formal",    marca: "Bata",       color: "Negro",  talla: "41", baseProb: 0.55, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV005", nombre: "Zapatilla Escolar",      precio:  79.9, costo: 50,   cat: "Escolar",   marca: "Kolosh",     color: "Blanco", talla: "36", baseProb: 0.6,  minQ: 1, maxQ: 3 },
+  { id: "PRUEBA_CV006", nombre: "Bota Urbana Negra",      precio: 189.9, costo: 120,  cat: "Urbano",    marca: "Timberland", color: "Negro",  talla: "43", baseProb: 0.4,  minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV007", nombre: "Zapato Formal Clasico",  precio: 149.9, costo: 90,   cat: "Formal",    marca: "Bata",       color: "Cafe",   talla: "40", baseProb: 0.45, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV008", nombre: "Chancleta Playera",      precio:  29.9, costo: 15,   cat: "Playa",     marca: "Rider",      color: "Verde",  talla: "39", baseProb: 0.55, minQ: 1, maxQ: 5 },
 ] as const;
 
 interface ScenarioCfg {
