@@ -66,6 +66,11 @@ const PRODUCTS_GRID_SKELETON_KEYS = [
   "product-skeleton-8",
 ];
 
+function productCountLabel(count: number): string {
+  const suffix = count === 1 ? "" : "s";
+  return `${count} producto${suffix}`;
+}
+
 type FilterOption = {
   label: string;
   value: string;
@@ -461,17 +466,17 @@ export default function ProductsPage() {
   );
 
   const pageSubtitle = useMemo(() => {
-    const visibleCount = `${filtered.length} producto${filtered.length !== 1 ? "s" : ""}`;
+    const visibleCount = productCountLabel(filtered.length);
 
     if (campana || promocion || coleccion) {
       return `${visibleCount} visibles dentro de la selección activa. Explora por filtros rápidos sin perder la línea visual de la colección.`;
     }
 
-    if (categoria !== "todos") {
-      return `${visibleCount} listos para explorar dentro de ${categoryLabel(categoria).toLowerCase()}. Usa los menús horizontales para afinar color, talla, material o promociones.`;
+    if (categoria === "todos") {
+      return `${visibleCount} listos para comparar con una navegación más limpia, directa y coherente con la marca.`;
     }
 
-    return `${visibleCount} listos para comparar con una navegación más limpia, directa y coherente con la marca.`;
+    return `${visibleCount} listos para explorar dentro de ${categoryLabel(categoria).toLowerCase()}. Usa los menús horizontales para afinar color, talla, material o promociones.`;
   }, [campana, categoria, coleccion, filtered.length, promocion]);
 
   const catalogCampaignSlides = useMemo(

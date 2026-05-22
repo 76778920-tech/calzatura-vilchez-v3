@@ -34,18 +34,17 @@ def _set_repo_source(root: ET.Element) -> None:
 
 def _class_filename(cls: ET.Element) -> str | None:
     fn = cls.get("filename")
-    return _normalize_filename(fn) if fn else None
+    if fn is None:
+        return None
+    return _normalize_filename(fn)
 
 
-def _normalize_or_remove_class(classes_el: ET.Element, cls: ET.Element) -> bool:
+def _normalize_class_filename(cls: ET.Element) -> str | None:
     norm = _class_filename(cls)
     if norm is None:
-        return False
-    if norm in _OMIT:
-        classes_el.remove(cls)
-        return True
+        return None
     cls.set("filename", norm)
-    return False
+    return norm
 
 
 def _strip_package(package: ET.Element) -> int:
@@ -53,18 +52,19 @@ def _strip_package(package: ET.Element) -> int:
     if classes_el is None:
         return 0
 
-    removed = 0
+    omitted_classes = []
     for cls in classes_el.findall("class"):
-        if _normalize_or_remove_class(classes_el, cls):
-            removed += 1
-    return removed
+        if _normalize_class_filename(cls) in _OMIT:
+            omitted_classes.append(cls)
+
+    for cls in omitted_classes:
+        classes_el.remove(cls)
+
+    return len(omitted_classes)
 
 
 def _strip_excluded(root: ET.Element) -> int:
-    removed = 0
-    for package in root.iter("package"):
-        removed += _strip_package(package)
-    return removed
+    return sum(_strip_package(package) for package in root.iter("package"))
 
 
 def main() -> None:
