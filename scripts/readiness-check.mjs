@@ -89,6 +89,8 @@ function normalizeUrl(base, suffix) {
 }
 
 function defaultTargets() {
+  const bffMaxMs = Number(process.env.READINESS_BFF_MAX_MS || 5000);
+  const aiMaxMs = Number(process.env.READINESS_AI_MAX_MS || 5000);
   const bff = normalizeUrl(
     process.env.BFF_BASE_URL || process.env.BFF_URL || process.env.VITE_BACKEND_API_URL || "http://127.0.0.1:8787",
     "/health",
@@ -98,8 +100,8 @@ function defaultTargets() {
     "/api/health",
   );
   return [
-    { name: "bff", url: bff, expectedStatus: [200], maxMs: 2000 },
-    { name: "ai-service", url: ai, expectedStatus: [200], maxMs: 3000 },
+    { name: "bff", url: bff, expectedStatus: [200], maxMs: bffMaxMs },
+    { name: "ai-service", url: ai, expectedStatus: [200], maxMs: aiMaxMs },
   ];
 }
 

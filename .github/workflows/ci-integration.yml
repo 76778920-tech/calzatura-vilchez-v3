@@ -186,6 +186,8 @@ jobs:
         env:
           BFF_BASE_URL: ${{ secrets.VITE_BACKEND_API_URL }}
           AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
+          READINESS_BFF_MAX_MS: 5000
+          READINESS_AI_MAX_MS: 5000
         run: |
           node scripts/readiness-check.mjs \
             --require-env BFF_BASE_URL \
