@@ -2,8 +2,8 @@ import { useEffect, useRef } from "react";
 import { supabase } from "@/supabase/client";
 
 /**
- * Suscribe al canal Realtime de Supabase para productos y sus metadatos
- * administrativos (`productos`, `productoCodigos`, `productoFinanzas`).
+ * Suscribe al canal Realtime de Supabase solo para `productos` (catálogo público).
+ * Metadatos admin (`productoCodigos`, `productoFinanzas`) no deben exponerse al cliente anon.
  */
 export function useProductsRealtime(onProductChange: () => void): void {
   const callbackRef = useRef(onProductChange);
@@ -26,8 +26,6 @@ export function useProductsRealtime(onProductChange: () => void): void {
     const channel = supabase
       .channel(`productos-rt-${Date.now()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "productos" }, handleChange)
-      .on("postgres_changes", { event: "*", schema: "public", table: "productoCodigos" }, handleChange)
-      .on("postgres_changes", { event: "*", schema: "public", table: "productoFinanzas" }, handleChange)
       .subscribe();
 
     return () => {

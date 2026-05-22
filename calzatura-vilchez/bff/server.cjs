@@ -140,7 +140,7 @@ const {
   idempotencyOrderJson,
 } = require("../functions/fnUtils");
 const { handleLookupDni, verifyDniLookupProof } = require("./lookupDni.cjs");
-const { redactOrderForStaff } = require("./privacy.cjs");
+const { redactOrderForStaff, maskEmail } = require("./privacy.cjs");
 const { buildCloudinaryUploadSignature } = require("./cloudinarySign.cjs");
 
 function loadFirebaseServiceAccount() {
@@ -288,6 +288,25 @@ const ADMIN_DATA_IMPORT_COLLECTIONS = new Set([
 ]);
 const ADMIN_DATA_MAX_IMPORT_ROWS = 5000;
 
+/** Columnas permitidas en export admin (sin PII cruda; redacción adicional en redactAdminExportRow). */
+const ADMIN_DATA_EXPORT_COLUMNS = {
+  productos:
+    "id,nombre,precio,stock,categoria,tipoCalzado,descripcion,marca,color,familiaId,tallas,tallaStock,destacado,esDePrueba,importadoEn,loteImportacion,escenario",
+  productoFinanzas:
+    "productId,costoCompra,margenMinimo,margenObjetivo,margenMaximo,precioMinimo,precioSugerido,precioMaximo,actualizadoEn,esDePrueba,importadoEn,loteImportacion,escenario",
+  fabricantes:
+    "id,dni,nombres,apellidos,marca,telefono,activo,observaciones,creadoEn,actualizadoEn,esDePrueba,importadoEn,loteImportacion,escenario",
+  ventasDiarias:
+    "id,productId,codigo,nombre,color,talla,fecha,cantidad,precioVenta,total,costoUnitario,costoTotal,ganancia,documentoTipo,documentoNumero,devuelto,creadoEn,esDePrueba,importadoEn,loteImportacion,escenario",
+  pedidos:
+    "id,userId,userEmail,total,subtotal,envio,estado,metodoPago,notas,creadoEn",
+  usuarios: "uid,nombres,apellidos,nombre,email,rol,creadoEn,telefono",
+};
+
+function adminDataExportSelect(collection) {
+  return ADMIN_DATA_EXPORT_COLUMNS[collection] || "";
+}
+
 function assertAdminDataCollection(collection, { importable = false } = {}) {
   const allowed = importable ? ADMIN_DATA_IMPORT_COLLECTIONS : ADMIN_DATA_EXPORT_COLLECTIONS;
   if (!allowed.has(collection)) {
@@ -362,6 +381,37 @@ function normalizeDniValue(value) {
 function maskDniValue(value) {
   const dni = normalizeDniValue(value);
   return dni ? `****${dni.slice(-4)}` : "";
+}
+
+function profileRowForClientRead(row) {
+  if (!row || typeof row !== "object") return null;
+  const profile = { ...row };
+  if (profile.dni != null) {
+    profile.dni = maskDniValue(profile.dni);
+  }
+  delete profile.dni_hash;
+  return profile;
+}
+
+function redactAdminExportRow(collection, row) {
+  if (!row || typeof row !== "object") return row;
+  const out = { ...row };
+  if (collection === "pedidos" && out.userEmail != null) {
+    out.userEmail = maskEmail(out.userEmail);
+  }
+  if (collection === "fabricantes" && out.dni != null) {
+    out.dni = maskDniValue(out.dni);
+  }
+  if (collection === "usuarios") {
+    delete out.dni;
+    delete out.dni_hash;
+    delete out.direcciones;
+  }
+  return out;
+}
+
+function redactAdminExportRows(collection, rows) {
+  return (rows ?? []).map((row) => redactAdminExportRow(collection, row));
 }
 
 function hashDniValue(value) {
@@ -528,6 +578,15 @@ function sanitizeAuditEntityLabel(entidad, entidadId, entidadNombre) {
     return safeAuditEntityRef(entity, entidadId);
   }
   return sanitizeAuditLabel(entidadNombre);
+}
+
+function sanitizeAuditEntryForResponse(entry) {
+  if (!entry || typeof entry !== "object") return entry;
+  return {
+    ...entry,
+    entidadNombre: sanitizeAuditEntityLabel(entry.entidad, entry.entidadId, entry.entidadNombre),
+    detalle: entry.detalle == null ? null : sanitizeAuditValue(entry.detalle),
+  };
 }
 
 async function resolveClientAuditEntityLabel(supabase, entidad, entidadId, entidadNombre) {
@@ -742,6 +801,26 @@ function isLoginRateLimited(ip) {
   return false;
 }
 
+function isOrsRateLimited(ip) {
+  const now = Date.now();
+  let row = orsRateByIp.get(ip);
+  if (!row || now > row.resetAt) {
+    row = { count: 0, resetAt: now + ORS_RATE_WINDOW_MS };
+  }
+  if (row.count >= ORS_RATE_MAX) {
+    orsRateByIp.set(ip, row);
+    return true;
+  }
+  row.count += 1;
+  orsRateByIp.set(ip, row);
+  if (orsRateByIp.size > 5000) {
+    for (const [k, v] of orsRateByIp) {
+      if (now > v.resetAt) orsRateByIp.delete(k);
+    }
+  }
+  return false;
+}
+
 const LOGIN_EMAIL_RE =
   /^[A-Za-z0-9_+~-]+(?:\.[A-Za-z0-9_+~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,}$/;
 
@@ -793,7 +872,23 @@ function normalizeAddress(address) {
     throw Object.assign(new Error("Telefono invalido"), { status: 400 });
   }
 
+  const lat = address.lat != null ? Number(address.lat) : NaN;
+  const lng = address.lng != null ? Number(address.lng) : NaN;
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    normalized.lat = lat;
+    normalized.lng = lng;
+  }
+
   return normalized;
+}
+
+function assertProductCanBeOrdered(product) {
+  if (!product || product.activo !== true) {
+    throw Object.assign(new Error("Producto no disponible"), { status: 400 });
+  }
+  if (product.esDePrueba === true) {
+    throw Object.assign(new Error("Producto no disponible"), { status: 400 });
+  }
 }
 
 function sumSizeStock(tallaStock) {
@@ -1063,7 +1158,11 @@ function extractProductName(item) {
 }
 
 async function fetchProductsByIds(supabase, ids) {
-  const { data, error } = await supabase.from("productos").select("*").in("id", ids);
+  const { data, error } = await supabase
+    .from("productos")
+    .select("*")
+    .in("id", ids)
+    .eq("activo", true);
   if (error) {
     throw Object.assign(new Error("No se pudo consultar productos"), { status: 500 });
   }
@@ -1157,8 +1256,11 @@ function clientProductIsOrderable(product, item) {
 async function resolveOrderProduct(supabase, productMap, item) {
   let product = productMap.get(item.productId);
   if (product) {
+    assertProductCanBeOrdered(product);
     product = await findProductVariantByColor(supabase, product, item.color);
+    assertProductCanBeOrdered(product);
     product = await findOrderableProductVariant(supabase, product, item);
+    assertProductCanBeOrdered(product);
     if (clientProductIsOrderable(product, item)) {
       return product;
     }
@@ -1214,6 +1316,7 @@ async function assertOrderStockAvailability(supabase, items) {
     }
 
     const product = await fetchProductOrThrow(supabase, productId);
+    assertProductCanBeOrdered(product);
     const price = toFinitePrice(product.precio);
     const totalStock = deriveTotalStock(product);
     const sizeStock = getSizeStock(product, talla || undefined, color || undefined);
@@ -1367,6 +1470,7 @@ app.post("/lookup-dni", (req, res) => {
 
 const ORS_API_BASE = "https://api.openrouteservice.org";
 const deliveryProviders = require("./delivery.cjs");
+const deliveryPricing = require("./deliveryPricing.cjs");
 
 function getOrsApiKey() {
   return (
@@ -1449,6 +1553,11 @@ app.get("/delivery/distance", cors, async (req, res) => {
 
 /** Proxy ORS: la clave queda en el servidor (Render), no en el navegador. */
 app.use("/ors", cors, async (req, res) => {
+  const ip = getClientIp(req);
+  if (isOrsRateLimited(ip)) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Intenta nuevamente." });
+  }
+
   const apiKey = getOrsApiKey();
   if (!apiKey) {
     return res.status(503).json({ error: "ORS_API_KEY no configurada en el BFF" });
@@ -1511,9 +1620,25 @@ app.post("/createOrder", (req, res) => {
         }
 
         const draft = await buildOrderDraft(supabase, items);
-        let envio = draft.envio;
+        let envio = 0;
+        const destLat = normalizedAddress.lat;
+        const destLng = normalizedAddress.lng;
+        if (Number.isFinite(destLat) && Number.isFinite(destLng)) {
+          const quote = await deliveryPricing.computeDeliveryFeeFromCoords(destLat, destLng);
+          if (quote.isOutOfRange) {
+            throw Object.assign(new Error("Direccion fuera del area de reparto"), { status: 400 });
+          }
+          envio = quote.cost;
+        }
+        envio = Math.min(Math.round(envio * 100) / 100, DELIVERY_MAX_ENVIO_S);
         if (typeof rawEnvio === "number" && Number.isFinite(rawEnvio) && rawEnvio >= 0) {
-          envio = Math.min(Math.round(rawEnvio * 100) / 100, DELIVERY_MAX_ENVIO_S);
+          const clientEnvio = Math.min(Math.round(rawEnvio * 100) / 100, DELIVERY_MAX_ENVIO_S);
+          if (clientEnvio > 0 && (!Number.isFinite(destLat) || !Number.isFinite(destLng))) {
+            throw Object.assign(new Error("Coordenadas de entrega requeridas para calcular envio"), { status: 400 });
+          }
+          if (Math.abs(clientEnvio - envio) > 0.05) {
+            throw Object.assign(new Error("El costo de envio no coincide con la direccion"), { status: 409 });
+          }
         }
         const total = draft.subtotal + envio;
         const creadoEn = new Date().toISOString();
@@ -3980,8 +4105,10 @@ app.get("/admin/data/export", (req, res) => {
       await assertAdminRole(supabase, decodedToken.uid);
       const collection = String(req.query.collection || "").trim();
       assertAdminDataCollection(collection);
-      const { data, error } = await supabase.from(collection).select("*");
+      const selectCols = adminDataExportSelect(collection);
+      const { data, error } = await supabase.from(collection).select(selectCols);
       if (error) throw error;
+      const rows = redactAdminExportRows(collection, data);
       let extra = undefined;
       if (collection === "productos") {
         const { data: codes, error: codesErr } = await supabase
@@ -3993,7 +4120,17 @@ app.get("/admin/data/export", (req, res) => {
           return acc;
         }, {});
       }
-      return res.status(200).json({ rows: data ?? [], extra });
+      await logAuditFn(
+        supabase,
+        "exportar",
+        collection,
+        collection,
+        collection,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { rowCount: rows.length },
+      );
+      return res.status(200).json({ rows, extra });
     } catch (error) {
       console.error("admin/data/export error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
@@ -4628,7 +4765,8 @@ app.get("/users/me", (req, res) => {
         .eq("uid", decodedToken.uid)
         .maybeSingle();
       if (error) throw error;
-      return res.status(200).json({ profile: data ?? null });
+      const profile = profileRowForClientRead(data);
+      return res.status(200).json({ profile });
     } catch (error) {
       console.error("users/me GET error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
@@ -4696,7 +4834,8 @@ app.get("/admin/audit", (req, res) => {
         .order("realizadoEn", { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return res.status(200).json({ entries: data ?? [] });
+      const entries = (data ?? []).map(sanitizeAuditEntryForResponse);
+      return res.status(200).json({ entries });
     } catch (error) {
       console.error("admin/audit error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });

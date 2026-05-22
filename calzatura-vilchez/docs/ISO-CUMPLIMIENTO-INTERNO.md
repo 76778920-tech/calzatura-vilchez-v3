@@ -67,6 +67,7 @@ Matriz detallada: `supabase/RLS-MATRIX.md`. Hallazgos: `security-audit.md`.
 | G1 | Pedidos web — PII trabajador | **Mitigado:** `GET /staff/orders` enmascara email, teléfono, dirección y referencia (`bff/privacy.cjs`) |
 | G2 | Roles `psicologo` / `rrhh` temporales | Eliminación planificada del producto |
 | G3 | App Check, CSP, Cloudinary | **Mitigado:** App Check opcional (`VITE_FIREBASE_APPCHECK_SITE_KEY`), CSP en `firebase.json`, subida Cloudinary firmada vía BFF |
+| G4 | MFA TOTP administrador | **Pendiente** — Firebase Auth multi-factor recomendado en perfil admin; sin enforcement en BFF (`adminMfaPolicy` stub) |
 
 ---
 

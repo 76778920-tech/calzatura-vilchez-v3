@@ -11,7 +11,7 @@ type AdminSaleDetailModalProps = Readonly<{
   onClose: () => void;
   returnMotivo: string;
   onReturnMotivoChange: (value: string) => void;
-  onReturn: () => void;
+  onRequestReturn: () => void;
   returning: boolean;
   onViewDocument: (sale: DailySale) => void;
   showFinancialDetails?: boolean;
@@ -22,7 +22,7 @@ export function AdminSaleDetailModal({
   onClose,
   returnMotivo,
   onReturnMotivoChange,
-  onReturn,
+  onRequestReturn,
   returning,
   onViewDocument,
   showFinancialDetails = true,
@@ -171,8 +171,8 @@ export function AdminSaleDetailModal({
                 rows={3}
                 className="form-input"
               />
-              <button type="button" onClick={onReturn} disabled={returning} className="btn-danger sale-modal-return-btn">
-                {returning ? "Procesando..." : "Confirmar devolución"}
+              <button type="button" onClick={onRequestReturn} disabled={returning} className="btn-danger sale-modal-return-btn">
+                Confirmar devolución
               </button>
             </div>
           )}

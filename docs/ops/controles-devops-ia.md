@@ -48,7 +48,7 @@ Medidas producidas: MAPE promedio RF, MAPE baseline, folds evaluados, ratio de f
 Validar evidencia de simulacro:
 
 ```bash
-node scripts/restore-drill-check.mjs --evidence docs/ops/restore-drill-evidence.example.json
+node scripts/restore-drill-check.mjs --evidence docs/ops/restore-drill-evidence.ci.json
 ```
 
 Para un simulacro real, completar una copia de `docs/ops/restore-drill-evidence.template.json` con el identificador del backup, destino temporal, RTO/RPO observados, verificaciones ejecutadas y plan de descarte del ambiente temporal.

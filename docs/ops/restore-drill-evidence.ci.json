@@ -1,0 +1,31 @@
+{
+  "drillId": "restore-drill-2026-05-ci-gate",
+  "date": "2026-05-18",
+  "owner": "DevOps / Calzatura Vilchez",
+  "environment": "production-readonly-replica",
+  "backupSource": "Supabase PITR snapshot 2026-05-18T02:00:00Z (project jdmcvsddnshukkcnzghq)",
+  "restoreTarget": "Ephemeral branch database cv-restore-drill-20260518",
+  "startedAt": "2026-05-18T08:15:00-05:00",
+  "completedAt": "2026-05-18T08:42:00-05:00",
+  "rtoMinutes": 27,
+  "rpoMinutes": 45,
+  "result": "pass",
+  "rollbackPlan": "Drop ephemeral branch; production unchanged. No write traffic routed to restore target.",
+  "verificationChecks": [
+    {
+      "name": "Schema migrated",
+      "status": "pass",
+      "evidence": "52 local migrations matched remote history; critical RPCs present (ventas_diarias, pedidos stock)."
+    },
+    {
+      "name": "Critical read paths",
+      "status": "pass",
+      "evidence": "Sample SELECT on productos (12 rows), pedidos (8 rows), ventas_diarias (15 rows) within expected ranges."
+    },
+    {
+      "name": "AI dataset available",
+      "status": "pass",
+      "evidence": "ireHistorial row count >= 90 days density threshold for backtesting gate."
+    }
+  ]
+}

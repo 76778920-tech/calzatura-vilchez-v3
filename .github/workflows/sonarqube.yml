@@ -128,9 +128,8 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           # qualitygate.wait=true → exit code 3 si el Quality Gate en SonarCloud esta Failed.
-          # false: sube el analisis; revisar QG en sonarcloud.io hasta endurecer de nuevo el CI.
           args: >
-            "-Dsonar.qualitygate.wait=false"
+            "-Dsonar.qualitygate.wait=true"
             "-Dsonar.projectBaseDir=."
             "-Dsonar.newCode.referenceBranch=main"
             "-Dsonar.javascript.lcov.reportPaths=calzatura-vilchez/coverage/lcov.info"

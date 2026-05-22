@@ -9,6 +9,7 @@ import type { UserRole } from "@/types";
 import { clearPendingVerificationEmail } from "@/utils/pendingVerification";
 import { formatPeruPhone, isValidPeruPhone, normalizePeruPhoneInput, peruPhoneError } from "@/utils/phone";
 import { profileSaveErrorToast } from "@/domains/usuarios/utils/profileSaveErrors";
+import { maskDniForDisplay } from "@/utils/maskEmail";
 
 function splitFallbackName(name = "") {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -143,7 +144,7 @@ export default function ProfilePage() {
                 <input
                   id="profile-dni"
                   type="text"
-                  value={userProfile?.dni ?? ""}
+                  value={maskDniForDisplay(userProfile?.dni)}
                   disabled
                   className="form-input with-icon"
                   style={{ opacity: 0.6, cursor: "not-allowed" }}

@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fromMock, rpcMock, bffFetchMock, getBackendApiBaseUrlMock, getIdTokenMock, authState } = vi.hoisted(() => ({
-  fromMock: vi.fn(),
-  rpcMock: vi.fn(),
+const { bffFetchMock, getBackendApiBaseUrlMock, getIdTokenMock, authState } = vi.hoisted(() => ({
   bffFetchMock: vi.fn(),
   getBackendApiBaseUrlMock: vi.fn(() => ""),
   getIdTokenMock: vi.fn(),
@@ -19,13 +17,6 @@ vi.mock("@/firebase/config", () => ({
 
 vi.mock("@/config/apiBackend", () => ({
   getBackendApiBaseUrl: getBackendApiBaseUrlMock,
-}));
-
-vi.mock("@/supabase/client", () => ({
-  supabase: {
-    from: fromMock,
-    rpc: rpcMock,
-  },
 }));
 
 vi.mock("@/utils/bffClient", () => ({
@@ -50,18 +41,11 @@ describe("finance service", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-13T10:00:00.000Z"));
-    fromMock.mockReset();
-    rpcMock.mockReset();
     bffFetchMock.mockReset();
     getBackendApiBaseUrlMock.mockReturnValue("");
-    authState.user = { getIdToken: getIdTokenMock.mockResolvedValue("token") };
     authState.user = null;
     getIdTokenMock.mockReset();
     getIdTokenMock.mockResolvedValue("token-test");
-    rpcMock.mockResolvedValue({
-      data: null,
-      error: { message: "Could not find the function list_ventas_diarias_by_fecha", code: "PGRST202" },
-    });
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -70,29 +54,14 @@ describe("finance service", () => {
     vi.unstubAllGlobals();
   });
 
-  it("fetchDailySalesViaBff devuelve null si fetch lanza", async () => {
+  it("fetchDailySales admin lanza si BFF falla (sin fallback Supabase)", async () => {
     getBackendApiBaseUrlMock.mockReturnValue("https://bff.example");
     authState.user = { getIdToken: getIdTokenMock };
     vi.mocked(fetch).mockRejectedValue(new Error("network"));
 
-    rpcMock.mockResolvedValueOnce({
-      data: [{ id: "rpc-1", creadoEn: "2026-05-13T10:00:00.000Z" }],
-      error: null,
-    });
-
-    const rows = await fetchDailySales("2026-05-13");
-    expect(rows).toHaveLength(1);
-  });
-
-  it("fetchDailySalesRpc propaga error no ignorables", async () => {
-    rpcMock.mockResolvedValueOnce({
-      data: null,
-      error: { message: "permission denied for ventasDiarias" },
-    });
-
-    await expect(fetchDailySales("2026-05-13")).rejects.toMatchObject({
-      message: "permission denied for ventasDiarias",
-    });
+    await expect(fetchDailySales("2026-05-13", "admin")).rejects.toThrow(
+      "No se pudieron cargar las ventas diarias. Verifica que el servidor BFF",
+    );
   });
 
   it("fetchDailySales usa BFF admin cuando hay sesión y responde sales", async () => {
@@ -116,7 +85,6 @@ describe("finance service", () => {
       expect.objectContaining({ headers: { Authorization: "Bearer token-test" } }),
     );
     expect(rows.map((r) => r.id)).toEqual(["b1", "b2"]);
-    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("fetchDailySales staff consulta /staff/dailySales y no hace fallback Supabase", async () => {
@@ -132,38 +100,43 @@ describe("finance service", () => {
       "https://bff.example/staff/dailySales?fecha=2026-05-13",
       expect.any(Object),
     );
-    expect(rpcMock).not.toHaveBeenCalled();
   });
 
-  it("fetchDailySales hace fallback a Supabase si BFF no responde", async () => {
+  it("fetchDailySales admin lanza si BFF responde no ok", async () => {
     getBackendApiBaseUrlMock.mockReturnValue("https://bff.example");
+    authState.user = { getIdToken: getIdTokenMock };
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response);
-    rpcMock.mockResolvedValueOnce({
-      data: [{ id: "rpc-1", creadoEn: "2026-05-13T10:00:00.000Z" }],
-      error: null,
-    });
 
-    const rows = await fetchDailySales("2026-05-13");
-
-    expect(rows).toHaveLength(1);
-    expect(rows[0].id).toBe("rpc-1");
+    await expect(fetchDailySales("2026-05-13", "admin")).rejects.toThrow(
+      "No se pudieron cargar las ventas diarias. Verifica que el servidor BFF",
+    );
   });
 
-  it("fetchDailySales lanza si BFF y Supabase no devuelven datos", async () => {
+  it("fetchDailySales admin lanza si no hay URL de BFF ni sesión", async () => {
     getBackendApiBaseUrlMock.mockReturnValue("");
-    rpcMock.mockResolvedValueOnce({
-      data: null,
-      error: { message: "Could not find the function list_ventas_diarias_by_fecha", code: "PGRST202" },
-    });
-    fromMock.mockImplementation(() => ({
-      select: () => ({
-        eq: () => Promise.resolve({ data: null, error: { message: "db down" } }),
-      }),
-    }));
 
-    await expect(fetchDailySales("2026-05-13")).rejects.toThrow(
-      "No se pudieron cargar las ventas diarias",
+    await expect(fetchDailySales("2026-05-13", "admin")).rejects.toThrow(
+      "No se pudieron cargar las ventas diarias. Verifica que el servidor BFF",
     );
+  });
+
+  it("fetchDailySales sin fecha consulta los ultimos 90 dias via BFF", async () => {
+    getBackendApiBaseUrlMock.mockReturnValue("https://bff.example");
+    authState.user = { getIdToken: getIdTokenMock };
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        sales: [{ id: "s1", creadoEn: "2026-05-13T10:00:00.000Z", fecha: "2026-05-13" }],
+      }),
+    } as Response);
+
+    const rows = await fetchDailySales(undefined, "admin");
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      "https://bff.example/admin/dailySales?sinceDays=90",
+      expect.any(Object),
+    );
+    expect(rows).toHaveLength(1);
   });
 
   it("fetchProductFinancials indexa resultados por productId (admin)", async () => {
@@ -225,33 +198,6 @@ describe("finance service", () => {
     );
   });
 
-  it("fetchDailySales filtra por fecha y ordena por creadoEn descendente", async () => {
-    rpcMock.mockResolvedValueOnce({
-      data: [
-        { id: "old", creadoEn: "2026-05-13T09:00:00.000Z" },
-        { id: "new", creadoEn: "2026-05-13T11:00:00.000Z" },
-      ],
-      error: null,
-    });
-
-    const rows = await fetchDailySales("2026-05-13");
-
-    expect(rpcMock).toHaveBeenCalledWith("list_ventas_diarias_by_fecha", { p_fecha: "2026-05-13" });
-    expect(rows.map((row) => row.id)).toEqual(["new", "old"]);
-  });
-
-  it("fetchDailySales sin fecha consulta los ultimos 90 dias", async () => {
-    rpcMock.mockResolvedValueOnce({
-      data: [{ id: "s1", creadoEn: "2026-05-13T10:00:00.000Z", fecha: "2026-05-13" }],
-      error: null,
-    });
-
-    const rows = await fetchDailySales();
-
-    expect(rpcMock).toHaveBeenCalledWith("list_ventas_diarias_since", { p_fecha_desde: "2026-02-12" });
-    expect(rows).toHaveLength(1);
-  });
-
   it("addDailySale registra via BFF y devuelve primer id", async () => {
     bffFetchMock.mockResolvedValue({ ids: ["sale-1"] });
 
@@ -310,7 +256,6 @@ describe("finance service", () => {
       "/admin/dailySales/register",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("registerDailySalesAtomic staff registra via BFF", async () => {
@@ -327,7 +272,6 @@ describe("finance service", () => {
       "/staff/dailySales/register",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(rpcMock).not.toHaveBeenCalled();
   });
 
   it("returnDailySaleAtomic devuelve fila via BFF (admin)", async () => {

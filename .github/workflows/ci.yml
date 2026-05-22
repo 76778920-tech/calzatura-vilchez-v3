@@ -55,10 +55,10 @@ jobs:
       - name: Restore drill - evidencia valida
         run: |
           node scripts/restore-drill-check.mjs \
-            --evidence docs/ops/restore-drill-evidence.example.json \
+            --evidence docs/ops/restore-drill-evidence.ci.json \
             --max-rto-minutes 60 \
             --max-rpo-minutes 1440 \
-            --output artifacts/restore-drill/example-summary.json
+            --output artifacts/restore-drill/ci-summary.json
 
       - name: Subir evidencia estatica de controles
         if: always()

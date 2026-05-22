@@ -14,7 +14,7 @@ describe("useProductsRealtime", () => {
     vi.clearAllMocks();
   });
 
-  it("escucha productos y metadatos, pero agrupa rafagas en un solo reload", () => {
+  it("escucha solo productos y agrupa rafagas en un solo reload", () => {
     vi.useFakeTimers();
     const callbacks: Array<() => void> = [];
     const channel = {
@@ -29,19 +29,10 @@ describe("useProductsRealtime", () => {
 
     const { unmount } = render(<Probe onChange={onChange} />);
 
+    expect(channel.on).toHaveBeenCalledTimes(1);
     expect(channel.on).toHaveBeenCalledWith(
       "postgres_changes",
       { event: "*", schema: "public", table: "productos" },
-      expect.any(Function)
-    );
-    expect(channel.on).toHaveBeenCalledWith(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "productoCodigos" },
-      expect.any(Function)
-    );
-    expect(channel.on).toHaveBeenCalledWith(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "productoFinanzas" },
       expect.any(Function)
     );
 

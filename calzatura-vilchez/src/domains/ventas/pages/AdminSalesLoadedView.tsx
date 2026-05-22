@@ -1,4 +1,5 @@
 import { Calculator, CircleDollarSign, FileText, IdCard, PackageSearch, Plus, Trash2, TrendingUp, Truck } from "lucide-react";
+import { AccessibleConfirmDialog } from "@/components/common/AccessibleConfirmDialog";
 import { AdminSaleDetailModal } from "./AdminSaleDetailModal";
 import { AdminSalesHistorialTable } from "./AdminSalesHistorialTable";
 import type { AdminSalesPageModel } from "./useAdminSalesPage";
@@ -369,13 +370,30 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
         />
       </div>
 
+      {p.returnConfirmOpen && p.selectedSale && (
+        <AccessibleConfirmDialog
+          title="Confirmar devolución"
+          description={(
+            <p>
+              Se registrará la devolución de <strong>{p.selectedSale.codigo}</strong> y se restaurará el stock.
+              Motivo: {p.returnMotivo.trim()}
+            </p>
+          )}
+          confirmLabel="Registrar devolución"
+          loadingLabel="Procesando..."
+          loading={p.returning}
+          onCancel={p.cancelReturnConfirm}
+          onConfirm={() => void p.confirmReturn()}
+        />
+      )}
+
       {p.selectedSale && (
         <AdminSaleDetailModal
           sale={p.selectedSale}
           onClose={() => p.setSelectedSale(null)}
           returnMotivo={p.returnMotivo}
           onReturnMotivoChange={p.setReturnMotivo}
-          onReturn={() => void p.handleReturn()}
+          onRequestReturn={p.requestReturnConfirm}
           returning={p.returning}
           onViewDocument={p.handleViewDocument}
           showFinancialDetails={p.showFinancialDetails}

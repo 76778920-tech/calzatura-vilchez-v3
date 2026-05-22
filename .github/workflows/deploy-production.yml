@@ -128,10 +128,13 @@ jobs:
           REQUIRED_WORKFLOWS: ${{ env.CI_WORKFLOW_NAME }}|${{ env.CI_INTEGRATION_NAME }}
         run: node scripts/github-verify-workflows-for-sha.mjs
 
+      - name: Verificar runbook post-deploy Supabase
+        run: test -f docs/ops/post-deploy-supabase-migrations.md
+
       - name: Verificar workflows listos para deploy
         env:
           DEPLOY_SHA: ${{ steps.sha.outputs.head_sha }}
-        run: echo "Gate OK — SHA $DEPLOY_SHA"
+        run: echo "Gate OK — SHA $DEPLOY_SHA (aplicar db push segun docs/ops/post-deploy-supabase-migrations.md si hay migraciones nuevas)"
 
   render-bff-service:
     name: Render — BFF

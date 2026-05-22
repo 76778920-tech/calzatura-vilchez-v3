@@ -1,3 +1,4 @@
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { X, ShoppingBag, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCart } from "@/domains/carrito/context/CartContext";
@@ -7,20 +8,59 @@ import { getSizeStock } from "@/utils/stock";
 
 export default function CartSidebar() {
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, subtotal, total, itemCount } = useCart();
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const titleId = "cart-sidebar-title";
+
+  useEffect(() => {
+    if (!isOpen) return;
+    dialogRef.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
+  }, [isOpen]);
+
+  const trapFocus = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setIsOpen(false);
+      return;
+    }
+    if (event.key !== "Tab" || !dialogRef.current) return;
+    const focusable = Array.from(
+      dialogRef.current.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex='-1'])"
+      )
+    ).filter((el) => el.offsetParent !== null);
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!last) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
-    <>
+    <div className="product-modal-host">
       <button
         type="button"
-        className="cart-overlay"
+        className="cart-overlay product-modal-backdrop"
         onClick={() => setIsOpen(false)}
         aria-label="Cerrar carrito"
       />
-      <aside className="cart-sidebar" aria-label="Carrito de compras">
+      <aside
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="cart-sidebar"
+        onKeyDown={trapFocus}
+      >
         <div className="cart-header">
-          <div className="cart-header-title">
+          <div className="cart-header-title" id={titleId}>
             <ShoppingBag size={20} aria-hidden="true" />
             <span>Mi Carrito ({itemCount})</span>
           </div>
@@ -101,6 +141,6 @@ export default function CartSidebar() {
           </div>
         )}
       </aside>
-    </>
+    </div>
   );
 }

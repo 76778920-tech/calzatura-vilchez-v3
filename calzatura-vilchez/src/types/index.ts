@@ -118,6 +118,9 @@ export interface Address {
   distrito: string;
   telefono: string;
   referencia?: string;
+  /** Coordenadas de entrega (obligatorias en checkout con reparto para validar envío en BFF). */
+  lat?: number;
+  lng?: number;
 }
 
 export type OrderStatus =

@@ -198,9 +198,16 @@ export default function CheckoutPage() {
     idempotencyKeyRef.current = idempotencyKey;
     try {
       const checkoutItems = await resolveCheckoutItems(items);
+      const deliveryPoint = geo.selectedDelivery;
+      const orderDireccion = {
+        ...direccion,
+        ...(deliveryPoint
+          ? { lat: deliveryPoint.lat, lng: deliveryPoint.lng }
+          : {}),
+      };
       const orderId = await createOrder({
         items: checkoutItems,
-        direccion,
+        direccion: orderDireccion,
         metodoPago,
         notas: "",
         envio: geo.envioMonto,
@@ -375,9 +382,10 @@ export default function CheckoutPage() {
 
           {step === "pago" && (
             <div className="checkout-form">
-              <h2 className="form-section-title">
-                <CreditCard size={18} /> Método de Pago
-              </h2>
+              <fieldset className="payment-options-fieldset">
+                <legend className="form-section-title payment-options-legend">
+                  <CreditCard size={18} aria-hidden="true" /> Método de Pago
+                </legend>
 
               <div className="payment-options">
                 <label className={`payment-option ${metodoPago === "stripe" ? "selected" : ""} ${!STRIPE_CONFIGURED ? "is-disabled" : ""}`}>
@@ -419,6 +427,7 @@ export default function CheckoutPage() {
                   </div>
                 </label>
               </div>
+              </fieldset>
 
               <div className="checkout-confirm-address">
                 <p>

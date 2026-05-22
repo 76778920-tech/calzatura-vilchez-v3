@@ -12,6 +12,7 @@ import { ORDER_STATUS_LABELS, orderItemLineKey } from "@/domains/pedidos/utils/o
 import { OrderAddressBlock, OrderItemDetails } from "@/domains/pedidos/components/orderShared";
 import { handleProductImageError } from "@/utils/imgUtils";
 import { maskEmailForDisplay } from "@/utils/maskEmail";
+import { AccessibleConfirmDialog } from "@/components/common/AccessibleConfirmDialog";
 
 const ESTADOS: OrderStatus[] = ["pendiente", "pagado", "enviado", "entregado", "cancelado"];
 
@@ -46,6 +47,12 @@ export default function AdminOrders() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [filterEstado, setFilterEstado] = useState<string>("todos");
   const [previewImage, setPreviewImage] = useState<{ src: string; title: string; subtitle?: string } | null>(null);
+  const [statusChangePending, setStatusChangePending] = useState<{
+    orderId: string;
+    orderLabel: string;
+    from: OrderStatus;
+    to: OrderStatus;
+  } | null>(null);
 
   const loadOrders = useCallback((showSpinner = false) => {
     if (showSpinner) setLoading(true);
@@ -66,6 +73,21 @@ export default function AdminOrders() {
 
   useOrdersRealtime(loadOrders);
 
+  const requestStatusChange = (order: Order, estado: OrderStatus) => {
+    if (estado === order.estado || savingStatusIds.has(order.id)) return;
+    setStatusChangePending({
+      orderId: order.id,
+      orderLabel: order.id.slice(-8).toUpperCase(),
+      from: order.estado,
+      to: estado,
+    });
+  };
+
+  const cancelStatusChange = () => {
+    if (statusChangePending && savingStatusIds.has(statusChangePending.orderId)) return;
+    setStatusChangePending(null);
+  };
+
   const handleStatusChange = async (orderId: string, estado: OrderStatus) => {
     if (savingStatusIds.has(orderId)) return;
     setSavingStatusIds((prev) => new Set(prev).add(orderId));
@@ -83,6 +105,7 @@ export default function AdminOrders() {
         ),
       );
       toast.success("Estado actualizado");
+      setStatusChangePending(null);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Error al actualizar estado";
       toast.error(message);
@@ -145,9 +168,13 @@ export default function AdminOrders() {
                 </button>
                 <div className="order-card-info">
                   <select
-                    value={order.estado}
+                    value={
+                      statusChangePending?.orderId === order.id
+                        ? statusChangePending.from
+                        : order.estado
+                    }
                     disabled={savingStatusIds.has(order.id)}
-                    onChange={(e) => handleStatusChange(order.id, e.target.value as OrderStatus)}
+                    onChange={(e) => requestStatusChange(order, e.target.value as OrderStatus)}
                     className="status-select"
                     style={{ color: STATUS_COLOR[order.estado] }}
                     aria-label={`Estado del pedido ${order.id.slice(-8).toUpperCase()}`}
@@ -219,6 +246,24 @@ export default function AdminOrders() {
       </div>
 
       {ordersMain}
+
+      {statusChangePending && (
+        <AccessibleConfirmDialog
+          title="Cambiar estado del pedido"
+          description={(
+            <p>
+              Pedido #{statusChangePending.orderLabel}: cambiar de{" "}
+              <strong>{ESTADO_LABEL[statusChangePending.from]}</strong> a{" "}
+              <strong>{ESTADO_LABEL[statusChangePending.to]}</strong>.
+            </p>
+          )}
+          confirmLabel="Actualizar estado"
+          loadingLabel="Guardando..."
+          loading={savingStatusIds.has(statusChangePending.orderId)}
+          onCancel={cancelStatusChange}
+          onConfirm={() => void handleStatusChange(statusChangePending.orderId, statusChangePending.to)}
+        />
+      )}
 
       {previewImage && (
         <ImagePreviewModal

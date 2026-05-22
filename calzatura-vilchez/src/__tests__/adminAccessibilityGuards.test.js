@@ -30,6 +30,26 @@ const adminDataSource = fs.readFileSync(
   path.resolve(process.cwd(), "src/domains/administradores/pages/AdminData.tsx"),
   "utf8",
 );
+const adminOrdersSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/pedidos/pages/AdminOrders.tsx"),
+  "utf8",
+);
+const adminSalesLoadedSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/ventas/pages/AdminSalesLoadedView.tsx"),
+  "utf8",
+);
+const cartSidebarSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/carrito/components/CartSidebar.tsx"),
+  "utf8",
+);
+const checkoutPageSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/carrito/pages/CheckoutPage.tsx"),
+  "utf8",
+);
+const isoComplianceSource = fs.readFileSync(
+  path.resolve(process.cwd(), "docs/ISO-CUMPLIMIENTO-INTERNO.md"),
+  "utf8",
+);
 const accessibleConfirmDialogSource = fs.readFileSync(
   path.resolve(process.cwd(), "src/components/common/AccessibleConfirmDialog.tsx"),
   "utf8",
@@ -67,6 +87,22 @@ describe("Admin ventas/productos accessibility guards", () => {
     expect(adminDataSource).not.toContain("confirm(");
     expect(manufacturersSource).toContain("<AccessibleConfirmDialog");
     expect(adminDataSource).toContain("<AccessibleConfirmDialog");
+  });
+
+  it("ventas, pedidos y carrito usan confirmacion accesible o dialog modal", () => {
+    expect(adminSalesLoadedSource).toContain("<AccessibleConfirmDialog");
+    expect(adminSalesLoadedSource).toContain("Confirmar devolución");
+    expect(adminOrdersSource).toContain("<AccessibleConfirmDialog");
+    expect(adminOrdersSource).not.toContain("confirm(");
+    expect(cartSidebarSource).toContain('role="dialog"');
+    expect(cartSidebarSource).toContain('aria-modal="true"');
+    expect(cartSidebarSource).toContain("event.key === \"Escape\"");
+    expect(checkoutPageSource).toContain("<fieldset");
+    expect(checkoutPageSource).toContain("<legend");
+  });
+
+  it("documenta MFA admin como pendiente en ISO interno", () => {
+    expect(isoComplianceSource).toMatch(/MFA.*Pendiente/i);
   });
 
   it("el dialogo de confirmacion reutilizable gestiona semantica y teclado", () => {

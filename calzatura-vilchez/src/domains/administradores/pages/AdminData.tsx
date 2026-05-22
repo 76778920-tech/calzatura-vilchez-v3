@@ -332,6 +332,11 @@ const COLLECTIONS: CollectionConfig[] = [
       activo: d.activo ?? true,
       observaciones: cellString(d.observaciones),
       creadoEn: cellString(d.creadoEn),
+      actualizadoEn: cellString(d.actualizadoEn),
+      esDePrueba: d.esDePrueba ?? false,
+      importadoEn: cellString(d.importadoEn),
+      loteImportacion: cellString(d.loteImportacion),
+      escenario: cellString(d.escenario),
     }),
     importTransform: (row, context) => ({
       dni: String(row.dni ?? "").trim(),
@@ -465,8 +470,7 @@ const COLLECTIONS: CollectionConfig[] = [
     templateExample: {},
     exportTransform: (d) => ({
       uid: cellString(d.uid ?? d.id),
-      dni: cellString(d.dni),
-      nombre: cellString(d.nombre),
+      nombre: cellString(d.nombre ?? d.nombres),
       email: cellString(d.email),
       rol: cellString(d.rol),
       telefono: cellString(d.telefono),

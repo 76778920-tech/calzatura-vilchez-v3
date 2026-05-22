@@ -19,10 +19,40 @@ jobs:
       - name: Validar migraciones SQL versionadas
         run: node scripts/validate-supabase-migrations.mjs
 
+  supabase-remote-parity:
+    name: Paridad migraciones Supabase (remoto)
+    needs: [supabase-migrations]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: calzatura-vilchez/package-lock.json
+
+      - name: Instalar Supabase CLI (app)
+        working-directory: calzatura-vilchez
+        run: npm ci --ignore-scripts
+
+      - name: Comparar migraciones locales vs remoto
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/verify-supabase-migration-parity.mjs
+
+      - name: Recordatorio post-deploy (db push manual)
+        run: |
+          test -f docs/ops/post-deploy-supabase-migrations.md
+          echo "Migraciones: tras deploy en main, aplicar db push segun docs/ops/post-deploy-supabase-migrations.md"
+
   # ── Job 1: Lint + Tests + Coverage + Build con secrets reales ────────────────
   quality:
     name: Calidad + Build (secrets reales)
-    needs: [supabase-migrations]
+    needs: [supabase-migrations, supabase-remote-parity]
     runs-on: ubuntu-latest
 
     defaults:
@@ -97,7 +127,7 @@ jobs:
   # ── Job 2: AI Service con validación real de Supabase ────────────────────────
   ai-service:
     name: AI Service + Schema Supabase (real)
-    needs: [supabase-migrations]
+    needs: [supabase-migrations, supabase-remote-parity]
     runs-on: ubuntu-latest
 
     defaults:
@@ -132,7 +162,7 @@ jobs:
 
   ai-service-docker:
     name: AI Service — Docker build (Render)
-    needs: [supabase-migrations]
+    needs: [supabase-migrations, supabase-remote-parity]
     runs-on: ubuntu-latest
 
     steps:
@@ -215,7 +245,7 @@ jobs:
       - name: Restore drill - evidencia operativa versionada
         run: |
           node scripts/restore-drill-check.mjs \
-            --evidence docs/ops/restore-drill-evidence.example.json \
+            --evidence docs/ops/restore-drill-evidence.ci.json \
             --max-rto-minutes 60 \
             --max-rpo-minutes 1440 \
             --output artifacts/restore-drill/integration-summary.json
@@ -230,7 +260,7 @@ jobs:
 
   e2e:
     name: E2E Playwright — Integración real
-    needs: [supabase-migrations]
+    needs: [supabase-migrations, supabase-remote-parity]
     runs-on: ubuntu-latest
 
     defaults:
@@ -304,7 +334,7 @@ jobs:
 
   deploy-production:
     name: Deploy — Producción (Firebase + Render)
-    needs: [quality, ai-service, ai-service-docker, ops-controls-real, e2e]
+    needs: [quality, ai-service, ai-service-docker, ops-controls-real, e2e, supabase-remote-parity]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read

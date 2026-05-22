@@ -19,6 +19,7 @@ describe("IA/DevOps measurable controls workflow guard", () => {
     expect(ci).toContain("--max-mape-pct 60");
     expect(ci).toContain("--min-wins-mape-ratio 0.5");
     expect(ci).toContain("restore-drill-check.mjs");
+    expect(ci).toContain("restore-drill-evidence.ci.json");
   });
 
   it("bloquea deploy de produccion si fallan readiness/backtesting/continuidad reales", () => {
@@ -35,7 +36,10 @@ describe("IA/DevOps measurable controls workflow guard", () => {
     expect(integration).toContain("--min-density-pct 0.5");
     expect(integration).toContain("--min-comparison-density-pct 5");
     expect(integration).toContain("Restore drill - evidencia operativa versionada");
-    expect(integration).toContain("needs: [quality, ai-service, ai-service-docker, ops-controls-real, e2e]");
+    expect(integration).toContain("restore-drill-evidence.ci.json");
+    expect(integration).toContain("supabase-remote-parity:");
+    expect(integration).toContain("verify-supabase-migration-parity.mjs");
+    expect(integration).toContain("needs: [quality, ai-service, ai-service-docker, ops-controls-real, e2e, supabase-remote-parity]");
 
     const realJob = integration.slice(integration.indexOf("ops-controls-real:"), integration.indexOf("  e2e:"));
     expect(realJob).not.toContain("--warn-only");

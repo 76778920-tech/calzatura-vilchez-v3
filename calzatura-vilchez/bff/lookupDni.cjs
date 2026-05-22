@@ -34,16 +34,9 @@ const allowedOrigins = loadAllowedOrigins();
 
 const crypto = require("crypto");
 
-const MOBILE_CLIENT_HEADER = "calzatura-mobile";
 const DNI_LOOKUP_PROOF_TTL_MS = 30 * 60 * 1000;
 
-function isMobileAppRequest(req) {
-  const h = req.headers["x-calzatura-client"];
-  return typeof h === "string" && h.trim() === MOBILE_CLIENT_HEADER;
-}
-
 function authorizeLookupRequest(req) {
-  if (isMobileAppRequest(req)) return { ok: true };
   const origin = req.headers.origin;
   if (!origin) return { ok: false, status: 403, error: "Origen requerido" };
   if (!allowedOrigins.has(origin)) {
@@ -90,9 +83,7 @@ function verifyDniLookupProof(token) {
 }
 
 const RATE_LIMIT_WINDOW_MS = 30 * 60 * 1000;
-/** Web: límite estricto por IP. App móvil: más intentos (registro / reintentos). */
 const RATE_LIMIT_MAX_WEB = 4;
-const RATE_LIMIT_MAX_MOBILE = 25;
 const ipBuckets = new Map();
 const REQUEST_TIMEOUT_MS = 10_000;
 
@@ -113,14 +104,13 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || "unknown";
 }
 
-function rateLimitKey(ip, req) {
-  const scope = isMobileAppRequest(req) ? "mobile" : "web";
-  return `${scope}:${ip}`;
+function rateLimitKey(ip) {
+  return `web:${ip}`;
 }
 
-function isRateLimitedInMemory(ip, req) {
-  const key = rateLimitKey(ip, req);
-  const max = isMobileAppRequest(req) ? RATE_LIMIT_MAX_MOBILE : RATE_LIMIT_MAX_WEB;
+function isRateLimitedInMemory(ip) {
+  const key = rateLimitKey(ip);
+  const max = RATE_LIMIT_MAX_WEB;
   const now = Date.now();
   const bucket = ipBuckets.get(key);
   if (!bucket || now - bucket.windowStart >= RATE_LIMIT_WINDOW_MS) {
@@ -132,13 +122,13 @@ function isRateLimitedInMemory(ip, req) {
 }
 
 /** Cupo global entre réplicas Vercel si UPSTASH_REDIS_REST_URL + TOKEN están definidos. */
-async function isRateLimitedUpstash(ip, req) {
+async function isRateLimitedUpstash(ip) {
   const baseUrl = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
   const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
   if (!baseUrl || !token) return null;
 
-  const key = rateLimitKey(ip, req);
-  const max = isMobileAppRequest(req) ? RATE_LIMIT_MAX_MOBILE : RATE_LIMIT_MAX_WEB;
+  const key = rateLimitKey(ip);
+  const max = RATE_LIMIT_MAX_WEB;
   const windowSec = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
   const bucket = `dni:rl:${key}:${Math.floor(Date.now() / RATE_LIMIT_WINDOW_MS)}`;
   const headers = { Authorization: `Bearer ${token}` };
@@ -165,10 +155,10 @@ async function isRateLimitedUpstash(ip, req) {
   }
 }
 
-async function isRateLimited(ip, req) {
-  const distributed = await isRateLimitedUpstash(ip, req);
+async function isRateLimited(ip) {
+  const distributed = await isRateLimitedUpstash(ip);
   if (distributed !== null) return distributed;
-  return isRateLimitedInMemory(ip, req);
+  return isRateLimitedInMemory(ip);
 }
 
 function setCorsHeaders(req, res) {
@@ -446,7 +436,7 @@ async function handleLookupDni(req, res, options = {}) {
   const origin = req.headers.origin;
 
   const clientIp = getClientIp(req);
-  if (await isRateLimited(clientIp, req)) {
+  if (await isRateLimited(clientIp)) {
     return res.status(429).json({ error: "Demasiadas solicitudes. Intenta nuevamente." });
   }
 

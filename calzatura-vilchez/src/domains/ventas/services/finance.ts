@@ -1,11 +1,8 @@
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
 import { auth } from "@/firebase/config";
-import { supabase } from "@/supabase/client";
 import { bffFetch } from "@/utils/bffClient";
 import type { PanelFetchScope } from "@/security/panelScope";
 import type { DailySale, ProductFinancial, ProductPriceRange } from "@/types";
-
-const SALES_COL = "ventasDiarias";
 
 /** Admin: datos completos. Staff: solo ventas propias y rangos sin costo. */
 export type FinanceFetchScope = PanelFetchScope;
@@ -62,12 +59,6 @@ export async function deleteProductFinancial(productId: string): Promise<void> {
   await bffFetch(`/admin/productFinanzas/${encodeURIComponent(productId)}`, { method: "DELETE" });
 }
 
-function sinceISO(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
 function sortDailySales(rows: DailySale[]) {
   return [...rows].sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
 }
@@ -97,44 +88,7 @@ async function fetchDailySalesViaBff(
   }
 }
 
-function isIgnorableDailySalesRpcError(message: string | undefined, rpcName: string): boolean {
-  return new RegExp(`${rpcName}|PGRST202`, "i").test(message ?? "");
-}
-
-async function fetchDailySalesRpc(date?: string): Promise<DailySale[] | null> {
-  if (date) {
-    const { data, error } = await supabase.rpc("list_ventas_diarias_by_fecha", { p_fecha: date });
-    if (!error && Array.isArray(data)) return sortDailySales(data as DailySale[]);
-    if (error && !isIgnorableDailySalesRpcError(error.message, "list_ventas_diarias_by_fecha")) throw error;
-    return null;
-  }
-
-  const desde = sinceISO(90);
-  const { data, error } = await supabase.rpc("list_ventas_diarias_since", { p_fecha_desde: desde });
-  if (!error && Array.isArray(data)) return sortDailySales(data as DailySale[]);
-  if (error && !isIgnorableDailySalesRpcError(error.message, "list_ventas_diarias_since")) throw error;
-  return null;
-}
-
-async function fetchDailySalesTable(date?: string): Promise<DailySale[] | null> {
-  let query = supabase.from(SALES_COL).select("*");
-  if (date) {
-    query = query.eq("fecha", date);
-  } else {
-    query = query.gte("fecha", sinceISO(90)).order("fecha", { ascending: false }).limit(500);
-  }
-  const { data, error } = await query;
-  if (error) return null;
-  return sortDailySales((data ?? []) as DailySale[]);
-}
-
-async function fetchDailySalesFromSupabase(date?: string): Promise<DailySale[] | null> {
-  const fromRpc = await fetchDailySalesRpc(date);
-  if (fromRpc) return fromRpc;
-  return fetchDailySalesTable(date);
-}
-
-/** Ventas en tienda física: BFF (service role) primero; fallback Supabase solo para admin. */
+/** Ventas en tienda física: solo vía BFF (service role). */
 export async function fetchDailySales(
   date?: string,
   scope: FinanceFetchScope = "admin",
@@ -148,10 +102,9 @@ export async function fetchDailySales(
     throw new Error("No se pudieron cargar tus ventas diarias");
   }
 
-  const fromSupabase = await fetchDailySalesFromSupabase(date);
-  if (fromSupabase) return fromSupabase;
-
-  throw new Error("No se pudieron cargar las ventas diarias");
+  throw new Error(
+    "No se pudieron cargar las ventas diarias. Verifica que el servidor BFF esté disponible y que hayas iniciado sesión.",
+  );
 }
 
 export async function addDailySale(data: Omit<DailySale, "id" | "creadoEn">): Promise<string> {

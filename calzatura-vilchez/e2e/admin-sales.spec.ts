@@ -252,6 +252,9 @@ test.describe("admin ventas → registro de venta y devolución", () => {
 
     await page.getByPlaceholder(/talla equivocada/i).fill("Talla equivocada, el cliente pidió una 42");
     await page.getByRole("button", { name: /confirmar devolución/i }).click();
+    const returnDialog = page.getByRole("dialog", { name: /confirmar devolución/i });
+    await expect(returnDialog).toBeVisible({ timeout: 5_000 });
+    await returnDialog.getByRole("button", { name: /registrar devolución/i }).click();
 
     await expect(page.getByText("Devolución registrada y stock restaurado").first()).toBeVisible({
       timeout: 8_000,

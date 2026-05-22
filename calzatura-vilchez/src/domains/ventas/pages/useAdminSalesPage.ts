@@ -92,6 +92,10 @@ export type AdminSalesPageModel = {
   registerPendingLines: () => void;
   handleViewDocument: (sale: DailySale) => void;
   handleReturn: () => Promise<void>;
+  returnConfirmOpen: boolean;
+  requestReturnConfirm: () => void;
+  cancelReturnConfirm: () => void;
+  confirmReturn: () => void;
   /** Vendido, ganancia, mín/máx y columna ganancia: solo administrador. */
   showFinancialDetails: boolean;
 };
@@ -125,6 +129,7 @@ export function useAdminSalesPage(): AdminSalesPageModel {
   const [selectedSale, setSelectedSale] = useState<DailySale | null>(null);
   const [returnMotivo, setReturnMotivo] = useState("");
   const [returning, setReturning] = useState(false);
+  const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
   const [historialSearch, setHistorialSearch] = useState("");
 
   const load = useCallback((targetDate = date) => {
@@ -420,6 +425,20 @@ export function useAdminSalesPage(): AdminSalesPageModel {
     });
   };
 
+  const requestReturnConfirm = () => {
+    if (!selectedSale) return;
+    if (!returnMotivo.trim()) {
+      toast.error("Escribe el motivo de la devolución");
+      return;
+    }
+    setReturnConfirmOpen(true);
+  };
+
+  const cancelReturnConfirm = () => {
+    if (returning) return;
+    setReturnConfirmOpen(false);
+  };
+
   const handleReturn = async () => {
     if (!selectedSale) return;
     const motivo = returnMotivo.trim();
@@ -427,6 +446,7 @@ export function useAdminSalesPage(): AdminSalesPageModel {
       toast.error("Escribe el motivo de la devolución");
       return;
     }
+    setReturnConfirmOpen(false);
     setReturning(true);
     try {
       const returned = await returnDailySaleAtomic(selectedSale.id, motivo, panelScope);
@@ -498,6 +518,10 @@ export function useAdminSalesPage(): AdminSalesPageModel {
     registerPendingLines,
     handleViewDocument,
     handleReturn,
+    returnConfirmOpen,
+    requestReturnConfirm,
+    cancelReturnConfirm,
+    confirmReturn: () => void handleReturn(),
     showFinancialDetails,
   };
 }
