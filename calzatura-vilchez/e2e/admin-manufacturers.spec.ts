@@ -99,7 +99,7 @@ test.describe("admin fabricantes → carga, filtro y borrado", () => {
   // ──────────────────────────────────────────────────────────────────────────
   // TC-MFR-003
   // ──────────────────────────────────────────────────────────────────────────
-  test("aceptar confirm en borrar llama DELETE y muestra toast (TC-MFR-003)", async ({ page }) => {
+  test("confirmar dialogo en borrar llama DELETE y muestra toast (TC-MFR-003)", async ({ page }) => {
     await goToManufacturers(page);
 
     await expect(page.getByText("MarcaActiva")).toBeVisible({ timeout: 10_000 });
@@ -114,9 +114,11 @@ test.describe("admin fabricantes → carga, filtro y borrado", () => {
       await route.fallback();
     });
 
-    page.once("dialog", (dialog) => dialog.accept());
-
     await page.locator(".action-btn.delete-btn").first().click();
+    const dialog = page.getByRole("dialog", { name: /eliminar fabricante/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText("MarcaActiva");
+    await dialog.getByRole("button", { name: /^eliminar fabricante$/i }).click();
 
     await expect(page.getByText(/Fabricante eliminado/i)).toBeVisible({ timeout: 5_000 });
     expect(deleteCalled).toBe(true);

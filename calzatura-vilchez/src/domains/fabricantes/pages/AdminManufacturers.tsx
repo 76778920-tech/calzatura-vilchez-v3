@@ -27,6 +27,7 @@ import type { Manufacturer, ManufacturerDocument } from "@/types";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import { compressImageFile, uploadImageToCloudinary } from "@/domains/administradores/services/cloudinary";
 import { maskDniForDisplay } from "@/utils/maskEmail";
+import { AccessibleConfirmDialog } from "@/components/common/AccessibleConfirmDialog";
 
 type ManufacturerForm = Omit<Manufacturer, "id" | "creadoEn" | "actualizadoEn">;
 type StatusFilter = "todos" | "activos" | "inactivos";
@@ -83,6 +84,8 @@ export default function AdminManufacturers() {
   const [validatedDni, setValidatedDni] = useState("");
   const [previewDocument, setPreviewDocument] = useState<ManufacturerDocument | null>(null);
   const [detailManufacturer, setDetailManufacturer] = useState<Manufacturer | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<Manufacturer | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
   const fileInputRefs = useRef<Record<DocumentType, HTMLInputElement | null>>({
     boleta: null,
     guia: null,
@@ -322,14 +325,28 @@ export default function AdminManufacturers() {
     }
   };
 
-  const handleDelete = async (item: Manufacturer) => {
-    if (!confirm(`¿Eliminar a ${item.marca}?`)) return;
+  const openDeleteDialog = (item: Manufacturer) => {
+    setDeleteCandidate(item);
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleteSaving) return;
+    setDeleteCandidate(null);
+  };
+
+  const confirmDeleteManufacturer = async () => {
+    if (!deleteCandidate) return;
+    setDeleteSaving(true);
     try {
-      await deleteManufacturer(item.id);
-      setManufacturers((current) => current.filter((manufacturer) => manufacturer.id !== item.id));
+      await deleteManufacturer(deleteCandidate.id);
+      setManufacturers((current) => current.filter((manufacturer) => manufacturer.id !== deleteCandidate.id));
+      if (detailManufacturer?.id === deleteCandidate.id) setDetailManufacturer(null);
+      setDeleteCandidate(null);
       toast.success("Fabricante eliminado");
     } catch {
       toast.error("No se pudo eliminar el fabricante");
+    } finally {
+      setDeleteSaving(false);
     }
   };
 
@@ -447,7 +464,7 @@ export default function AdminManufacturers() {
                     <button type="button" onClick={(e) => { e.stopPropagation(); openEdit(item); }} className="action-btn edit-btn" aria-label="Editar">
                       <Pencil size={15} />
                     </button>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); void handleDelete(item); }} className="action-btn delete-btn" aria-label="Eliminar">
+                    <button type="button" onClick={(e) => { e.stopPropagation(); openDeleteDialog(item); }} className="action-btn delete-btn" aria-label="Eliminar">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -681,6 +698,23 @@ export default function AdminManufacturers() {
           title={previewDocument.nombre}
           subtitle={documentLabel(previewDocument.tipo)}
           onClose={() => setPreviewDocument(null)}
+        />
+      )}
+
+      {deleteCandidate && (
+        <AccessibleConfirmDialog
+          title="Eliminar fabricante"
+          description={(
+            <p>
+              Esta accion eliminara la marca <strong>{deleteCandidate.marca}</strong>
+              {fullName(deleteCandidate) ? ` asociada a ${fullName(deleteCandidate)}` : ""}. No se puede deshacer.
+            </p>
+          )}
+          confirmLabel="Eliminar fabricante"
+          loadingLabel="Eliminando..."
+          loading={deleteSaving}
+          onCancel={closeDeleteDialog}
+          onConfirm={() => void confirmDeleteManufacturer()}
         />
       )}
 

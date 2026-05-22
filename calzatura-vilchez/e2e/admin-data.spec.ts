@@ -70,4 +70,16 @@ test.describe("admin datos excel → carga y botón plantilla", () => {
     await expect(plantillaBtn).toBeVisible();
     await expect(plantillaBtn).toBeEnabled();
   });
+
+  test("borrado por fecha abre dialogo accesible antes de eliminar (TC-DATA-003)", async ({ page }) => {
+    await goToData(page);
+
+    await page.getByRole("button", { name: /^Eliminar registros$/i }).click();
+    const dialog = page.getByRole("dialog", { name: /eliminar ventas por fecha/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText(/Ventas Diarias/i);
+
+    await dialog.getByRole("button", { name: /^Cancelar$/i }).click();
+    await expect(dialog).toBeHidden();
+  });
 });

@@ -16,6 +16,7 @@ import {
 } from "@/domains/administradores/services/adminData";
 import { aiAdminFetch } from "@/services/aiAdminClient";
 import { calculatePriceRange } from "@/domains/ventas/services/finance";
+import { AccessibleConfirmDialog } from "@/components/common/AccessibleConfirmDialog";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,10 @@ type ExportStatus = "idle" | "loading" | "success";
 
 type Row = Record<string, unknown>;
 type ScenarioKey = "crisis" | "normal" | "buenas" | "general";
+type PendingDataDelete =
+  | { type: "sales-date"; date: string }
+  | { type: "scenario"; scenario: ScenarioKey }
+  | { type: "batch"; loteImportacion: string };
 
 interface ImportContext {
   fileName: string;
@@ -833,6 +838,7 @@ export default function AdminData() {
   const [deleteCount, setDeleteCount] = useState<number | null>(null);
   const [countLoading, setCountLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PendingDataDelete | null>(null);
   const [scenarioDone, setScenarioDone] = useState<Record<string, boolean>>({});
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
@@ -867,11 +873,15 @@ export default function AdminData() {
 
   const handleDeleteByDate = async () => {
     if (!deleteDate) return;
-    if (!globalThis.confirm(`¿Eliminar TODOS los registros de Ventas Diarias con fecha hasta el ${deleteDate}? Esta acción no se puede deshacer.`)) return;
+    setPendingDelete({ type: "sales-date", date: deleteDate });
+  };
+
+  const confirmDeleteByDate = async (date: string) => {
     setDeleteLoading(true);
     try {
-      const deleted = await deleteSalesUpToDate(deleteDate);
+      const deleted = await deleteSalesUpToDate(date);
       setDeleteCount(0);
+      setPendingDelete(null);
       await invalidateAICache();
       await refreshTestBatches();
       toast.success(`${deleted} registros eliminados correctamente`);
@@ -964,14 +974,18 @@ export default function AdminData() {
   };
 
   const handleDeleteScenario = async () => {
-    if (!globalThis.confirm(`¿Eliminar todos los datos de prueba del escenario ${scenarioLabel(scenarioKey)}?`)) return;
+    setPendingDelete({ type: "scenario", scenario: scenarioKey });
+  };
+
+  const confirmDeleteScenario = async (scenario: ScenarioKey) => {
     setScenarioDeleteLoading(true);
     try {
-      const deleted = await deleteScenarioTestData(scenarioKey);
+      const deleted = await deleteScenarioTestData(scenario);
       setScenarioCount(0);
+      setPendingDelete(null);
       await invalidateAICache();
       await refreshTestBatches();
-      toast.success(`${deleted} registros del escenario ${scenarioLabel(scenarioKey)} eliminados`);
+      toast.success(`${deleted} registros del escenario ${scenarioLabel(scenario)} eliminados`);
     } catch {
       toast.error("No se pudo eliminar el escenario seleccionado");
     } finally {
@@ -980,10 +994,14 @@ export default function AdminData() {
   };
 
   const handleDeleteBatch = async (loteImportacion: string) => {
-    if (!globalThis.confirm(`¿Eliminar el lote ${loteImportacion}? Solo se borrarán datos marcados como prueba.`)) return;
+    setPendingDelete({ type: "batch", loteImportacion });
+  };
+
+  const confirmDeleteBatch = async (loteImportacion: string) => {
     setDeletingBatch(loteImportacion);
     try {
       const deleted = await deleteTestBatch(loteImportacion);
+      setPendingDelete(null);
       await invalidateAICache();
       await refreshTestBatches();
       toast.success(`${deleted} registros eliminados del lote seleccionado`);
@@ -992,6 +1010,65 @@ export default function AdminData() {
     } finally {
       setDeletingBatch(null);
     }
+  };
+
+  const confirmDeleteLoading =
+    (pendingDelete?.type === "sales-date" && deleteLoading) ||
+    (pendingDelete?.type === "scenario" && scenarioDeleteLoading) ||
+    (pendingDelete?.type === "batch" && deletingBatch === pendingDelete.loteImportacion);
+
+  const confirmDeleteCopy = (() => {
+    if (!pendingDelete) return null;
+    if (pendingDelete.type === "sales-date") {
+      return {
+        title: "Eliminar ventas por fecha",
+        confirmLabel: "Eliminar registros",
+        loadingLabel: "Eliminando...",
+        description: (
+          <p>
+            Se eliminaran permanentemente todos los registros de <strong>Ventas Diarias</strong> con fecha igual o anterior a{" "}
+            <strong>{pendingDelete.date}</strong>. Esta accion no se puede deshacer.
+          </p>
+        ),
+      };
+    }
+    if (pendingDelete.type === "scenario") {
+      return {
+        title: "Eliminar escenario de prueba",
+        confirmLabel: "Eliminar escenario",
+        loadingLabel: "Eliminando...",
+        description: (
+          <p>
+            Se eliminaran los datos de prueba del escenario <strong>{scenarioLabel(pendingDelete.scenario)}</strong> en productos,
+            fabricantes y ventas diarias. Esta accion no afecta datos reales.
+          </p>
+        ),
+      };
+    }
+    return {
+      title: "Eliminar lote de prueba",
+      confirmLabel: "Eliminar lote",
+      loadingLabel: "Eliminando...",
+      description: (
+        <p>
+          Se eliminaran los datos marcados como prueba del lote <code>{pendingDelete.loteImportacion}</code>. Esta accion no se
+          puede deshacer.
+        </p>
+      ),
+    };
+  })();
+
+  const confirmPendingDelete = () => {
+    if (!pendingDelete) return;
+    if (pendingDelete.type === "sales-date") {
+      void confirmDeleteByDate(pendingDelete.date);
+      return;
+    }
+    if (pendingDelete.type === "scenario") {
+      void confirmDeleteScenario(pendingDelete.scenario);
+      return;
+    }
+    void confirmDeleteBatch(pendingDelete.loteImportacion);
   };
 
   let testBatchesBlock: ReactNode;
@@ -1317,6 +1394,20 @@ export default function AdminData() {
           ))}
         </div>
       </div>
+
+      {pendingDelete && confirmDeleteCopy && (
+        <AccessibleConfirmDialog
+          title={confirmDeleteCopy.title}
+          description={confirmDeleteCopy.description}
+          confirmLabel={confirmDeleteCopy.confirmLabel}
+          loadingLabel={confirmDeleteCopy.loadingLabel}
+          loading={confirmDeleteLoading}
+          onCancel={() => {
+            if (!confirmDeleteLoading) setPendingDelete(null);
+          }}
+          onConfirm={confirmPendingDelete}
+        />
+      )}
     </div>
   );
 }

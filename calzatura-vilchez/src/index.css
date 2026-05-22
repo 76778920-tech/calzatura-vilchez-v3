@@ -9389,6 +9389,22 @@ dialog.document-preview-modal {
   color: var(--text);
   line-height: 1.5;
 }
+.product-delete-dialog__description {
+  color: var(--text);
+  line-height: 1.5;
+}
+.product-delete-dialog__description p {
+  margin: 0;
+}
+.product-delete-dialog__description code {
+  font-family: monospace;
+  font-size: 12px;
+  background: var(--bg-alt);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  color: var(--gold-dark);
+  overflow-wrap: anywhere;
+}
 .product-delete-dialog__actions {
   display: flex;
   justify-content: flex-end;

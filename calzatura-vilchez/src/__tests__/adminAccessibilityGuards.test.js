@@ -22,6 +22,18 @@ const saleDetailModalSource = fs.readFileSync(
   path.resolve(process.cwd(), "src/domains/ventas/pages/AdminSaleDetailModal.tsx"),
   "utf8",
 );
+const manufacturersSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/fabricantes/pages/AdminManufacturers.tsx"),
+  "utf8",
+);
+const adminDataSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/domains/administradores/pages/AdminData.tsx"),
+  "utf8",
+);
+const accessibleConfirmDialogSource = fs.readFileSync(
+  path.resolve(process.cwd(), "src/components/common/AccessibleConfirmDialog.tsx"),
+  "utf8",
+);
 
 describe("Admin ventas/productos accessibility guards", () => {
   it("no usa confirm nativo para eliminar productos", () => {
@@ -47,5 +59,21 @@ describe("Admin ventas/productos accessibility guards", () => {
     expect(saleDetailModalSource).toContain("aria-modal=\"true\"");
     expect(saleDetailModalSource).toContain("aria-labelledby=\"sale-detail-title\"");
     expect(saleDetailModalSource).toContain("onKeyDown={trapFocus}");
+  });
+
+  it("fabricantes y limpieza de datos no usan confirm nativo", () => {
+    expect(manufacturersSource).not.toContain("confirm(");
+    expect(adminDataSource).not.toContain("globalThis.confirm");
+    expect(adminDataSource).not.toContain("confirm(");
+    expect(manufacturersSource).toContain("<AccessibleConfirmDialog");
+    expect(adminDataSource).toContain("<AccessibleConfirmDialog");
+  });
+
+  it("el dialogo de confirmacion reutilizable gestiona semantica y teclado", () => {
+    expect(accessibleConfirmDialogSource).toContain("aria-modal=\"true\"");
+    expect(accessibleConfirmDialogSource).toContain("aria-describedby={descriptionId}");
+    expect(accessibleConfirmDialogSource).toContain("event.key === \"Escape\"");
+    expect(accessibleConfirmDialogSource).toContain("event.key !== \"Tab\"");
+    expect(accessibleConfirmDialogSource).toContain("button:not([disabled])");
   });
 });
