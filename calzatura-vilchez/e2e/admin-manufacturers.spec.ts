@@ -39,6 +39,27 @@ const ALL_MFRS = [MFR_ACTIVO, MFR_INACTIVO];
 // ─── Setup helper ─────────────────────────────────────────────────────────────
 
 async function setupMfrMocks(page: Page, manufacturers: unknown[] = ALL_MFRS) {
+  await page.route(/\/admin\/manufacturers\/?(\?.*)?$/i, async (route) => {
+    const method = route.request().method();
+    if (method === "GET") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ manufacturers }) });
+      return;
+    }
+    if (method === "POST") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, id: "mfr-new" }) });
+      return;
+    }
+    await route.fallback();
+  });
+  await page.route(/\/admin\/manufacturers\/[^/]+\/?$/i, async (route) => {
+    const method = route.request().method();
+    if (method === "PATCH" || method === "DELETE") {
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
+      return;
+    }
+    await route.fallback();
+  });
+
   await page.route("**/rest/v1/fabricantes*", async (route) => {
     const method = route.request().method();
     if (method === "GET") {
@@ -105,10 +126,10 @@ test.describe("admin fabricantes → carga, filtro y borrado", () => {
     await expect(page.getByText("MarcaActiva")).toBeVisible({ timeout: 10_000 });
 
     let deleteCalled = false;
-    await page.route("**/rest/v1/fabricantes*", async (route) => {
+    await page.route(/\/admin\/manufacturers\/[^/]+\/?$/i, async (route) => {
       if (route.request().method() === "DELETE") {
         deleteCalled = true;
-        await route.fulfill({ status: 204, body: "" });
+        await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true }) });
         return;
       }
       await route.fallback();

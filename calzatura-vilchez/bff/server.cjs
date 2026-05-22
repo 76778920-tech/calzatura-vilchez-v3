@@ -3610,6 +3610,53 @@ app.post("/registrarIngresoStock", (req, res) => {
   });
 });
 
+app.post("/admin/products/decrementStock", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const { productId, lines } = req.body || {};
+      if (!productId || !Array.isArray(lines)) {
+        return res.status(400).json({ error: "Datos de stock incompletos" });
+      }
+      const { error } = await supabase.rpc("decrement_product_stock", {
+        p_product_id: productId,
+        p_lines: lines,
+      });
+      if (error) handleAdminRpcError(error);
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("admin/products/decrementStock error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/admin/products/restoreStock", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const { productId, talla, cantidad } = req.body || {};
+      if (!productId || !Number.isInteger(Number(cantidad)) || Number(cantidad) <= 0) {
+        return res.status(400).json({ error: "Datos de stock incompletos" });
+      }
+      const { error } = await supabase.rpc("restore_product_stock", {
+        p_product_id: productId,
+        p_talla: talla ?? null,
+        p_cantidad: Number(cantidad),
+      });
+      if (error) handleAdminRpcError(error);
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("admin/products/restoreStock error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.post("/createCheckoutSession", (req, res) => {
     cors(req, res, async () => {
       if (req.method !== "POST") {
@@ -4185,6 +4232,60 @@ app.get("/admin/productFinanzas", (req, res) => {
   });
 });
 
+app.put("/admin/productFinanzas/:productId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const productId = String(req.params.productId || "").trim();
+      const data = req.body || {};
+      if (!productId) {
+        return res.status(400).json({ error: "Producto invalido" });
+      }
+      const payload = {
+        productId,
+        costoCompra: Number(data.costoCompra ?? 0),
+        margenMinimo: Number(data.margenMinimo ?? 0),
+        margenObjetivo: Number(data.margenObjetivo ?? 0),
+        margenMaximo: Number(data.margenMaximo ?? 0),
+        precioMinimo: Number(data.precioMinimo ?? 0),
+        precioSugerido: Number(data.precioSugerido ?? 0),
+        precioMaximo: Number(data.precioMaximo ?? 0),
+        actualizadoEn: new Date().toISOString(),
+      };
+      const { error } = await supabase
+        .from("productoFinanzas")
+        .upsert(payload, { onConflict: "productId" });
+      if (error) throw error;
+      return res.status(200).json({ ok: true, row: payload });
+    } catch (error) {
+      console.error("admin/productFinanzas PUT error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.delete("/admin/productFinanzas/:productId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const productId = String(req.params.productId || "").trim();
+      if (!productId) {
+        return res.status(400).json({ error: "Producto invalido" });
+      }
+      const { error } = await supabase.from("productoFinanzas").delete().eq("productId", productId);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("admin/productFinanzas DELETE error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.get("/staff/productPriceRanges", (req, res) => {
   cors(req, res, async () => {
     try {
@@ -4216,6 +4317,36 @@ app.get("/admin/products", (req, res) => {
       return res.status(200).json({ products: data ?? [] });
     } catch (error) {
       console.error("admin/products error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/admin/products", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const product = req.body?.product || req.body;
+      if (!product || typeof product !== "object" || !String(product.nombre || "").trim()) {
+        return res.status(400).json({ error: "Producto incompleto" });
+      }
+      const { data, error } = await supabase.from("productos").insert(product).select("id").single();
+      if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "crear",
+        "producto",
+        data.id,
+        product.nombre || data.id,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { source: "admin/products" },
+      );
+      return res.status(200).json({ ok: true, id: data.id });
+    } catch (error) {
+      console.error("admin/products POST error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -4264,6 +4395,63 @@ app.get("/admin/products/:productId", (req, res) => {
   });
 });
 
+app.patch("/admin/products/:productId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const productId = String(req.params.productId || "").trim();
+      const data = req.body?.product || req.body;
+      if (!productId || !data || typeof data !== "object") {
+        return res.status(400).json({ error: "Producto invalido" });
+      }
+      const { error } = await supabase.from("productos").update(data).eq("id", productId);
+      if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "editar",
+        "producto",
+        productId,
+        data.nombre || productId,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { source: "admin/products/:id", campos: Object.keys(data) },
+      );
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("admin/products PATCH error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.put("/admin/productCodes/:productId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const productId = String(req.params.productId || "").trim();
+      const codigo = String(req.body?.codigo || "").trim();
+      if (!productId || !codigo) {
+        return res.status(400).json({ error: "Codigo de producto invalido" });
+      }
+      const { error } = await supabase
+        .from("productoCodigos")
+        .upsert(
+          { productoId: productId, codigo, actualizadoEn: new Date().toISOString() },
+          { onConflict: "productoId" },
+        );
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("admin/productCodes PUT error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.get("/admin/productCodes", (req, res) => {
   cors(req, res, async () => {
     try {
@@ -4289,6 +4477,113 @@ app.get("/staff/productCodes", (req, res) => {
       return res.status(200).json({ codes });
     } catch (error) {
       console.error("staff/productCodes error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/manufacturers", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const { data, error } = await supabase.from("fabricantes").select("*").order("marca");
+      if (error) throw error;
+      return res.status(200).json({ manufacturers: data ?? [] });
+    } catch (error) {
+      console.error("admin/manufacturers error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.post("/admin/manufacturers", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const manufacturer = req.body?.manufacturer || req.body;
+      if (!manufacturer || typeof manufacturer !== "object" || !String(manufacturer.marca || "").trim()) {
+        return res.status(400).json({ error: "Fabricante incompleto" });
+      }
+      const { data, error } = await supabase.from("fabricantes").insert(manufacturer).select("id").single();
+      if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "crear",
+        "fabricante",
+        data.id,
+        manufacturer.marca || data.id,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { source: "admin/manufacturers" },
+      );
+      return res.status(200).json({ ok: true, id: data.id });
+    } catch (error) {
+      console.error("admin/manufacturers POST error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.patch("/admin/manufacturers/:manufacturerId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const manufacturerId = String(req.params.manufacturerId || "").trim();
+      const data = req.body?.manufacturer || req.body;
+      if (!manufacturerId || !data || typeof data !== "object") {
+        return res.status(400).json({ error: "Fabricante invalido" });
+      }
+      const { error } = await supabase.from("fabricantes").update(data).eq("id", manufacturerId);
+      if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "editar",
+        "fabricante",
+        manufacturerId,
+        data.marca || manufacturerId,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { source: "admin/manufacturers/:id", campos: Object.keys(data) },
+      );
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("admin/manufacturers PATCH error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.delete("/admin/manufacturers/:manufacturerId", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const manufacturerId = String(req.params.manufacturerId || "").trim();
+      if (!manufacturerId) {
+        return res.status(400).json({ error: "Fabricante invalido" });
+      }
+      const { error } = await supabase.from("fabricantes").delete().eq("id", manufacturerId);
+      if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "eliminar",
+        "fabricante",
+        manufacturerId,
+        manufacturerId,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { source: "admin/manufacturers/:id" },
+      );
+      return res.status(200).json({ ok: true });
+    } catch (error) {
+      console.error("admin/manufacturers DELETE error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });

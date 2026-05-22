@@ -5,7 +5,6 @@ import { bffFetch } from "@/utils/bffClient";
 import type { PanelFetchScope } from "@/security/panelScope";
 import type { DailySale, ProductFinancial, ProductPriceRange } from "@/types";
 
-const FINANCIAL_COL = "productoFinanzas";
 const SALES_COL = "ventasDiarias";
 
 /** Admin: datos completos. Staff: solo ventas propias y rangos sin costo. */
@@ -53,17 +52,14 @@ export async function upsertProductFinancial(
   productId: string,
   data: Omit<ProductFinancial, "productId" | "actualizadoEn">
 ): Promise<void> {
-  const { error } = await supabase.from(FINANCIAL_COL).upsert({
-    productId,
-    ...data,
-    actualizadoEn: new Date().toISOString(),
-  }, { onConflict: "productId" });
-  if (error) throw error;
+  await bffFetch(`/admin/productFinanzas/${encodeURIComponent(productId)}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
 }
 
 export async function deleteProductFinancial(productId: string): Promise<void> {
-  const { error } = await supabase.from(FINANCIAL_COL).delete().eq("productId", productId);
-  if (error) throw error;
+  await bffFetch(`/admin/productFinanzas/${encodeURIComponent(productId)}`, { method: "DELETE" });
 }
 
 function sinceISO(days: number) {
@@ -159,13 +155,8 @@ export async function fetchDailySales(
 }
 
 export async function addDailySale(data: Omit<DailySale, "id" | "creadoEn">): Promise<string> {
-  const { data: row, error } = await supabase.from(SALES_COL).insert({
-    ...data,
-    canal: "tienda",
-    creadoEn: new Date().toISOString(),
-  }).select("id").single();
-  if (error) throw error;
-  return row.id;
+  const ids = await registerDailySalesAtomic([data as DailySaleAtomicInput], "admin");
+  return ids[0] ?? "";
 }
 
 export type DailySaleAtomicInput = Omit<DailySale, "id" | "creadoEn" | "devuelto" | "motivoDevolucion" | "devueltoEn" | "canal">;
@@ -202,12 +193,7 @@ export async function registerDailySalesAtomic(
 }
 
 export async function markSaleReturned(saleId: string, motivo: string): Promise<void> {
-  const { error } = await supabase.from(SALES_COL).update({
-    devuelto: true,
-    motivoDevolucion: motivo,
-    devueltoEn: new Date().toISOString(),
-  }).eq("id", saleId);
-  if (error) throw error;
+  await returnDailySaleAtomic(saleId, motivo, "admin");
 }
 
 export async function returnDailySaleAtomic(
@@ -229,11 +215,10 @@ export async function decrementProductStock(
   productId: string,
   lines: { talla: string | null; cantidad: number }[]
 ): Promise<void> {
-  const { error } = await supabase.rpc("decrement_product_stock", {
-    p_product_id: productId,
-    p_lines: lines,
+  await bffFetch("/admin/products/decrementStock", {
+    method: "POST",
+    body: JSON.stringify({ productId, lines }),
   });
-  if (error) throw error;
 }
 
 export async function restoreProductStock(
@@ -241,10 +226,8 @@ export async function restoreProductStock(
   talla: string | null,
   cantidad: number
 ): Promise<void> {
-  const { error } = await supabase.rpc("restore_product_stock", {
-    p_product_id: productId,
-    p_talla: talla ?? null,
-    p_cantidad: cantidad,
+  await bffFetch("/admin/products/restoreStock", {
+    method: "POST",
+    body: JSON.stringify({ productId, talla: talla ?? null, cantidad }),
   });
-  if (error) throw error;
 }

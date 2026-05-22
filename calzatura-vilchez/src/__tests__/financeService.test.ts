@@ -192,9 +192,8 @@ describe("finance service", () => {
     expect(bffFetchMock).toHaveBeenCalledWith("/staff/productPriceRanges");
   });
 
-  it("upsertProductFinancial guarda fecha de actualizacion", async () => {
-    const upsert = vi.fn().mockResolvedValue({ error: null });
-    fromMock.mockReturnValue({ upsert });
+  it("upsertProductFinancial guarda via BFF", async () => {
+    bffFetchMock.mockResolvedValue({ ok: true });
 
     await upsertProductFinancial("p1", {
       costoCompra: 100,
@@ -206,24 +205,24 @@ describe("finance service", () => {
       precioMaximo: 160,
     });
 
-    expect(upsert).toHaveBeenCalledWith(
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/admin/productFinanzas/p1",
       expect.objectContaining({
-        productId: "p1",
-        actualizadoEn: "2026-05-13T10:00:00.000Z",
+        method: "PUT",
+        body: expect.stringContaining("\"precioMaximo\":160"),
       }),
-      { onConflict: "productId" }
     );
   });
 
-  it("deleteProductFinancial elimina por productId", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: null });
-    const deleteMock = vi.fn().mockReturnValue({ eq });
-    fromMock.mockReturnValue({ delete: deleteMock });
+  it("deleteProductFinancial elimina via BFF", async () => {
+    bffFetchMock.mockResolvedValue({ ok: true });
 
     await deleteProductFinancial("p1");
 
-    expect(deleteMock).toHaveBeenCalled();
-    expect(eq).toHaveBeenCalledWith("productId", "p1");
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/admin/productFinanzas/p1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 
   it("fetchDailySales filtra por fecha y ordena por creadoEn descendente", async () => {
@@ -253,59 +252,48 @@ describe("finance service", () => {
     expect(rows).toHaveLength(1);
   });
 
-  it("addDailySale inserta canal tienda y devuelve id", async () => {
-    const single = vi.fn().mockResolvedValue({ data: { id: "sale-1" }, error: null });
-    const select = vi.fn().mockReturnValue({ single });
-    const insert = vi.fn().mockReturnValue({ select });
-    fromMock.mockReturnValue({ insert });
+  it("addDailySale registra via BFF y devuelve primer id", async () => {
+    bffFetchMock.mockResolvedValue({ ids: ["sale-1"] });
 
     await expect(addDailySale({ fecha: "2026-05-13", total: 50 } as never)).resolves.toBe("sale-1");
-    expect(insert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        canal: "tienda",
-        creadoEn: "2026-05-13T10:00:00.000Z",
-      })
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/admin/dailySales/register",
+      expect.objectContaining({ method: "POST" }),
     );
-    expect(select).toHaveBeenCalledWith("id");
   });
 
-  it("markSaleReturned marca devolucion con motivo", async () => {
-    const eq = vi.fn().mockResolvedValue({ error: null });
-    const update = vi.fn().mockReturnValue({ eq });
-    fromMock.mockReturnValue({ update });
+  it("markSaleReturned registra devolucion via BFF", async () => {
+    bffFetchMock.mockResolvedValue({ sale: { id: "sale-1" } });
 
     await markSaleReturned("sale-1", "Cambio");
 
-    expect(update).toHaveBeenCalledWith({
-      devuelto: true,
-      motivoDevolucion: "Cambio",
-      devueltoEn: "2026-05-13T10:00:00.000Z",
-    });
-    expect(eq).toHaveBeenCalledWith("id", "sale-1");
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/admin/dailySales/return",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ saleId: "sale-1", motivo: "Cambio" }) }),
+    );
   });
 
-  it("decrementProductStock llama al RPC correcto", async () => {
+  it("decrementProductStock llama al BFF correcto", async () => {
     const lines = [{ talla: "38", cantidad: 2 }];
-    rpcMock.mockResolvedValue({ error: null });
+    bffFetchMock.mockResolvedValue({ ok: true });
 
     await decrementProductStock("p1", lines);
 
-    expect(rpcMock).toHaveBeenCalledWith("decrement_product_stock", {
-      p_product_id: "p1",
-      p_lines: lines,
-    });
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/admin/products/decrementStock",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ productId: "p1", lines }) }),
+    );
   });
 
-  it("restoreProductStock normaliza talla undefined a null", async () => {
-    rpcMock.mockResolvedValue({ error: null });
+  it("restoreProductStock normaliza talla undefined a null y llama BFF", async () => {
+    bffFetchMock.mockResolvedValue({ ok: true });
 
     await restoreProductStock("p1", undefined as never, 2);
 
-    expect(rpcMock).toHaveBeenCalledWith("restore_product_stock", {
-      p_product_id: "p1",
-      p_talla: null,
-      p_cantidad: 2,
-    });
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/admin/products/restoreStock",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ productId: "p1", talla: null, cantidad: 2 }) }),
+    );
   });
 
   it("registerDailySalesAtomic registra via BFF (admin)", async () => {

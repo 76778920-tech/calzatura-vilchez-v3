@@ -8,7 +8,6 @@ import type { Product } from "@/types";
 import { effectiveFamiliaKey, tallyFamilyGroupSizes } from "@/utils/productFamily";
 
 const COL = "productos";
-const CODE_COL = "productoCodigos";
 
 /** Panel admin: todos los productos. Staff: solo activos. Público: `fetchPublicProducts`. */
 export async function fetchProducts(scope: PanelFetchScope = "admin"): Promise<Product[]> {
@@ -95,10 +94,11 @@ export async function fetchFeaturedProducts(): Promise<Product[]> {
 }
 
 export async function addProduct(data: Omit<Product, "id">): Promise<string> {
-  const { data: row, error } = await supabase.from(COL).insert(data).select("id").single();
-  if (error) throw error;
-  void logAudit("crear", "producto", row.id, data.nombre);
-  return row.id;
+  const { id } = await bffFetch<{ id: string }>("/admin/products", {
+    method: "POST",
+    body: JSON.stringify({ product: data }),
+  });
+  return id;
 }
 
 type VariantAtomicInput = {
@@ -138,9 +138,10 @@ export async function createProductVariantsAtomic(
 }
 
 export async function updateProduct(id: string, data: Partial<Omit<Product, "id">>): Promise<void> {
-  const { error } = await supabase.from(COL).update(data).eq("id", id);
-  if (error) throw error;
-  void logAudit("editar", "producto", id, data.nombre ?? id, { campos: Object.keys(data) });
+  await bffFetch(`/admin/products/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ product: data }),
+  });
 }
 
 type ProductEditFinancials = {
@@ -216,12 +217,10 @@ export async function fetchProductCodes(scope: PanelFetchScope = "admin"): Promi
 }
 
 export async function upsertProductCode(productId: string, codigo: string): Promise<void> {
-  const { error } = await supabase.from(CODE_COL).upsert({
-    productoId: productId,
-    codigo,
-    actualizadoEn: new Date().toISOString(),
-  }, { onConflict: "productoId" });
-  if (error) throw error;
+  await bffFetch(`/admin/productCodes/${encodeURIComponent(productId)}`, {
+    method: "PUT",
+    body: JSON.stringify({ codigo }),
+  });
 }
 
 export async function fetchCategories(): Promise<string[]> {
