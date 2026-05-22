@@ -75,16 +75,45 @@ function inferScenario(fileName: string): ScenarioKey {
   return "general";
 }
 
+function importBaseName(fileName: string): string {
+  const dotIndex = fileName.lastIndexOf(".");
+  const withoutExtension = dotIndex > 0 ? fileName.slice(0, dotIndex) : fileName;
+  let slug = "";
+
+  for (const char of withoutExtension.toLowerCase()) {
+    const isAsciiLetter = char >= "a" && char <= "z";
+    const isDigit = char >= "0" && char <= "9";
+    if (isAsciiLetter || isDigit) {
+      slug += char;
+    } else if (slug && !slug.endsWith("-")) {
+      slug += "-";
+    }
+
+    if (slug.length >= 48) break;
+  }
+
+  if (slug.endsWith("-")) {
+    slug = slug.slice(0, -1);
+  }
+  return slug || "archivo";
+}
+
+function compactDigits(value: string, maxLength: number): string {
+  let digits = "";
+  for (const char of value) {
+    if (char >= "0" && char <= "9") {
+      digits += char;
+      if (digits.length >= maxLength) break;
+    }
+  }
+  return digits;
+}
+
 function createImportContext(fileName: string): ImportContext {
   const importadoEn = new Date().toISOString();
   const escenario = inferScenario(fileName);
-  const base = fileName
-    .replace(/\.[^.]+$/, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48) || "archivo";
-  const stamp = importadoEn.replace(/\D/g, "").slice(0, 14);
+  const base = importBaseName(fileName);
+  const stamp = compactDigits(importadoEn, 14);
   const rand = crypto.randomUUID().slice(0, 4);
   return {
     fileName,
