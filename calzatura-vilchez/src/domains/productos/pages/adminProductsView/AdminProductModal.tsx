@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import type { AdminProductsViewModel } from "../useAdminProductsPage";
+import { useDialogKeyboardTrap } from "@/hooks/useDialogKeyboardTrap";
 import { AdminProductFormColumn } from "./AdminProductFormColumn";
 import { AdminProductModalImageColumn } from "./AdminProductModalImageColumn";
 
@@ -32,6 +33,8 @@ export function AdminProductModal(props: Readonly<AdminProductsViewModel>) {
   } = props;
 
   const s: ModalState = m;
+  const dialogRef = modalRef;
+  useDialogKeyboardTrap(dialogRef, { enabled: s.showModal, onEscape: s.closeModal });
 
   return (
     <div className="product-modal-host">
@@ -42,7 +45,6 @@ export function AdminProductModal(props: Readonly<AdminProductsViewModel>) {
         aria-modal="true"
         aria-labelledby="product-modal-title"
         className={`modal product-modal${s.editingId ? "" : " product-modal--create"}`}
-        onKeyDown={s.trapFocus}
       >
         <div className="modal-header">
           <h2 id="product-modal-title">{s.editingId ? "Editar producto" : "Nuevo producto"}</h2>

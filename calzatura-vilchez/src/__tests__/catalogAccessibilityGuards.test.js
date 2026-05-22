@@ -23,8 +23,7 @@ describe("Catálogo ProductCard accessibility guards", () => {
     expect(productCardSource).toContain('aria-modal="true"');
     expect(productCardSource).toContain("aria-labelledby={sizePickerTitleId}");
     expect(productCardSource).toContain('aria-label="Cerrar selector de talla"');
-    expect(productCardSource).toContain('event.key === "Escape"');
-    expect(productCardSource).toContain("event.key !== \"Tab\"");
+    expect(productCardSource).toContain("useDialogKeyboardTrap");
     expect(productCardSource).toContain("firstSizeButtonRef.current?.focus()");
     expect(productCardSource).toContain("openSizePickerButtonRef.current?.focus()");
   });

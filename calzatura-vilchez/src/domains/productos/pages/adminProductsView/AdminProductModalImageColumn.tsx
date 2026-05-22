@@ -13,7 +13,7 @@ type Props = Readonly<{
   compressing: boolean;
   isDraggingVariants: boolean;
   fileInputRefs: RefObject<Array<HTMLInputElement | null>>;
-  variantsCarouselRef: RefObject<HTMLDivElement | null>;
+  variantsCarouselRef: RefObject<HTMLElement | null>;
   setPreviewImage: (v: { src: string; title: string; subtitle?: string }) => void;
   setFileInputRef: (index: number) => (element: HTMLInputElement | null) => void;
   handleFileChange: (event: ChangeEvent<HTMLInputElement>, index: number) => void;

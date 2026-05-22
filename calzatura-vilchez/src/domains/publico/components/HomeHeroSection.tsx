@@ -4,9 +4,6 @@ import {
   useRef,
   useState,
   type CSSProperties,
-  type KeyboardEvent,
-  type MouseEvent,
-  type TouchEvent,
 } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
@@ -46,7 +43,7 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
   const [heroDragOffset, setHeroDragOffset] = useState(0);
   const [heroParallax, setHeroParallax] = useState({ x: 0, y: 0 });
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
-  const heroCarouselRef = useRef<HTMLDivElement | null>(null);
+  const heroCarouselRef = useRef<HTMLElement | null>(null);
   const heroDragStartXRef = useRef<number | null>(null);
   const heroDragStartYRef = useRef<number | null>(null);
   const heroSwipeSuppressClickRef = useRef(false);
@@ -112,15 +109,15 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
     setHeroDragOffset(deltaX);
   };
 
-  const beginHeroSwipe = (clientX: number, clientY: number) => {
+  const beginHeroSwipe = useCallback((clientX: number, clientY: number) => {
     if (heroSlides.length < 2) return;
     heroDragStartXRef.current = clientX;
     heroDragStartYRef.current = clientY;
     heroSwipeSuppressClickRef.current = false;
     setIsHeroInteractionPaused(true);
-  };
+  }, [heroSlides.length]);
 
-  const finishHeroSwipe = (clientX: number, clientY: number) => {
+  const finishHeroSwipe = useCallback((clientX: number, clientY: number) => {
     const startX = heroDragStartXRef.current;
     const startY = heroDragStartYRef.current;
     const deltaX = startX === null ? 0 : clientX - startX;
@@ -135,7 +132,7 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
     if (Math.abs(deltaX) < HERO_SWIPE_THRESHOLD || Math.abs(deltaX) <= Math.abs(deltaY)) return;
     heroSwipeSuppressClickRef.current = true;
     shiftHeroSlide(deltaX < 0 ? 1 : -1);
-  };
+  }, [shiftHeroSlide]);
 
   const cancelHeroSwipe = () => {
     heroDragStartXRef.current = null;
@@ -145,100 +142,139 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
     setHeroDragOffset(0);
   };
 
-  const handleHeroTouchStart = (event: TouchEvent<HTMLDivElement>) => {
-    const touch = event.touches[0];
-    if (!touch) return;
-    beginHeroSwipe(touch.clientX, touch.clientY);
-  };
+  useEffect(() => {
+    const carousel = heroCarouselRef.current;
+    if (!carousel) return undefined;
 
-  const handleHeroTouchEnd = (event: TouchEvent<HTMLDivElement>) => {
-    const touch = event.changedTouches[0];
-    if (!touch) {
-      cancelHeroSwipe();
-      return;
-    }
+    const slideCount = heroSlides.length;
 
-    finishHeroSwipe(touch.clientX, touch.clientY);
-  };
-
-  const handleHeroTouchMove = (event: TouchEvent<HTMLDivElement>) => {
-    const touch = event.touches[0];
-    if (!touch) return;
-    updateHeroDrag(touch.clientX, touch.clientY);
-    if (heroDragStartXRef.current !== null && heroDragStartYRef.current !== null) {
-      const deltaX = touch.clientX - heroDragStartXRef.current;
-      const deltaY = touch.clientY - heroDragStartYRef.current;
-      if (Math.abs(deltaX) > Math.abs(deltaY) && event.cancelable) {
-        event.preventDefault();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (slideCount < 2) return;
+      switch (event.key) {
+        case "ArrowLeft":
+          event.preventDefault();
+          setIsHeroInteractionPaused(true);
+          shiftHeroSlide(-1);
+          break;
+        case "ArrowRight":
+          event.preventDefault();
+          setIsHeroInteractionPaused(true);
+          shiftHeroSlide(1);
+          break;
+        case "Home":
+          event.preventDefault();
+          setIsHeroInteractionPaused(true);
+          goToHeroSlide(0);
+          break;
+        case "End":
+          event.preventDefault();
+          setIsHeroInteractionPaused(true);
+          goToHeroSlide(slideCount - 1);
+          break;
+        default:
+          break;
       }
-    }
-  };
+    };
 
-  const handleHeroMouseDown = (event: MouseEvent<HTMLDivElement>) => {
-    if (event.button !== 0) return;
-    beginHeroSwipe(event.clientX, event.clientY);
-  };
+    const onTouchStart = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      beginHeroSwipe(touch.clientX, touch.clientY);
+    };
 
-  const handleHeroMouseMove = (event: MouseEvent<HTMLDivElement>) => {
-    if (heroDragStartXRef.current !== null) {
-      updateHeroDrag(event.clientX, event.clientY);
-      return;
-    }
+    const onTouchEnd = (event: TouchEvent) => {
+      const touch = event.changedTouches[0];
+      if (!touch) {
+        cancelHeroSwipe();
+        return;
+      }
+      finishHeroSwipe(touch.clientX, touch.clientY);
+    };
 
-    if (prefersReducedMotion) return;
-    const container = heroCarouselRef.current;
-    if (!container) return;
-    const bounds = container.getBoundingClientRect();
-    const relativeX = (event.clientX - bounds.left) / bounds.width;
-    const relativeY = (event.clientY - bounds.top) / bounds.height;
-    const nextX = (relativeX - 0.5) * 26;
-    const nextY = (relativeY - 0.5) * 22;
-    setHeroParallax({ x: nextX, y: nextY });
-  };
+    const onTouchMove = (event: TouchEvent) => {
+      const touch = event.touches[0];
+      if (!touch) return;
+      updateHeroDrag(touch.clientX, touch.clientY);
+      if (heroDragStartXRef.current !== null && heroDragStartYRef.current !== null) {
+        const deltaX = touch.clientX - heroDragStartXRef.current;
+        const deltaY = touch.clientY - heroDragStartYRef.current;
+        if (Math.abs(deltaX) > Math.abs(deltaY) && event.cancelable) {
+          event.preventDefault();
+        }
+      }
+    };
 
-  const handleHeroMouseUp = (event: MouseEvent<HTMLDivElement>) => {
-    if (heroDragStartXRef.current === null) return;
-    finishHeroSwipe(event.clientX, event.clientY);
-  };
+    const onMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+      beginHeroSwipe(event.clientX, event.clientY);
+    };
 
-  const handleHeroMouseLeave = () => {
-    if (heroDragStartXRef.current !== null) {
-      cancelHeroSwipe();
-    }
-    setHeroParallax({ x: 0, y: 0 });
-  };
+    const onMouseMove = (event: MouseEvent) => {
+      if (heroDragStartXRef.current !== null) {
+        updateHeroDrag(event.clientX, event.clientY);
+        return;
+      }
+      if (prefersReducedMotion) return;
+      const bounds = carousel.getBoundingClientRect();
+      const relativeX = (event.clientX - bounds.left) / bounds.width;
+      const relativeY = (event.clientY - bounds.top) / bounds.height;
+      setHeroParallax({ x: (relativeX - 0.5) * 26, y: (relativeY - 0.5) * 22 });
+    };
 
-  const handleHeroClickCapture = (event: MouseEvent<HTMLDivElement>) => {
-    if (!heroSwipeSuppressClickRef.current) return;
-    heroSwipeSuppressClickRef.current = false;
-    event.preventDefault();
-    event.stopPropagation();
-  };
+    const onMouseUp = (event: MouseEvent) => {
+      if (heroDragStartXRef.current === null) return;
+      finishHeroSwipe(event.clientX, event.clientY);
+    };
 
-  const handleHeroCarouselKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (heroSlides.length < 2) return;
+    const onMouseLeave = () => {
+      if (heroDragStartXRef.current !== null) {
+        cancelHeroSwipe();
+      }
+      setHeroParallax({ x: 0, y: 0 });
+    };
 
-    switch (event.key) {
-      case "ArrowLeft":
-        event.preventDefault();
-        handleHeroControl(() => shiftHeroSlide(-1));
-        break;
-      case "ArrowRight":
-        event.preventDefault();
-        handleHeroControl(() => shiftHeroSlide(1));
-        break;
-      case "Home":
-        event.preventDefault();
-        handleHeroControl(() => goToHeroSlide(0));
-        break;
-      case "End":
-        event.preventDefault();
-        handleHeroControl(() => goToHeroSlide(heroSlides.length - 1));
-        break;
-      default:
-        break;
-    }
-  };
+    const onClickCapture = (event: MouseEvent) => {
+      if (!heroSwipeSuppressClickRef.current) return;
+      heroSwipeSuppressClickRef.current = false;
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const onFocus = () => setIsHeroInteractionPaused(true);
+    const onBlur = (event: FocusEvent) => {
+      if (shouldResumeHeroCarouselAutoplay(carousel, event.relatedTarget)) {
+        setIsHeroInteractionPaused(false);
+      }
+    };
+
+    carousel.addEventListener("keydown", onKeyDown);
+    carousel.addEventListener("touchstart", onTouchStart, { passive: true });
+    carousel.addEventListener("touchend", onTouchEnd);
+    carousel.addEventListener("touchmove", onTouchMove, { passive: false });
+    carousel.addEventListener("touchcancel", cancelHeroSwipe);
+    carousel.addEventListener("mousedown", onMouseDown);
+    carousel.addEventListener("mousemove", onMouseMove);
+    carousel.addEventListener("mouseup", onMouseUp);
+    carousel.addEventListener("mouseleave", onMouseLeave);
+    carousel.addEventListener("click", onClickCapture, true);
+    carousel.addEventListener("focus", onFocus);
+    carousel.addEventListener("blur", onBlur);
+
+    return () => {
+      carousel.removeEventListener("keydown", onKeyDown);
+      carousel.removeEventListener("touchstart", onTouchStart);
+      carousel.removeEventListener("touchend", onTouchEnd);
+      carousel.removeEventListener("touchmove", onTouchMove);
+      carousel.removeEventListener("touchcancel", cancelHeroSwipe);
+      carousel.removeEventListener("mousedown", onMouseDown);
+      carousel.removeEventListener("mousemove", onMouseMove);
+      carousel.removeEventListener("mouseup", onMouseUp);
+      carousel.removeEventListener("mouseleave", onMouseLeave);
+      carousel.removeEventListener("click", onClickCapture, true);
+      carousel.removeEventListener("focus", onFocus);
+      carousel.removeEventListener("blur", onBlur);
+    };
+  }, [beginHeroSwipe, finishHeroSwipe, goToHeroSlide, heroSlides.length, prefersReducedMotion, shiftHeroSlide]);
 
   const getHeroSlideState = (index: number) => {
     if (index === activeHeroIndex) return "active";
@@ -249,9 +285,8 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
 
   return (
     <section className="home-hero" aria-roledescription="carousel" aria-label="Promociones destacadas">
-      <div
+      <section
         ref={heroCarouselRef}
-        role="region"
         aria-label="Carrusel de promociones destacadas"
         aria-describedby="home-hero-carousel-keyboard-help"
         className={`home-hero-carousel ${isHeroDragging ? "is-dragging" : ""}`}
@@ -263,23 +298,7 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
             "--hero-parallax-y": `${heroParallax.y}px`,
           } as CSSProperties
         }
-        onMouseLeave={handleHeroMouseLeave}
-        onMouseDown={handleHeroMouseDown}
-        onMouseMove={handleHeroMouseMove}
-        onMouseUp={handleHeroMouseUp}
-        onTouchStart={handleHeroTouchStart}
-        onTouchMove={handleHeroTouchMove}
-        onTouchEnd={handleHeroTouchEnd}
-        onTouchCancel={cancelHeroSwipe}
-        onClickCapture={handleHeroClickCapture}
-        onKeyDown={handleHeroCarouselKeyDown}
         tabIndex={heroSlides.length > 1 ? 0 : undefined}
-        onFocus={() => setIsHeroInteractionPaused(true)}
-        onBlur={(event) => {
-          if (shouldResumeHeroCarouselAutoplay(event.currentTarget, event.relatedTarget)) {
-            setIsHeroInteractionPaused(false);
-          }
-        }}
       >
         <div id="home-hero-carousel-keyboard-help" className="home-hero-progress-sr-only">
           Usa las flechas izquierda y derecha para cambiar de promocion. Usa Inicio y Fin para ir a la primera o ultima promocion.
@@ -431,7 +450,7 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
             })}
           </div>
         ) : null}
-      </div>
+      </section>
     </section>
   );
 }

@@ -1,10 +1,11 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef } from "react";
 import { X, ShoppingBag, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { CartSummaryRows, CartItemQtyControls } from "@/domains/carrito/components/cartShared";
 import { handleProductImageError } from "@/utils/imgUtils";
 import { getSizeStock } from "@/utils/stock";
+import { useDialogKeyboardTrap } from "@/hooks/useDialogKeyboardTrap";
 
 export default function CartSidebar() {
   const { items, isOpen, setIsOpen, removeItem, updateQuantity, subtotal, total, itemCount } = useCart();
@@ -16,30 +17,10 @@ export default function CartSidebar() {
     dialogRef.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
   }, [isOpen]);
 
-  const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      setIsOpen(false);
-      return;
-    }
-    if (event.key !== "Tab" || !dialogRef.current) return;
-    const focusable = Array.from(
-      dialogRef.current.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), a[href], input:not([disabled]), [tabindex]:not([tabindex='-1'])"
-      )
-    ).filter((el) => el.offsetParent !== null);
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (!last) return;
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
+  useDialogKeyboardTrap(dialogRef, {
+    enabled: isOpen,
+    onEscape: () => setIsOpen(false),
+  });
 
   if (!isOpen) return null;
 
@@ -58,7 +39,6 @@ export default function CartSidebar() {
         aria-label="Carrito de compras"
         aria-labelledby={titleId}
         className="cart-sidebar"
-        onKeyDown={trapFocus}
       >
         <div className="cart-header">
           <div className="cart-header-title" id={titleId}>

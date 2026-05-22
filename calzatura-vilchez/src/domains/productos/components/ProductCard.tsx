@@ -8,6 +8,7 @@ import { useCart } from "@/domains/carrito/context/CartContext";
 import { useFavorites } from "@/domains/clientes/context/FavoritesContext";
 import { getProductColors } from "@/utils/colors";
 import { getAvailableSizes } from "@/utils/stock";
+import { useDialogKeyboardTrap } from "@/hooks/useDialogKeyboardTrap";
 
 type Props = Readonly<{
   product: Product;
@@ -29,6 +30,7 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   const openSizePickerButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeSizePickerButtonRef = useRef<HTMLButtonElement | null>(null);
   const firstSizeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const sizePickerRef = useRef<HTMLDialogElement | null>(null);
   const colors = getProductColors(product);
   const availableSizes = getAvailableSizes(product);
   const images = (product.imagenes?.length ? product.imagenes : [product.imagen]).filter(Boolean);
@@ -67,29 +69,11 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
     queueMicrotask(() => openSizePickerButtonRef.current?.focus());
   };
 
-  const handleSizePickerKeyDown = (event: React.KeyboardEvent<HTMLDialogElement>) => {
-    if (event.key === "Escape") {
-      event.stopPropagation();
-      handleCloseSizePicker();
-      return;
-    }
-    if (event.key !== "Tab") return;
-
-    const focusables = Array.from(
-      event.currentTarget.querySelectorAll<HTMLButtonElement>("button:not(:disabled)")
-    );
-    if (focusables.length === 0) return;
-    const first = focusables[0];
-    const last = focusables.at(-1);
-    if (!last) return;
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
+  useDialogKeyboardTrap(sizePickerRef, {
+    enabled: showSizePicker,
+    onEscape: handleCloseSizePicker,
+    focusSelector: "button:not(:disabled)",
+  });
 
   const handleLike = async (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -228,11 +212,11 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
 
       {showSizePicker && (
         <dialog
+          ref={sizePickerRef}
           open
           className="product-size-picker"
           aria-modal="true"
           aria-labelledby={sizePickerTitleId}
-          onKeyDown={handleSizePickerKeyDown}
           style={{ bottom: "auto", aspectRatio: "1 / 1" }}
         >
           <button

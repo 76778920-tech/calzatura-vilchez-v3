@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import type { AdminProduct } from "../adminProductsInternals";
+import { useDialogKeyboardTrap } from "@/hooks/useDialogKeyboardTrap";
 
 type Props = Readonly<{
   product: AdminProduct;
@@ -17,28 +17,11 @@ export function AdminProductDeleteDialog({ product, deleting, onCancel, onConfir
     dialogRef.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
   }, []);
 
-  const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
+  useDialogKeyboardTrap(dialogRef, {
+    onEscape: () => {
       if (!deleting) onCancel();
-      return;
-    }
-    if (event.key !== "Tab" || !dialogRef.current) return;
-    const focusable = Array.from(
-      dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), [tabindex]:not([tabindex='-1'])")
-    ).filter((el) => el.offsetParent !== null);
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (!last) return;
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
+    },
+  });
 
   return (
     <div className="product-modal-host">
@@ -55,7 +38,6 @@ export function AdminProductDeleteDialog({ product, deleting, onCancel, onConfir
         aria-labelledby="product-delete-title"
         aria-describedby="product-delete-description"
         className="modal product-delete-dialog"
-        onKeyDown={trapFocus}
       >
         <div className="modal-header">
           <h2 id="product-delete-title">
@@ -69,15 +51,14 @@ export function AdminProductDeleteDialog({ product, deleting, onCancel, onConfir
 
         <div className="product-delete-dialog__body">
           <p id="product-delete-description">
-            Esta accion eliminara <strong>{product.nombre}</strong>
-            {product.codigo ? ` (${product.codigo})` : ""} del catalogo. No se puede deshacer.
+            ¿Eliminar <strong>{product.nombre}</strong> ({product.codigo})? Esta acción no se puede deshacer.
           </p>
           <div className="product-delete-dialog__actions">
             <button type="button" className="btn-outline" onClick={onCancel} disabled={deleting}>
               Cancelar
             </button>
             <button type="button" className="btn-danger" onClick={onConfirm} disabled={deleting}>
-              {deleting ? "Eliminando..." : "Eliminar producto"}
+              {deleting ? "Eliminando..." : "Eliminar"}
             </button>
           </div>
         </div>

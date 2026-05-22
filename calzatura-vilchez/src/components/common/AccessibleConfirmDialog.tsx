@@ -1,5 +1,6 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { useDialogKeyboardTrap } from "@/hooks/useDialogKeyboardTrap";
 
 type AccessibleConfirmDialogProps = Readonly<{
   title: string;
@@ -30,28 +31,11 @@ export function AccessibleConfirmDialog({
     dialogRef.current?.querySelector<HTMLElement>("button:not([disabled])")?.focus();
   }, []);
 
-  const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
+  useDialogKeyboardTrap(dialogRef, {
+    onEscape: () => {
       if (!loading) onCancel();
-      return;
-    }
-    if (event.key !== "Tab" || !dialogRef.current) return;
-    const focusable = Array.from(
-      dialogRef.current.querySelectorAll<HTMLElement>("button:not([disabled]), [tabindex]:not([tabindex='-1'])")
-    ).filter((el) => el.offsetParent !== null);
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (!last) return;
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
+    },
+  });
 
   return (
     <div className="product-modal-host">
@@ -68,7 +52,6 @@ export function AccessibleConfirmDialog({
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
         className="modal product-delete-dialog"
-        onKeyDown={trapFocus}
       >
         <div className="modal-header">
           <h2 id={titleId}>

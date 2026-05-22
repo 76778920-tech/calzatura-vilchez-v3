@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Eye, RotateCcw, X } from "lucide-react";
+import { useDialogKeyboardTrap } from "@/hooks/useDialogKeyboardTrap";
 import type { DailySale } from "@/types";
 import { SALE_DOCUMENT_LABELS } from "./adminSaleDocumentLabels";
 import { maskDniForDisplay } from "@/utils/maskEmail";
@@ -36,30 +36,7 @@ export function AdminSaleDetailModal({
     first?.focus();
   }, []);
 
-  const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onClose();
-      return;
-    }
-    if (event.key !== "Tab" || !modalRef.current) return;
-    const focusable = Array.from(
-      modalRef.current.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex='-1'])"
-      )
-    ).filter((el) => el.offsetParent !== null);
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (!last) return;
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
+  useDialogKeyboardTrap(modalRef, { onEscape: onClose });
 
   return (
     <div className="sale-modal-overlay">
@@ -70,7 +47,6 @@ export function AdminSaleDetailModal({
         aria-modal="true"
         aria-labelledby="sale-detail-title"
         className="sale-modal"
-        onKeyDown={trapFocus}
       >
         <div className="sale-modal-header">
           <div>

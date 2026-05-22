@@ -6,7 +6,7 @@ type Props = Readonly<{
   variantSlots: VariantSlot[];
   compressing: boolean;
   isDraggingVariants: boolean;
-  variantsCarouselRef: RefObject<HTMLDivElement | null>;
+  variantsCarouselRef: RefObject<HTMLElement | null>;
   handleVariantFileChange: (event: ChangeEvent<HTMLInputElement>, slotIndex: number, imageIndex: number) => void;
   updateVariantSlotImageUrl: (slotIndex: number, imageIndex: number, value: string) => void;
   validateVariantSlotImageUrl: (slotIndex: number, imageIndex: number, value: string) => void;
@@ -36,9 +36,8 @@ export function AdminProductCreateVariantsPanel({
 
   return (
     <section className="admin-variants-panel">
-      <div
+      <section
         ref={variantsCarouselRef}
-        role="region"
         aria-label="Carrusel de variantes. Arrastra para desplazar."
         className={`admin-variants-carousel${isDraggingVariants ? " dragging" : ""}`}
       >
@@ -59,7 +58,7 @@ export function AdminProductCreateVariantsPanel({
             />
           );
         })}
-      </div>
+      </section>
     </section>
   );
 }

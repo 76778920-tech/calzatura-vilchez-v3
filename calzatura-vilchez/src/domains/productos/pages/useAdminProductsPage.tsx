@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent, KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { ChangeEvent } from "react";
 
 function isInteractiveVariantsDragTarget(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
@@ -139,7 +139,7 @@ export function useAdminProductsPage() {
   const colorPaletteRef = useRef<HTMLDivElement | null>(null);
   const estiloSelectRef = useRef<HTMLDivElement | null>(null);
   const activeColorSlotRef = useRef<HTMLDivElement | null>(null);
-  const variantsCarouselRef = useRef<HTMLDivElement | null>(null);
+  const variantsCarouselRef = useRef<HTMLElement | null>(null);
   const modalRef = useRef<HTMLDialogElement | null>(null);
   const triggerRef = useRef<HTMLElement | null>(null);
   const variantsDragStateRef = useRef({
@@ -312,25 +312,6 @@ export function useAdminProductsPage() {
     setEstiloSelectOpen(false);
     setShowModal(false);
     globalThis.setTimeout(() => triggerRef.current?.focus(), 0);
-  };
-
-  const trapFocus = (event: ReactKeyboardEvent<HTMLDialogElement>) => {
-    if (event.key === "Escape") { event.preventDefault(); closeModal(); return; }
-    if (event.key !== "Tab" || !modalRef.current) return;
-    const focusable = Array.from(
-      modalRef.current.querySelectorAll<HTMLElement>(
-        "input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex='-1'])"
-      )
-    ).filter((el) => el.offsetParent !== null);
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (!last) return;
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault(); last.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault(); first.focus();
-    }
   };
 
   const stats = useMemo(
@@ -753,7 +734,6 @@ export function useAdminProductsPage() {
     stats,
     stockFilter,
     toggleEstiloOption,
-    trapFocus,
     updateCategory,
     updateImageUrl,
     updateTallaStock,

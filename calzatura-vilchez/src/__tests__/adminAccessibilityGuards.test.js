@@ -61,14 +61,13 @@ describe("Admin ventas/productos accessibility guards", () => {
     expect(productsHookSource).toContain("setDeleteCandidate(product)");
     expect(productDeleteDialogSource).toContain("aria-modal=\"true\"");
     expect(productDeleteDialogSource).toContain("aria-describedby=\"product-delete-description\"");
-    expect(productDeleteDialogSource).toContain("onKeyDown={trapFocus}");
+    expect(productDeleteDialogSource).toContain("useDialogKeyboardTrap");
   });
 
   it("el modal de ingreso de stock gestiona foco, Escape y Tab", () => {
     expect(stockEntryModalSource).toContain("ref={modalRef}");
     expect(stockEntryModalSource).toContain("aria-modal=\"true\"");
-    expect(stockEntryModalSource).toContain("event.key === \"Escape\"");
-    expect(stockEntryModalSource).toContain("event.key !== \"Tab\"");
+    expect(stockEntryModalSource).toContain("useDialogKeyboardTrap");
     expect(stockEntryModalSource).toContain("first?.focus()");
   });
 
@@ -78,7 +77,7 @@ describe("Admin ventas/productos accessibility guards", () => {
     expect(salesTableSource).toContain("aria-label={`Ver detalle de venta ${sale.codigo}`}");
     expect(saleDetailModalSource).toContain("aria-modal=\"true\"");
     expect(saleDetailModalSource).toContain("aria-labelledby=\"sale-detail-title\"");
-    expect(saleDetailModalSource).toContain("onKeyDown={trapFocus}");
+    expect(saleDetailModalSource).toContain("useDialogKeyboardTrap");
   });
 
   it("fabricantes y limpieza de datos no usan confirm nativo", () => {
@@ -96,7 +95,7 @@ describe("Admin ventas/productos accessibility guards", () => {
     expect(adminOrdersSource).not.toContain("confirm(");
     expect(cartSidebarSource).toContain("<dialog");
     expect(cartSidebarSource).toContain('aria-modal="true"');
-    expect(cartSidebarSource).toContain("event.key === \"Escape\"");
+    expect(cartSidebarSource).toContain("useDialogKeyboardTrap");
     expect(checkoutPageSource).toContain("<fieldset");
     expect(checkoutPageSource).toContain("<legend");
   });
@@ -108,8 +107,7 @@ describe("Admin ventas/productos accessibility guards", () => {
   it("el dialogo de confirmacion reutilizable gestiona semantica y teclado", () => {
     expect(accessibleConfirmDialogSource).toContain("aria-modal=\"true\"");
     expect(accessibleConfirmDialogSource).toContain("aria-describedby={descriptionId}");
-    expect(accessibleConfirmDialogSource).toContain("event.key === \"Escape\"");
-    expect(accessibleConfirmDialogSource).toContain("event.key !== \"Tab\"");
+    expect(accessibleConfirmDialogSource).toContain("useDialogKeyboardTrap");
     expect(accessibleConfirmDialogSource).toContain("button:not([disabled])");
   });
 });
