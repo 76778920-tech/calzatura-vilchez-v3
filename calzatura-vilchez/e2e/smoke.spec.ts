@@ -58,7 +58,7 @@ test.describe("smoke tienda publica", () => {
     await page.evaluate(() => localStorage.removeItem("calzatura_cart"));
 
     await page.getByRole("button", { name: /abrir carrito/i }).click();
-    await expect(page.getByLabel(/carrito de compras/i)).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("dialog", { name: /mi carrito/i })).toBeVisible({ timeout: 10_000 });
 
     await page.getByRole("link", { name: /ver productos/i }).click();
     await expect(page).toHaveURL(/\/productos/);

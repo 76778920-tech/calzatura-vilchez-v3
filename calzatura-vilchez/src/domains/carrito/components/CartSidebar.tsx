@@ -55,6 +55,7 @@ export default function CartSidebar() {
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-label="Carrito de compras"
         aria-labelledby={titleId}
         className="cart-sidebar"
         onKeyDown={trapFocus}

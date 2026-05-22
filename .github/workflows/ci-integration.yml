@@ -222,7 +222,7 @@ jobs:
           node scripts/readiness-check.mjs \
             --require-env BFF_BASE_URL \
             --require-env AI_SERVICE_URL \
-            --timeout-ms 10000 \
+            --timeout-ms 25000 \
             --retries 2 \
             --output artifacts/readiness/integration-live.json
 

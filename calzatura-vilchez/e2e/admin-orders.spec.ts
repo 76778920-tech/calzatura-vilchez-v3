@@ -115,6 +115,7 @@ test.describe("admin pedidos → filtro, expansión y cambio de estado", () => {
     // Cambiar estado del primer pedido (pendiente → pagado)
     const statusSelect = page.locator(".status-select").first();
     await statusSelect.selectOption("pagado");
+    await page.getByRole("button", { name: /actualizar estado/i }).click();
 
     await expect(page.getByText(/Estado actualizado/i)).toBeVisible({ timeout: 5_000 });
     expect(patchCalled).toBe(true);

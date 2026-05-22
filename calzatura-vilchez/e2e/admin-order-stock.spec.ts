@@ -64,6 +64,7 @@ test.describe("admin pedidos → stock al marcar pagado", () => {
     await expect(page.locator(".order-card")).toHaveCount(1, { timeout: 10_000 });
 
     await page.locator(".status-select").first().selectOption("pagado");
+    await page.getByRole("button", { name: /actualizar estado/i }).click();
 
     await expect(page.getByText(/Estado actualizado/i)).toBeVisible({ timeout: 8_000 });
     expect(capturedBody).not.toBeNull();
