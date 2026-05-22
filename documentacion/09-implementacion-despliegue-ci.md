@@ -22,6 +22,7 @@ Cazatura Vilchez V3/
   scripts/
     validate-supabase-migrations.mjs
     github-verify-workflows-for-sha.mjs
+    github-verify-workflows-lib.mjs
     clean-local-residual.mjs
   .github/workflows/
     ci.yml                       # CI con mocks — corre en todo push/PR
@@ -145,7 +146,7 @@ No usar `db pull` para “arreglar” prod salvo que quieras traer SQL generado 
 |---------|--------------|------|-----------|
 | `.github/workflows/ci.yml` | `push` y `pull_request` a cualquier rama | validar migraciones · lint + test + build / E2E | Validación rápida — mocks de red |
 | `.github/workflows/ci-integration.yml` | `push` a `main` + `workflow_dispatch` | validar migraciones · quality · ai-service · e2e | Integración con secrets reales — solo en `main` |
-| `.github/workflows/deploy-production.yml` | tras **CI Integration** success en `main` + `workflow_dispatch` | gate (CI+Integration) · Firebase Hosting · Render IA + smoke | **Único** pipeline de deploy a producción |
+| `.github/workflows/deploy-production.yml` | `workflow_call` desde CI Integration + `workflow_dispatch` manual | gate · Firebase Hosting · Render BFF + IA + smoke | **Único** pipeline de deploy a producción |
 | `.github/workflows/sonarqube.yml` | `push` / `pull_request` | análisis Sonar | Calidad de código (independiente del deploy) |
 
 #### ci-integration.yml — detalle de jobs
@@ -179,12 +180,22 @@ Tras cada push a `main`, revisar **Actions → SonarQube Analysis** (objetivo: `
 ### 7.1 Flujo automático en `main`
 
 ```text
-push main → CI (tests + migraciones)     ─┐
-         → CI Integration (secrets reales) ─┤ ambos deben ser success
-         → Deploy Producción (gate)       ← solo si Integration terminó OK
-              ├─ Firebase Hosting + smoke https://calzaturavilchez-ab17f.web.app
-              └─ Render deploy hook + smoke /api/health
+push main → CI (tests + migraciones)
+         → CI Integration (secrets reales, E2E, build)
+              └─ workflow_call → Deploy Producción (gate)
+                    ├─ gate workflow_call: exige solo CI base en success (evita ciclo)
+                    ├─ Firebase Hosting + smoke https://calzaturavilchez-ab17f.web.app
+                    └─ Render deploy hooks (BFF + IA)
 ```
+
+**Gate (`scripts/github-verify-workflows-for-sha.mjs`):**
+
+| Origen del deploy | Workflows que debe ver en success |
+|-------------------|-----------------------------------|
+| `workflow_call` (automático desde CI Integration) | Solo **CI base** |
+| `workflow_dispatch` (manual) | **CI base** + **CI Integration** |
+
+Si el script encuentra un workflow requerido aún en curso (`conclusion` null, `status` in_progress), el log indica *sigue en curso* en lugar del antiguo *terminó en null*. Si `conclusion` es null sin estar en curso, sugiere revisar que no se exija CI Integration dentro del propio CI Integration.
 
 No hay deploy en `pull_request`. El workflow antiguo `Deploy — Firebase Hosting` en paralelo al CI fue sustituido por `Deploy — Producción`.
 

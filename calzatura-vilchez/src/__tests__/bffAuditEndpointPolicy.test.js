@@ -115,6 +115,7 @@ describe("BFF /audit policy guards", () => {
     expect(deployWorkflowSource).toContain("VITE_STRIPE_PUBLIC_KEY:");
     expect(deployWorkflowSource).toContain("VITE_DNI_LOOKUP_URL:");
     expect(deployWorkflowSource).toContain("run: node scripts/verify-deploy-firebase-secrets.mjs");
+    expect(deployWorkflowSource).toContain("run: node scripts/github-verify-workflows-for-sha.mjs");
   });
 
   it("incluye migracion de saneamiento para auditoria historica con PII", () => {

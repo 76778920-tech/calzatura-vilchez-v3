@@ -3,6 +3,12 @@
  * Falla si los workflows requeridos no terminaron en success para un commit.
  * Uso en deploy-production (tras CI Integration en main).
  */
+import {
+  findLatestWorkflowRun,
+  formatWorkflowGateFailure,
+  isWorkflowRunSuccess,
+} from "./github-verify-workflows-lib.mjs";
+
 const owner = process.env.GITHUB_REPOSITORY?.split("/")[0];
 const repo = process.env.GITHUB_REPOSITORY?.split("/")[1];
 const sha = process.env.HEAD_SHA;
@@ -39,15 +45,13 @@ if (!res.ok) {
 const runs = (await res.json()).workflow_runs || [];
 
 for (const name of required) {
-  const match = runs.find((r) => r.name === name);
+  const match = findLatestWorkflowRun(runs, name);
   if (!match) {
     console.error(`github-verify-workflows-for-sha: sin ejecución de "${name}" para ${sha}`);
     process.exit(1);
   }
-  if (match.conclusion !== "success") {
-    console.error(
-      `github-verify-workflows-for-sha: "${name}" terminó en ${match.conclusion} (run ${match.id})`,
-    );
+  if (!isWorkflowRunSuccess(match)) {
+    console.error(formatWorkflowGateFailure(name, match));
     process.exit(1);
   }
   console.log(`github-verify-workflows-for-sha: OK — ${name} (${match.id})`);
