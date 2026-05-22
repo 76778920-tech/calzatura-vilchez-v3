@@ -78,7 +78,7 @@ Cada sección **1–9** aplica estos aspectos **solo donde aplica** al módulo c
 ### Qué está bien
 
 - **A2 / A3:** CRUD y variantes pasan por `products.ts` con **`logAudit`** en crear/editar/eliminar.
-- **A5:** Cobertura E2E amplia: filtros, chips de variantes, guardas de código comercial, stock/tallas, campaña, humo de redirección admin; borrado con `window.confirm()` en `e2e/admin-product-delete.spec.ts` (TC-PROD-DEL01 / TC-PROD-DEL02 en CU-T07, incluida aserción de estado vacío como fila en `<tbody>`).
+- **A5:** Cobertura E2E amplia: filtros, chips de variantes, guardas de código comercial, stock/tallas, campaña, humo de redirección admin; borrado con dialogo accesible en `e2e/admin-product-delete.spec.ts` (TC-PROD-DEL01 / TC-PROD-DEL02 en CU-T07, incluida aserción de estado vacío como fila en `<tbody>`).
 - **A8:** Informe de auditoría del módulo con trazabilidad a CU-T07.
 
 ### Qué falta o mejora
@@ -166,7 +166,7 @@ Cada sección **1–9** aplica estos aspectos **solo donde aplica** al módulo c
 
 - **A3:** CRUD en `manufacturers.ts` con **`logAudit`** en crear/editar/eliminar.
 - **A2:** Relación con catálogo de productos gestionada desde el dominio de fabricantes.
-- **A5:** E2E `e2e/admin-manufacturers.spec.ts` — TC-MFR-001…003 (lista/stats, filtro inactivos, borrado con confirmación).
+- **A5:** E2E `e2e/admin-manufacturers.spec.ts` — TC-MFR-001…003 (lista/stats, filtro inactivos, borrado con dialogo accesible).
 - **A8:** [AdminManufacturers-auditoria.md](./AdminManufacturers-auditoria.md) (impacto en productos, CU-T07).
 
 ### Qué falta o mejora

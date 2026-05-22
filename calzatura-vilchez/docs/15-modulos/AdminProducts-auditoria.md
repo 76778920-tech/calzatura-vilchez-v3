@@ -70,20 +70,21 @@ Formulario de creación y edición de productos con variantes, galería de imág
 
 ---
 
-### A5 - Flujo de borrado con confirmacion cubierto por E2E
+### A5 - Flujo de borrado con dialogo accesible cubierto por E2E
 
 **Severidad:** Media (cobertura)
 
-**Antes:** `handleDelete` usaba `window.confirm()` para confirmar el borrado y llamaba DELETE en tres tablas (`productos`, `productoCodigos`, `productoFinanzas`). No habia ningun test E2E que verificara ni que el borrado se ejecutara al aceptar ni que no se ejecutara al cancelar.
+**Antes:** `handleDelete` usaba confirmacion nativa del navegador para confirmar el borrado y llamaba DELETE en tres tablas (`productos`, `productoCodigos`, `productoFinanzas`). No habia ningun test E2E que verificara ni que el borrado se ejecutara al aceptar ni que no se ejecutara al cancelar.
 
 **Despues:**
 - El borrado usa el RPC atomico `delete_product_atomic`.
-- Nuevo spec `e2e/admin-product-delete.spec.ts` con `page.once("dialog", ...)` para interceptar `window.confirm()`:
+- La confirmacion actual usa dialogo accesible con `aria-modal`, descripcion, foco inicial, cierre con Escape y trap de Tab.
+- Spec `e2e/admin-product-delete.spec.ts` actualizado para operar el dialogo accesible:
 
 | ID | Descripcion | Estado |
 |---|---|---|
-| TC-PROD-DEL01 | Aceptar confirm -> RPC `delete_product_atomic` + texto estado vacio + producto no visible (no contar filas: el vacio es un `<tr>`) | OK |
-| TC-PROD-DEL02 | Rechazar confirm -> 0 llamadas al RPC + producto permanece | OK |
+| TC-PROD-DEL01 | Confirmar dialogo -> RPC `delete_product_atomic` + texto estado vacio + producto no visible (no contar filas: el vacio es un `<tr>`) | OK |
+| TC-PROD-DEL02 | Cancelar dialogo -> 0 llamadas al RPC + producto permanece | OK |
 
 **Nota:** El handler GET de productos devuelve `[]` despues de la llamada al RPC para simular la recarga de lista que hace el componente tras borrar.
 

@@ -12,7 +12,7 @@
 
 ## Alcance del módulo
 
-CRUD de fabricantes con modal de formulario, validación de DNI (lookup externo opcional), subida de documentos (boletas/guías) a Cloudinary, filtro por estado (activos/inactivos), búsqueda por nombre/DNI/marca, borrado con `window.confirm()`, y `logAudit` en crear/editar/eliminar. Incluye modal de detalle (`detailManufacturer`) y preview de imagen de documento.
+CRUD de fabricantes con modal de formulario, validación de DNI (lookup externo opcional), subida de documentos (boletas/guías) a Cloudinary, filtro por estado (activos/inactivos), búsqueda por nombre/DNI/marca, borrado con dialogo accesible reutilizable, y `logAudit` en crear/editar/eliminar. Incluye modal de detalle (`detailManufacturer`) y preview de imagen de documento.
 
 ---
 
@@ -43,7 +43,7 @@ CRUD de fabricantes con modal de formulario, validación de DNI (lookup externo 
 |---|---|---|
 | TC-MFR-001 | Pantalla carga con la lista de fabricantes y las métricas de stats | ✅ |
 | TC-MFR-002 | Filtro "inactivos" muestra solo fabricantes con `activo = false` | ✅ |
-| TC-MFR-003 | Aceptar confirm en borrar llama DELETE + muestra toast "Fabricante eliminado" | ✅ |
+| TC-MFR-003 | Confirmar dialogo accesible en borrar llama DELETE + muestra toast "Fabricante eliminado" | ✅ |
 
 **Estado:** ✅ Cerrado
 
