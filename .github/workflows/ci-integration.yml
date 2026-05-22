@@ -157,6 +157,73 @@ jobs:
             python -c "import fastapi, sklearn, pandas; from main import app; print('docker-smoke-ok', app.title)"
 
   # ── Job 3: E2E Playwright con credenciales reales ────────────────────────────
+  ops-controls-real:
+    name: Controles medibles IA/DevOps (real)
+    needs: [quality, ai-service, ai-service-docker]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 20
+
+      - name: Configurar Python 3.12 para backtesting IA
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: ai-service/requirements-dev.txt
+
+      - name: Instalar dependencias IA
+        working-directory: ai-service
+        run: bash scripts/ci_install_python_deps.sh
+
+      - name: Readiness live BFF/IA
+        env:
+          BFF_BASE_URL: ${{ secrets.VITE_BACKEND_API_URL }}
+          AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
+        run: |
+          node scripts/readiness-check.mjs \
+            --require-env BFF_BASE_URL \
+            --require-env AI_SERVICE_URL \
+            --timeout-ms 10000 \
+            --retries 2 \
+            --output artifacts/readiness/integration-live.json
+
+      - name: Backtesting IA real con umbrales
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: |
+          node scripts/ai-backtest-gate.mjs \
+            --run \
+            --history 180 \
+            --folds 6 \
+            --max-mape-pct 150 \
+            --min-wins-mape-ratio 0.34 \
+            --min-folds 3 \
+            --output artifacts/ai-backtesting/integration-summary.json
+
+      - name: Restore drill - evidencia operativa versionada
+        run: |
+          node scripts/restore-drill-check.mjs \
+            --evidence docs/ops/restore-drill-evidence.example.json \
+            --max-rto-minutes 60 \
+            --max-rpo-minutes 1440 \
+            --output artifacts/restore-drill/integration-summary.json
+
+      - name: Subir evidencia real de controles
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ops-controls-real-evidence
+          path: artifacts/
+          retention-days: 30
+
   e2e:
     name: E2E Playwright — Integración real
     needs: [supabase-migrations]
@@ -233,7 +300,7 @@ jobs:
 
   deploy-production:
     name: Deploy — Producción (Firebase + Render)
-    needs: [quality, ai-service, ai-service-docker, e2e]
+    needs: [quality, ai-service, ai-service-docker, ops-controls-real, e2e]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: read

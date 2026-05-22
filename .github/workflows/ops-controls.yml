@@ -18,11 +18,11 @@ on:
       backtest_warn_only:
         description: "Do not fail workflow when AI thresholds are breached"
         required: true
-        default: "true"
+        default: "false"
         type: choice
         options:
-          - "true"
           - "false"
+          - "true"
       max_mape_pct:
         description: "Max accepted average RF MAPE"
         required: true
