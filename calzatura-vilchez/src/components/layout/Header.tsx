@@ -16,15 +16,13 @@ import {
   Moon,
   Sun,
   BriefcaseBusiness,
-  Brain,
-  Building2,
 } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { logoutUser } from "@/domains/usuarios/services/auth";
 import { fetchPublicProducts } from "@/domains/productos/services/products";
 import { useThemeMode } from "@/hooks/useThemeMode";
-import { ADMIN_ROUTES, CLIENT_ROUTES, HR_ROUTES, INFO_ROUTES, PSYCHOLOGY_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "@/routes/paths";
+import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "@/routes/paths";
 import {
   buildCatalogHref,
   catalogRouteParamsFromPathname,
@@ -323,7 +321,7 @@ function MegaMenuPanel({
 }
 
 export default function Header() {
-  const { user, userProfile, isAdmin, isTrabajador, isPsicologo, isRrhh, hasVerifiedAccess, requiresEmailVerification } = useAuth();
+  const { user, userProfile, isAdmin, isTrabajador, hasVerifiedAccess, requiresEmailVerification } = useAuth();
   const { itemCount, setIsOpen: setCartOpen } = useCart();
   const { theme, toggleTheme } = useThemeMode();
   const location = useLocation();
@@ -650,18 +648,6 @@ export default function Header() {
                         <Link to={STAFF_ROUTES.home} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
                           <BriefcaseBusiness size={16} />
                           Panel Trabajador
-                        </Link>
-                      )}
-                      {(isPsicologo || isAdmin) && (
-                        <Link to={PSYCHOLOGY_ROUTES.home} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
-                          <Brain size={16} />
-                          Panel Psicólogo
-                        </Link>
-                      )}
-                      {(isRrhh || isAdmin) && (
-                        <Link to={HR_ROUTES.home} className="dropdown-item" onClick={() => setUserMenuOpen(false)} role="menuitem">
-                          <Building2 size={16} />
-                          Panel RR.HH.
                         </Link>
                       )}
                       {userDropdownPrimarySection}

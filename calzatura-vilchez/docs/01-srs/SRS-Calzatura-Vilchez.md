@@ -31,7 +31,7 @@ El sistema cubre:
 - Servicio de inteligencia artificial (FastAPI + scikit-learn) para predicción de demanda por producto, cálculo del Índice de Riesgo Empresarial (IRE) y alertas de stock.
 - Aplicación móvil complementaria (Flutter) con catálogo, carrito y perfil para clientes.
 
-El sistema no cubre: contabilidad formal, integraciones con SUNAT para facturación electrónica, o módulos de RRHH.
+El sistema no cubre: contabilidad formal, integraciones con SUNAT para facturación electrónica, o módulos de gestión interna de personal.
 
 ### 1.3 Definiciones y acrónimos
 

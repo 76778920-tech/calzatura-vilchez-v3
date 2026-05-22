@@ -65,7 +65,6 @@ Matriz detallada: `supabase/RLS-MATRIX.md`. Hallazgos: `security-audit.md`.
 | ID | Tema | Notas |
 |----|------|-------|
 | G1 | Pedidos web — PII trabajador | **Mitigado:** `GET /staff/orders` enmascara email, teléfono, dirección y referencia (`bff/privacy.cjs`) |
-| G2 | Roles `psicologo` / `rrhh` temporales | Eliminación planificada del producto |
 | G3 | App Check, CSP, Cloudinary | **Mitigado:** App Check opcional (`VITE_FIREBASE_APPCHECK_SITE_KEY`), CSP en `firebase.json`, subida Cloudinary firmada vía BFF |
 | G4 | MFA TOTP administrador | **Pendiente** — Firebase Auth multi-factor recomendado en perfil admin; sin enforcement en BFF (`adminMfaPolicy` stub) |
 
@@ -110,7 +109,6 @@ Matriz detallada: `supabase/RLS-MATRIX.md`. Hallazgos: `security-audit.md`.
 | RPC productos / stock admin | **Cerrado** — `20260519150000` revoca `anon`/`authenticated`; BFF `service_role` + `assertAdminRole` | 27001 |
 | `AdminData` import/export | **Cerrado** — `/admin/data/*` solo admin vía BFF | 27001 / 9001 |
 | App Check + CSP + Cloudinary | **Parcial** — código listo; falta activar App Check en Firebase Console y secretos BFF Cloudinary | 27001 |
-| Roles `psicologo` / `rrhh` | Pendiente eliminación de producto | 27001 |
 | SGSI certificable | No — faltan políticas, SoA, auditoría externa, pentest | 27001 |
 
 ---

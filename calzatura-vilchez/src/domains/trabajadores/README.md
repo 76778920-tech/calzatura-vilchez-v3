@@ -11,7 +11,6 @@ Cumplimiento interno ISO (27001 / 25010 / 9001): `docs/ISO-CUMPLIMIENTO-INTERNO.
 | `/staff` | Inicio |
 | `/staff/pedidos` | Pedidos (`AdminOrders` con scope staff) |
 | `/staff/ventas` | Ventas diarias (sin datos financieros en UI/API) |
-| `/staff/desempeno` | Desempeño y notificaciones |
 
 Login redirige a `/staff` (`redirects.ts`). Admin sigue en `/admin`.
 

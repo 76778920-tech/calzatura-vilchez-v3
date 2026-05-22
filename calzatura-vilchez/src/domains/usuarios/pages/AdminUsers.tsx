@@ -18,7 +18,7 @@ import type { Order, UserProfile, UserRole } from "@/types";
 
 type UserFilter = "todos" | UserRole;
 
-const ROLE_OPTIONS: UserRole[] = ["cliente", "trabajador", "psicologo", "rrhh", "admin"];
+const ROLE_OPTIONS: UserRole[] = ["cliente", "trabajador", "admin"];
 
 function fullName(user: UserProfile) {
   const names = [user.nombres, user.apellidos].filter(Boolean).join(" ").trim();
@@ -26,9 +26,7 @@ function fullName(user: UserProfile) {
 }
 
 function normalizeRole(role?: string): UserRole {
-  if (role === "admin" || role === "cliente" || role === "trabajador" || role === "psicologo" || role === "rrhh") {
-    return role;
-  }
+  if (role === "admin" || role === "cliente" || role === "trabajador") return role;
   return "cliente";
 }
 
@@ -36,8 +34,6 @@ function roleLabel(role: UserRole) {
   const labels: Record<UserRole, string> = {
     admin: "Administrador",
     cliente: "Cliente",
-    psicologo: "Psicólogo",
-    rrhh: "RR.HH.",
     trabajador: "Trabajador",
   };
   return labels[role];
@@ -149,7 +145,7 @@ export default function AdminUsers() {
         acc[role] += 1;
         return acc;
       },
-      { admin: 0, cliente: 0, trabajador: 0, psicologo: 0, rrhh: 0 }
+      { admin: 0, cliente: 0, trabajador: 0 }
     );
   }, [users]);
 
@@ -199,7 +195,7 @@ export default function AdminUsers() {
           <h1 className="admin-page-title">Usuarios registrados</h1>
           <p className="admin-page-subtitle">
             Asigna roles manualmente para controlar quién es cliente,
-            trabajador, psicólogo, RR.HH. o administrador.
+            trabajador o administrador.
           </p>
         </div>
       </div>
@@ -220,14 +216,6 @@ export default function AdminUsers() {
         <div className="stat-card admin-metric-card">
           <ShieldCheck size={22} />
           <div><span>Administradores</span><strong>{stats.admin}</strong></div>
-        </div>
-        <div className="stat-card admin-metric-card">
-          <BriefcaseBusiness size={22} />
-          <div><span>Psicólogos</span><strong>{stats.psicologo}</strong></div>
-        </div>
-        <div className="stat-card admin-metric-card">
-          <ShieldCheck size={22} />
-          <div><span>RR.HH.</span><strong>{stats.rrhh}</strong></div>
         </div>
       </div>
 
@@ -250,9 +238,6 @@ export default function AdminUsers() {
             <option value="admin">Administradores</option>
             <option value="cliente">Clientes</option>
             <option value="trabajador">Trabajadores</option>
-            <option value="psicologo">Psicólogos</option>
-            <option value="rrhh">RR.HH.</option>
-
           </select>
         </div>
       </div>

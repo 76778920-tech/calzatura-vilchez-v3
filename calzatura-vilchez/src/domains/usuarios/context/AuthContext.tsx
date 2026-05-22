@@ -14,8 +14,6 @@ type AuthContextType = Readonly<{
   loading: boolean;
   isAdmin: boolean;
   isTrabajador: boolean;
-  isPsicologo: boolean;
-  isRrhh: boolean;
   requiresEmailVerification: boolean;
   hasVerifiedAccess: boolean;
   refreshProfile: () => Promise<void>;
@@ -31,8 +29,6 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAdmin: false,
   isTrabajador: false,
-  isPsicologo: false,
-  isRrhh: false,
   requiresEmailVerification: false,
   hasVerifiedAccess: false,
   refreshProfile: async () => {},
@@ -112,8 +108,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const isAdmin =
     userProfile?.rol === "admin" || isSuperAdminEmail(user?.email);
   const isTrabajador = userProfile?.rol === "trabajador";
-  const isPsicologo = userProfile?.rol === "psicologo";
-  const isRrhh = userProfile?.rol === "rrhh";
   const requiresEmailVerification =
     Boolean(user && !user.emailVerified && !isAdmin);
   const hasVerifiedAccess =
@@ -126,13 +120,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       loading,
       isAdmin,
       isTrabajador,
-      isPsicologo,
-      isRrhh,
       requiresEmailVerification,
       hasVerifiedAccess,
       refreshProfile,
     }),
-    [user, userProfile, loading, isAdmin, isTrabajador, isPsicologo, isRrhh, requiresEmailVerification, hasVerifiedAccess, refreshProfile],
+    [user, userProfile, loading, isAdmin, isTrabajador, requiresEmailVerification, hasVerifiedAccess, refreshProfile],
   );
 
   return (

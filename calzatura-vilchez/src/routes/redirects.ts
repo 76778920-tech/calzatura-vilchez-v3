@@ -1,6 +1,6 @@
 import type { UserRole } from "@/types";
 import { isAdminRole } from "../security/accessControl";
-import { ADMIN_ROUTES, HR_ROUTES, PSYCHOLOGY_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "./paths";
+import { ADMIN_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "./paths";
 
 function hasAsciiControlChars(path: string): boolean {
   for (let i = 0; i < path.length; i++) {
@@ -27,14 +27,6 @@ export function isStaffPath(path: string) {
   return path === STAFF_ROUTES.home || path.startsWith(`${STAFF_ROUTES.home}/`);
 }
 
-export function isPsychologyPath(path: string) {
-  return path === PSYCHOLOGY_ROUTES.home || path.startsWith(`${PSYCHOLOGY_ROUTES.home}/`);
-}
-
-export function isHrPath(path: string) {
-  return path === HR_ROUTES.home || path.startsWith(`${HR_ROUTES.home}/`);
-}
-
 export function getPostLoginRedirect({
   redirect,
   role,
@@ -56,18 +48,6 @@ export function getPostLoginRedirect({
     return safeRedirect && isStaffPath(safeRedirect)
       ? safeRedirect
       : STAFF_ROUTES.home;
-  }
-
-  if (role === "psicologo") {
-    return safeRedirect && isPsychologyPath(safeRedirect)
-      ? safeRedirect
-      : PSYCHOLOGY_ROUTES.home;
-  }
-
-  if (role === "rrhh") {
-    return safeRedirect && isHrPath(safeRedirect)
-      ? safeRedirect
-      : HR_ROUTES.home;
   }
 
   if (safeRedirect && !isAdminPath(safeRedirect)) {

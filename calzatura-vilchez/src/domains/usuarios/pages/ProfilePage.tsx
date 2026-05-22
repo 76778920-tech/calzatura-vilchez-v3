@@ -24,8 +24,6 @@ function roleLabel(role?: UserRole) {
   const labels: Record<UserRole, string> = {
     admin: "Administrador",
     cliente: "Cliente",
-    psicologo: "Psicólogo",
-    rrhh: "RR.HH.",
     trabajador: "Trabajador",
   };
   return labels[role ?? "cliente"];

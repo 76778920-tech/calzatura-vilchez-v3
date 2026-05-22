@@ -6,8 +6,6 @@ export type AccessArea =
   | "clientes"
   | "administradores"
   | "trabajadores"
-  | "psicologos"
-  | "rrhh"
   | "carrito"
   | "productos"
   | "fabricantes"
@@ -23,8 +21,6 @@ export const AREA_ALLOWED_ROLES: Record<AccessArea, UserRole[] | "public"> = {
   pedidos: ["cliente", "trabajador", "admin"],
   administradores: ["admin"],
   trabajadores: ["trabajador", "admin"],
-  psicologos: ["psicologo", "admin"],
-  rrhh: ["rrhh", "admin"],
   fabricantes: ["admin"],
   ventas: ["admin", "trabajador"],
   usuarios: ["admin"],

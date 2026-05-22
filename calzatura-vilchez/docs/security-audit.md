@@ -141,7 +141,6 @@ Endpoints trabajador (token Firebase + rol `trabajador` en Supabase):
 | T2 | Catálogo inactivo visible al trabajador | Baja | **Cerrado** — `GET /staff/products` y `/staff/productCodes` solo activos |
 | T6 | Precio de venta manipulable desde cliente | Alta | **Cerrado** — validación BFF min/max + recálculo de costos en servidor |
 | T7 | Sin auditoría de ventas tienda | Media | **Cerrado** — `registrar_venta` / `devolver_venta` en `auditoria` |
-| T3 | Roles `psicologo` / `rrhh` temporales | Baja | Pendiente eliminación de producto |
 | T4 | Tests E2E 403 trabajador (29119) | Media | Fuera de alcance 29119; cubierto parcial por Vitest (`panelScopeServices`, `financeService`) |
 | T5 | Orden despliegue migraciones ventas | Alta | Documentado en `ISO-CUMPLIMIENTO-INTERNO.md` |
 
