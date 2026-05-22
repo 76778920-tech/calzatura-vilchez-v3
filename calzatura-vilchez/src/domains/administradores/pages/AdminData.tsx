@@ -98,7 +98,7 @@ function importBaseName(fileName: string): string {
   return slug || "archivo";
 }
 
-function compactDigits(value: string, maxLength: number): string {
+function compactDigits(value: string, maxLength = Number.MAX_SAFE_INTEGER): string {
   let digits = "";
   for (const char of value) {
     if (char >= "0" && char <= "9") {
@@ -107,6 +107,36 @@ function compactDigits(value: string, maxLength: number): string {
     }
   }
   return digits;
+}
+
+function normalizeImportToken(value: unknown, maxLength: number): string {
+  const raw = cellString(value).trim();
+  let normalized = "";
+  let lastWasSeparator = false;
+
+  for (const char of raw) {
+    const isSeparator = char === "/" || char === "\\" || char.trim() === "";
+    if (isSeparator) {
+      if (normalized && !lastWasSeparator) {
+        normalized += "-";
+        lastWasSeparator = true;
+      }
+    } else {
+      normalized += char;
+      lastWasSeparator = false;
+    }
+
+    if (normalized.length >= maxLength) break;
+  }
+
+  if (normalized.endsWith("-")) {
+    normalized = normalized.slice(0, -1);
+  }
+  return normalized;
+}
+
+function removePrefix(value: string, prefix: string): string {
+  return value.startsWith(prefix) ? value.slice(prefix.length) : value;
 }
 
 function createImportContext(fileName: string): ImportContext {
@@ -148,11 +178,7 @@ function cellString(value: unknown): string {
 }
 
 function normalizeImportId(value: unknown): string {
-  return cellString(value)
-    .trim()
-    .replace(/[\\/]/g, "-")
-    .replace(/\s+/g, "-")
-    .slice(0, 120);
+  return normalizeImportToken(value, 120);
 }
 
 function deriveProductImportId(row: Row): string | null {
@@ -384,7 +410,7 @@ const COLLECTIONS: CollectionConfig[] = [
       escenario: context.escenario,
     }),
     importValidate: (row) => {
-      const dni = cellString(row.dni).replace(/\D/g, "");
+      const dni = compactDigits(cellString(row.dni));
       if (dni.length !== 8) return "El DNI debe tener exactamente 8 dígitos";
       if (!row.nombres) return "Falta el campo 'nombres'";
       if (!row.apellidos) return "Falta el campo 'apellidos'";
@@ -763,7 +789,7 @@ function downloadScenario(sc: ScenarioCfg): void {
     else if (p.cat === "Deportivo") tipoCalzado = "Zapatillas";
     return {
       id: p.id,
-      codigo: p.id.replace("PRUEBA_", ""),
+      codigo: removePrefix(p.id, "PRUEBA_"),
       nombre: p.nombre,
       precio,
       stock: sc.stocks[i],
@@ -830,7 +856,7 @@ function downloadScenario(sc: ScenarioCfg): void {
           const costoT = Math.round(qty * p.costo  * 100) / 100;
           salesRows.push({
             productId: p.id,
-            codigo: p.id.replace("PRUEBA_", ""),
+            codigo: removePrefix(p.id, "PRUEBA_"),
             nombre: p.nombre,
             color: p.color,
             talla: p.talla,
