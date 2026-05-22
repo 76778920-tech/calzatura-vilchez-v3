@@ -118,7 +118,10 @@ export type DailySaleAtomicInput = Omit<DailySale, "id" | "creadoEn" | "devuelto
 export type StaffDailySaleAtomicInput = Omit<DailySaleAtomicInput, "costoUnitario" | "costoTotal" | "ganancia">;
 
 function stripClientFinancialFieldsFromSale(sale: DailySaleAtomicInput): StaffDailySaleAtomicInput {
-  const { costoUnitario: _cu, costoTotal: _ct, ganancia: _g, ...staffSale } = sale;
+  const staffSale = { ...sale };
+  delete staffSale.costoUnitario;
+  delete staffSale.costoTotal;
+  delete staffSale.ganancia;
   return staffSale;
 }
 
