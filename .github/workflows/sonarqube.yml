@@ -76,10 +76,6 @@ jobs:
       - name: Verificar reportes para SonarQube
         shell: bash
         run: |
-          if [ -f ai-service/scripts/fix_coverage_xml_for_sonar.py ]; then
-            echo "::error::No recrees ai-service/scripts/fix_coverage_xml_for_sonar.py; usa scripts/fix-ai-service-coverage-xml-for-sonar.py"
-            exit 1
-          fi
           test -f calzatura-vilchez/coverage/lcov.info
           test -f ai-service/coverage.xml
           test -f calzatura-vilchez/eslint-report.json

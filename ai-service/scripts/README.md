@@ -1,7 +1,14 @@
 # Scripts de `ai-service`
 
-El ajuste de `coverage.xml` para SonarCloud se ejecuta desde la raíz del monorepo:
+## Cobertura SonarCloud
 
-`scripts/fix-ai-service-coverage-xml-for-sonar.py`
+| Script | Uso |
+|--------|-----|
+| `scripts/fix-ai-service-coverage-xml-for-sonar.py` (raíz del repo) | Lo ejecuta el CI antes del análisis Sonar |
+| `fix_coverage_xml_for_sonar.py` (este directorio) | Delega al script canónico; no duplica lógica |
 
-No vuelvas a crear `fix_coverage_xml_for_sonar.py` en esta carpeta: era un duplicado que generaba issues duplicados en SonarCloud.
+```bash
+python scripts/fix-ai-service-coverage-xml-for-sonar.py
+# equivalente:
+python ai-service/scripts/fix_coverage_xml_for_sonar.py
+```

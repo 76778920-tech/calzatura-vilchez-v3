@@ -9,19 +9,6 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const lcovPath = path.join(repoRoot, "calzatura-vilchez", "coverage", "lcov.info");
 const xmlPath = path.join(repoRoot, "ai-service", "coverage.xml");
-const legacyCoverageScript = path.join(
-  repoRoot,
-  "ai-service",
-  "scripts",
-  "fix_coverage_xml_for_sonar.py",
-);
-
-if (fs.existsSync(legacyCoverageScript)) {
-  fail(
-    "existe ai-service/scripts/fix_coverage_xml_for_sonar.py (duplicado); usa scripts/fix-ai-service-coverage-xml-for-sonar.py",
-  );
-}
-
 function fail(msg) {
   console.error(`validate-sonar-coverage-reports: ${msg}`);
   process.exit(1);
