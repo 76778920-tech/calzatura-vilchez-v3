@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
  * Cierra issues OPEN del script eliminado ai-service/scripts/fix_coverage_xml_for_sonar.py.
- * Sonar UI puede mostrarlos en "Overall Code" aunque "New Code" diga 0.
+ * Usa issueStatuses (Sonar 10.4+), no statuses (deprecado; la UI filtra con issueStatuses).
  */
 const SONAR_HOST = (process.env.SONAR_HOST_URL ?? "https://sonarcloud.io").replace(/\/$/, "");
 const ORGANIZATION = "76778920-tech";
 const PROJECT_KEY = "76778920-tech_calzatura-vilchez-v3";
-const STALE_PATH = "ai-service/scripts/fix_coverage_xml_for_sonar.py";
+const STALE_COMPONENT = `${PROJECT_KEY}:ai-service/scripts/fix_coverage_xml_for_sonar.py`;
+const STALE_PATH = "fix_coverage_xml_for_sonar.py";
 const token = process.env.SONAR_TOKEN;
 
 if (!token) {
@@ -48,7 +49,17 @@ function isStaleIssue(issue) {
   return component.includes(STALE_PATH);
 }
 
-async function fetchAllOpenStaleIssues() {
+async function searchByComponentKeys(branchQuery) {
+  const path =
+    `/api/issues/search?organization=${ORGANIZATION}` +
+    `&componentKeys=${encodeURIComponent(STALE_COMPONENT)}` +
+    `&issueStatuses=OPEN,REOPENED,CONFIRMED${branchQuery}` +
+    `&ps=100&p=1`;
+  const data = await sonarGet(path);
+  return data.issues ?? [];
+}
+
+async function searchByProjectScan(branchQuery) {
   const found = new Map();
   let page = 1;
   const pageSize = 500;
@@ -56,7 +67,8 @@ async function fetchAllOpenStaleIssues() {
   while (page <= 10) {
     const path =
       `/api/issues/search?organization=${ORGANIZATION}` +
-      `&projects=${PROJECT_KEY}&branch=main&statuses=OPEN` +
+      `&projects=${PROJECT_KEY}` +
+      `&issueStatuses=OPEN,REOPENED,CONFIRMED${branchQuery}` +
       `&ps=${pageSize}&p=${page}`;
     const data = await sonarGet(path);
     for (const issue of data.issues ?? []) {
@@ -70,40 +82,43 @@ async function fetchAllOpenStaleIssues() {
   return [...found.values()];
 }
 
-async function closeIssue(issue) {
-  const transitions = ["falsepositive", "wontfix", "resolve", "confirm"];
-  for (const transition of transitions) {
-    try {
-      await sonarPost("/api/issues/do_transition", { issue: issue.key, transition });
-      console.log(`cerrado ${issue.key} (${issue.rule}) via ${transition}`);
-      return;
-    } catch {
-      // siguiente
+async function fetchAllOpenStaleIssues() {
+  const branchVariants = ["&branch=main", ""];
+
+  for (const branchQuery of branchVariants) {
+    const direct = await searchByComponentKeys(branchQuery);
+    if (direct.length > 0) {
+      console.log(
+        `close-sonar-stale-coverage-shim-issues: ${direct.length} por componentKeys (${branchQuery || "sin branch"})`,
+      );
+      return direct;
+    }
+
+    const scanned = await searchByProjectScan(branchQuery);
+    if (scanned.length > 0) {
+      console.log(
+        `close-sonar-stale-coverage-shim-issues: ${scanned.length} por projects+issueStatuses (${branchQuery || "sin branch"})`,
+      );
+      return scanned;
     }
   }
-  throw new Error(`no se pudo cerrar ${issue.key} (${issue.rule})`);
+
+  return [];
 }
 
 const stale = await fetchAllOpenStaleIssues();
 
 if (stale.length === 0) {
-  console.log("close-sonar-stale-coverage-shim-issues: 0 issues OPEN en Overall (ruta eliminada)");
+  console.log(
+    "close-sonar-stale-coverage-shim-issues: 0 issues (API issueStatuses; la UI puede seguir mostrando fantasmas hasta cierre manual)",
+  );
   process.exit(0);
 }
 
-console.log(`close-sonar-stale-coverage-shim-issues: encontrados ${stale.length} OPEN en ${STALE_PATH}`);
-
 const keys = stale.map((issue) => issue.key).join(",");
-try {
-  await sonarPost("/api/issues/bulk_change", {
-    issues: keys,
-    set_status: "RESOLVED",
-    set_resolution: "FALSE-POSITIVE",
-  });
-  console.log(`cerrados ${stale.length} → RESOLVED / FALSE-POSITIVE (bulk)`);
-} catch (bulkError) {
-  console.warn(`bulk_change: ${bulkError.message}`);
-  for (const issue of stale) {
-    await closeIssue(issue);
-  }
-}
+await sonarPost("/api/issues/bulk_change", {
+  issues: keys,
+  set_status: "RESOLVED",
+  set_resolution: "FALSE-POSITIVE",
+});
+console.log(`cerrados ${stale.length} → RESOLVED/FALSE-POSITIVE: ${keys}`);
