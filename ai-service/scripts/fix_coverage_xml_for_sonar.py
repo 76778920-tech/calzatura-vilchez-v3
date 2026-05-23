@@ -32,39 +32,33 @@ def _set_repo_source(root: ET.Element) -> None:
     ET.SubElement(sources_el, "source").text = _REPO_SOURCE
 
 
-def _class_filename(cls: ET.Element) -> str | None:
+def _update_class(cls: ET.Element) -> bool:
+    """Devuelve True si la clase debe eliminarse del informe."""
     fn = cls.get("filename")
-    if fn is None:
-        return None
-    return _normalize_filename(fn)
-
-
-def _normalize_class_filename(cls: ET.Element) -> str | None:
-    norm = _class_filename(cls)
-    if norm is None:
-        return None
+    if not fn:
+        return False
+    norm = _normalize_filename(fn)
+    if norm in _OMIT:
+        return True
     cls.set("filename", norm)
-    return norm
+    return False
 
 
 def _strip_package(package: ET.Element) -> int:
     classes_el = package.find("classes")
     if classes_el is None:
         return 0
-
-    omitted_classes = []
-    for cls in classes_el.findall("class"):
-        if _normalize_class_filename(cls) in _OMIT:
-            omitted_classes.append(cls)
-
-    for cls in omitted_classes:
+    omit = [cls for cls in classes_el.findall("class") if _update_class(cls)]
+    for cls in omit:
         classes_el.remove(cls)
-
-    return len(omitted_classes)
+    return len(omit)
 
 
 def _strip_excluded(root: ET.Element) -> int:
-    return sum(_strip_package(package) for package in root.iter("package"))
+    removed = 0
+    for package in root.iter("package"):
+        removed += _strip_package(package)
+    return removed
 
 
 def main() -> None:
