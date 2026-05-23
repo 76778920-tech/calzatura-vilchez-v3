@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { canAccessArea, isAdminRole, isTrabajadorRole, panelFetchScopeForRole } from "@/security/accessControl";
 
-const SUPERADMIN = "76778920@continental.edu.pe";
+const SUPERADMIN = "superadmin@test.calzatura.internal";
 
 describe("canAccessArea", () => {
   it("permite acceso sin rol a áreas públicas", () => {

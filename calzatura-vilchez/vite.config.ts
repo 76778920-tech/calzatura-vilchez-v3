@@ -48,6 +48,7 @@ export default defineConfig({
     sourcemap: false,
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
+      external: (id) => id.includes('__tests__') || id.includes('.test.ts') || id.includes('.test.tsx'),
       output: {
         manualChunks(id) {
           if (id.includes('/src/domains/')) {

@@ -26,12 +26,12 @@ function loadAllowedOrigins() {
 const allowedOrigins = loadAllowedOrigins();
 
 function loadSuperadminEmails() {
-  const defaults = ["76778920@continental.edu.pe"];
-  const extras = (process.env.SUPERADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-  return new Set([...defaults, ...extras]);
+  return new Set(
+    (process.env.SUPERADMIN_EMAILS || "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean),
+  );
 }
 
 const superadminEmails = loadSuperadminEmails();
@@ -3043,6 +3043,16 @@ app.put("/admin/productFinanzas/:productId", (req, res) => {
         .from("productoFinanzas")
         .upsert(payload, { onConflict: "productId" });
       if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "editar",
+        "productoFinanzas",
+        productId,
+        productId,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { campos: Object.keys(payload).filter((k) => k !== "productId" && k !== "actualizadoEn"), source: "admin/productFinanzas/:id" },
+      );
       return res.status(200).json({ ok: true, row: payload });
     } catch (error) {
       console.error("admin/productFinanzas PUT error:", error);
@@ -3063,6 +3073,16 @@ app.delete("/admin/productFinanzas/:productId", (req, res) => {
       }
       const { error } = await supabase.from("productoFinanzas").delete().eq("productId", productId);
       if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "eliminar",
+        "productoFinanzas",
+        productId,
+        productId,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { source: "admin/productFinanzas/:id" },
+      );
       return res.status(200).json({ ok: true });
     } catch (error) {
       console.error("admin/productFinanzas DELETE error:", error);
@@ -3567,6 +3587,16 @@ app.patch("/admin/users/:uid/role", (req, res) => {
       }
       const { error } = await supabase.from("usuarios").update({ rol }).eq("uid", uid);
       if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "cambiar_rol",
+        "usuario",
+        uid,
+        uid,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { rolNuevo: rol, rolAnterior: targetUser?.rol ?? null, source: "admin/users/:uid/role" },
+      );
       return res.status(200).json({ ok: true });
     } catch (error) {
       console.error("admin/users role error:", error);
@@ -3602,6 +3632,16 @@ app.delete("/admin/users/:uid", (req, res) => {
       }
       const { error } = await supabase.from("usuarios").delete().eq("uid", uid);
       if (error) throw error;
+      await logAuditFn(
+        supabase,
+        "eliminar",
+        "usuario",
+        uid,
+        targetUser?.email || uid,
+        decodedToken.uid,
+        decodedToken.email || "",
+        { rolEliminado: targetUser?.rol ?? null, source: "admin/users/:uid" },
+      );
       return res.status(200).json({ ok: true });
     } catch (error) {
       console.error("admin/users DELETE error:", error);
