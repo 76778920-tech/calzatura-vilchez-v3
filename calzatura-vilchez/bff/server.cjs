@@ -114,10 +114,10 @@ function applyCorsHeaders(req, res, next) {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=(), payment=(), usb=(), autoplay=()");
+  res.setHeader("Content-Security-Policy", "default-src 'none'");
   if (isProductionRuntime()) {
-    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   }
   if (req.method === "OPTIONS") {
     return res.status(204).end();
@@ -1304,7 +1304,10 @@ async function assertLivePrices(supabase, items) {
   for (const item of items) {
     const pid = item?.product?.id;
     if (!pid) continue;
-    const stored = Number(item?.product?.precio || 0);
+    const stored = Number(item?.product?.precio);
+    if (isNaN(stored)) {
+      throw Object.assign(new Error("Precio del producto no disponible en el pedido almacenado"), { status: 409 });
+    }
     const live = liveMap.get(pid);
     if (live === undefined) {
       throw Object.assign(new Error("Producto no encontrado al validar precio"), { status: 409 });

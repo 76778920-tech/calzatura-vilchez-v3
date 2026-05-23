@@ -118,15 +118,27 @@ describe("ISO A.8.9 — headers de seguridad en applyCorsHeaders", () => {
     expect(serverSource).toContain('"strict-origin-when-cross-origin"');
   });
 
-  it("incluye HSTS solo en producción", () => {
+  it("incluye HSTS solo en producción con preload", () => {
     expect(serverSource).toContain('"Strict-Transport-Security"');
     expect(serverSource).toContain("isProductionRuntime()");
     expect(serverSource).toContain("max-age=31536000");
+    expect(serverSource).toContain("preload");
   });
 
-  it("incluye Permissions-Policy", () => {
+  it("incluye Permissions-Policy con restricciones de pago y USB", () => {
     expect(serverSource).toContain('"Permissions-Policy"');
     expect(serverSource).toContain("geolocation=()");
+    expect(serverSource).toContain("payment=()");
+    expect(serverSource).toContain("usb=()");
+  });
+
+  it("incluye Content-Security-Policy: default-src 'none' en API", () => {
+    expect(serverSource).toContain('"Content-Security-Policy"');
+    expect(serverSource).toContain("default-src 'none'");
+  });
+
+  it("NO incluye X-XSS-Protection (header deprecado y potencialmente dañino)", () => {
+    expect(serverSource).not.toContain("X-XSS-Protection");
   });
 });
 
@@ -142,20 +154,26 @@ describe("ISO A.8.26 — CORS permite método PUT", () => {
 });
 
 // ─── ISO 27002 8.2.3 — Complejidad de contraseña ─────────────────────────────
+// Nota: los tests comportamentales reales están en authCredentialsComplexity.test.ts
+// Estos guards verifican que el cableado estructural no sea revertido.
 describe("ISO 27002 8.2.3 — validación de complejidad de contraseña", () => {
   it("authCredentials exporta validateRegisterPasswordComplexity", () => {
     expect(authCredSource).toContain("validateRegisterPasswordComplexity");
     expect(authCredSource).toContain("export function validateRegisterPasswordComplexity");
   });
 
-  it("exige al menos una mayúscula", () => {
+  it("exige al menos una mayúscula con regex /[A-Z]/", () => {
     expect(authCredSource).toContain("HAS_UPPERCASE");
     expect(authCredSource).toMatch(/\/\[A-Z\]\//);
   });
 
-  it("exige al menos un dígito", () => {
+  it(String.raw`exige al menos un dígito con regex \d`, () => {
     expect(authCredSource).toContain("HAS_DIGIT");
     expect(authCredSource).toMatch(/\\d/);
+  });
+
+  it("devuelve null cuando la contraseña cumple todos los requisitos (contrato de API)", () => {
+    expect(authCredSource).toContain("return null");
   });
 
   it("auth.ts llama validateRegisterPasswordComplexity en registerUser", () => {
@@ -189,6 +207,11 @@ describe("PCI DSS 3.5 — revalidación de precios antes de Stripe", () => {
   it("assertLivePrices rechaza precios con diferencia mayor a 0.01", () => {
     expect(serverSource).toContain("Math.abs(live - stored) > 0.01");
     expect(serverSource).toContain("{ status: 409 }");
+  });
+
+  it("assertLivePrices guarda contra precio NaN (precio faltante en pedido almacenado)", () => {
+    expect(serverSource).toContain("isNaN(stored)");
+    expect(serverSource).toContain("Precio del producto no disponible en el pedido almacenado");
   });
 });
 
