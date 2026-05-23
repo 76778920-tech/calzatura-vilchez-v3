@@ -44,21 +44,41 @@ async function sonarPost(path, body) {
 }
 
 async function fetchOpenIssues() {
-  const queries = [
-    `/api/issues/search?organization=${ORGANIZATION}&projects=${PROJECT_KEY}&branch=main&statuses=OPEN&components=${encodeURIComponent(COMPONENT)}&ps=100`,
-    `/api/issues/search?organization=${ORGANIZATION}&projects=${PROJECT_KEY}&branch=main&issueStatuses=OPEN&components=${encodeURIComponent(COMPONENT)}&ps=100`,
-    `/api/issues/search?organization=${ORGANIZATION}&projects=${PROJECT_KEY}&branch=main&statuses=OPEN&ps=500`,
-  ];
+  const path =
+    `/api/issues/search?organization=${ORGANIZATION}` +
+    `&projects=${PROJECT_KEY}&branch=main&statuses=OPEN` +
+    `&components=${encodeURIComponent(COMPONENT)}&ps=100`;
+  const data = await sonarGet(path);
+  return data.issues ?? [];
+}
 
-  for (const path of queries) {
-    const data = await sonarGet(path);
-    const stale = (data.issues ?? []).filter((issue) => {
-      const component = issue.component ?? "";
-      return component.includes("fix_coverage_xml_for_sonar.py");
-    });
-    if (stale.length > 0) return stale;
+async function closeIssue(issue) {
+  const transitions = ["falsepositive", "wontfix", "resolve", "confirm"];
+  for (const transition of transitions) {
+    try {
+      await sonarPost("/api/issues/do_transition", { issue: issue.key, transition });
+      console.log(`cerrado ${issue.key} (${issue.rule}) via ${transition}`);
+      return;
+    } catch {
+      // probar siguiente transición
+    }
   }
-  return [];
+
+  const show = await sonarGet(
+    `/api/issues/show?organization=${ORGANIZATION}&issue=${encodeURIComponent(issue.key)}`,
+  );
+  const available = (show.issue?.transitions ?? []).map((t) => t.key ?? t);
+  for (const transition of available) {
+    try {
+      await sonarPost("/api/issues/do_transition", { issue: issue.key, transition });
+      console.log(`cerrado ${issue.key} (${issue.rule}) via ${transition} (show)`);
+      return;
+    } catch {
+      // siguiente
+    }
+  }
+
+  throw new Error(`no se pudo cerrar ${issue.key} (${issue.rule}); transitions=${available.join(",")}`);
 }
 
 const stale = await fetchOpenIssues();
@@ -72,26 +92,13 @@ const keys = stale.map((issue) => issue.key).join(",");
 try {
   await sonarPost("/api/issues/bulk_change", {
     issues: keys,
-    set_type: "FALSE_POSITIVE",
+    set_status: "RESOLVED",
+    set_resolution: "FALSE-POSITIVE",
   });
-  console.log(`close-sonar-stale-coverage-shim-issues: ${stale.length} issue(s) → FALSE_POSITIVE (bulk)`);
+  console.log(`close-sonar-stale-coverage-shim-issues: ${stale.length} issue(s) → RESOLVED/FALSE-POSITIVE`);
 } catch (bulkError) {
-  console.warn(`bulk_change fallo (${bulkError.message}); probando do_transition...`);
+  console.warn(`bulk_change: ${bulkError.message}`);
   for (const issue of stale) {
-    const transitions = ["falsepositive", "wontfix", "resolve"];
-    let closed = false;
-    for (const transition of transitions) {
-      try {
-        await sonarPost("/api/issues/do_transition", { issue: issue.key, transition });
-        console.log(`cerrado ${issue.key} (${issue.rule}) via ${transition}`);
-        closed = true;
-        break;
-      } catch {
-        // siguiente transición
-      }
-    }
-    if (!closed) {
-      throw new Error(`no se pudo cerrar ${issue.key} (${issue.rule})`);
-    }
+    await closeIssue(issue);
   }
 }
