@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * Cierra en SonarCloud issues OPEN del script eliminado
- * ai-service/scripts/fix_coverage_xml_for_sonar.py (avisos fantasma).
+ * Cierra issues OPEN del script eliminado ai-service/scripts/fix_coverage_xml_for_sonar.py.
+ * Sonar UI puede mostrarlos en "Overall Code" aunque "New Code" diga 0.
  */
 const SONAR_HOST = (process.env.SONAR_HOST_URL ?? "https://sonarcloud.io").replace(/\/$/, "");
 const ORGANIZATION = "76778920-tech";
 const PROJECT_KEY = "76778920-tech_calzatura-vilchez-v3";
-const COMPONENT = `${PROJECT_KEY}:ai-service/scripts/fix_coverage_xml_for_sonar.py`;
+const STALE_PATH = "ai-service/scripts/fix_coverage_xml_for_sonar.py";
 const token = process.env.SONAR_TOKEN;
 
 if (!token) {
@@ -43,13 +43,31 @@ async function sonarPost(path, body) {
   return text;
 }
 
-async function fetchOpenIssues() {
-  const path =
-    `/api/issues/search?organization=${ORGANIZATION}` +
-    `&projects=${PROJECT_KEY}&branch=main&statuses=OPEN` +
-    `&components=${encodeURIComponent(COMPONENT)}&ps=100`;
-  const data = await sonarGet(path);
-  return data.issues ?? [];
+function isStaleIssue(issue) {
+  const component = issue.component ?? "";
+  return component.includes(STALE_PATH);
+}
+
+async function fetchAllOpenStaleIssues() {
+  const found = new Map();
+  let page = 1;
+  const pageSize = 500;
+
+  while (page <= 10) {
+    const path =
+      `/api/issues/search?organization=${ORGANIZATION}` +
+      `&projects=${PROJECT_KEY}&branch=main&statuses=OPEN` +
+      `&ps=${pageSize}&p=${page}`;
+    const data = await sonarGet(path);
+    for (const issue of data.issues ?? []) {
+      if (isStaleIssue(issue)) found.set(issue.key, issue);
+    }
+    const total = data.paging?.total ?? 0;
+    if (page * pageSize >= total) break;
+    page += 1;
+  }
+
+  return [...found.values()];
 }
 
 async function closeIssue(issue) {
@@ -60,33 +78,20 @@ async function closeIssue(issue) {
       console.log(`cerrado ${issue.key} (${issue.rule}) via ${transition}`);
       return;
     } catch {
-      // probar siguiente transición
-    }
-  }
-
-  const show = await sonarGet(
-    `/api/issues/show?organization=${ORGANIZATION}&issue=${encodeURIComponent(issue.key)}`,
-  );
-  const available = (show.issue?.transitions ?? []).map((t) => t.key ?? t);
-  for (const transition of available) {
-    try {
-      await sonarPost("/api/issues/do_transition", { issue: issue.key, transition });
-      console.log(`cerrado ${issue.key} (${issue.rule}) via ${transition} (show)`);
-      return;
-    } catch {
       // siguiente
     }
   }
-
-  throw new Error(`no se pudo cerrar ${issue.key} (${issue.rule}); transitions=${available.join(",")}`);
+  throw new Error(`no se pudo cerrar ${issue.key} (${issue.rule})`);
 }
 
-const stale = await fetchOpenIssues();
+const stale = await fetchAllOpenStaleIssues();
 
 if (stale.length === 0) {
-  console.log("close-sonar-stale-coverage-shim-issues: no hay issues OPEN en la ruta eliminada");
+  console.log("close-sonar-stale-coverage-shim-issues: 0 issues OPEN en Overall (ruta eliminada)");
   process.exit(0);
 }
+
+console.log(`close-sonar-stale-coverage-shim-issues: encontrados ${stale.length} OPEN en ${STALE_PATH}`);
 
 const keys = stale.map((issue) => issue.key).join(",");
 try {
@@ -95,7 +100,7 @@ try {
     set_status: "RESOLVED",
     set_resolution: "FALSE-POSITIVE",
   });
-  console.log(`close-sonar-stale-coverage-shim-issues: ${stale.length} issue(s) → RESOLVED/FALSE-POSITIVE`);
+  console.log(`cerrados ${stale.length} → RESOLVED / FALSE-POSITIVE (bulk)`);
 } catch (bulkError) {
   console.warn(`bulk_change: ${bulkError.message}`);
   for (const issue of stale) {
