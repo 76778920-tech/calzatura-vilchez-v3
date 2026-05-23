@@ -7,12 +7,12 @@ type CampaignTransition = { from: number; to: number; direction: 1 | -1 };
 
 function readWindowScrollY(): number | null {
   const win = globalThis.window;
-  return typeof win === "undefined" ? null : win.scrollY;
+  return win === undefined ? null : win.scrollY;
 }
 
 function restoreWindowScrollY(targetY: number): void {
   const win = globalThis.window;
-  if (typeof win === "undefined") return;
+  if (win === undefined) return;
   if (Math.abs(win.scrollY - targetY) > 2) {
     win.scrollTo(0, targetY);
   }
