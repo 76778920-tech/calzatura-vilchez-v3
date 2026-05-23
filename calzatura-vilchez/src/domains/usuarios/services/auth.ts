@@ -57,16 +57,16 @@ function parsePendingProfileMarker(displayName: string | null): {
 }
 
 export async function checkDisposableEmail(email: string): Promise<void> {
+  const base = getBackendApiBaseUrl();
+  const url = base
+    ? `${base}/check-email?email=${encodeURIComponent(email)}`
+    : `https://www.disify.com/api/email/${encodeURIComponent(email)}`;
   try {
-    const res = await fetch(
-      `https://www.disify.com/api/email/${encodeURIComponent(email)}`,
-      { signal: AbortSignal.timeout(4000) }
-    );
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
     if (!res.ok) return;
     const data = await res.json();
     if (data.disposable === true) throw new Error("DISPOSABLE_EMAIL");
   } catch (err) {
-    // Si la API falla por red/timeout dejamos pasar — Firebase igual exige verificación
     if (err instanceof Error && err.message === "DISPOSABLE_EMAIL") throw err;
   }
 }

@@ -1438,6 +1438,22 @@ app.get("/", (_req, res) =>
 
 app.get("/health", (_req, res) => res.status(200).type("text/plain").send("ok"));
 
+app.get("/check-email", cors, async (req, res) => {
+  const email = String(req.query.email || "").trim();
+  if (!email) return res.status(400).json({ error: "email requerido" });
+  try {
+    const upstream = await fetch(
+      `https://www.disify.com/api/email/${encodeURIComponent(email)}`,
+      { signal: AbortSignal.timeout(4000) },
+    );
+    if (!upstream.ok) return res.json({ disposable: false });
+    const data = await upstream.json();
+    return res.json({ disposable: data.disposable === true });
+  } catch {
+    return res.json({ disposable: false });
+  }
+});
+
 app.post("/lookup-dni", (req, res) => {
   cors(req, res, () => handleLookupDni(req, res, {
     requireAppCheck: requireDniAppCheck(),
