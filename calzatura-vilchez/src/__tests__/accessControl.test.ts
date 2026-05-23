@@ -1,7 +1,15 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, afterAll, describe, it, expect, vi } from "vitest";
 import { canAccessArea, isAdminRole, isTrabajadorRole, panelFetchScopeForRole } from "@/security/accessControl";
 
 const SUPERADMIN = "superadmin@test.calzatura.internal";
+
+beforeAll(() => {
+  vi.stubEnv("VITE_SUPERADMIN_EMAILS", SUPERADMIN);
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("canAccessArea", () => {
   it("permite acceso sin rol a áreas públicas", () => {
