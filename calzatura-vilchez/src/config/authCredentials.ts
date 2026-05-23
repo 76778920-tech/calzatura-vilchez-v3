@@ -7,6 +7,10 @@ export const MIN_AUTH_PASSWORD_LENGTH = 8;
 export const MAX_AUTH_PASSWORD_LENGTH = 128;
 export const MAX_AUTH_EMAIL_INPUT_LENGTH = 100;
 
+// ISO/IEC 27002:2022 8.2.3 — composición mínima requerida
+const HAS_UPPERCASE = /[A-Z]/;
+const HAS_DIGIT = /\d/;
+
 /** Validación de longitud de contraseña para registro (mínimo fuerte de la app). */
 export function validateRegisterPasswordLength(raw: string): string | null {
   if (raw.length < MIN_AUTH_PASSWORD_LENGTH) {
@@ -14,6 +18,20 @@ export function validateRegisterPasswordLength(raw: string): string | null {
   }
   if (raw.length > MAX_AUTH_PASSWORD_LENGTH) {
     return `La contraseña no puede superar ${MAX_AUTH_PASSWORD_LENGTH} caracteres`;
+  }
+  return null;
+}
+
+/**
+ * Validación de complejidad para registro.
+ * ISO/IEC 27002:2022 8.2.3 + NIST SP 800-63B: variedad mínima de caracteres.
+ */
+export function validateRegisterPasswordComplexity(raw: string): string | null {
+  if (!HAS_UPPERCASE.test(raw)) {
+    return "La contraseña debe incluir al menos una letra mayúscula";
+  }
+  if (!HAS_DIGIT.test(raw)) {
+    return "La contraseña debe incluir al menos un número";
   }
   return null;
 }

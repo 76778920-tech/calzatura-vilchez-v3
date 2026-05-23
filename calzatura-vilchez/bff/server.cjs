@@ -111,6 +111,14 @@ function applyCorsHeaders(req, res, next) {
     );
     res.setHeader("Access-Control-Max-Age", "86400");
   }
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  if (isProductionRuntime()) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   if (req.method === "OPTIONS") {
     return res.status(204).end();
   }
@@ -1279,6 +1287,34 @@ function assertStoredTotals(order) {
     Math.abs(Number(order.total || 0) - total) > 0.01
   ) {
     throw Object.assign(new Error("Los totales del pedido no coinciden"), { status: 409 });
+  }
+}
+
+// PCI DSS 3.5 — revalida precios contra BD antes de generar sesión Stripe
+async function assertLivePrices(supabase, items) {
+  if (!Array.isArray(items) || items.length === 0) return;
+  const productIds = items.map((i) => i?.product?.id).filter(Boolean);
+  if (productIds.length === 0) return;
+  const { data, error } = await supabase
+    .from("productos")
+    .select("id,precio")
+    .in("id", productIds);
+  if (error) throw error;
+  const liveMap = new Map((data || []).map((p) => [p.id, Number(p.precio)]));
+  for (const item of items) {
+    const pid = item?.product?.id;
+    if (!pid) continue;
+    const stored = Number(item?.product?.precio || 0);
+    const live = liveMap.get(pid);
+    if (live === undefined) {
+      throw Object.assign(new Error("Producto no encontrado al validar precio"), { status: 409 });
+    }
+    if (Math.abs(live - stored) > 0.01) {
+      throw Object.assign(
+        new Error("El precio de un producto cambio. Recarga tu carrito e intenta de nuevo."),
+        { status: 409 },
+      );
+    }
   }
 }
 
@@ -2458,6 +2494,7 @@ app.post("/createCheckoutSession", (req, res) => {
 
         assertStoredTotals(order);
         await assertOrderStockAvailability(supabase, order.items);
+        await assertLivePrices(supabase, order.items);
 
         if (order.stripeSessionId) {
           try {

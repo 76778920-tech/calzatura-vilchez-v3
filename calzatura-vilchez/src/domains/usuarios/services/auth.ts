@@ -23,6 +23,7 @@ import {
   MAX_AUTH_PASSWORD_LENGTH,
   MIN_AUTH_PASSWORD_LENGTH,
   validateLoginPasswordLength,
+  validateRegisterPasswordComplexity,
 } from "@/config/authCredentials";
 
 const PENDING_PROFILE_PREFIX = "CV_PENDING";
@@ -104,6 +105,10 @@ export async function registerUser(
   }
   if (data.password.length > MAX_AUTH_PASSWORD_LENGTH) {
     throw new Error("PASSWORD_TOO_LONG");
+  }
+  const complexityError = validateRegisterPasswordComplexity(data.password);
+  if (complexityError) {
+    throw new Error("PASSWORD_TOO_WEAK");
   }
   const userCredential = await createUserWithEmailAndPassword(
     auth,
