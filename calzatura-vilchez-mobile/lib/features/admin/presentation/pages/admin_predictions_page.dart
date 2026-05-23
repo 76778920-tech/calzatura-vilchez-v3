@@ -367,7 +367,7 @@ class _PageHeader extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.psychology_alt_outlined, color: Colors.white),
+              const Icon(Icons.auto_awesome_outlined, color: Colors.white),
               const SizedBox(width: 10),
               const Expanded(
                 child: Text(
@@ -876,7 +876,7 @@ class _FinanceTab extends StatelessWidget {
                             title: 'Confianza',
                             value: '${summary.confidence.round()}%',
                             subtitle: _confidenceLabel(summary.confidence),
-                            icon: Icons.psychology_alt_outlined,
+                            icon: Icons.insights_outlined,
                           ),
                         ],
                       ),
