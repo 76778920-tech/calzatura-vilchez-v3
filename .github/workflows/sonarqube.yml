@@ -121,7 +121,15 @@ jobs:
           echo "=== Repositorio GitHub ==="
           echo "GITHUB_REPOSITORY=${GITHUB_REPOSITORY:-}"
 
+      - name: Cerrar issues fantasma del script coverage eliminado
+        if: steps.sonar-config.outputs.ready == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+        run: node scripts/close-sonar-stale-coverage-shim-issues.mjs
+
       - name: Ejecutar analisis SonarQube
+        id: sonar-scan
         if: steps.sonar-config.outputs.ready == 'true'
         uses: SonarSource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432 # v8.0.0
         env:
@@ -135,8 +143,8 @@ jobs:
             "-Dsonar.javascript.lcov.reportPaths=calzatura-vilchez/coverage/lcov.info"
             "-Dsonar.python.coverage.reportPaths=ai-service/coverage.xml"
 
-      - name: Cerrar issues fantasma del script coverage eliminado
-        if: steps.sonar-config.outputs.ready == 'true'
+      - name: Reintentar cierre issues fantasma (post-scan)
+        if: always() && steps.sonar-config.outputs.ready == 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
