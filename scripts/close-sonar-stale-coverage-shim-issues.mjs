@@ -8,6 +8,8 @@ const ORGANIZATION = "76778920-tech";
 const PROJECT_KEY = "76778920-tech_calzatura-vilchez-v3";
 const STALE_COMPONENT = `${PROJECT_KEY}:ai-service/scripts/fix_coverage_xml_for_sonar.py`;
 const STALE_PATH = "fix_coverage_xml_for_sonar.py";
+/** SonarCloud 10.4+: REOPENED no es válido en issueStatuses. */
+const ISSUE_STATUSES_OPEN = "OPEN,CONFIRMED";
 const token = process.env.SONAR_TOKEN;
 
 if (!token) {
@@ -53,7 +55,7 @@ async function searchByComponentKeys(branchQuery) {
   const path =
     `/api/issues/search?organization=${ORGANIZATION}` +
     `&componentKeys=${encodeURIComponent(STALE_COMPONENT)}` +
-    `&issueStatuses=OPEN,REOPENED,CONFIRMED${branchQuery}` +
+    `&issueStatuses=${ISSUE_STATUSES_OPEN}${branchQuery}` +
     `&ps=100&p=1`;
   const data = await sonarGet(path);
   return data.issues ?? [];
@@ -68,7 +70,7 @@ async function searchByProjectScan(branchQuery) {
     const path =
       `/api/issues/search?organization=${ORGANIZATION}` +
       `&projects=${PROJECT_KEY}` +
-      `&issueStatuses=OPEN,REOPENED,CONFIRMED${branchQuery}` +
+      `&issueStatuses=${ISSUE_STATUSES_OPEN}${branchQuery}` +
       `&ps=${pageSize}&p=${page}`;
     const data = await sonarGet(path);
     for (const issue of data.issues ?? []) {
