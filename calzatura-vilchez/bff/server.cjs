@@ -104,7 +104,7 @@ function applyCorsHeaders(req, res, next) {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
     }
-    res.setHeader("Access-Control-Allow-Methods", "GET,POST,DELETE,PATCH,OPTIONS");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
     res.setHeader(
       "Access-Control-Allow-Headers",
       "Authorization, Content-Type, Idempotency-Key, X-Firebase-AppCheck, X-Calzatura-Client",
@@ -125,7 +125,7 @@ const cors = require("cors")({
     }
     callback(new Error("Origen no permitido"));
   },
-  methods: ["GET", "POST", "DELETE", "PATCH", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
   allowedHeaders: [
     "Authorization",
     "Content-Type",
