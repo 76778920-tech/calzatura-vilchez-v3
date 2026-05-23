@@ -1,14 +1,9 @@
 # Scripts de `ai-service`
 
-## Cobertura SonarCloud
+## Cobertura SonarCloud (único script)
 
-| Script | Uso |
-|--------|-----|
-| `scripts/fix-ai-service-coverage-xml-for-sonar.py` (raíz del repo) | Lo ejecuta el CI antes del análisis Sonar |
-| `fix_coverage_xml_for_sonar.py` (este directorio) | Delega al script canónico; no duplica lógica |
+El CI ejecuta **solo** este archivo en la raíz del monorepo:
 
-```bash
-python scripts/fix-ai-service-coverage-xml-for-sonar.py
-# equivalente:
-python ai-service/scripts/fix_coverage_xml_for_sonar.py
-```
+`scripts/fix-ai-service-coverage-xml-for-sonar.py`
+
+No existe `fix_coverage_xml_for_sonar.py` en esta carpeta. Si SonarCloud muestra issues en esa ruta, son **avisos antiguos** de un archivo ya eliminado; el workflow de CI los cierra automáticamente tras cada análisis.

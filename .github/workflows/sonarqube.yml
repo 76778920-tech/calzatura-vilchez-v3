@@ -134,3 +134,10 @@ jobs:
             "-Dsonar.newCode.referenceBranch=main"
             "-Dsonar.javascript.lcov.reportPaths=calzatura-vilchez/coverage/lcov.info"
             "-Dsonar.python.coverage.reportPaths=ai-service/coverage.xml"
+
+      - name: Cerrar issues fantasma del script coverage eliminado
+        if: steps.sonar-config.outputs.ready == 'true'
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+        run: node scripts/close-sonar-stale-coverage-shim-issues.mjs
