@@ -5,6 +5,19 @@ type CampaignSlide = { id: string; image: string; alt: string };
 
 type CampaignTransition = { from: number; to: number; direction: 1 | -1 };
 
+function readWindowScrollY(): number | null {
+  const win = globalThis.window;
+  return typeof win === "undefined" ? null : win.scrollY;
+}
+
+function restoreWindowScrollY(targetY: number): void {
+  const win = globalThis.window;
+  if (typeof win === "undefined") return;
+  if (Math.abs(win.scrollY - targetY) > 2) {
+    win.scrollTo(0, targetY);
+  }
+}
+
 export type CatalogCampaignCarouselControls = {
   activeCampaignSlide: number;
   isCampaignDragging: boolean;
@@ -48,12 +61,10 @@ export function useCatalogCampaignCarousel(
 
   const restorePreservedWindowScroll = useCallback(() => {
     const targetY = preservedWindowScrollYRef.current;
-    if (targetY === null || typeof window === "undefined") return;
+    if (targetY === null) return;
     preservedWindowScrollYRef.current = null;
     requestAnimationFrame(() => {
-      if (Math.abs(window.scrollY - targetY) > 2) {
-        window.scrollTo(0, targetY);
-      }
+      restoreWindowScrollY(targetY);
     });
   }, []);
 
@@ -62,8 +73,9 @@ export function useCatalogCampaignCarousel(
       const slideCount = catalogCampaignSlides.length;
       if (slideCount < 2 || campaignTransition) return;
 
-      if (typeof window !== "undefined") {
-        preservedWindowScrollYRef.current = window.scrollY;
+      const scrollY = readWindowScrollY();
+      if (scrollY !== null) {
+        preservedWindowScrollYRef.current = scrollY;
       }
 
       const from = activeCampaignSlide;
