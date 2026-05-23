@@ -118,9 +118,33 @@ if (stale.length === 0) {
 }
 
 const keys = stale.map((issue) => issue.key).join(",");
-await sonarPost("/api/issues/bulk_change", {
-  issues: keys,
-  set_status: "RESOLVED",
-  set_resolution: "FALSE-POSITIVE",
-});
-console.log(`cerrados ${stale.length} → RESOLVED/FALSE-POSITIVE: ${keys}`);
+
+async function closeIssue(issue) {
+  const transitions = ["falsepositive", "accept", "wontfix", "resolve"];
+  for (const transition of transitions) {
+    try {
+      await sonarPost("/api/issues/do_transition", {
+        issue: issue.key,
+        transition,
+      });
+      console.log(`cerrado ${issue.key} (${issue.rule}) via do_transition=${transition}`);
+      return;
+    } catch {
+      // siguiente transición
+    }
+  }
+  throw new Error(`no se pudo cerrar ${issue.key} (${issue.rule})`);
+}
+
+try {
+  await sonarPost("/api/issues/bulk_change", {
+    issues: keys,
+    doTransition: "falsepositive",
+  });
+  console.log(`cerrados ${stale.length} → doTransition=falsepositive (bulk): ${keys}`);
+} catch (bulkError) {
+  console.warn(`bulk_change: ${bulkError.message}; probando do_transition por issue`);
+  for (const issue of stale) {
+    await closeIssue(issue);
+  }
+}
