@@ -3576,6 +3576,7 @@ button.cart-overlay {
   width: 100vw;
   margin-inline: calc(50% - 50vw);
   overflow: hidden;
+  overflow-anchor: none;
   background: var(--black);
 }
 .catalog-campaign-track {

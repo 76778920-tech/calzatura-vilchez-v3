@@ -97,6 +97,17 @@ async function expectCampaignVisible(page: Page) {
   return snapshot;
 }
 
+async function scrollCatalogBelowCarousel(page: Page, targetY = 1_500) {
+  await page.evaluate((y) => window.scrollTo({ top: y, left: 0, behavior: "instant" }), targetY);
+  await expect.poll(async () => page.evaluate(() => window.scrollY), { timeout: 5_000 }).toBeGreaterThan(200);
+  await expect.poll(async () => {
+    const first = await page.evaluate(() => window.scrollY);
+    await page.waitForTimeout(120);
+    const second = await page.evaluate(() => window.scrollY);
+    return Math.abs(first - second) <= 4 ? second : null;
+  }, { timeout: 3_000 }).not.toBeNull();
+}
+
 async function dragCampaignLeft(page: Page) {
   const track = page.locator(".catalog-campaign-track");
   const box = await track.boundingBox();
@@ -141,13 +152,12 @@ test.describe("catalogo: carrusel de campana", () => {
     await expect.poll(async () => (await getCarouselSnapshot(page)).active).toBe("2");
     await page.waitForTimeout(CATALOG_CAMPAIGN_ANIMATION_MS + 150);
 
-    await page.evaluate(() => window.scrollTo(0, 1_500));
-    await expect.poll(async () => page.evaluate(() => window.scrollY), { timeout: 5_000 }).toBeGreaterThan(200);
+    await scrollCatalogBelowCarousel(page);
     const scrollBeforeAutoplay = await page.evaluate(() => window.scrollY);
 
     await expect.poll(
       async () => (await getCarouselSnapshot(page)).active,
-      { timeout: CATALOG_CAMPAIGN_ROTATION_MS + 2_000 }
+      { timeout: CATALOG_CAMPAIGN_ROTATION_MS + 2_000 },
     ).toBe("1");
 
     const duringLoopTransition = await expectCampaignVisible(page);
@@ -160,7 +170,11 @@ test.describe("catalogo: carrusel de campana", () => {
     expect(afterAutoplay.active).toBe("1");
     expect(afterAutoplay.visible).toHaveLength(1);
     expect(afterAutoplay.scrollY).toBeGreaterThan(200);
-    expect(Math.abs(afterAutoplay.scrollY - scrollBeforeAutoplay)).toBeLessThan(260);
+
+    await expect.poll(async () => {
+      const scrollY = await page.evaluate(() => window.scrollY);
+      return Math.abs(scrollY - scrollBeforeAutoplay) <= 260 ? scrollY : null;
+    }, { timeout: 4_000 }).not.toBeNull();
   });
 });
 

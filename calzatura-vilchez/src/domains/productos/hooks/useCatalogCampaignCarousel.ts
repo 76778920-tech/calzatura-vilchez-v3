@@ -25,6 +25,7 @@ export function useCatalogCampaignCarousel(
   const campaignTrackRef = useRef<HTMLDivElement | null>(null);
   const campaignDragStartXRef = useRef<number | null>(null);
   const campaignDragDeltaXRef = useRef(0);
+  const preservedWindowScrollYRef = useRef<number | null>(null);
   const [activeCampaignSlide, setActiveCampaignSlide] = useState(0);
   const [isCampaignDragging, setIsCampaignDragging] = useState(false);
   const [campaignDragOffset, setCampaignDragOffset] = useState(0);
@@ -45,10 +46,25 @@ export function useCatalogCampaignCarousel(
     return () => observer.disconnect();
   }, []);
 
+  const restorePreservedWindowScroll = useCallback(() => {
+    const targetY = preservedWindowScrollYRef.current;
+    if (targetY === null || typeof window === "undefined") return;
+    preservedWindowScrollYRef.current = null;
+    requestAnimationFrame(() => {
+      if (Math.abs(window.scrollY - targetY) > 2) {
+        window.scrollTo(0, targetY);
+      }
+    });
+  }, []);
+
   const moveCampaignBy = useCallback(
     (direction: 1 | -1) => {
       const slideCount = catalogCampaignSlides.length;
       if (slideCount < 2 || campaignTransition) return;
+
+      if (typeof window !== "undefined") {
+        preservedWindowScrollYRef.current = window.scrollY;
+      }
 
       const from = activeCampaignSlide;
       const to = (activeCampaignSlide + direction + slideCount) % slideCount;
@@ -144,9 +160,10 @@ export function useCatalogCampaignCarousel(
     (index: number) => {
       if (campaignTransition?.to === index) {
         setCampaignTransition(null);
+        restorePreservedWindowScroll();
       }
     },
-    [campaignTransition],
+    [campaignTransition, restorePreservedWindowScroll],
   );
 
   let campaignDragDirection = 0;
