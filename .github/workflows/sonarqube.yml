@@ -151,6 +151,7 @@ jobs:
 
       - name: Reintentar cierre issues fantasma (post-scan)
         if: always() && steps.sonar-config.outputs.ready == 'true'
+        continue-on-error: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
