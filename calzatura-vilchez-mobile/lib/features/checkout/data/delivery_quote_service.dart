@@ -65,6 +65,21 @@ class DeliveryQuoteService {
     return list.map((e) => GeoCandidate.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<String?> reverseGeocode(double lat, double lng) async {
+    final uri = Uri.parse('$_base/delivery/reverse').replace(queryParameters: {
+      'lat': lat.toString(),
+      'lng': lng.toString(),
+    });
+    try {
+      final response = await _client.get(uri);
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return body['label'] as String?;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<List<List<double>>> getRoute(double destLat, double destLng) async {
     final uri = Uri.parse('$_base/delivery/route').replace(queryParameters: {
       'destLat': destLat.toString(),

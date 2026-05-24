@@ -51,6 +51,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   double? _confirmedLat;
   double? _confirmedLng;
   List<List<double>> _routePositions = [];
+  bool _mapExpanded = false;
 
   // ── Geocode autocomplete ─────────────────────────────────────────────────────
   List<GeoCandidate> _geoCandidates = [];
@@ -168,6 +169,51 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       setState(() {
         _quoteLoading = false;
         _quoteError = 'Error calculando envío: $e';
+      });
+    }
+  }
+
+  Future<void> _selectFromMap(double lat, double lng) async {
+    setState(() {
+      _confirmedLat = lat;
+      _confirmedLng = lng;
+      _quoteLoading = true;
+      _quoteError = null;
+      _quote = null;
+      _routePositions = [];
+    });
+    try {
+      final results = await Future.wait([
+        _deliveryService.reverseGeocode(lat, lng),
+        _deliveryService.getQuote(lat, lng),
+        _deliveryService.getRoute(lat, lng),
+      ]);
+      if (!mounted) return;
+      final label = results[0] as String?;
+      final q = results[1] as DeliveryQuote?;
+      final route = results[2] as List<List<double>>;
+      if (label != null && label.isNotEmpty) _direccionCtrl.text = label;
+      if (q == null || q.isOutOfRange) {
+        setState(() {
+          _quoteLoading = false;
+          _quoteError = q == null
+              ? 'No se pudo calcular el costo de envío.'
+              : 'Fuera del área de reparto (máx. ~15 km).';
+          _confirmedLat = null;
+          _confirmedLng = null;
+        });
+        return;
+      }
+      setState(() {
+        _quote = q;
+        _quoteLoading = false;
+        _routePositions = route;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _quoteLoading = false;
+        _quoteError = 'Error: $e';
       });
     }
   }
@@ -414,10 +460,15 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                                       ],
                                     ),
                                   ),
-                                if (_routePositions.length >= 2)
+                                if (_routePositions.length >= 2 || _confirmedLat != null)
                                   Padding(
                                     padding: const EdgeInsets.only(bottom: 12),
-                                    child: _RouteMap(positions: _routePositions),
+                                    child: _RouteMap(
+                                      positions: _routePositions,
+                                      expanded: _mapExpanded,
+                                      onToggle: () => setState(() => _mapExpanded = !_mapExpanded),
+                                      onMapTap: _selectFromMap,
+                                    ),
                                   ),
                                 _CheckoutField(
                                   controller: _telefonoCtrl,
@@ -795,8 +846,17 @@ class _CheckoutEmptyCart extends StatelessWidget {
 }
 
 class _RouteMap extends StatelessWidget {
-  const _RouteMap({required this.positions});
+  const _RouteMap({
+    required this.positions,
+    required this.expanded,
+    required this.onToggle,
+    required this.onMapTap,
+  });
+
   final List<List<double>> positions;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final void Function(double lat, double lng) onMapTap;
 
   static const _storeLat = -12.071951;
   static const _storeLng = -75.205281;
@@ -805,44 +865,122 @@ class _RouteMap extends StatelessWidget {
   Widget build(BuildContext context) {
     final points = positions.map((p) => LatLng(p[0], p[1])).toList();
     final midIdx = points.length ~/ 2;
-    final center = points.isNotEmpty ? points[midIdx] : const LatLng(_storeLat, _storeLng);
+    final center = points.isNotEmpty
+        ? points[midIdx]
+        : const LatLng(_storeLat, _storeLng);
+    final height = expanded ? 420.0 : 260.0;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        height: 260,
-        child: FlutterMap(
-          options: MapOptions(
-            initialCenter: center,
-            initialZoom: 13,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom | InteractiveFlag.drag,
-            ),
-          ),
+        height: height,
+        child: Stack(
           children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.calzaturavilchez.calzatura_vilchez_mobile',
-            ),
-            PolylineLayer(
-              polylines: [
-                Polyline(points: points, strokeWidth: 4, color: AppColors.gold),
+            FlutterMap(
+              options: MapOptions(
+                initialCenter: center,
+                initialZoom: 13,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.pinchZoom |
+                      InteractiveFlag.doubleTapZoom |
+                      InteractiveFlag.drag,
+                ),
+                onTap: (_, point) => onMapTap(point.latitude, point.longitude),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.calzaturavilchez.calzatura_vilchez_mobile',
+                ),
+                if (points.length >= 2)
+                  PolylineLayer(
+                    polylines: [
+                      Polyline(points: points, strokeWidth: 4, color: AppColors.gold),
+                    ],
+                  ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: const LatLng(_storeLat, _storeLng),
+                      child: const Icon(Icons.store_rounded, color: AppColors.black, size: 30),
+                    ),
+                    if (points.isNotEmpty)
+                      Marker(
+                        point: points.last,
+                        child: const Icon(Icons.location_pin, color: AppColors.error, size: 36),
+                      ),
+                  ],
+                ),
               ],
             ),
-            MarkerLayer(
-              markers: [
-                Marker(
-                  point: const LatLng(_storeLat, _storeLng),
-                  child: const Icon(Icons.store_rounded, color: AppColors.black, size: 30),
-                ),
-                Marker(
-                  point: points.last,
-                  child: const Icon(Icons.location_pin, color: AppColors.error, size: 36),
-                ),
-              ],
+            // Botones maximizar / minimizar
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Column(
+                children: [
+                  _MapBtn(
+                    icon: Icons.fullscreen_rounded,
+                    active: expanded,
+                    onTap: expanded ? null : onToggle,
+                  ),
+                  const SizedBox(height: 4),
+                  _MapBtn(
+                    icon: Icons.fullscreen_exit_rounded,
+                    active: !expanded,
+                    onTap: expanded ? onToggle : null,
+                  ),
+                ],
+              ),
             ),
+            // Hint tap
+            if (points.isEmpty)
+              const Positioned(
+                bottom: 10,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.all(Radius.circular(8)),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      child: Text(
+                        'Toca el mapa para seleccionar tu ubicación',
+                        style: TextStyle(color: Colors.white, fontSize: 11),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _MapBtn extends StatelessWidget {
+  const _MapBtn({required this.icon, required this.active, this.onTap});
+  final IconData icon;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: active ? AppColors.gold : Colors.white.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+        ),
+        child: Icon(icon, size: 20, color: active ? Colors.white : AppColors.textSecondary),
       ),
     );
   }
