@@ -239,198 +239,204 @@ class _CartTile extends StatelessWidget {
   final int index;
   final WidgetRef ref;
 
+  int get _stockMax {
+    if (item.talla != null) {
+      final ts = item.product.stockDeTalla(item.talla!);
+      if (ts > 0) return ts;
+    }
+    return item.product.stock;
+  }
+
   @override
   Widget build(BuildContext context) {
     final imageUrl = item.product.allImages.isNotEmpty
         ? item.product.allImages.first
         : '';
+    final atMax = item.quantity >= _stockMax;
 
-    return Dismissible(
-      key: ValueKey('${item.product.id}-${item.talla}'),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 22),
-        decoration: BoxDecoration(
-          color: AppColors.error,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: const Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.delete_rounded, color: Colors.white, size: 26),
-            SizedBox(height: 4),
-            Text(
-              'Eliminar',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      onDismissed: (_) => ref.read(cartProvider.notifier).removeItem(index),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Imagen
-            Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          width: 80,
-                          height: 80,
-                          fit: BoxFit.cover,
-                        )
-                      : Container(
-                          width: 80,
-                          height: 80,
-                          color: AppColors.shimmerBase,
-                          child: const Icon(
-                            Icons.storefront_rounded,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                ),
-                if (item.product.hasDescuento)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 5,
-                        vertical: 3,
-                      ),
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFE53935),
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(12),
-                          bottomRight: Radius.circular(8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Imagen
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      )
+                    : Container(
+                        width: 80,
+                        height: 80,
+                        color: AppColors.shimmerBase,
+                        child: const Icon(
+                          Icons.storefront_rounded,
+                          color: AppColors.textSecondary,
                         ),
                       ),
-                      child: Text(
-                        '${item.product.descuento}%',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
+              ),
+              if (item.product.hasDescuento)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE53935),
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(12),
+                        bottomRight: Radius.circular(8),
                       ),
                     ),
-                  ),
-              ],
-            ),
-            const SizedBox(width: 12),
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (item.product.marca != null)
-                    Text(
-                      item.product.marca!.toUpperCase(),
+                    child: Text(
+                      '${item.product.descuento}%',
                       style: const TextStyle(
-                        color: AppColors.textSecondary,
+                        color: Colors.white,
                         fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
+                        fontWeight: FontWeight.w900,
                       ),
-                    ),
-                  Text(
-                    item.product.nombre,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                      color: AppColors.textPrimary,
-                      height: 1.3,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  // Tags talla + color
-                  if (item.talla != null || item.color != null)
-                    Wrap(
-                      spacing: 6,
-                      children: [
-                        if (item.talla != null) _Tag(label: 'T. ${item.talla}'),
-                        if (item.color != null) _Tag(label: item.color!),
-                      ],
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          // Info + controles
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (item.product.marca != null)
+                  Text(
+                    item.product.marca!.toUpperCase(),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
                     ),
-                  const SizedBox(height: 6),
-                  Row(
+                  ),
+                Text(
+                  item.product.nombre,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                if (item.talla != null || item.color != null)
+                  Wrap(
+                    spacing: 6,
                     children: [
-                      if (item.product.hasDescuento)
-                        Text(
-                          item.product.precioOriginalFormatted,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                            decoration: TextDecoration.lineThrough,
-                          ),
-                        ),
-                      Text(
-                        item.product.precioFormatted,
-                        style: TextStyle(
-                          color: item.product.hasDescuento
-                              ? const Color(0xFFE53935)
-                              : AppColors.gold,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                        ),
-                      ),
+                      if (item.talla != null) _Tag(label: 'T. ${item.talla}'),
+                      if (item.color != null) _Tag(label: item.color!),
                     ],
                   ),
-                ],
-              ),
-            ),
-            // Controles cantidad
-            Column(
-              children: [
-                _QtyBtn(
-                  icon: Icons.add,
-                  onTap: () => ref
-                      .read(cartProvider.notifier)
-                      .updateQuantity(index, item.quantity + 1),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    if (item.product.hasDescuento)
+                      Text(
+                        item.product.precioOriginalFormatted,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          decoration: TextDecoration.lineThrough,
+                        ),
+                      ),
+                    Text(
+                      item.product.precioFormatted,
+                      style: TextStyle(
+                        color: item.product.hasDescuento
+                            ? const Color(0xFFE53935)
+                            : AppColors.gold,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
                 ),
-                Container(
-                  width: 32,
-                  alignment: Alignment.center,
-                  child: Text(
-                    '${item.quantity}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 15,
+                const SizedBox(height: 8),
+                // ── Fila inferior: controles + papelera ──────────────────
+                Row(
+                  children: [
+                    // Papelera
+                    GestureDetector(
+                      onTap: () => ref.read(cartProvider.notifier).removeItem(index),
+                      child: Container(
+                        width: 30,
+                        height: 30,
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.error),
+                      ),
+                    ),
+                    const Spacer(),
+                    // Controles horizontales [− qty +]
+                    Row(
+                      children: [
+                        _QtyBtn(
+                          icon: Icons.remove,
+                          onTap: () => ref
+                              .read(cartProvider.notifier)
+                              .updateQuantity(index, item.quantity - 1),
+                        ),
+                        Container(
+                          width: 36,
+                          alignment: Alignment.center,
+                          child: Text(
+                            '${item.quantity}',
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                          ),
+                        ),
+                        _QtyBtn(
+                          icon: Icons.add,
+                          disabled: atMax,
+                          onTap: atMax
+                              ? null
+                              : () => ref
+                                  .read(cartProvider.notifier)
+                                  .updateQuantity(index, item.quantity + 1),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                if (atMax)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Stock máximo: $_stockMax',
+                      style: const TextStyle(fontSize: 10, color: AppColors.error),
                     ),
                   ),
-                ),
-                _QtyBtn(
-                  icon: Icons.remove,
-                  onTap: () => ref
-                      .read(cartProvider.notifier)
-                      .updateQuantity(index, item.quantity - 1),
-                ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -460,22 +466,27 @@ class _Tag extends StatelessWidget {
 }
 
 class _QtyBtn extends StatelessWidget {
-  const _QtyBtn({required this.icon, required this.onTap});
+  const _QtyBtn({required this.icon, this.onTap, this.disabled = false});
   final IconData icon;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool disabled;
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: disabled ? null : onTap,
       child: Container(
         width: 30,
         height: 30,
         decoration: BoxDecoration(
-          color: AppColors.beige,
+          color: disabled ? AppColors.shimmerBase : AppColors.beige,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.shimmerBase),
         ),
-        child: Icon(icon, size: 16, color: AppColors.textPrimary),
+        child: Icon(
+          icon,
+          size: 16,
+          color: disabled ? AppColors.textSecondary : AppColors.textPrimary,
+        ),
       ),
     );
   }
