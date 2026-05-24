@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -48,6 +50,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   String? _quoteError;
   double? _confirmedLat;
   double? _confirmedLng;
+  List<List<double>> _routePositions = [];
 
   // ── Geocode autocomplete ─────────────────────────────────────────────────────
   List<GeoCandidate> _geoCandidates = [];
@@ -114,6 +117,10 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   }
 
   Future<void> _selectCandidate(GeoCandidate candidate) async {
+    // Auto-fill ciudad y distrito desde el resultado geocode
+    if (candidate.city.isNotEmpty) _ciudadCtrl.text = candidate.city;
+    if (candidate.district.isNotEmpty) _distritoCtrl.text = candidate.district;
+
     setState(() {
       _geoCandidates = [];
       _confirmedLat = candidate.lat;
@@ -121,11 +128,17 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       _quoteLoading = true;
       _quoteError = null;
       _quote = null;
+      _routePositions = [];
     });
 
     try {
-      final q = await _deliveryService.getQuote(candidate.lat, candidate.lng);
+      final results = await Future.wait([
+        _deliveryService.getQuote(candidate.lat, candidate.lng),
+        _deliveryService.getRoute(candidate.lat, candidate.lng),
+      ]);
       if (!mounted) return;
+      final q = results[0] as DeliveryQuote?;
+      final route = results[1] as List<List<double>>;
       if (q == null) {
         setState(() {
           _quoteLoading = false;
@@ -145,6 +158,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       setState(() {
         _quote = q;
         _quoteLoading = false;
+        _routePositions = route;
       });
     } catch (e) {
       if (!mounted) return;
@@ -388,6 +402,11 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                                         ),
                                       ],
                                     ),
+                                  ),
+                                if (_routePositions.length >= 2)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _RouteMap(positions: _routePositions),
                                   ),
                                 Row(
                                   children: [
@@ -764,6 +783,59 @@ class _CheckoutEmptyCart extends StatelessWidget {
             const Text('Tu carrito está vacío', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
             const SizedBox(height: 12),
             OutlinedButton(onPressed: () => context.go('/catalog'), child: const Text('Explorar catálogo')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RouteMap extends StatelessWidget {
+  const _RouteMap({required this.positions});
+  final List<List<double>> positions;
+
+  // Coordenadas de la tienda (Huancayo)
+  static const _storeLat = -12.0651;
+  static const _storeLng = -75.2049;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = positions.map((p) => LatLng(p[0], p[1])).toList();
+    final midIdx = points.length ~/ 2;
+    final center = points.isNotEmpty ? points[midIdx] : const LatLng(_storeLat, _storeLng);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        height: 160,
+        child: FlutterMap(
+          options: MapOptions(
+            initialCenter: center,
+            initialZoom: 12,
+            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.calzaturavilchez.calzatura_vilchez_mobile',
+            ),
+            PolylineLayer(
+              polylines: [
+                Polyline(points: points, strokeWidth: 3.5, color: AppColors.gold),
+              ],
+            ),
+            MarkerLayer(
+              markers: [
+                Marker(
+                  point: const LatLng(_storeLat, _storeLng),
+                  child: const Icon(Icons.store_rounded, color: AppColors.black, size: 28),
+                ),
+                Marker(
+                  point: points.last,
+                  child: const Icon(Icons.location_pin, color: AppColors.error, size: 32),
+                ),
+              ],
+            ),
           ],
         ),
       ),

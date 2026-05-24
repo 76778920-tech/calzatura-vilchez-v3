@@ -168,11 +168,18 @@ function nominatimLayer(place) {
 }
 
 function mapNominatimPlace(place) {
+  const addr = place.address || {};
+  const city =
+    addr.city || addr.town || addr.municipality || addr.county || "";
+  const district =
+    addr.suburb || addr.neighbourhood || addr.quarter || addr.district || addr.city_district || "";
   return {
     lat: Number.parseFloat(place.lat),
     lng: Number.parseFloat(place.lon),
     label: place.display_name || "",
     layer: nominatimLayer(place),
+    city,
+    district,
   };
 }
 
@@ -190,6 +197,10 @@ async function nominatimSearch(query, limit, bbox) {
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("countrycodes", "pe");
   url.searchParams.set("limit", String(Math.min(Math.max(limit, 1), 20)));
+  if (bbox) {
+    url.searchParams.set("viewbox", `${bbox.minLon},${bbox.maxLat},${bbox.maxLon},${bbox.minLat}`);
+    url.searchParams.set("bounded", "1");
+  }
 
   const res = await fetch(url.toString(), {
     headers: { "User-Agent": DELIVERY_UA, Accept: "application/json" },

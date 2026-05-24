@@ -27,13 +27,23 @@ class GeoCandidate {
   final double lat;
   final double lng;
   final String label;
+  final String city;
+  final String district;
 
-  const GeoCandidate({required this.lat, required this.lng, required this.label});
+  const GeoCandidate({
+    required this.lat,
+    required this.lng,
+    required this.label,
+    this.city = '',
+    this.district = '',
+  });
 
   factory GeoCandidate.fromJson(Map<String, dynamic> json) => GeoCandidate(
         lat: (json['lat'] as num).toDouble(),
         lng: (json['lng'] as num).toDouble(),
         label: json['label'] as String? ?? '',
+        city: json['city'] as String? ?? '',
+        district: json['district'] as String? ?? '',
       );
 }
 
@@ -53,6 +63,26 @@ class DeliveryQuoteService {
     final body = jsonDecode(response.body) as Map<String, dynamic>;
     final list = body['candidates'] as List<dynamic>? ?? [];
     return list.map((e) => GeoCandidate.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<List<List<double>>> getRoute(double destLat, double destLng) async {
+    final uri = Uri.parse('$_base/delivery/route').replace(queryParameters: {
+      'destLat': destLat.toString(),
+      'destLng': destLng.toString(),
+      'storeLat': '-12.0651',
+      'storeLng': '-75.2049',
+    });
+    try {
+      final response = await _client.get(uri);
+      if (response.statusCode != 200) return [];
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      final positions = body['positions'] as List<dynamic>? ?? [];
+      return positions
+          .map((p) => [(p as List)[0] as double, p[1] as double])
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
   Future<DeliveryQuote?> getQuote(double destLat, double destLng) async {
