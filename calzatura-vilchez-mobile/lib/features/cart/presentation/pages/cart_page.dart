@@ -268,7 +268,7 @@ class _CartTile extends StatelessWidget {
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Imagen
           Stack(
@@ -286,10 +286,7 @@ class _CartTile extends StatelessWidget {
                         width: 80,
                         height: 80,
                         color: AppColors.shimmerBase,
-                        child: const Icon(
-                          Icons.storefront_rounded,
-                          color: AppColors.textSecondary,
-                        ),
+                        child: const Icon(Icons.storefront_rounded, color: AppColors.textSecondary),
                       ),
               ),
               if (item.product.hasDescuento)
@@ -307,42 +304,29 @@ class _CartTile extends StatelessWidget {
                     ),
                     child: Text(
                       '${item.product.descuento}%',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
             ],
           ),
           const SizedBox(width: 12),
-          // Info + controles
+          // Info (marca, nombre, talla, precio)
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (item.product.marca != null)
                   Text(
                     item.product.marca!.toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                    ),
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 9, fontWeight: FontWeight.w700, letterSpacing: 0.8),
                   ),
                 Text(
                   item.product.nombre,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: AppColors.textPrimary,
-                    height: 1.3,
-                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.textPrimary, height: 1.3),
                 ),
                 const SizedBox(height: 4),
                 if (item.talla != null || item.color != null)
@@ -359,82 +343,74 @@ class _CartTile extends StatelessWidget {
                     if (item.product.hasDescuento)
                       Text(
                         item.product.precioOriginalFormatted,
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          decoration: TextDecoration.lineThrough,
-                        ),
+                        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary, decoration: TextDecoration.lineThrough),
                       ),
                     Text(
                       item.product.precioFormatted,
                       style: TextStyle(
-                        color: item.product.hasDescuento
-                            ? const Color(0xFFE53935)
-                            : AppColors.gold,
+                        color: item.product.hasDescuento ? const Color(0xFFE53935) : AppColors.gold,
                         fontWeight: FontWeight.w800,
                         fontSize: 14,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                // ── Fila inferior: controles + papelera ──────────────────
-                Row(
-                  children: [
-                    // Papelera
-                    GestureDetector(
-                      onTap: () => ref.read(cartProvider.notifier).removeItem(index),
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: AppColors.error.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.error),
-                      ),
-                    ),
-                    const Spacer(),
-                    // Controles horizontales [− qty +]
-                    Row(
-                      children: [
-                        _QtyBtn(
-                          icon: Icons.remove,
-                          onTap: () => ref
-                              .read(cartProvider.notifier)
-                              .updateQuantity(index, item.quantity - 1),
-                        ),
-                        Container(
-                          width: 36,
-                          alignment: Alignment.center,
-                          child: Text(
-                            '${item.quantity}',
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-                          ),
-                        ),
-                        _QtyBtn(
-                          icon: Icons.add,
-                          disabled: atMax,
-                          onTap: atMax
-                              ? null
-                              : () => ref
-                                  .read(cartProvider.notifier)
-                                  .updateQuantity(index, item.quantity + 1),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
                 if (atMax)
                   Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      'Stock máximo: $_stockMax',
-                      style: const TextStyle(fontSize: 10, color: AppColors.error),
-                    ),
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text('Stock máximo: $_stockMax', style: const TextStyle(fontSize: 10, color: AppColors.error)),
                   ),
               ],
             ),
+          ),
+          const SizedBox(width: 10),
+          // ── Columna derecha: papelera + caja [− qty +] ───────────────
+          Column(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // Papelera
+              GestureDetector(
+                onTap: () => ref.read(cartProvider.notifier).removeItem(index),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppColors.error.withValues(alpha: 0.09),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                ),
+              ),
+              // Caja [− qty +]
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.beige,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.shimmerBase),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _QtyBtn(
+                      icon: Icons.remove,
+                      onTap: () => ref.read(cartProvider.notifier).updateQuantity(index, item.quantity - 1),
+                    ),
+                    SizedBox(
+                      width: 38,
+                      child: Center(
+                        child: Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                      ),
+                    ),
+                    _QtyBtn(
+                      icon: Icons.add,
+                      disabled: atMax,
+                      onTap: atMax ? null : () => ref.read(cartProvider.notifier).updateQuantity(index, item.quantity + 1),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
