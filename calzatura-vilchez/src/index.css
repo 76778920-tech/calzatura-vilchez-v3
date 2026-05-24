@@ -5143,9 +5143,8 @@ button.cart-overlay {
   background: #2563eb;
   box-shadow: 0 0 0 1px #fff;
 }
-.checkout-delivery-map--interactive .leaflet-container { cursor: crosshair; }
-.checkout-delivery-map--interactive .leaflet-marker-draggable { cursor: grab; }
-.checkout-delivery-map--interactive .leaflet-marker-draggable.leaflet-drag-target { cursor: grabbing; }
+.checkout-delivery-map--interactive { cursor: crosshair; }
+.checkout-delivery-map--interactive .gm-style { cursor: crosshair; }
 .checkout-delivery-map-hint {
   position: absolute;
   top: 6px;
@@ -5160,17 +5159,8 @@ button.cart-overlay {
   z-index: 401;
   line-height: 1.3;
 }
-.checkout-delivery-map-divicon { background: transparent !important; border: none !important; }
-.checkout-delivery-map-pin--customer {
-  display: block;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 3px solid #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-  background: #3b82f6;
-  box-sizing: border-box;
-}
+.checkout-delivery-map .gm-style { font-family: inherit; }
+.checkout-delivery-map .gm-style-iw-c { display: none; }
 .checkout-delivery-suggest-list {
   list-style: none;
   margin: 0.35rem 0 0;
@@ -5205,7 +5195,7 @@ button.cart-overlay {
 }
 .checkout-delivery-suggest-btn:hover { background: var(--bg-alt); }
 .checkout-delivery-map-inner { height: 100%; width: 100%; z-index: 0; }
-.checkout-delivery-map .leaflet-container { font-family: inherit; }
+.checkout-delivery-map .gm-bundled-control { display: none; }
 .checkout-delivery-map-legend {
   position: absolute;
   bottom: 6px;
