@@ -91,7 +91,10 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       _quoteError = null;
     });
 
-    final query = '${value.trim()}, ${_ciudadCtrl.text.trim()}, Perú';
+    final provincia = _ciudadCtrl.text.trim();
+    final distrito = _distritoCtrl.text.trim();
+    final parts = [value.trim(), if (distrito.isNotEmpty) distrito, if (provincia.isNotEmpty) provincia, 'Perú'];
+    final query = parts.join(', ');
     if (query.length < 6) {
       setState(() => _geoCandidates = []);
       return;
@@ -344,10 +347,18 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                                     Expanded(child: _CheckoutField(controller: _apellidoCtrl, label: 'Apellido', icon: Icons.badge_outlined)),
                                   ],
                                 ),
-                                // Campo dirección con autocomplete
+                                // Provincia y Distrito primero
+                                Row(
+                                  children: [
+                                    Expanded(child: _CheckoutField(controller: _ciudadCtrl, label: 'Provincia', icon: Icons.location_city_outlined)),
+                                    const SizedBox(width: 10),
+                                    Expanded(child: _CheckoutField(controller: _distritoCtrl, label: 'Distrito', icon: Icons.map_outlined)),
+                                  ],
+                                ),
+                                // Dirección con autocomplete (usa provincia+distrito como contexto)
                                 _CheckoutField(
                                   controller: _direccionCtrl,
-                                  label: 'Dirección',
+                                  label: 'Dirección y N° de casa',
                                   icon: Icons.location_on_outlined,
                                   onChanged: _onDireccionChanged,
                                   suffix: _geocoding
@@ -408,13 +419,6 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                                     padding: const EdgeInsets.only(bottom: 12),
                                     child: _RouteMap(positions: _routePositions),
                                   ),
-                                Row(
-                                  children: [
-                                    Expanded(child: _CheckoutField(controller: _ciudadCtrl, label: 'Ciudad', icon: Icons.location_city_outlined)),
-                                    const SizedBox(width: 10),
-                                    Expanded(child: _CheckoutField(controller: _distritoCtrl, label: 'Distrito', icon: Icons.map_outlined)),
-                                  ],
-                                ),
                                 _CheckoutField(
                                   controller: _telefonoCtrl,
                                   label: 'Teléfono',
@@ -794,9 +798,8 @@ class _RouteMap extends StatelessWidget {
   const _RouteMap({required this.positions});
   final List<List<double>> positions;
 
-  // Coordenadas de la tienda (Huancayo)
-  static const _storeLat = -12.0651;
-  static const _storeLng = -75.2049;
+  static const _storeLat = -12.071951;
+  static const _storeLng = -75.205281;
 
   @override
   Widget build(BuildContext context) {
@@ -807,12 +810,14 @@ class _RouteMap extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        height: 160,
+        height: 260,
         child: FlutterMap(
           options: MapOptions(
             initialCenter: center,
-            initialZoom: 12,
-            interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+            initialZoom: 13,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.pinchZoom | InteractiveFlag.doubleTapZoom | InteractiveFlag.drag,
+            ),
           ),
           children: [
             TileLayer(
@@ -821,18 +826,18 @@ class _RouteMap extends StatelessWidget {
             ),
             PolylineLayer(
               polylines: [
-                Polyline(points: points, strokeWidth: 3.5, color: AppColors.gold),
+                Polyline(points: points, strokeWidth: 4, color: AppColors.gold),
               ],
             ),
             MarkerLayer(
               markers: [
                 Marker(
                   point: const LatLng(_storeLat, _storeLng),
-                  child: const Icon(Icons.store_rounded, color: AppColors.black, size: 28),
+                  child: const Icon(Icons.store_rounded, color: AppColors.black, size: 30),
                 ),
                 Marker(
                   point: points.last,
-                  child: const Icon(Icons.location_pin, color: AppColors.error, size: 32),
+                  child: const Icon(Icons.location_pin, color: AppColors.error, size: 36),
                 ),
               ],
             ),

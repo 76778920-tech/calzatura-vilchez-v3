@@ -69,8 +69,8 @@ class DeliveryQuoteService {
     final uri = Uri.parse('$_base/delivery/route').replace(queryParameters: {
       'destLat': destLat.toString(),
       'destLng': destLng.toString(),
-      'storeLat': '-12.0651',
-      'storeLng': '-75.2049',
+      'storeLat': '-12.071951',
+      'storeLng': '-75.205281',
     });
     try {
       final response = await _client.get(uri);
