@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'firebase_options.dart';
 import 'core/config/env.dart';
 import 'core/router/app_router.dart';
@@ -27,6 +28,7 @@ void main() async {
   );
 
   await dotenv.load(fileName: '.env');
+  Stripe.publishableKey = Env.stripePublishableKey;
   assert(() {
     debugPrint('[Calzatura] BFF: ${Env.backendApiUrl}');
     debugPrint('[Calzatura] DNI lookup: ${Env.dniLookupUrl}');

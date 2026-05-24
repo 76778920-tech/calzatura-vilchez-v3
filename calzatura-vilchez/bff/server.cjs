@@ -1584,6 +1584,21 @@ app.get("/delivery/distance", cors, async (req, res) => {
   }
 });
 
+app.get("/delivery/quote", cors, async (req, res) => {
+  try {
+    const destLat = Number(req.query.destLat);
+    const destLng = Number(req.query.destLng);
+    if (!Number.isFinite(destLat) || !Number.isFinite(destLng)) {
+      return res.status(400).json({ error: "destLat/destLng requeridos" });
+    }
+    const quote = await deliveryPricing.computeDeliveryFeeFromCoords(destLat, destLng);
+    return res.status(200).json(quote);
+  } catch (err) {
+    console.error("delivery/quote:", err?.message || err);
+    return res.status(200).json({ distanceKm: null, cost: 0, isFreeDelivery: false, isOutOfRange: true });
+  }
+});
+
 /** Proxy ORS: la clave queda en el servidor (Render), no en el navegador. */
 app.use("/ors", cors, async (req, res) => {
   const ip = getClientIp(req);
@@ -2595,6 +2610,53 @@ app.post("/createCheckoutSession", (req, res) => {
     });
 });
 
+app.post("/mobile/paymentIntent", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      const { orderId } = req.body || {};
+      if (!orderId || typeof orderId !== "string") {
+        return res.status(400).json({ error: "orderId requerido" });
+      }
+
+      const order = await fetchOrderOrThrow(supabase, orderId);
+      if (order.userId !== decodedToken.uid) {
+        return res.status(403).json({ error: "Acceso denegado" });
+      }
+      if (order.estado !== "pendiente" || order.metodoPago !== "stripe") {
+        return res.status(409).json({ error: "El pedido no está en estado de pago pendiente" });
+      }
+
+      const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+      const amountCents = Math.round(order.total * 100);
+      if (!Number.isFinite(amountCents) || amountCents < 100) {
+        return res.status(409).json({ error: "Monto inválido para el pago" });
+      }
+
+      await assertLivePrices(supabase, order);
+
+      const intent = await stripe.paymentIntents.create({
+        amount: amountCents,
+        currency: "pen",
+        automatic_payment_methods: { enabled: true },
+        metadata: {
+          orderId: order.id,
+          userId: decodedToken.uid,
+        },
+      });
+
+      return res.status(200).json({
+        clientSecret: intent.client_secret,
+        publishableKey: process.env.STRIPE_PUBLIC_KEY || process.env.VITE_STRIPE_PUBLIC_KEY || "",
+      });
+    } catch (error) {
+      console.error("mobile/paymentIntent:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
 app.post("/stripeWebhook", async (req, res) => {
     const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
     const supabase = getSupabaseAdmin();
@@ -2608,58 +2670,66 @@ app.post("/stripeWebhook", async (req, res) => {
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      const orderId = session.metadata?.orderId;
-
-      if (orderId) {
-        try {
-          const order = await fetchOrderOrThrow(supabase, orderId);
-
-          if (order.estado !== "pagado") {
-            const fromEstado = assertOrderStatusTransition(order, "pagado");
-            let stockDescontadoEn = order.stockDescontadoEn || null;
-            if (!stockDescontadoEn) {
-              try {
-                await discountOrderStockRpc(supabase, order);
-                stockDescontadoEn = new Date().toISOString();
-              } catch (discountError) {
-                console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
-                return res.status(500).json({
-                  error: "No se pudo descontar stock. Stripe reintentara el webhook.",
-                });
-              }
+    async function handleOrderPaid(orderId, stripeSessionId, userId) {
+      try {
+        const order = await fetchOrderOrThrow(supabase, orderId);
+        if (order.estado !== "pagado") {
+          const fromEstado = assertOrderStatusTransition(order, "pagado");
+          let stockDescontadoEn = order.stockDescontadoEn || null;
+          if (!stockDescontadoEn) {
+            try {
+              await discountOrderStockRpc(supabase, order);
+              stockDescontadoEn = new Date().toISOString();
+            } catch (discountError) {
+              console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
+              throw Object.assign(new Error("No se pudo descontar stock. Stripe reintentara el webhook."), { status: 500 });
             }
-            await updateOrder(supabase, orderId, {
-              estado: "pagado",
-              stripeSessionId: session.id,
-              pagadoEn: new Date().toISOString(),
-              ...(stockDescontadoEn ? { stockDescontadoEn } : {}),
-            });
-            await logAuditFn(
-              supabase,
-              "cambiar_estado",
-              "pedido",
-              orderId,
-              `#${orderId.slice(-8).toUpperCase()}`,
-              session.metadata?.userId ?? null,
-              order.userEmail ?? null,
-              {
-                from: fromEstado,
-                to: "pagado",
-                source: "stripe_webhook",
-                stripeEventId: event.id,
-                stripeSessionId: session.id,
-              },
-            );
           }
-          // Si order.estado === "pagado": Stripe está reintentando un evento ya procesado.
-          // No actualizamos ni auditamos de nuevo para evitar duplicados.
-        } catch (error) {
-          console.error("Stripe webhook order error:", error);
-          return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+          await updateOrder(supabase, orderId, {
+            estado: "pagado",
+            stripeSessionId,
+            pagadoEn: new Date().toISOString(),
+            ...(stockDescontadoEn ? { stockDescontadoEn } : {}),
+          });
+          await logAuditFn(
+            supabase,
+            "cambiar_estado",
+            "pedido",
+            orderId,
+            `#${orderId.slice(-8).toUpperCase()}`,
+            userId ?? null,
+            order.userEmail ?? null,
+            {
+              from: fromEstado,
+              to: "pagado",
+              source: "stripe_webhook",
+              stripeEventId: event.id,
+              stripeSessionId,
+            },
+          );
+        }
+      } catch (error) {
+        console.error("Stripe webhook order error:", error);
+        throw error;
+      }
+    }
+
+    try {
+      if (event.type === "checkout.session.completed") {
+        const session = event.data.object;
+        const orderId = session.metadata?.orderId;
+        if (orderId) {
+          await handleOrderPaid(orderId, session.id, session.metadata?.userId);
+        }
+      } else if (event.type === "payment_intent.succeeded") {
+        const intent = event.data.object;
+        const orderId = intent.metadata?.orderId;
+        if (orderId) {
+          await handleOrderPaid(orderId, intent.id, intent.metadata?.userId);
         }
       }
+    } catch (error) {
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
 
     return res.json({ received: true });

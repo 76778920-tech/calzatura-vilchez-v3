@@ -33,4 +33,9 @@ class Env {
     if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
     return 'https://project-rif8c.vercel.app/api/lookup-dni';
   }
+
+  /// Clave pública de Stripe (pk_test_... / pk_live_...).
+  /// No tiene valor por defecto — falla rápido si falta.
+  static String get stripePublishableKey =>
+      dotenv.env['STRIPE_PUBLISHABLE_KEY']!;
 }

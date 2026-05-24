@@ -3,12 +3,8 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
-
 import '../../../core/config/env.dart';
 import '../../cart/domain/cart_item.dart';
-
-const _ordersTable = 'pedidos';
 
 class OrderAddress {
   const OrderAddress({
@@ -19,6 +15,8 @@ class OrderAddress {
     required this.distrito,
     required this.telefono,
     this.referencia = '',
+    this.lat,
+    this.lng,
   });
 
   final String nombre;
@@ -28,6 +26,8 @@ class OrderAddress {
   final String distrito;
   final String telefono;
   final String referencia;
+  final double? lat;
+  final double? lng;
 
   Map<String, dynamic> toJson() => {
     'nombre': nombre,
@@ -37,6 +37,8 @@ class OrderAddress {
     'distrito': distrito,
     'telefono': telefono,
     'referencia': referencia,
+    if (lat != null) 'lat': lat,
+    if (lng != null) 'lng': lng,
   };
 }
 
@@ -105,40 +107,49 @@ class Order {
 
 class OrdersRepository {
   OrdersRepository({
-    SupabaseClient? supabase,
     FirebaseAuth? auth,
     http.Client? client,
-  }) : _supabase = supabase ?? Supabase.instance.client,
-       _auth = auth ?? FirebaseAuth.instance,
+  }) : _auth = auth ?? FirebaseAuth.instance,
        _client = client ?? http.Client();
 
-  final SupabaseClient _supabase;
   final FirebaseAuth _auth;
   final http.Client _client;
 
   Future<List<Order>> getUserOrders(String uid) async {
-    final data = await _supabase
-        .from(_ordersTable)
-        .select('*')
-        .eq('userId', uid)
-        .order('creadoEn', ascending: false);
-    return (data as List).map((e) => Order.fromJson(e)).toList();
+    final user = _auth.currentUser;
+    if (user == null) return [];
+    final idToken = await user.getIdToken();
+    final base = Env.backendApiUrl.replaceAll(RegExp(r'/$'), '');
+    final response = await _client.get(
+      Uri.parse('$base/myOrders'),
+      headers: {'Authorization': 'Bearer $idToken'},
+    );
+    if (response.statusCode != 200) return [];
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final list = payload['orders'] as List<dynamic>? ?? [];
+    return list.map((e) => Order.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Order?> getOrderById(String id) async {
-    final data = await _supabase
-        .from(_ordersTable)
-        .select('*')
-        .eq('id', id)
-        .maybeSingle();
-    if (data == null) return null;
-    return Order.fromJson(data);
+    final user = _auth.currentUser;
+    if (user == null) return null;
+    final idToken = await user.getIdToken();
+    final base = Env.backendApiUrl.replaceAll(RegExp(r'/$'), '');
+    final response = await _client.get(
+      Uri.parse('$base/orders/$id'),
+      headers: {'Authorization': 'Bearer $idToken'},
+    );
+    if (response.statusCode != 200) return null;
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final orderMap = (payload['order'] ?? payload) as Map<String, dynamic>;
+    return Order.fromJson(orderMap);
   }
 
   Future<String> createOrder({
     required List<CartItem> items,
     required OrderAddress direccion,
     required String metodoPago,
+    double envio = 0,
     String notas = '',
   }) async {
     final user = _auth.currentUser;
@@ -167,6 +178,7 @@ class OrdersRepository {
             .toList(),
         'direccion': direccion.toJson(),
         'metodoPago': metodoPago,
+        'envio': envio,
         'notas': notas,
       }),
     );
