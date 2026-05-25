@@ -364,51 +364,45 @@ class _CartTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // ── Columna derecha: papelera + caja [− qty +] ───────────────
+          // ── Columna derecha: papelera + controles qty ────────────────
           Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Papelera
+              // Papelera: fondo rojo, borde rojo, icono blanco
               GestureDetector(
                 onTap: () => ref.read(cartProvider.notifier).removeItem(index),
                 child: Container(
-                  width: 34,
-                  height: 34,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.09),
+                    color: AppColors.error,
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.error, width: 1.8),
                   ),
-                  child: const Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.error),
+                  child: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.white),
                 ),
               ),
-              // Caja [− qty +]
-              Container(
-                decoration: BoxDecoration(
-                  color: AppColors.beige,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.shimmerBase),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _QtyBtn(
-                      icon: Icons.remove,
-                      onTap: () => ref.read(cartProvider.notifier).updateQuantity(index, item.quantity - 1),
+              // [− qty +] cada botón con su propio marco negro
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _QtyBtn(
+                    icon: Icons.remove,
+                    onTap: () => ref.read(cartProvider.notifier).updateQuantity(index, item.quantity - 1),
+                  ),
+                  SizedBox(
+                    width: 32,
+                    child: Center(
+                      child: Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                     ),
-                    SizedBox(
-                      width: 38,
-                      child: Center(
-                        child: Text('${item.quantity}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                      ),
-                    ),
-                    _QtyBtn(
-                      icon: Icons.add,
-                      disabled: atMax,
-                      onTap: atMax ? null : () => ref.read(cartProvider.notifier).updateQuantity(index, item.quantity + 1),
-                    ),
-                  ],
-                ),
+                  ),
+                  _QtyBtn(
+                    icon: Icons.add,
+                    disabled: atMax,
+                    onTap: atMax ? null : () => ref.read(cartProvider.notifier).updateQuantity(index, item.quantity + 1),
+                  ),
+                ],
               ),
             ],
           ),
@@ -448,20 +442,21 @@ class _QtyBtn extends StatelessWidget {
   final bool disabled;
   @override
   Widget build(BuildContext context) {
+    final borderColor = disabled ? Colors.black26 : Colors.black;
     return GestureDetector(
       onTap: disabled ? null : onTap,
       child: Container(
-        width: 30,
-        height: 30,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: disabled ? AppColors.shimmerBase : AppColors.beige,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.shimmerBase),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor, width: 1.8),
         ),
         child: Icon(
           icon,
-          size: 16,
-          color: disabled ? AppColors.textSecondary : AppColors.textPrimary,
+          size: 20,
+          color: borderColor,
         ),
       ),
     );
