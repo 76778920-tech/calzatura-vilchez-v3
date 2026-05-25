@@ -43,7 +43,6 @@ class ShellPage extends ConsumerWidget {
               context.go('/catalog');
             case 2:
               ref.invalidate(wishlistProvider);
-              ref.invalidate(wishlistProductsProvider);
               context.go('/wishlist');
             case 3:
               ref.read(cartProvider.notifier).reload();

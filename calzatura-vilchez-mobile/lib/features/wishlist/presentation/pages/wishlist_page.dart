@@ -23,7 +23,6 @@ class WishlistPage extends ConsumerWidget {
       body: CVRefreshWrapper(
         onRefresh: () async {
           ref.invalidate(wishlistProvider);
-          ref.invalidate(wishlistProductsProvider);
         },
         bubbleTop: 68,
         child: CustomScrollView(

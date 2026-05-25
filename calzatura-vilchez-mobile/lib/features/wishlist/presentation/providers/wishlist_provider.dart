@@ -30,8 +30,8 @@ class WishlistNotifier extends AsyncNotifier<Set<String>> {
     } else {
       updated.remove(productId);
     }
+    // Actualización optimista — wishlistProductsProvider reacciona automáticamente
     state = AsyncData(updated);
-    ref.invalidate(wishlistProductsProvider);
 
     try {
       if (isAdding) {
@@ -40,14 +40,19 @@ class WishlistNotifier extends AsyncNotifier<Set<String>> {
         await api.remove(productId);
       }
     } catch (_) {
+      // Revertir si falla la API
       state = AsyncData(Set<String>.from(original));
-      ref.invalidate(wishlistProductsProvider);
     }
   }
 
   Future<void> refresh() async {
     state = const AsyncLoading();
-    state = AsyncData(await build());
+    try {
+      final ids = await ref.read(favoritesApiProvider).fetchProductIds();
+      state = AsyncData(ids);
+    } catch (e, st) {
+      state = AsyncError(e, st);
+    }
   }
 }
 
@@ -59,8 +64,10 @@ final isWishedProvider = Provider.family<bool, String>((ref, productId) {
   return ref.watch(wishlistProvider).valueOrNull?.contains(productId) ?? false;
 });
 
-final wishlistProductsProvider = FutureProvider<List<Product>>((ref) async {
-  final ids = ref.watch(wishlistProvider).valueOrNull ?? {};
+// autoDispose: se recrea al entrar a la pantalla → siempre dato fresco.
+// Espera con .future para no emitir [] mientras wishlistProvider carga.
+final wishlistProductsProvider = FutureProvider.autoDispose<List<Product>>((ref) async {
+  final ids = await ref.watch(wishlistProvider.future);
   if (ids.isEmpty) return [];
 
   final data = await sb.Supabase.instance.client
