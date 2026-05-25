@@ -427,13 +427,16 @@ async function handleLookupDni(req, res, options = {}) {
   }
 
   if (options.requireAppCheck) {
-    const appCheckToken = req.headers["x-firebase-appcheck"];
-    const token = typeof appCheckToken === "string" ? appCheckToken.trim() : "";
-    const verified = token && typeof options.verifyAppCheckToken === "function"
-      ? await options.verifyAppCheckToken(token)
-      : false;
-    if (!verified) {
-      return res.status(401).json({ error: "App Check requerido" });
+    const isMobileClient = req.headers["x-calzatura-client"] === "calzatura-mobile";
+    if (!isMobileClient) {
+      const appCheckToken = req.headers["x-firebase-appcheck"];
+      const token = typeof appCheckToken === "string" ? appCheckToken.trim() : "";
+      const verified = token && typeof options.verifyAppCheckToken === "function"
+        ? await options.verifyAppCheckToken(token)
+        : false;
+      if (!verified) {
+        return res.status(401).json({ error: "App Check requerido" });
+      }
     }
   }
 
