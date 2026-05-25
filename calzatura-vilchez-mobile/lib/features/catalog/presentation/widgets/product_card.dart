@@ -8,6 +8,7 @@ import 'package:shimmer/shimmer.dart';
 import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/product.dart';
+import '../../../../shared/widgets/added_to_cart_sheet.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../cart/presentation/providers/cart_provider.dart';
 import '../../../wishlist/presentation/providers/wishlist_provider.dart';
@@ -389,17 +390,7 @@ class _AddCartBtn extends ConsumerWidget {
     final tallas = product.tallas;
     if (tallas == null || tallas.isEmpty) {
       ref.read(cartProvider.notifier).addItem(product);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${product.nombre} añadido'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
-      );
+      showAddedToCartSheet(context, product);
       return;
     }
 
@@ -409,7 +400,11 @@ class _AddCartBtn extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (ctx) => _SizeSheet(product: product, widgetRef: ref),
+      builder: (ctx) => _SizeSheet(
+        product: product,
+        widgetRef: ref,
+        onAdded: (talla) => showAddedToCartSheet(context, product, talla: talla),
+      ),
     );
   }
 
@@ -431,10 +426,15 @@ class _AddCartBtn extends ConsumerWidget {
 }
 
 class _SizeSheet extends ConsumerWidget {
-  const _SizeSheet({required this.product, required this.widgetRef});
+  const _SizeSheet({
+    required this.product,
+    required this.widgetRef,
+    required this.onAdded,
+  });
 
   final Product product;
   final WidgetRef widgetRef;
+  final void Function(String talla) onAdded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -540,16 +540,7 @@ class _SizeSheet extends ConsumerWidget {
                             .read(cartProvider.notifier)
                             .addItem(product, talla: talla);
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('${product.nombre} T.$talla añadido'),
-                            backgroundColor: AppColors.success,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        );
+                        onAdded(talla);
                       }
                     : null,
                 child: AnimatedContainer(

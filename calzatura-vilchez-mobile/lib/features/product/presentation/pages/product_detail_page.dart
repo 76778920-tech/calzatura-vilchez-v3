@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/product.dart';
+import '../../../../shared/widgets/added_to_cart_sheet.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../../cart/presentation/providers/cart_provider.dart';
 import '../../../catalog/presentation/providers/catalog_provider.dart';
@@ -47,19 +48,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
     for (int i = 0; i < _qty; i++) {
       ref.read(cartProvider.notifier).addItem(product, talla: _selectedTalla);
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$_qty × ${product.nombre} → carrito'),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        action: SnackBarAction(
-          label: 'Ver',
-          textColor: Colors.white,
-          onPressed: () => context.go('/cart'),
-        ),
-      ),
-    );
+    showAddedToCartSheet(context, product, talla: _selectedTalla);
   }
 
   @override
