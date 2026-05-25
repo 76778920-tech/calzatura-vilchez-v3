@@ -31,7 +31,7 @@ class Env {
         dotenv.env['DNI_LOOKUP_URL']?.trim() ??
         dotenv.env['VITE_DNI_LOOKUP_URL']?.trim();
     if (fromEnv != null && fromEnv.isNotEmpty) return fromEnv;
-    return 'https://calzatura-vilchez-bff.onrender.com/lookup-dni';
+    return 'https://project-rif8c.vercel.app/api/lookup-dni';
   }
 
   /// Clave pública de Stripe (pk_test_... / pk_live_...).

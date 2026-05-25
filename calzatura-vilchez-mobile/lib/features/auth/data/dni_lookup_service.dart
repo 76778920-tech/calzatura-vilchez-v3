@@ -87,6 +87,7 @@ class DniLookupService {
               'Content-Type': 'application/json',
               'Accept': 'application/json',
               'X-Calzatura-Client': _mobileClientHeader,
+              'Origin': 'https://calzaturavilchez-ab17f.web.app',
             },
             body: jsonEncode({'dni': normalized}),
           )
