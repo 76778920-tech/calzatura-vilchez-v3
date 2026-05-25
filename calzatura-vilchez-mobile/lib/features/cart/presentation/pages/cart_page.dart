@@ -268,9 +268,9 @@ class _CartTile extends StatelessWidget {
         ],
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Imagen
+          // ── Imagen ──────────────────────────────────────────────────
           Stack(
             children: [
               ClipRRect(
@@ -311,11 +311,11 @@ class _CartTile extends StatelessWidget {
             ],
           ),
           const SizedBox(width: 12),
-          // Info (marca, nombre, talla, precio)
+          // ── Info (marca, nombre, talla, precio) ─────────────────────
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 if (item.product.marca != null)
                   Text(
@@ -364,9 +364,9 @@ class _CartTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          // ── Columna derecha: papelera + controles qty ────────────────
+          // ── Columna derecha: papelera arriba + [− qty +] abajo ───────
           Column(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               // Papelera: fondo rojo, borde rojo, icono blanco
@@ -383,7 +383,8 @@ class _CartTile extends StatelessWidget {
                   child: const Icon(Icons.delete_outline_rounded, size: 20, color: Colors.white),
                 ),
               ),
-              // [− qty +] cada botón con su propio marco negro
+              const SizedBox(height: 10),
+              // [− qty +]: cada botón con su propio marco negro
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
