@@ -235,7 +235,11 @@ async function verifyFirebaseUser(req) {
   if (!token) {
     throw Object.assign(new Error("No autenticado"), { status: 401 });
   }
-  return admin.auth().verifyIdToken(token);
+  try {
+    return await admin.auth().verifyIdToken(token);
+  } catch {
+    throw Object.assign(new Error("No autenticado"), { status: 401 });
+  }
 }
 
 /** Solo registra errores reales de servidor (5xx o sin status). Silencia 4xx (auth, validación). */
