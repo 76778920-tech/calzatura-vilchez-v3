@@ -197,6 +197,21 @@ class OrdersRepository {
 
     return orderId;
   }
+
+  Future<void> cancelOrder(String orderId) async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    final idToken = await user.getIdToken();
+    final base = Env.backendApiUrl.replaceAll(RegExp(r'/$'), '');
+    await _client.post(
+      Uri.parse('$base/updateOrderStatus'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $idToken',
+      },
+      body: jsonEncode({'orderId': orderId, 'estado': 'cancelado'}),
+    );
+  }
 }
 
 final ordersRepositoryProvider = Provider<OrdersRepository>(

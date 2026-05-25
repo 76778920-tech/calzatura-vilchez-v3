@@ -465,7 +465,7 @@ class _QtyBtn extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Resumen del pedido + checkout
+// Resumen del carrito + checkout
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _OrderSummary extends StatelessWidget {
@@ -506,7 +506,7 @@ class _OrderSummary extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           const Text(
-            'Resumen del pedido',
+            'Resumen de tu carrito',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               fontSize: 16,

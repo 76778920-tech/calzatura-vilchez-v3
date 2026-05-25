@@ -281,24 +281,34 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
           );
 
       if (_metodoPago == 'stripe') {
-        await StripeService().payWithSheet(orderId);
+        try {
+          await StripeService().payWithSheet(orderId);
+        } on StripeException catch (e) {
+          // Pago cancelado o fallido → cancelar el pedido creado
+          await ref
+              .read(ordersRepositoryProvider)
+              .cancelOrder(orderId)
+              .catchError((_) {});
+          if (!mounted) return;
+          final msg = e.error.localizedMessage ?? e.error.message ?? 'Pago cancelado';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                e.error.code == FailureCode.Canceled
+                    ? 'Pago cancelado. Tu pedido no fue procesado.'
+                    : 'Error de pago: $msg',
+              ),
+              backgroundColor: e.error.code == FailureCode.Canceled
+                  ? AppColors.warning
+                  : AppColors.error,
+            ),
+          );
+          return;
+        }
       }
 
       ref.read(cartProvider.notifier).clear();
       if (mounted) context.go('/order-success/$orderId');
-    } on StripeException catch (e) {
-      if (!mounted) return;
-      final msg = e.error.localizedMessage ?? e.error.message ?? 'Pago cancelado';
-      // El usuario canceló el sheet — no es un error fatal
-      if (e.error.code == FailureCode.Canceled) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Pago cancelado: $msg'), backgroundColor: AppColors.warning),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error de pago: $msg'), backgroundColor: AppColors.error),
-        );
-      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
