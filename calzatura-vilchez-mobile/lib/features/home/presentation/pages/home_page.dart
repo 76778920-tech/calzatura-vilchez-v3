@@ -264,7 +264,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         onRefresh: _refreshHome,
         bubbleTop: 68,
         child: CustomScrollView(
-          physics: const BouncingScrollPhysics(
+          physics: const ClampingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
           slivers: [
@@ -316,7 +316,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onTap: _goToCatalog,
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            const SliverToBoxAdapter(child: SizedBox(height: 0)),
           ],
         ),
       ),
