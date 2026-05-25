@@ -85,9 +85,9 @@ function validateProductionRuntimeConfig(serviceAccount) {
   }
 
   if (missing.length > 0) {
-    console.error("Configuracion BFF de produccion incompleta. Faltan secrets/variables:");
+    logServerError("Configuracion BFF de produccion incompleta. Faltan secrets/variables:");
     for (const name of missing) {
-      console.error(`- ${name}`);
+      logServerError(`- ${name}`);
     }
     process.exit(1);
   }
@@ -158,13 +158,13 @@ function loadFirebaseServiceAccount() {
     const p = String(filePath).trim();
     try {
       if (!fs.existsSync(p)) {
-        console.error("FIREBASE_SERVICE_ACCOUNT_FILE: archivo no existe:", p);
+        logServerError("FIREBASE_SERVICE_ACCOUNT_FILE: archivo no existe:", p);
         process.exit(1);
       }
       const raw = fs.readFileSync(p, "utf8");
       return JSON.parse(raw);
     } catch (e) {
-      console.error("FIREBASE_SERVICE_ACCOUNT_FILE invalido:", e.message);
+      logServerError("FIREBASE_SERVICE_ACCOUNT_FILE invalido:", e.message);
       process.exit(1);
     }
   }
@@ -175,7 +175,7 @@ function loadFirebaseServiceAccount() {
       const raw = Buffer.from(String(b64).trim(), "base64").toString("utf8");
       return JSON.parse(raw);
     } catch (e) {
-      console.error("FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 invalido:", e.message);
+      logServerError("FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 invalido:", e.message);
       process.exit(1);
     }
   }
@@ -186,11 +186,11 @@ function loadFirebaseServiceAccount() {
       return JSON.parse(t);
     } catch (e) {
       if (t.startsWith("-----BEGIN") || t.startsWith('"-----BEGIN')) {
-        console.error(
+        logServerError(
           "FIREBASE_SERVICE_ACCOUNT_JSON: valor incorrecto (PEM suelto). Usa el .json completo, FIREBASE_SERVICE_ACCOUNT_JSON_BASE64, o FIREBASE_SERVICE_ACCOUNT_FILE (Render Secret File)."
         );
       }
-      console.error("FIREBASE_SERVICE_ACCOUNT_JSON invalido:", e.message);
+      logServerError("FIREBASE_SERVICE_ACCOUNT_JSON invalido:", e.message);
       process.exit(1);
     }
   }
@@ -236,6 +236,14 @@ async function verifyFirebaseUser(req) {
     throw Object.assign(new Error("No autenticado"), { status: 401 });
   }
   return admin.auth().verifyIdToken(token);
+}
+
+/** Solo registra errores reales de servidor (5xx o sin status). Silencia 4xx (auth, validación). */
+function logServerError(label, error) {
+  const status = error?.status ?? error?.statusCode ?? 500;
+  if (status < 400 || status >= 500) {
+    console.error(label, error); // eslint-disable-line no-console
+  }
 }
 
 async function verifyFirebaseAppCheckToken(token) {
@@ -1522,7 +1530,7 @@ app.get("/delivery/geocode", cors, async (req, res) => {
     const candidates = await deliveryProviders.geocodeCandidates(q, limit);
     return res.status(200).json({ candidates });
   } catch (err) {
-    console.error("delivery/geocode:", err?.message || err);
+    logServerError("delivery/geocode:", err?.message || err);
     return res.status(200).json({ candidates: [] });
   }
 });
@@ -1537,7 +1545,7 @@ app.get("/delivery/reverse", cors, async (req, res) => {
     const label = await deliveryProviders.nominatimReverse(lat, lng);
     return res.status(200).json({ label });
   } catch (err) {
-    console.error("delivery/reverse:", err?.message || err);
+    logServerError("delivery/reverse:", err?.message || err);
     return res.status(200).json({ label: null });
   }
 });
@@ -1554,7 +1562,7 @@ app.get("/delivery/route", cors, async (req, res) => {
     const route = await deliveryProviders.drivingRoute(storeLng, storeLat, destLng, destLat);
     return res.status(200).json(route);
   } catch (err) {
-    console.error("delivery/route:", err?.message || err);
+    logServerError("delivery/route:", err?.message || err);
     return res.status(200).json({ positions: [], distanceKm: null });
   }
 });
@@ -1579,7 +1587,7 @@ app.get("/delivery/distance", cors, async (req, res) => {
     }
     return res.status(200).json({ distanceKm });
   } catch (err) {
-    console.error("delivery/distance:", err?.message || err);
+    logServerError("delivery/distance:", err?.message || err);
     return res.status(200).json({ distanceKm: null });
   }
 });
@@ -1594,7 +1602,7 @@ app.get("/delivery/quote", cors, async (req, res) => {
     const quote = await deliveryPricing.computeDeliveryFeeFromCoords(destLat, destLng);
     return res.status(200).json(quote);
   } catch (err) {
-    console.error("delivery/quote:", err?.message || err);
+    logServerError("delivery/quote:", err?.message || err);
     return res.status(200).json({ distanceKm: null, cost: 0, isFreeDelivery: false, isOutOfRange: true });
   }
 });
@@ -1637,7 +1645,7 @@ app.use("/ors", cors, async (req, res) => {
     }
     return res.send(text);
   } catch (err) {
-    console.error("ors proxy:", err?.message || err);
+    logServerError("ors proxy:", err?.message || err);
     return res.status(502).json({ error: "No se pudo contactar OpenRouteService" });
   }
 });
@@ -1753,7 +1761,7 @@ app.post("/createOrder", (req, res) => {
           estado: "pendiente",
         });
       } catch (error) {
-        console.error("Create order error:", error);
+        logServerError("Create order error:", error);
         return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
       }
     });
@@ -1815,7 +1823,7 @@ app.post("/updateOrderStatus", (req, res) => {
           );
         }
       } catch (stockErr) {
-        console.error("updateOrderStatus stock:", stockErr?.message || stockErr);
+        logServerError("updateOrderStatus stock:", stockErr?.message || stockErr);
         const isRestore = estado === "cancelado";
         return res.status(409).json({
           error: isRestore
@@ -1839,7 +1847,7 @@ app.post("/updateOrderStatus", (req, res) => {
 
       return res.status(200).json({ orderId, estado });
     } catch (error) {
-      console.error("Update order status error:", error);
+      logServerError("Update order status error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
     });
@@ -2148,7 +2156,7 @@ app.get("/admin/dailySales", (req, res) => {
       const sales = await queryDailySales(supabase, parseDailySalesQuery(req));
       return res.status(200).json({ sales });
     } catch (error) {
-      console.error("admin/dailySales error:", error);
+      logServerError("admin/dailySales error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2170,7 +2178,7 @@ app.get("/staff/dailySales", (req, res) => {
       });
       return res.status(200).json({ sales: sales.map(redactDailySaleForStaff) });
     } catch (error) {
-      console.error("staff/dailySales error:", error);
+      logServerError("staff/dailySales error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2204,7 +2212,7 @@ app.post("/staff/dailySales/register", (req, res) => {
       });
       return res.status(200).json({ ids });
     } catch (error) {
-      console.error("staff/dailySales/register error:", error);
+      logServerError("staff/dailySales/register error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2235,7 +2243,7 @@ app.post("/admin/dailySales/register", (req, res) => {
       });
       return res.status(200).json({ ids });
     } catch (error) {
-      console.error("admin/dailySales/register error:", error);
+      logServerError("admin/dailySales/register error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2272,7 +2280,7 @@ app.post("/staff/dailySales/return", (req, res) => {
       );
       return res.status(200).json({ sale: data });
     } catch (error) {
-      console.error("staff/dailySales/return error:", error);
+      logServerError("staff/dailySales/return error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2307,7 +2315,7 @@ app.post("/admin/dailySales/return", (req, res) => {
       );
       return res.status(200).json({ sale: data });
     } catch (error) {
-      console.error("admin/dailySales/return error:", error);
+      logServerError("admin/dailySales/return error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2345,7 +2353,7 @@ app.post("/updateProductAtomic", (req, res) => {
       );
       return res.status(200).json({ ok: true, id: p_id });
     } catch (error) {
-      console.error("updateProductAtomic error:", error);
+      logServerError("updateProductAtomic error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2369,7 +2377,7 @@ app.post("/createProductVariantsAtomic", (req, res) => {
       const ids = Array.isArray(data?.ids) ? data.ids : [];
       return res.status(200).json({ ok: true, ids });
     } catch (error) {
-      console.error("createProductVariantsAtomic error:", error);
+      logServerError("createProductVariantsAtomic error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2392,7 +2400,7 @@ app.post("/deleteProductAtomic", (req, res) => {
       if (error) handleAdminRpcError(error);
       return res.status(200).json({ ok: true, id: p_id });
     } catch (error) {
-      console.error("deleteProductAtomic error:", error);
+      logServerError("deleteProductAtomic error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2429,7 +2437,7 @@ app.post("/registrarIngresoStock", (req, res) => {
       if (error) handleAdminRpcError(error);
       return res.status(200).json(data);
     } catch (error) {
-      console.error("registrarIngresoStock error:", error);
+      logServerError("registrarIngresoStock error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2452,7 +2460,7 @@ app.post("/admin/products/decrementStock", (req, res) => {
       if (error) handleAdminRpcError(error);
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("admin/products/decrementStock error:", error);
+      logServerError("admin/products/decrementStock error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2476,7 +2484,7 @@ app.post("/admin/products/restoreStock", (req, res) => {
       if (error) handleAdminRpcError(error);
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("admin/products/restoreStock error:", error);
+      logServerError("admin/products/restoreStock error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2591,7 +2599,7 @@ app.post("/createCheckoutSession", (req, res) => {
           checkoutUrl = retrieved.url;
         }
         if (!checkoutUrl || typeof checkoutUrl !== "string" || !checkoutUrl.startsWith("https://")) {
-          console.error("Stripe checkout session sin URL", {
+          logServerError("Stripe checkout session sin URL", {
             sessionId: session.id,
             ui_mode: session.ui_mode,
             status: session.status,
@@ -2604,7 +2612,7 @@ app.post("/createCheckoutSession", (req, res) => {
 
         return res.status(200).json({ sessionId: session.id, url: checkoutUrl });
       } catch (error) {
-        console.error("Stripe error:", error);
+        logServerError("Stripe error:", error);
         return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
       }
     });
@@ -2651,7 +2659,7 @@ app.post("/mobile/paymentIntent", (req, res) => {
         publishableKey: process.env.STRIPE_PUBLIC_KEY || process.env.VITE_STRIPE_PUBLIC_KEY || "",
       });
     } catch (error) {
-      console.error("mobile/paymentIntent:", error);
+      logServerError("mobile/paymentIntent:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2681,7 +2689,7 @@ app.post("/stripeWebhook", async (req, res) => {
               await discountOrderStockRpc(supabase, order);
               stockDescontadoEn = new Date().toISOString();
             } catch (discountError) {
-              console.error("Stripe webhook stock discount error:", discountError?.message || discountError);
+              logServerError("Stripe webhook stock discount error:", discountError?.message || discountError);
               throw Object.assign(new Error("No se pudo descontar stock. Stripe reintentara el webhook."), { status: 500 });
             }
           }
@@ -2709,7 +2717,7 @@ app.post("/stripeWebhook", async (req, res) => {
           );
         }
       } catch (error) {
-        console.error("Stripe webhook order error:", error);
+        logServerError("Stripe webhook order error:", error);
         throw error;
       }
     }
@@ -2757,7 +2765,7 @@ app.get("/myOrders", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ orders: data ?? [] });
     } catch (error) {
-      console.error("myOrders error:", error);
+      logServerError("myOrders error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2777,7 +2785,7 @@ app.get("/orders/:orderId", (req, res) => {
       const safeOrder = await assertOrderResponseForRole(supabase, decodedToken, order);
       return res.status(200).json({ order: safeOrder });
     } catch (error) {
-      console.error("orders/:orderId error:", error);
+      logServerError("orders/:orderId error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2796,7 +2804,7 @@ app.get("/admin/orders", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ orders: data ?? [] });
     } catch (error) {
-      console.error("admin/orders error:", error);
+      logServerError("admin/orders error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2816,7 +2824,7 @@ app.get("/staff/orders", (req, res) => {
       const orders = (data ?? []).map(redactOrderForStaff);
       return res.status(200).json({ orders });
     } catch (error) {
-      console.error("staff/orders error:", error);
+      logServerError("staff/orders error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2834,7 +2842,7 @@ app.get("/admin/users", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ users: data ?? [] });
     } catch (error) {
-      console.error("admin/users error:", error);
+      logServerError("admin/users error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2849,7 +2857,7 @@ app.get("/admin/data/product-ids", (req, res) => {
       const ids = await loadProductIdSet(supabase);
       return res.status(200).json({ ids: Array.from(ids) });
     } catch (error) {
-      console.error("admin/data/product-ids error:", error);
+      logServerError("admin/data/product-ids error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2890,7 +2898,7 @@ app.get("/admin/data/export", (req, res) => {
       );
       return res.status(200).json({ rows, extra });
     } catch (error) {
-      console.error("admin/data/export error:", error);
+      logServerError("admin/data/export error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2966,7 +2974,7 @@ app.post("/admin/data/import", (req, res) => {
       );
       return res.status(200).json({ ok: true, imported });
     } catch (error) {
-      console.error("admin/data/import error:", error);
+      logServerError("admin/data/import error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -2987,7 +2995,7 @@ app.get("/admin/data/test-batches", (req, res) => {
       );
       return res.status(200).json({ docs: results.flat() });
     } catch (error) {
-      console.error("admin/data/test-batches error:", error);
+      logServerError("admin/data/test-batches error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3033,7 +3041,7 @@ app.delete("/admin/data/test-data", (req, res) => {
 
       return res.status(400).json({ error: "mode invalido (scenario|batch)" });
     } catch (error) {
-      console.error("admin/data/test-data error:", error);
+      logServerError("admin/data/test-data error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3056,7 +3064,7 @@ app.get("/admin/data/sales/count", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ count: count ?? 0 });
     } catch (error) {
-      console.error("admin/data/sales/count error:", error);
+      logServerError("admin/data/sales/count error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3090,7 +3098,7 @@ app.delete("/admin/data/sales", (req, res) => {
       );
       return res.status(200).json({ ok: true, deleted: count ?? 0 });
     } catch (error) {
-      console.error("admin/data/sales error:", error);
+      logServerError("admin/data/sales error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3105,7 +3113,7 @@ app.post("/admin/media/cloudinary-signature", (req, res) => {
       const payload = buildCloudinaryUploadSignature();
       return res.status(200).json(payload);
     } catch (error) {
-      console.error("admin/media/cloudinary-signature error:", error);
+      logServerError("admin/media/cloudinary-signature error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3121,7 +3129,7 @@ app.get("/admin/productFinanzas", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ rows: data ?? [] });
     } catch (error) {
-      console.error("admin/productFinanzas error:", error);
+      logServerError("admin/productFinanzas error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3165,7 +3173,7 @@ app.put("/admin/productFinanzas/:productId", (req, res) => {
       );
       return res.status(200).json({ ok: true, row: payload });
     } catch (error) {
-      console.error("admin/productFinanzas PUT error:", error);
+      logServerError("admin/productFinanzas PUT error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3195,7 +3203,7 @@ app.delete("/admin/productFinanzas/:productId", (req, res) => {
       );
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("admin/productFinanzas DELETE error:", error);
+      logServerError("admin/productFinanzas DELETE error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3215,7 +3223,7 @@ app.get("/staff/productPriceRanges", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ rows: (data ?? []).map(toStaffProductPriceRange) });
     } catch (error) {
-      console.error("staff/productPriceRanges error:", error);
+      logServerError("staff/productPriceRanges error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3231,7 +3239,7 @@ app.get("/admin/products", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ products: data ?? [] });
     } catch (error) {
-      console.error("admin/products error:", error);
+      logServerError("admin/products error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3261,7 +3269,7 @@ app.post("/admin/products", (req, res) => {
       );
       return res.status(200).json({ ok: true, id: data.id });
     } catch (error) {
-      console.error("admin/products POST error:", error);
+      logServerError("admin/products POST error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3281,7 +3289,7 @@ app.get("/staff/products", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ products: data ?? [] });
     } catch (error) {
-      console.error("staff/products error:", error);
+      logServerError("staff/products error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3304,7 +3312,7 @@ app.get("/admin/products/:productId", (req, res) => {
       }
       return res.status(200).json({ product: data });
     } catch (error) {
-      console.error("admin/products/:id error:", error);
+      logServerError("admin/products/:id error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3335,7 +3343,7 @@ app.patch("/admin/products/:productId", (req, res) => {
       );
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("admin/products PATCH error:", error);
+      logServerError("admin/products PATCH error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3361,7 +3369,7 @@ app.put("/admin/productCodes/:productId", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("admin/productCodes PUT error:", error);
+      logServerError("admin/productCodes PUT error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3376,7 +3384,7 @@ app.get("/admin/productCodes", (req, res) => {
       const codes = await fetchProductCodesMap(supabase);
       return res.status(200).json({ codes });
     } catch (error) {
-      console.error("admin/productCodes error:", error);
+      logServerError("admin/productCodes error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3391,7 +3399,7 @@ app.get("/staff/productCodes", (req, res) => {
       const codes = await fetchProductCodesMap(supabase, { activeOnly: true });
       return res.status(200).json({ codes });
     } catch (error) {
-      console.error("staff/productCodes error:", error);
+      logServerError("staff/productCodes error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3407,7 +3415,7 @@ app.get("/admin/manufacturers", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ manufacturers: data ?? [] });
     } catch (error) {
-      console.error("admin/manufacturers error:", error);
+      logServerError("admin/manufacturers error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3437,7 +3445,7 @@ app.post("/admin/manufacturers", (req, res) => {
       );
       return res.status(200).json({ ok: true, id: data.id });
     } catch (error) {
-      console.error("admin/manufacturers POST error:", error);
+      logServerError("admin/manufacturers POST error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3468,7 +3476,7 @@ app.patch("/admin/manufacturers/:manufacturerId", (req, res) => {
       );
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("admin/manufacturers PATCH error:", error);
+      logServerError("admin/manufacturers PATCH error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3498,7 +3506,7 @@ app.delete("/admin/manufacturers/:manufacturerId", (req, res) => {
       );
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("admin/manufacturers DELETE error:", error);
+      logServerError("admin/manufacturers DELETE error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3526,7 +3534,7 @@ app.get("/staff/products/:productId", (req, res) => {
       }
       return res.status(200).json({ product: data });
     } catch (error) {
-      console.error("staff/products/:id error:", error);
+      logServerError("staff/products/:id error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3546,7 +3554,7 @@ app.get("/users/me", (req, res) => {
       const profile = profileRowForClientRead(data);
       return res.status(200).json({ profile });
     } catch (error) {
-      console.error("users/me GET error:", error);
+      logServerError("users/me GET error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3593,7 +3601,7 @@ app.post("/audit", (req, res) => {
       );
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("audit POST error:", error);
+      logServerError("audit POST error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3615,7 +3623,7 @@ app.get("/admin/audit", (req, res) => {
       const entries = (data ?? []).map(sanitizeAuditEntryForResponse);
       return res.status(200).json({ entries });
     } catch (error) {
-      console.error("admin/audit error:", error);
+      logServerError("admin/audit error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3643,7 +3651,7 @@ app.put("/users/me", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("users/me PUT error:", error);
+      logServerError("users/me PUT error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3669,7 +3677,7 @@ app.patch("/users/me", (req, res) => {
       if (error) throw error;
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("users/me PATCH error:", error);
+      logServerError("users/me PATCH error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3709,7 +3717,7 @@ app.patch("/admin/users/:uid/role", (req, res) => {
       );
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("admin/users role error:", error);
+      logServerError("admin/users role error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3754,7 +3762,7 @@ app.delete("/admin/users/:uid", (req, res) => {
       );
       return res.status(200).json({ ok: true });
     } catch (error) {
-      console.error("admin/users DELETE error:", error);
+      logServerError("admin/users DELETE error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -3861,7 +3869,7 @@ function favoritesRouter(req, res) {
 
       return res.status(405).json({ error: "Metodo no permitido" });
     } catch (error) {
-      console.error("Favorites error:", error);
+      logServerError("Favorites error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });
@@ -4009,7 +4017,7 @@ app.all("/aiAdminProxy", (req, res) => {
     try {
       return await runAiAdminProxyRequest(req, res);
     } catch (error) {
-      console.error("aiAdminProxy error:", error);
+      logServerError("aiAdminProxy error:", error);
       const status = aiAdminProxyErrorStatus(error);
       const message = aiAdminProxyErrorMessage(status, error);
       return res.status(status).json({ error: message });
@@ -4046,7 +4054,7 @@ app.all("/authLogin", (req, res) => {
       const password = String(rawPassword);
       const apiKey = process.env.FIREBASE_WEB_API_KEY;
       if (!apiKey) {
-        console.error("authLogin: falta FIREBASE_WEB_API_KEY en entorno del BFF");
+        logServerError("authLogin: falta FIREBASE_WEB_API_KEY en entorno del BFF");
         return res.status(200).json({ ok: false });
       }
 
@@ -4066,7 +4074,7 @@ app.all("/authLogin", (req, res) => {
       const customToken = await admin.auth().createCustomToken(identityJson.localId);
       return res.status(200).json({ ok: true, customToken });
     } catch {
-      console.error("authLogin: error interno");
+      logServerError("authLogin: error interno");
       return res.status(200).json({ ok: false });
     }
   });
