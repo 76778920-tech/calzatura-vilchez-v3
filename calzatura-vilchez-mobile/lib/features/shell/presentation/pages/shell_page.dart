@@ -28,6 +28,7 @@ class ShellPage extends ConsumerWidget {
 
     final location = GoRouterState.of(context).matchedLocation;
     final cartCount = ref.watch(cartItemCountProvider);
+    final wishCount = ref.watch(wishlistProvider).valueOrNull?.length ?? 0;
     final currentIdx = _currentIndex(location);
 
     return Scaffold(
@@ -35,6 +36,7 @@ class ShellPage extends ConsumerWidget {
       bottomNavigationBar: _FloatingNav(
         currentIdx: currentIdx,
         cartCount: cartCount,
+        wishCount: wishCount,
         onTap: (i) {
           switch (i) {
             case 0:
@@ -58,11 +60,13 @@ class _FloatingNav extends StatelessWidget {
   const _FloatingNav({
     required this.currentIdx,
     required this.cartCount,
+    required this.wishCount,
     required this.onTap,
   });
 
   final int currentIdx;
   final int cartCount;
+  final int wishCount;
   final ValueChanged<int> onTap;
 
   @override
@@ -105,6 +109,7 @@ class _FloatingNav extends StatelessWidget {
             icon: Icons.favorite_border_rounded,
             activeIcon: Icons.favorite_rounded,
             selected: currentIdx == 2,
+            badge: wishCount > 0 ? wishCount.toString() : null,
             onTap: () => onTap(2),
           ),
           _NavIcon(
