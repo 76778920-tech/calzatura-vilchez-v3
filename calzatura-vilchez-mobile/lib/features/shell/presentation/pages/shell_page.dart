@@ -174,15 +174,18 @@ class _NavIcon extends StatelessWidget {
         badgeContent: Text(
           badge!,
           style: const TextStyle(
-            color: AppColors.black,
-            fontSize: 9,
-            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
           ),
         ),
         badgeStyle: const badges.BadgeStyle(
-          badgeColor: AppColors.gold,
-          padding: EdgeInsets.all(3),
+          badgeColor: Color(0xFFE53935),
+          padding: EdgeInsets.all(5),
+          borderSide: BorderSide(color: AppColors.black, width: 1.5),
+          elevation: 4,
         ),
+        position: badges.BadgePosition.topEnd(top: -8, end: -10),
         child: iconWidget,
       );
     }
