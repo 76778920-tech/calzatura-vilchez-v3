@@ -450,11 +450,24 @@ async function handleLookupDni(req, res, options = {}) {
   }
 
   if (!hasAnyProviderToken()) {
-    return res.status(500).json({
-      error: "Servicio no configurado",
-      detail:
-        "Define al menos una variable DNI: APISPERU_TOKEN, CONSULTAS_PERU_TOKEN, PERUAPI_TOKEN o TOKEN_PERUAPI, API_INTI_TOKEN o APIPERU_DEV_TOKEN, LATINFO_API_KEY",
-    });
+    const fallbackUrl = (
+      process.env.DNI_LOOKUP_FALLBACK_URL?.trim() ||
+      "https://project-rif8c.vercel.app/api/lookup-dni"
+    );
+    try {
+      const { status, json: payload } = await fetchJson(fallbackUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Origin": "https://calzaturavilchez-ab17f.web.app",
+        },
+        body: JSON.stringify({ dni }),
+      });
+      return res.status(status).json(payload);
+    } catch {
+      return res.status(502).json({ error: toPublicError(502) });
+    }
   }
 
   let sawHttp = false;
