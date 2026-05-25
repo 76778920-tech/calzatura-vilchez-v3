@@ -499,7 +499,7 @@ class _OrderSummary extends StatelessWidget {
         20,
         20,
         20,
-        MediaQuery.of(context).padding.bottom + 100,
+        MediaQuery.of(context).padding.bottom + 16,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
