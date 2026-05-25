@@ -126,6 +126,12 @@ class AuthNotifier extends StateNotifier<AsyncValue<void>> {
     } on FirebaseAuthException catch (e) {
       state = AsyncError(_mapError(e), StackTrace.current);
       return false;
+    } on EmailAlreadyInUseException {
+      state = AsyncError('El correo ya está registrado.', StackTrace.current);
+      return false;
+    } catch (_) {
+      state = AsyncError('Error al crear la cuenta. Intenta nuevamente.', StackTrace.current);
+      return false;
     }
   }
 

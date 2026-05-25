@@ -247,7 +247,19 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           nombre: nombre,
           telefonoFormatted: formatPeruPhone(_telefonoCtrl.text),
         );
-    if (ok && mounted) navigateAfterAuth(context);
+    if (ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Cuenta creada. Revisa tu correo ${_emailCtrl.text.trim()} para verificar tu cuenta.',
+          ),
+          backgroundColor: Colors.green.shade800,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      navigateAfterAuth(context);
+    }
   }
 
   @override

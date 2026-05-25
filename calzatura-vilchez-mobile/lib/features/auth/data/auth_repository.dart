@@ -3,6 +3,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+class EmailAlreadyInUseException implements Exception {
+  const EmailAlreadyInUseException();
+}
+
 class AuthRepository {
   final _auth = FirebaseAuth.instance;
   final _supabase = sb.Supabase.instance.client;
@@ -19,15 +23,26 @@ class AuthRepository {
     required String nombre,
     required String telefonoFormatted,
   }) async {
+    // Verificar email duplicado en Supabase antes de crear cuenta Firebase
+    final existing = await _supabase
+        .from('usuarios')
+        .select('uid')
+        .eq('email', email.trim().toLowerCase())
+        .maybeSingle();
+    if (existing != null) {
+      throw const EmailAlreadyInUseException();
+    }
+
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email,
       password: password,
     );
-    await cred.user?.updateDisplayName(nombre);
+
     try {
-      await _supabase.from('usuarios').upsert({
+      await cred.user?.updateDisplayName(nombre);
+      await _supabase.from('usuarios').insert({
         'uid': cred.user!.uid,
-        'email': email,
+        'email': email.trim().toLowerCase(),
         'dni': dni,
         'nombres': nombres,
         'apellidos': apellidos,
@@ -35,11 +50,15 @@ class AuthRepository {
         'telefono': telefonoFormatted,
         'rol': 'cliente',
         'creadoEn': DateTime.now().toIso8601String(),
-      }, onConflict: 'uid');
+      });
+      await cred.user?.sendEmailVerification();
     } catch (e) {
-      // Firebase auth OK; el perfil en Supabase falló — el usuario existe pero sin fila completa
-      debugPrint('[AuthRepository] Supabase upsert failed: $e');
+      // Si Supabase falla, eliminar cuenta Firebase para evitar cuentas huérfanas
+      debugPrint('[AuthRepository] post-register failed: $e');
+      await cred.user?.delete().catchError((_) {});
+      rethrow;
     }
+
     return cred;
   }
 
