@@ -94,7 +94,7 @@ class _FloatingNav extends StatelessWidget {
             activeIcon: Icons.home_rounded,
             selected: currentIdx == 0,
             onTap: () => onTap(0),
-            customIcon: CVLogo(size: 32, opacity: currentIdx == 0 ? 1.0 : 0.55),
+            customIcon: CVLogo(size: 40, opacity: currentIdx == 0 ? 1.0 : 0.55),
           ),
           _NavIcon(
             icon: Icons.storefront_outlined,
