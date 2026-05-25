@@ -316,7 +316,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 onTap: _goToCatalog,
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
           ],
         ),
       ),
