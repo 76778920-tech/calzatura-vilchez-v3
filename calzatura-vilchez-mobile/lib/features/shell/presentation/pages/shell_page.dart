@@ -86,7 +86,7 @@ class _FloatingNav extends StatelessWidget {
         ],
       ),
       padding: EdgeInsets.only(bottom: bottomPadding),
-      height: 60 + bottomPadding,
+      height: 72 + bottomPadding,
       child: Row(
         children: [
           _NavIcon(
@@ -94,7 +94,7 @@ class _FloatingNav extends StatelessWidget {
             activeIcon: Icons.home_rounded,
             selected: currentIdx == 0,
             onTap: () => onTap(0),
-            customIcon: CVLogo(size: 26, opacity: currentIdx == 0 ? 1.0 : 0.35),
+            customIcon: CVLogo(size: 32, opacity: currentIdx == 0 ? 1.0 : 0.55),
           ),
           _NavIcon(
             icon: Icons.storefront_outlined,
@@ -162,11 +162,11 @@ class _NavIcon extends StatelessWidget {
 
   Widget _buildIcon() {
     if (customIcon != null) return customIcon!;
-    final color = selected ? AppColors.gold : Colors.white38;
+    final color = selected ? AppColors.gold : Colors.white60;
     final iconWidget = Icon(
       selected ? activeIcon : icon,
       color: color,
-      size: 24,
+      size: 30,
     );
 
     if (badge != null) {
