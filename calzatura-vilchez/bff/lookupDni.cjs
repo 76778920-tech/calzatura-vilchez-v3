@@ -37,6 +37,10 @@ const crypto = require("crypto");
 const DNI_LOOKUP_PROOF_TTL_MS = 30 * 60 * 1000;
 
 function authorizeLookupRequest(req) {
+  // Clientes móviles nativos no envían Origin — se identifican con este header
+  if (req.headers["x-calzatura-client"] === "calzatura-mobile") {
+    return { ok: true };
+  }
   const origin = req.headers.origin;
   if (!origin) return { ok: false, status: 403, error: "Origen requerido" };
   if (!allowedOrigins.has(origin)) {
