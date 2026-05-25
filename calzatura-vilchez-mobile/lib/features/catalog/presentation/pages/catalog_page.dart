@@ -49,12 +49,6 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
           ),
           slivers: [
             _buildAppBar(),
-            SliverToBoxAdapter(
-              child: _CatalogHeader(
-                productsAsync: productsAsync,
-                selected: selected,
-              ),
-            ),
             SliverPersistentHeader(
               pinned: true,
               delegate: _CategoryDelegate(
@@ -198,74 +192,6 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
 // Encabezado del catálogo
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _CatalogHeader extends StatelessWidget {
-  const _CatalogHeader({required this.productsAsync, required this.selected});
-  final AsyncValue<dynamic> productsAsync;
-  final String selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 18,
-            decoration: BoxDecoration(
-              color: AppColors.gold,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            selected == 'todos' ? 'Todos los productos' : _catLabel(selected),
-            style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(width: 8),
-          productsAsync
-                  .whenData(
-                    (p) => Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.gold.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '${(p as List).length}',
-                        style: const TextStyle(
-                          color: AppColors.gold,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  )
-                  .valueOrNull ??
-              const SizedBox(),
-        ],
-      ),
-    );
-  }
-
-  String _catLabel(String cat) {
-    const map = {
-      'hombre': 'Hombre',
-      'dama': 'Dama',
-      'juvenil': 'Juvenil',
-      'nino': 'Niños',
-      'bebe': 'Bebé',
-    };
-    return map[cat] ?? cat;
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Category chips delegate
