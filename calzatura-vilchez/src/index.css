@@ -5315,13 +5315,11 @@ button.order-card-header {
 .order-card-body { padding: 1.25rem; border-top: 1px solid var(--border); background: var(--bg); display: flex; flex-direction: column; gap: 1.25rem; }
 .order-items-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .order-item { display: flex; gap: 0.75rem; align-items: center; }
-.order-item-img-button,
-.admin-image-thumb-button {
+.order-item-img-button {
   padding: 0; border: 0; background: transparent; border-radius: var(--radius-sm);
   cursor: zoom-in; display: inline-flex; align-items: center; justify-content: center;
 }
-.order-item-img-button:focus-visible,
-.admin-image-thumb-button:focus-visible {
+.order-item-img-button:focus-visible {
   outline: 2px solid var(--gold); outline-offset: 2px;
 }
 .order-item-img { width: 48px; height: 48px; object-fit: cover; border-radius: var(--radius-sm); flex-shrink: 0; display: block; }

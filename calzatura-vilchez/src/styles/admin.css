@@ -3824,3 +3824,11 @@ dialog.document-preview-modal {
 [data-theme="dark"] .quiebre-date      { background: rgba(239,68,68,0.14);  color: #fca5a5; border-color: rgba(239,68,68,0.28); }
 [data-theme="dark"] .quiebre-date-warn { background: rgba(245,158,11,0.14); color: #fcd34d; border-color: rgba(245,158,11,0.28); }
 
+.admin-image-thumb-button {
+  padding: 0; border: 0; background: transparent; border-radius: var(--radius-sm);
+  cursor: zoom-in; display: inline-flex; align-items: center; justify-content: center;
+}
+.admin-image-thumb-button:focus-visible {
+  outline: 2px solid var(--gold); outline-offset: 2px;
+}
+

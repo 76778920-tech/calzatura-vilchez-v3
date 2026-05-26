@@ -1346,7 +1346,7 @@ export function IreHistoryPanel({ data }: { data: IreHistorialPoint[] }) {
         </div>
       )}
 
-      <div className="admin-table-wrap">
+      <div className="admin-table-wrapper">
         <table className="admin-table" style={{ fontSize: "12px" }}>
           <thead>
             <tr>
