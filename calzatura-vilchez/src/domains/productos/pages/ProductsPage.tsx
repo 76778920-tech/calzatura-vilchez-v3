@@ -450,10 +450,12 @@ export default function ProductsPage() {
 
   const [catalogPage, setCatalogPage] = useState(1);
   const filterParamsKey = effectiveParams.toString();
+  const [prevFilterParamsKey, setPrevFilterParamsKey] = useState(filterParamsKey);
 
-  useEffect(() => {
+  if (prevFilterParamsKey !== filterParamsKey) {
+    setPrevFilterParamsKey(filterParamsKey);
     setCatalogPage(1);
-  }, [filterParamsKey]);
+  }
 
   const totalCatalogPages = Math.ceil(filtered.length / CATALOG_PAGE_SIZE);
   const pagedProducts = useMemo(

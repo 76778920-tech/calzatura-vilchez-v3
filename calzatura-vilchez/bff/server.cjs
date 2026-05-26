@@ -246,7 +246,7 @@ async function verifyFirebaseUser(req) {
 function logServerError(label, error) {
   const status = error?.status ?? error?.statusCode ?? 500;
   if (status < 400 || status >= 500) {
-    console.error(label, error); // eslint-disable-line no-console
+    console.error(label, error);
   }
 }
 

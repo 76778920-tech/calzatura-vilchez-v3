@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 const SRC_ROOT = path.join(process.cwd(), "src");
 const ASSETS_DIR = path.join(SRC_ROOT, "assets");
 
-function listFiles(dir: string, acc: string[] = []): string[] {
+function listFiles(dir, acc = []) {
   if (!fs.existsSync(dir)) return acc;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
@@ -18,8 +18,8 @@ function listFiles(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-function listSourceFiles(dir: string): string[] {
-  const files: string[] = [];
+function listSourceFiles(dir) {
+  const files = [];
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === "node_modules" || entry.name === "dist" || entry.name === "__tests__") continue;
     const full = path.join(dir, entry.name);
@@ -41,11 +41,11 @@ describe("image assets integrity (PNG → WebP migration)", () => {
   it("every .webp import in source code resolves to an existing file", () => {
     const importPattern = /from\s+["']@\/assets\/([^"']+\.webp)["']/g;
     const sourceFiles = listSourceFiles(SRC_ROOT);
-    const missing: string[] = [];
+    const missing = [];
 
     for (const file of sourceFiles) {
       const content = fs.readFileSync(file, "utf8");
-      let match: RegExpExecArray | null;
+      let match;
       while ((match = importPattern.exec(content)) !== null) {
         const assetRelative = match[1];
         const assetAbsolute = path.join(ASSETS_DIR, assetRelative);
@@ -61,7 +61,7 @@ describe("image assets integrity (PNG → WebP migration)", () => {
   it("no source file imports a .png from @/assets/", () => {
     const importPattern = /from\s+["']@\/assets\/[^"']+\.png["']/g;
     const sourceFiles = listSourceFiles(SRC_ROOT);
-    const violations: string[] = [];
+    const violations = [];
 
     for (const file of sourceFiles) {
       const content = fs.readFileSync(file, "utf8");
@@ -81,7 +81,7 @@ describe("image assets integrity (PNG → WebP migration)", () => {
     const sourceFiles = listSourceFiles(SRC_ROOT);
     const allSource = sourceFiles.map((f) => fs.readFileSync(f, "utf8")).join("\n");
 
-    const unreferenced: string[] = [];
+    const unreferenced = [];
     for (const webp of webpFiles) {
       const basename = path.basename(webp);
       if (!allSource.includes(basename)) {
@@ -97,7 +97,7 @@ describe("image assets integrity (PNG → WebP migration)", () => {
 
   it("every .webp file has valid content (not 0 bytes, has RIFF header)", () => {
     const webpFiles = listFiles(ASSETS_DIR).filter((f) => f.endsWith(".webp"));
-    const corrupt: string[] = [];
+    const corrupt = [];
 
     for (const webp of webpFiles) {
       const stat = fs.statSync(webp);
@@ -119,7 +119,7 @@ describe("image assets integrity (PNG → WebP migration)", () => {
 
   it("no .webp file exceeds 500 KB (performance guard)", () => {
     const webpFiles = listFiles(ASSETS_DIR).filter((f) => f.endsWith(".webp"));
-    const oversized: string[] = [];
+    const oversized = [];
     const MAX_KB = 500;
 
     for (const webp of webpFiles) {
