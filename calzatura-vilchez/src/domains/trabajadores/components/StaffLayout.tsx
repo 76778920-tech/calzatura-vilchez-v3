@@ -1,3 +1,4 @@
+import "@/styles/admin.css";
 import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, ShoppingBag, CircleDollarSign, LogOut, Store } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";

@@ -1,3 +1,4 @@
+import "@/styles/admin.css";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain, FileSpreadsheet, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
