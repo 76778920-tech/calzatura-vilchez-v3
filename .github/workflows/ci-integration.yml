@@ -363,3 +363,5 @@ jobs:
       VITE_ORS_API_KEY: ${{ secrets.VITE_ORS_API_KEY }}
       RENDER_BFF_DEPLOY_HOOK_URL: ${{ secrets.RENDER_BFF_DEPLOY_HOOK_URL }}
       RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      VITE_ADMIN_PATH: ${{ secrets.VITE_ADMIN_PATH }}
+      VITE_STAFF_PATH: ${{ secrets.VITE_STAFF_PATH }}

@@ -49,6 +49,10 @@ on:
         required: true
       RENDER_DEPLOY_HOOK_URL:
         required: false
+      VITE_ADMIN_PATH:
+        required: false
+      VITE_STAFF_PATH:
+        required: false
   workflow_dispatch:
 
 env:
@@ -258,8 +262,8 @@ jobs:
           VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
           VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
           VITE_ORS_API_KEY: ${{ secrets.VITE_ORS_API_KEY }}
-          VITE_ADMIN_PATH: ${{ secrets.VITE_ADMIN_PATH }}-${{ needs.gate.outputs.head_sha }}
-          VITE_STAFF_PATH: ${{ secrets.VITE_STAFF_PATH }}-${{ needs.gate.outputs.head_sha }}
+          VITE_ADMIN_PATH: ${{ secrets.VITE_ADMIN_PATH || 'cv-panel' }}-${{ needs.gate.outputs.head_sha }}
+          VITE_STAFF_PATH: ${{ secrets.VITE_STAFF_PATH || 'cv-ops' }}-${{ needs.gate.outputs.head_sha }}
 
       - name: Deploy a Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@500ac625ca2dd40cbd15f7659af953801858032a # node24 (upstream main, PR #450)
