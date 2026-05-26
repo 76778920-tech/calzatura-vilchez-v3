@@ -33,24 +33,28 @@ export const CLIENT_ROUTES = {
   favorites: "/favoritos",
 } as const;
 
+const _AP = import.meta.env.VITE_ADMIN_PATH ?? "/admin";
+
 export const ADMIN_ROUTES = {
-  root: "/admin/*",
-  dashboard: "/admin",
-  products: "/admin/productos",
-  orders: "/admin/pedidos",
-  sales: "/admin/ventas",
-  users: "/admin/usuarios",
-  manufacturers: "/admin/fabricantes",
-  predictions: "/admin/predicciones",
-  data: "/admin/datos",
+  root: `${_AP}/*`,
+  dashboard: _AP,
+  products: `${_AP}/productos`,
+  orders: `${_AP}/pedidos`,
+  sales: `${_AP}/ventas`,
+  users: `${_AP}/usuarios`,
+  manufacturers: `${_AP}/fabricantes`,
+  predictions: `${_AP}/predicciones`,
+  data: `${_AP}/datos`,
 } as const;
+
+const _SP = import.meta.env.VITE_STAFF_PATH ?? "/staff";
 
 /** Panel operativo tienda (rol trabajador). */
 export const STAFF_ROUTES = {
-  root: "/staff/*",
-  home: "/staff",
-  orders: "/staff/pedidos",
-  sales: "/staff/ventas",
+  root: `${_SP}/*`,
+  home: _SP,
+  orders: `${_SP}/pedidos`,
+  sales: `${_SP}/ventas`,
 } as const;
 
 export const ROUTE_GROUPS = {

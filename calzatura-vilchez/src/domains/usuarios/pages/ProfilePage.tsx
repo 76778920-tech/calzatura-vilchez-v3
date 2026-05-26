@@ -50,7 +50,7 @@ export default function ProfilePage() {
     if (telefono.trim()) {
       const phoneError = peruPhoneError(telefono);
       if (phoneError || !isValidPeruPhone(telefono)) {
-        toast.error(phoneError ?? "Ingresa un telefono valido");
+        toast.error(phoneError ?? "Ingresa un teléfono válido");
         return;
       }
     }
@@ -183,7 +183,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="input-group">
-              <label htmlFor="profile-email">Correo electronico</label>
+              <label htmlFor="profile-email">Correo electrónico</label>
               <div className="input-wrapper">
                 <Mail size={16} className="input-icon" />
                 <input
@@ -201,7 +201,7 @@ export default function ProfilePage() {
             </div>
 
             <div className="input-group">
-              <label htmlFor="profile-telefono">Telefono</label>
+              <label htmlFor="profile-telefono">Teléfono</label>
               <div className="input-wrapper">
                 <Phone size={16} className="input-icon" />
                 <input

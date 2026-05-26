@@ -49,46 +49,9 @@ export default defineConfig({
     chunkSizeWarningLimit: 1200,
     rollupOptions: {
       external: (id) => id.includes('__tests__') || id.includes('.test.ts') || id.includes('.test.tsx'),
+    },
+    rolldownOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('/src/domains/')) {
-            if (
-              id.includes('/administradores/') ||
-              id.includes('/fabricantes/') ||
-              id.includes('/Admin') ||
-              id.includes('/ventas/')
-            ) {
-              return 'app-admin'
-            }
-            if (id.includes('/carrito/') || id.includes('/pedidos/') || id.includes('/Checkout')) {
-              return 'app-checkout'
-            }
-            return 'app-public'
-          }
-
-          if (!id.includes('node_modules')) return undefined
-
-          if (
-            id.includes('@react-three/') ||
-            id.includes('/three/')
-          ) {
-            return 'three'
-          }
-
-          if (id.includes('/exceljs/')) {
-            return 'exceljs'
-          }
-
-          if (id.includes('/firebase/')) {
-            return 'firebase'
-          }
-
-          if (id.includes('@supabase/')) {
-            return 'supabase'
-          }
-
-          return 'vendor'
-        },
         chunkFileNames: 'assets/[hash].js',
         entryFileNames: 'assets/[hash].js',
         assetFileNames: 'assets/[hash].[ext]',

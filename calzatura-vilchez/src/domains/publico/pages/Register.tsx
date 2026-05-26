@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { IdCard, User, Mail, Lock, Eye, EyeOff, Search, Smartphone } from "lucide-react";
 import { checkDisposableEmail, registerUser } from "@/domains/usuarios/services/auth";
-import { PUBLIC_ROUTES } from "@/routes/paths";
+import { INFO_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 import { dniLookupFailureMessage, isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
 import { getNormalizedRegisterEmail, getRegisterBlockingMessage } from "./registerFormValidation";
 import { savePendingVerificationEmail } from "@/utils/pendingVerification";
@@ -24,6 +24,7 @@ export default function Register() {
   const [validatedDni, setValidatedDni] = useState("");
   const [dniLookupToken, setDniLookupToken] = useState("");
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const showDniLookupError = (err: unknown) => {
     toast.error(dniLookupFailureMessage(err));
@@ -78,6 +79,10 @@ export default function Register() {
       toast.error("Vuelve a validar el DNI antes de crear la cuenta");
       return;
     }
+    if (!acceptedTerms) {
+      toast.error("Debes aceptar los términos y condiciones para continuar");
+      return;
+    }
     const emailNorm = getNormalizedRegisterEmail(email);
 
     setLoading(true);
@@ -115,7 +120,7 @@ export default function Register() {
           </svg>
         </div>
         <h1 className="auth-title">Crear Cuenta</h1>
-        <p className="auth-subtitle">Unete a Calzatura Vilchez</p>
+        <p className="auth-subtitle">Únete a Calzatura Vilchez</p>
 
         <form onSubmit={handleRegister} className="auth-form">
           <div className="input-group">
@@ -193,7 +198,7 @@ export default function Register() {
           </div>
 
           <div className="input-group">
-            <label htmlFor="register-email">Correo electronico</label>
+            <label htmlFor="register-email">Correo electrónico</label>
             <div className="input-wrapper">
               <Mail size={16} className="input-icon" />
               <input
@@ -234,7 +239,7 @@ export default function Register() {
 
           <div className="form-row">
             <div className="input-group">
-              <label htmlFor="register-password">Contrasena</label>
+              <label htmlFor="register-password">Contraseña</label>
               <div className="input-wrapper">
                 <Lock size={16} className="input-icon" />
                 <input
@@ -275,7 +280,26 @@ export default function Register() {
             </div>
           </div>
 
-          <button type="submit" disabled={loading} className="btn-primary btn-full">
+          <label className="register-terms-label">
+            <input
+              type="checkbox"
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+              className="register-terms-checkbox"
+            />
+            <span>
+              Acepto los{" "}
+              <Link to={INFO_ROUTES.legalTerminos} className="auth-link" target="_blank" rel="noopener noreferrer">
+                Términos y condiciones
+              </Link>{" "}
+              y la{" "}
+              <Link to={INFO_ROUTES.legalPrivacidad} className="auth-link" target="_blank" rel="noopener noreferrer">
+                Política de privacidad
+              </Link>
+            </span>
+          </label>
+
+          <button type="submit" disabled={loading || !acceptedTerms} className="btn-primary btn-full">
             {loading ? "Creando cuenta..." : "Crear Cuenta"}
           </button>
         </form>

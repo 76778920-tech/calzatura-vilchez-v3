@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../../../../core/config/env.dart';
@@ -426,8 +431,11 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
   final _searchCtrl = TextEditingController();
   bool _searching = false;
   String _categoryFilter = 'todos';
+  String _typeFilter = 'todos';
+  String _priceFilter = 'todos';
   String _stockFilter = 'todos';
   String _featuredFilter = 'todos';
+  bool _exporting = false;
 
   @override
   void dispose() {
@@ -444,19 +452,40 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
       list = list.where((p) => p['categoria'] == _categoryFilter).toList();
     }
 
-    if (_stockFilter == 'bajo') {
-      list = list.where((p) {
-        final stock = (p['stock'] as num?)?.toInt() ?? 0;
-        return stock > 0 && stock <= 5;
-      }).toList();
-    } else if (_stockFilter == 'con') {
-      list = list
-          .where((p) => ((p['stock'] as num?)?.toInt() ?? 0) > 5)
-          .toList();
-    } else if (_stockFilter == 'sin') {
-      list = list
-          .where((p) => ((p['stock'] as num?)?.toInt() ?? 0) == 0)
-          .toList();
+    if (_typeFilter != 'todos') {
+      list = list.where((p) => p['tipoCalzado'] == _typeFilter).toList();
+    }
+
+    switch (_priceFilter) {
+      case 'bajo':
+        list = list
+            .where((p) => ((p['precio'] as num?)?.toDouble() ?? 0) < 100)
+            .toList();
+      case 'medio':
+        list = list.where((p) {
+          final price = (p['precio'] as num?)?.toDouble() ?? 0;
+          return price >= 100 && price < 200;
+        }).toList();
+      case 'alto':
+        list = list
+            .where((p) => ((p['precio'] as num?)?.toDouble() ?? 0) >= 200)
+            .toList();
+    }
+
+    switch (_stockFilter) {
+      case 'bajo':
+        list = list.where((p) {
+          final stock = (p['stock'] as num?)?.toInt() ?? 0;
+          return stock > 0 && stock <= 5;
+        }).toList();
+      case 'con':
+        list = list
+            .where((p) => ((p['stock'] as num?)?.toInt() ?? 0) > 5)
+            .toList();
+      case 'sin':
+        list = list
+            .where((p) => ((p['stock'] as num?)?.toInt() ?? 0) == 0)
+            .toList();
     }
 
     if (_featuredFilter == 'destacados') {
@@ -482,6 +511,11 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
     }
 
     return list;
+  }
+
+  List<String> _typesForFilter() {
+    if (_categoryFilter == 'todos') return [];
+    return _typesForCategory(_categoryFilter);
   }
 
   Future<void> _toggleActive(Map<String, dynamic> product) async {
@@ -546,6 +580,74 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
     );
   }
 
+  String _csvCell(dynamic value) {
+    final s = value?.toString() ?? '';
+    if (s.contains(',') || s.contains('"') || s.contains('\n')) {
+      return '"${s.replaceAll('"', '""')}"';
+    }
+    return s;
+  }
+
+  Future<void> _exportProducts(
+    BuildContext context,
+    List<Map<String, dynamic>> products,
+  ) async {
+    if (_exporting) return;
+    setState(() => _exporting = true);
+    try {
+      final header = [
+        'Código',
+        'Nombre',
+        'Marca',
+        'Categoría',
+        'Tipo',
+        'Color',
+        'Precio',
+        'Costo Sugerido',
+        'Stock',
+        'Activo',
+        'Destacado',
+      ];
+      final rows = <String>[header.map(_csvCell).join(',')];
+      for (final p in products) {
+        final finanzas = p['finanzas'] as Map? ?? {};
+        rows.add([
+          _csvCell(p['codigo']),
+          _csvCell(p['nombre']),
+          _csvCell(p['marca']),
+          _csvCell(p['categoria']),
+          _csvCell(p['tipoCalzado']),
+          _csvCell(p['color']),
+          _csvCell(p['precio']),
+          _csvCell(finanzas['precioSugerido']),
+          _csvCell(p['stock']),
+          _csvCell(p['activo'] == true ? 'Sí' : 'No'),
+          _csvCell(p['destacado'] == true ? 'Sí' : 'No'),
+        ].join(','));
+      }
+      final csv = rows.join('\n');
+      final dir = await getTemporaryDirectory();
+      final stamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
+      final file = File('${dir.path}/productos_$stamp.csv');
+      await file.writeAsString(csv, encoding: utf8);
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'text/csv')],
+        subject: 'Lista de productos Calzatura Vilchez',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al exportar: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final productsAsync = ref.watch(adminProductsProvider);
@@ -589,6 +691,33 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
                 if (!_searching) _searchCtrl.clear();
               }),
             ),
+            if (_exporting)
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 12),
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.gold,
+                  ),
+                ),
+              )
+            else
+              IconButton(
+                tooltip: 'Exportar lista CSV',
+                icon: const Icon(
+                  Icons.download_rounded,
+                  color: Colors.white70,
+                ),
+                onPressed: () {
+                  final productsAsync = ref.read(adminProductsProvider);
+                  productsAsync.whenData((all) {
+                    final toExport = _filterProducts(all);
+                    _exportProducts(context, toExport);
+                  });
+                },
+              ),
             IconButton(
               icon: const Icon(
                 Icons.add_rounded,
@@ -613,9 +742,12 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
             final outOfStock = products
                 .where((p) => ((p['stock'] as num?)?.toInt() ?? 0) == 0)
                 .length;
-            final featured = products
-                .where((p) => p['destacado'] == true)
-                .length;
+            final featured =
+                products.where((p) => p['destacado'] == true).length;
+            final stockTotal = products.fold<int>(
+              0,
+              (sum, p) => sum + ((p['stock'] as num?)?.toInt() ?? 0),
+            );
 
             return RefreshIndicator(
               color: AppColors.gold,
@@ -625,33 +757,47 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
                   SliverToBoxAdapter(
                     child: Container(
                       color: AppColors.black,
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Row(
-                        children: [
-                          _StatChip(
-                            label: 'Total',
-                            value: '${products.length}',
-                            color: AppColors.gold,
-                          ),
-                          const SizedBox(width: 8),
-                          _StatChip(
-                            label: 'Stock bajo',
-                            value: '$lowStock',
-                            color: AppColors.warning,
-                          ),
-                          const SizedBox(width: 8),
-                          _StatChip(
-                            label: 'Sin stock',
-                            value: '$outOfStock',
-                            color: AppColors.error,
-                          ),
-                          const SizedBox(width: 8),
-                          _StatChip(
-                            label: 'Destacados',
-                            value: '$featured',
-                            color: AppColors.success,
-                          ),
-                        ],
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _StatCard(
+                              icon: Icons.inventory_2_outlined,
+                              label: 'Total',
+                              value: '${products.length}',
+                              color: AppColors.gold,
+                            ),
+                            const SizedBox(width: 8),
+                            _StatCard(
+                              icon: Icons.warning_amber_rounded,
+                              label: 'Stock bajo',
+                              value: '$lowStock',
+                              color: AppColors.warning,
+                            ),
+                            const SizedBox(width: 8),
+                            _StatCard(
+                              icon: Icons.remove_shopping_cart_outlined,
+                              label: 'Sin stock',
+                              value: '$outOfStock',
+                              color: AppColors.error,
+                            ),
+                            const SizedBox(width: 8),
+                            _StatCard(
+                              icon: Icons.layers_outlined,
+                              label: 'Stock total',
+                              value: '$stockTotal',
+                              color: const Color(0xFF0EA5E9),
+                            ),
+                            const SizedBox(width: 8),
+                            _StatCard(
+                              icon: Icons.star_outline_rounded,
+                              label: 'Destacados',
+                              value: '$featured',
+                              color: AppColors.success,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -668,11 +814,29 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
                           'bebe': 'Bebé',
                         },
                         selected: _categoryFilter,
-                        onSelect: (value) =>
-                            setState(() => _categoryFilter = value),
+                        onSelect: (value) => setState(() {
+                          _categoryFilter = value;
+                          _typeFilter = 'todos';
+                        }),
                       ),
                     ),
                   ),
+                  if (_categoryFilter != 'todos' &&
+                      _typesForFilter().isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+                        child: _FilterChips(
+                          items: {
+                            'todos': 'Todos los tipos',
+                            for (final t in _typesForFilter()) t: t,
+                          },
+                          selected: _typeFilter,
+                          onSelect: (value) =>
+                              setState(() => _typeFilter = value),
+                        ),
+                      ),
+                    ),
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -701,6 +865,22 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
                         selected: _featuredFilter,
                         onSelect: (value) =>
                             setState(() => _featuredFilter = value),
+                      ),
+                    ),
+                  ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+                      child: _FilterChips(
+                        items: const {
+                          'todos': 'Todos los precios',
+                          'bajo': '≤ S/ 100',
+                          'medio': 'S/ 101–200',
+                          'alto': '> S/ 200',
+                        },
+                        selected: _priceFilter,
+                        onSelect: (value) =>
+                            setState(() => _priceFilter = value),
                       ),
                     ),
                   ),
@@ -781,7 +961,22 @@ class _ProductTile extends StatelessWidget {
       product['finanzas'] as Map? ?? {},
     );
     final precioSugerido = (finanzas['precioSugerido'] as num?)?.toDouble();
+    final precioMinimo = (finanzas['precioMinimo'] as num?)?.toDouble();
+    final precioMaximo = (finanzas['precioMaximo'] as num?)?.toDouble();
     final imagen = product['imagen']?.toString() ?? '';
+    final codigo = product['codigo']?.toString() ?? '';
+    final categoria = product['categoria']?.toString() ?? '';
+    final tipo = product['tipoCalzado']?.toString() ?? '';
+    final marca = product['marca']?.toString() ?? 'Sin marca';
+    final color = product['color']?.toString() ?? '';
+    final material = product['material']?.toString() ?? '';
+
+    // Subtitle: marca · material · color (solo los que existen)
+    final subtitle = [
+      marca,
+      if (material.isNotEmpty) material,
+      if (color.isNotEmpty) color,
+    ].join(' · ');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -798,83 +993,95 @@ class _ProductTile extends StatelessWidget {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Imagen
           ClipRRect(
             borderRadius: const BorderRadius.horizontal(
               left: Radius.circular(14),
             ),
             child: SizedBox(
-              width: 76,
-              height: 96,
+              width: 72,
+              height: 110,
               child: imagen.isNotEmpty
                   ? Image.network(
                       imagen,
                       fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const _PlaceholderImg(),
+                      errorBuilder: (_, _, _) => const _PlaceholderImg(),
                     )
                   : const _PlaceholderImg(),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 10),
+
+          // Contenido
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.fromLTRB(0, 9, 0, 9),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          product['nombre']?.toString() ?? '',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            color: AppColors.textPrimary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  // Código badge (como admin-code-badge de la web)
+                  if (codigo.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.black,
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        codigo,
+                        style: const TextStyle(
+                          color: AppColors.gold,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                      if (destacado)
-                        Container(
-                          margin: const EdgeInsets.only(left: 4),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.gold.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            '★',
-                            style: TextStyle(
-                              color: AppColors.gold,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                    ],
+                    ),
+
+                  // Nombre
+                  Text(
+                    product['nombre']?.toString() ?? '',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 2),
+
+                  // Marca · material · color
                   Text(
-                    '${product['marca'] ?? 'Sin marca'} · ${(product['categoria'] ?? '').toString().toUpperCase()}',
+                    subtitle,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 11,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  if ((product['codigo']?.toString() ?? '').isNotEmpty)
-                    Text(
-                      product['codigo'].toString(),
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 10,
-                      ),
-                    ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 5),
+
+                  // Categoría + Tipo como soft-badges (igual que la web)
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [
+                      if (categoria.isNotEmpty)
+                        _SoftBadge(label: _catLabel(categoria)),
+                      if (tipo.isNotEmpty) _SoftBadge(label: tipo),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+
+                  // Precio + rango finanzas
                   Row(
                     children: [
                       Text(
@@ -885,8 +1092,22 @@ class _ProductTile extends StatelessWidget {
                           fontSize: 13,
                         ),
                       ),
-                      if (precioSugerido != null) ...[
-                        const SizedBox(width: 8),
+                      if (precioMinimo != null && precioMaximo != null) ...[
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            'S/${precioMinimo.toStringAsFixed(0)}–S/${precioMaximo.toStringAsFixed(0)}'
+                            '${precioSugerido != null ? ' · Sug.S/${precioSugerido.toStringAsFixed(0)}' : ''}',
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 9.5,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ] else if (precioSugerido != null) ...[
+                        const SizedBox(width: 6),
                         Text(
                           'Sug. S/ ${precioSugerido.toStringAsFixed(2)}',
                           style: const TextStyle(
@@ -897,18 +1118,26 @@ class _ProductTile extends StatelessWidget {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 5),
+
+                  // Stock · Activo · Destacado
                   Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                    spacing: 5,
+                    runSpacing: 4,
                     children: [
                       _TagPill(
-                        label: 'Stock: $stock',
+                        label: 'Stock $stock',
                         color: _stockColor(stock),
                       ),
                       _TagPill(
                         label: activo ? 'Activo' : 'Oculto',
                         color: activo ? AppColors.success : AppColors.error,
+                      ),
+                      _TagPill(
+                        label: destacado ? '★ Sí' : '★ No',
+                        color: destacado
+                            ? AppColors.gold
+                            : AppColors.textSecondary,
                       ),
                     ],
                   ),
@@ -916,43 +1145,88 @@ class _ProductTile extends StatelessWidget {
               ),
             ),
           ),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(
-                  Icons.visibility_outlined,
-                  size: 18,
-                  color: AppColors.textSecondary,
+
+          // Acciones
+          Padding(
+            padding: const EdgeInsets.only(top: 4, right: 2),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    activo
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    size: 17,
+                    color: activo
+                        ? AppColors.textSecondary
+                        : AppColors.textSecondary,
+                  ),
+                  onPressed: onToggleActive,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: activo ? 'Ocultar' : 'Activar',
                 ),
-                onPressed: onToggleActive,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.edit_outlined,
-                  size: 18,
-                  color: AppColors.gold,
+                IconButton(
+                  icon: const Icon(
+                    Icons.edit_outlined,
+                    size: 17,
+                    color: AppColors.gold,
+                  ),
+                  onPressed: onEdit,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Editar',
                 ),
-                onPressed: onEdit,
-                visualDensity: VisualDensity.compact,
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.delete_outline_rounded,
-                  size: 18,
-                  color: AppColors.error,
+                IconButton(
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 17,
+                    color: AppColors.error,
+                  ),
+                  onPressed: onDelete,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Eliminar',
                 ),
-                onPressed: onDelete,
-                visualDensity: VisualDensity.compact,
-              ),
-            ],
+              ],
+            ),
           ),
-          const SizedBox(width: 4),
         ],
       ),
     ).animate(delay: Duration(milliseconds: index * 30)).fadeIn(duration: 300.ms);
   }
+
+  String _catLabel(String cat) {
+    const map = {
+      'hombre': 'Hombre',
+      'dama': 'Dama',
+      'juvenil': 'Juvenil',
+      'nino': 'Niños',
+      'bebe': 'Bebé',
+    };
+    return map[cat] ?? cat;
+  }
+}
+
+// Badge suave: fondo gris claro, texto oscuro (igual que admin-soft-badge web)
+class _SoftBadge extends StatelessWidget {
+  const _SoftBadge({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+    decoration: BoxDecoration(
+      color: const Color(0xFFF0EDE6),
+      borderRadius: BorderRadius.circular(5),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        color: AppColors.textSecondary,
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
+  );
 }
 
 class _ProductFormSheet extends StatefulWidget {
@@ -978,6 +1252,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
   late final TextEditingController _targetMarginCtrl;
   late final TextEditingController _maxMarginCtrl;
   late final TextEditingController _imageCtrl;
+  late final TextEditingController _imageCtrl2;
   late final TextEditingController _descriptionCtrl;
 
   late String _category;
@@ -1057,6 +1332,12 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     _imageCtrl = TextEditingController(
       text: product?['imagen']?.toString() ?? '',
     );
+    final imagenes = product?['imagenes'];
+    _imageCtrl2 = TextEditingController(
+      text: (imagenes is List && imagenes.length > 1)
+          ? imagenes[1].toString()
+          : '',
+    );
     _descriptionCtrl = TextEditingController(
       text: product?['descripcion']?.toString() ?? '',
     );
@@ -1102,6 +1383,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
       _targetMarginCtrl,
       _maxMarginCtrl,
       _imageCtrl,
+      _imageCtrl2,
       _descriptionCtrl,
     ]) {
       controller.dispose();
@@ -1132,6 +1414,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
     final cost = _parseDouble(_costCtrl.text);
     final color = _capitalizeWords(_colorCtrl.text);
     final image = _imageCtrl.text.trim();
+    final image2 = _imageCtrl2.text.trim();
     final minMargin = _parseDouble(_minMarginCtrl.text);
     final targetMargin = _parseDouble(_targetMarginCtrl.text);
     final maxMargin = _parseDouble(_maxMarginCtrl.text);
@@ -1305,7 +1588,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
       'precio': price,
       'descripcion': _descriptionCtrl.text.trim(),
       'imagen': image,
-      'imagenes': [image],
+      'imagenes': [image, if (image2.isNotEmpty) image2],
       'stock': _totalStock,
       'categoria': _category,
       'tipoCalzado': _type.trim(),
@@ -1486,64 +1769,111 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
                   children: [
                     const _FormSection('Información básica'),
-                    _Field(
-                      ctrl: _codeCtrl,
-                      label: 'Código interno *',
-                      icon: Icons.qr_code_2_outlined,
-                      textCapitalization: TextCapitalization.characters,
-                      onChanged: (value) {
-                        final normalized = _normalizeVariantCode(value);
-                        if (value != normalized) {
-                          _codeCtrl.value = _codeCtrl.value.copyWith(
-                            text: normalized,
-                            selection: TextSelection.collapsed(
-                              offset: normalized.length,
-                            ),
-                          );
-                        }
-                      },
+                    // Código | Nombre en fila
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _Field(
+                            ctrl: _codeCtrl,
+                            label: 'Código *',
+                            icon: Icons.qr_code_2_outlined,
+                            textCapitalization: TextCapitalization.characters,
+                            onChanged: (value) {
+                              final normalized = _normalizeVariantCode(value);
+                              if (value != normalized) {
+                                _codeCtrl.value = _codeCtrl.value.copyWith(
+                                  text: normalized,
+                                  selection: TextSelection.collapsed(
+                                    offset: normalized.length,
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _Field(
+                            ctrl: _nameCtrl,
+                            label: 'Nombre *',
+                            icon: Icons.label_outline,
+                            required: true,
+                          ),
+                        ),
+                      ],
                     ),
-                    _Field(
-                      ctrl: _nameCtrl,
-                      label: 'Nombre *',
-                      icon: Icons.label_outline,
-                      required: true,
-                    ),
-                    _Field(
-                      ctrl: _brandCtrl,
-                      label: 'Marca *',
-                      icon: Icons.sell_outlined,
-                      required: true,
-                    ),
-                    _DropdownField(
-                      label: 'Material',
-                      value: _material,
-                      items: const ['', ..._materialPresets],
-                      itemLabels: const {'': 'Sin material'},
-                      onChanged: (value) {
-                        setState(() => _material = value ?? '');
-                      },
+                    // Marca | Material en fila
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _Field(
+                            ctrl: _brandCtrl,
+                            label: 'Marca *',
+                            icon: Icons.sell_outlined,
+                            required: true,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _DropdownField(
+                            label: 'Material',
+                            value: _material,
+                            items: const ['', ..._materialPresets],
+                            itemLabels: const {'': 'Sin material'},
+                            onChanged: (value) {
+                              setState(() => _material = value ?? '');
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                     if (_isEditing) ...[
+                      _ColorPickerTile(
+                        current: _colorCtrl.text,
+                        onSelect: (color) =>
+                            setState(() => _colorCtrl.text = color),
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 2, bottom: 6),
+                        child: Text(
+                          'Si no se abre la paleta, escribe el color directamente.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
                       _Field(
                         ctrl: _colorCtrl,
-                        label: 'Color *',
+                        label: 'Color (texto alternativo)',
                         icon: Icons.palette_outlined,
-                        required: true,
+                        onChanged: (_) => setState(() {}),
                       ),
                       _Field(
                         ctrl: _imageCtrl,
-                        label: 'Imagen principal (URL) *',
+                        label: 'URL imagen 1 *',
                         icon: Icons.image_outlined,
                         required: true,
                       ),
+                      _Field(
+                        ctrl: _imageCtrl2,
+                        label: 'URL imagen 2',
+                        icon: Icons.image_outlined,
+                      ),
                       _UploadImageButton(
                         busy: _uploadingImage,
-                        onPressed: () => _uploadInto(_imageCtrl),
+                        onPressed: () {
+                          final target = _imageCtrl.text.trim().isEmpty
+                              ? _imageCtrl
+                              : _imageCtrl2;
+                          _uploadInto(target);
+                        },
                       ),
                     ],
 
-                    const _FormSection('Categoría y tipo'),
+                    const _FormSection('Categoría, tipo y precio'),
                     _DropdownField(
                       label: 'Categoría',
                       value: _category,
@@ -1596,8 +1926,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                         });
                       },
                     ),
-
-                    const _FormSection('Precios'),
+                    const SizedBox(height: 12),
                     _Field(
                       ctrl: _priceCtrl,
                       label: 'Precio de venta (S/) *',
@@ -1607,19 +1936,53 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                       ),
                       required: true,
                     ),
-                    _Field(
-                      ctrl: _costCtrl,
-                      label: 'Costo de compra (S/) *',
-                      icon: Icons.payments_outlined,
-                      keyboard: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      required: true,
-                      onChanged: (_) => setState(() {}),
-                    ),
 
-                    const _FormSection('Reglas comerciales'),
+                    const _FormSection('Rentabilidad'),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        'Rango óptimo de venta',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    // Costo | Margen objetivo en fila
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: _Field(
+                            ctrl: _costCtrl,
+                            label: 'Costo (S/) *',
+                            icon: Icons.payments_outlined,
+                            keyboard: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            required: true,
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          flex: 2,
+                          child: _Field(
+                            ctrl: _targetMarginCtrl,
+                            label: 'Margen obj. %',
+                            icon: Icons.adjust_rounded,
+                            keyboard: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                      ],
+                    ),
+                    // Margen mín | Margen máx en fila
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: _Field(
@@ -1632,19 +1995,7 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                             onChanged: (_) => setState(() {}),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _Field(
-                            ctrl: _targetMarginCtrl,
-                            label: 'Margen obj. %',
-                            icon: Icons.adjust_rounded,
-                            keyboard: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (_) => setState(() {}),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: _Field(
                             ctrl: _maxMarginCtrl,
@@ -1726,7 +2077,17 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                             ),
                           ),
                         ),
-                      const SizedBox(height: 10),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 6, bottom: 4),
+                        child: Text(
+                          'La visibilidad es por color: si una variante se oculta, las demás siguen activas.',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       if (_activeVariantSlots.isEmpty)
                         const _VariantEmptyState()
                       else
@@ -1764,56 +2125,64 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                       ),
                     ],
 
-                    const _FormSection('Descripción'),
-                    TextFormField(
-                      controller: _descriptionCtrl,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Descripción',
-                      ),
-                    ),
-
-                    const _FormSection('Opciones'),
-                    _DropdownField(
-                      label: 'Campaña',
-                      value: _campaign,
-                      items: const [
-                        '',
-                        'lanzamiento',
-                        'nueva-temporada',
-                        'cyber-wow',
-                        'club-calzado',
-                        'outlet',
+                    const _FormSection('Campaña y visibilidad'),
+                    // Campaña | Descuento en fila
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: _DropdownField(
+                            label: 'Campaña',
+                            value: _campaign,
+                            items: const [
+                              '',
+                              'lanzamiento',
+                              'nueva-temporada',
+                              'cyber-wow',
+                              'club-calzado',
+                              'outlet',
+                            ],
+                            itemLabels: const {
+                              '': 'Sin campaña',
+                              'lanzamiento': 'Lanzamiento',
+                              'nueva-temporada': 'Nueva Temporada',
+                              'cyber-wow': 'Cyber Wow',
+                              'club-calzado': 'Club Calzado',
+                              'outlet': 'Outlet',
+                            },
+                            onChanged: (value) =>
+                                setState(() => _campaign = value ?? ''),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _DropdownField(
+                            label: 'Descuento',
+                            value: _discount?.toString() ?? '',
+                            items: const ['', '10', '20', '30'],
+                            itemLabels: const {
+                              '': 'Sin descuento',
+                              '10': '10%',
+                              '20': '20%',
+                              '30': '30%',
+                            },
+                            onChanged: (value) => setState(
+                              () => _discount =
+                                  (value == null || value.isEmpty)
+                                      ? null
+                                      : int.parse(value),
+                            ),
+                          ),
+                        ),
                       ],
-                      itemLabels: const {
-                        '': 'Sin campaña',
-                        'lanzamiento': 'Lanzamiento',
-                        'nueva-temporada': 'Nueva Temporada',
-                        'cyber-wow': 'Cyber Wow',
-                        'club-calzado': 'Club Calzado',
-                        'outlet': 'Outlet',
-                      },
-                      onChanged: (value) =>
-                          setState(() => _campaign = value ?? ''),
                     ),
-                    const SizedBox(height: 12),
-                    _DropdownField(
-                      label: 'Descuento Cyber Wow',
-                      value: _discount?.toString() ?? '',
-                      items: const ['', '10', '20', '30'],
-                      itemLabels: const {
-                        '': 'Sin descuento',
-                        '10': '10%',
-                        '20': '20%',
-                        '30': '30%',
-                      },
-                      onChanged: (value) => setState(
-                        () => _discount = (value == null || value.isEmpty)
-                            ? null
-                            : int.parse(value),
-                      ),
+                    const SizedBox(height: 4),
+                    _SwitchRow(
+                      label: 'Producto destacado',
+                      icon: Icons.star_outline_rounded,
+                      value: _featured,
+                      onChanged: (value) => setState(() => _featured = value),
                     ),
-                    const SizedBox(height: 12),
                     if (_isEditing)
                       _SwitchRow(
                         label: 'Visible en tienda',
@@ -1821,11 +2190,23 @@ class _ProductFormSheetState extends State<_ProductFormSheet> {
                         value: _active,
                         onChanged: (value) => setState(() => _active = value),
                       ),
-                    _SwitchRow(
-                      label: 'Producto destacado',
-                      icon: Icons.star_outline_rounded,
-                      value: _featured,
-                      onChanged: (value) => setState(() => _featured = value),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _descriptionCtrl,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Descripción',
+                      ),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Text(
+                        'Se aplica a los colores sin descripción propia. Cada variante puede tener su propia descripción.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
                     ),
 
                     const SizedBox(height: 24),
@@ -1971,35 +2352,51 @@ class _TagPill extends StatelessWidget {
   }
 }
 
-class _StatChip extends StatelessWidget {
-  const _StatChip({
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.icon,
     required this.label,
     required this.value,
     required this.color,
   });
 
+  final IconData icon;
   final String label;
   final String value;
   final Color color;
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.15),
-      borderRadius: BorderRadius.circular(10),
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: color.withValues(alpha: 0.25)),
     ),
-    child: Column(
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          value,
-          style: TextStyle(
-            color: color,
-            fontWeight: FontWeight.w800,
-            fontSize: 16,
-          ),
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 6),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+                height: 1.1,
+              ),
+            ),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white54, fontSize: 9),
+            ),
+          ],
         ),
-        Text(label, style: const TextStyle(color: Colors.white54, fontSize: 9)),
       ],
     ),
   );
@@ -2129,6 +2526,7 @@ class _DropdownField extends StatelessWidget {
   @override
   Widget build(BuildContext context) => DropdownButtonFormField<String>(
     initialValue: items.contains(value) ? value : items.first,
+    isExpanded: true,
     decoration: InputDecoration(labelText: label),
     items: items
         .map(
@@ -2345,7 +2743,20 @@ class _ColorOption extends StatelessWidget {
             width: 18,
             height: 18,
             decoration: BoxDecoration(
-              color: color,
+              color: name.toLowerCase() == 'multicolor' ? null : color,
+              gradient: name.toLowerCase() == 'multicolor'
+                  ? const SweepGradient(
+                      colors: [
+                        Color(0xFFFF0000),
+                        Color(0xFFFF9900),
+                        Color(0xFFFFFF00),
+                        Color(0xFF00CC00),
+                        Color(0xFF0099FF),
+                        Color(0xFF9900FF),
+                        Color(0xFFFF0000),
+                      ],
+                    )
+                  : null,
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.shimmerBase),
             ),
@@ -2363,6 +2774,120 @@ class _ColorOption extends StatelessWidget {
       ),
     ),
   );
+}
+
+// Selector de color para el formulario de edición (mismo sheet que las variantes)
+class _ColorPickerTile extends StatelessWidget {
+  const _ColorPickerTile({required this.current, required this.onSelect});
+
+  final String current;
+  final ValueChanged<String> onSelect;
+
+  bool get _isMulticolor => current.toLowerCase() == 'multicolor';
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: GestureDetector(
+        onTap: () => _open(context),
+        child: InputDecorator(
+          isEmpty: current.isEmpty,
+          decoration: const InputDecoration(
+            labelText: 'Color *',
+            prefixIcon: Icon(Icons.palette_outlined, size: 18),
+            suffixIcon: Icon(Icons.expand_more_rounded, size: 20),
+          ),
+          child: current.isEmpty
+              ? const SizedBox(height: 20)
+              : Row(
+                  children: [
+                    Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: _isMulticolor ? null : _colorSwatch(current),
+                        gradient: _isMulticolor
+                            ? const SweepGradient(
+                                colors: [
+                                  Color(0xFFFF0000),
+                                  Color(0xFFFF9900),
+                                  Color(0xFFFFFF00),
+                                  Color(0xFF00CC00),
+                                  Color(0xFF0099FF),
+                                  Color(0xFF9900FF),
+                                  Color(0xFFFF0000),
+                                ],
+                              )
+                            : null,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.shimmerBase),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      current,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  void _open(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.55,
+        maxChildSize: 0.85,
+        builder: (_, sc) => Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Selecciona un color',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: GridView.count(
+                  controller: sc,
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 3.6,
+                  children: _colorPalette.map(
+                    (item) => _ColorOption(
+                      name: item.$1,
+                      color: item.$2,
+                      selected:
+                          current.toLowerCase() == item.$1.toLowerCase(),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        onSelect(item.$1);
+                      },
+                    ),
+                  ).toList(),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _VariantEmptyState extends StatelessWidget {
@@ -2538,7 +3063,7 @@ class _UploadImageButton extends StatelessWidget {
   );
 }
 
-class _SizeBox extends StatelessWidget {
+class _SizeBox extends StatefulWidget {
   const _SizeBox({
     required this.size,
     required this.qty,
@@ -2550,55 +3075,93 @@ class _SizeBox extends StatelessWidget {
   final ValueChanged<int> onChanged;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 64,
-    padding: const EdgeInsets.all(8),
-    decoration: BoxDecoration(
-      color: qty > 0 ? AppColors.gold.withValues(alpha: 0.1) : Colors.white,
-      border: Border.all(
-        color: qty > 0 ? AppColors.gold : AppColors.shimmerBase,
+  State<_SizeBox> createState() => _SizeBoxState();
+}
+
+class _SizeBoxState extends State<_SizeBox> {
+  late final TextEditingController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(
+      text: widget.qty > 0 ? widget.qty.toString() : '',
+    );
+  }
+
+  @override
+  void didUpdateWidget(_SizeBox old) {
+    super.didUpdateWidget(old);
+    if (old.qty != widget.qty) {
+      final next = widget.qty > 0 ? widget.qty.toString() : '';
+      if (_ctrl.text != next) _ctrl.text = next;
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasStock = widget.qty > 0;
+    return Container(
+      width: 76,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      decoration: BoxDecoration(
+        color:
+            hasStock ? AppColors.gold.withValues(alpha: 0.08) : Colors.white,
+        border: Border.all(
+          color: hasStock ? AppColors.gold : AppColors.shimmerBase,
+          width: hasStock ? 1.4 : 1,
+        ),
+        borderRadius: BorderRadius.circular(12),
       ),
-      borderRadius: BorderRadius.circular(10),
-    ),
-    child: Column(
-      children: [
-        Text(
-          size,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-        ),
-        const SizedBox(height: 4),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: () {
-                if (qty > 0) onChanged(qty - 1);
-              },
-              child: const Icon(
-                Icons.remove,
-                size: 14,
-                color: AppColors.textSecondary,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.size,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+              color: hasStock ? AppColors.goldDark : AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _ctrl,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: hasStock ? AppColors.goldDark : AppColors.textPrimary,
+            ),
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 2),
+              border: InputBorder.none,
+              hintText: '0',
+              hintStyle: TextStyle(
+                color: AppColors.shimmerBase,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Text(
-                '$qty',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+            onTap: () => _ctrl.selection = TextSelection(
+              baseOffset: 0,
+              extentOffset: _ctrl.text.length,
             ),
-            GestureDetector(
-              onTap: () => onChanged(qty + 1),
-              child: const Icon(Icons.add, size: 14, color: AppColors.gold),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
+            onChanged: (value) => widget.onChanged(int.tryParse(value) ?? 0),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _SwitchRow extends StatelessWidget {

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import { CartProvider } from "@/domains/carrito/context/CartContext";
 import { FavoritesProvider } from "@/domains/clientes/context/FavoritesContext";
@@ -14,7 +14,6 @@ import Footer from "./components/layout/Footer";
 import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "./routes/paths";
 import { CATALOG_SHELF } from "./routes/catalogRouting";
 import { AreaRoute, AuthenticatedRoute, PageLoader } from "./routes/RouteGuards";
-import { useAuth } from "@/domains/usuarios/context/AuthContext";
 
 // Carga diferida por dominio. El control real de acceso está en AreaRoute,
 // AdminLayout y datos de perfil (Supabase `usuarios` + Firebase Auth), no en ocultar archivos del bundle.
@@ -48,12 +47,9 @@ const InfoPage = lazy(() => import("@/domains/publico/pages/InfoPage"));
 const ThesisIsoPage = lazy(() => import("@/domains/publico/pages/ThesisIsoPage"));
 const CyberWowLandingPage = lazy(() => import("@/domains/publico/pages/CyberWowLandingPage"));
 const ClubCalzadoLandingPage = lazy(() => import("@/domains/publico/pages/ClubCalzadoLandingPage"));
+const NotFoundPage = lazy(() => import("@/domains/publico/pages/NotFoundPage"));
 
 function Storefront() {
-  const { loading } = useAuth();
-
-  if (loading) return <PageLoader />;
-
   return (
     <div className="app-shell">
       <Header />
@@ -113,7 +109,7 @@ function Storefront() {
               element={<AreaRoute area="clientes"><FavoritesPage /></AreaRoute>}
             />
 
-            <Route path="*" element={<Navigate to={PUBLIC_ROUTES.home} replace />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </div>

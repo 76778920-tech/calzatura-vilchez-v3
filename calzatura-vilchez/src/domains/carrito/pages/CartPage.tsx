@@ -1,12 +1,14 @@
 import { Link } from "react-router-dom";
-import { ShoppingBag, Trash2, ArrowRight } from "lucide-react";
+import { ShoppingBag, Trash2, ArrowRight, LogIn } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { CartSummaryRows, CartItemQtyControls } from "@/domains/carrito/components/cartShared";
 import { handleProductImageError } from "@/utils/imgUtils";
 import { getSizeStock } from "@/utils/stock";
+import { useAuth } from "@/domains/usuarios/context/AuthContext";
 
 export default function CartPage() {
   const { items, removeItem, updateQuantity, subtotal, total, clearCart } = useCart();
+  const { user } = useAuth();
 
   if (items.length === 0) {
     return (
@@ -75,13 +77,25 @@ export default function CartPage() {
 
         {/* Summary */}
         <div className="cart-page-summary">
-          <h2>Resumen del Pedido</h2>
+          <h2>Resumen de tu carrito</h2>
           <div className="summary-rows">
             <CartSummaryRows subtotal={subtotal} total={total} rowClass="summary-row" totalClass="summary-total" />
           </div>
-          <Link to="/checkout" className="btn-primary btn-full">
-            Proceder al Pago <ArrowRight size={16} />
-          </Link>
+          {user ? (
+            <Link to="/checkout" className="btn-primary btn-full">
+              Proceder al Pago <ArrowRight size={16} />
+            </Link>
+          ) : (
+            <>
+              <div className="cart-login-notice">
+                <LogIn size={15} aria-hidden="true" />
+                <span>Necesitas iniciar sesión para continuar con el pago</span>
+              </div>
+              <Link to="/login?redirect=/checkout" className="btn-primary btn-full">
+                Iniciar Sesión para Pagar <ArrowRight size={16} />
+              </Link>
+            </>
+          )}
           <Link to="/productos" className="btn-outline btn-full" style={{ marginTop: "0.75rem" }}>
             Seguir Comprando
           </Link>

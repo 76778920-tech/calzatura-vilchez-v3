@@ -13,6 +13,13 @@ import ProductCard from "@/domains/productos/components/ProductCard";
 import HomeHeroSection, { type HomeHeroSlide } from "@/domains/publico/components/HomeHeroSection";
 import { fetchPublicProducts } from "@/domains/productos/services/products";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
+
+let prefetchedProducts: Promise<Product[]> | null = null;
+function getPrefetchedProducts() {
+  if (!prefetchedProducts) prefetchedProducts = fetchPublicProducts();
+  return prefetchedProducts;
+}
+getPrefetchedProducts();
 import type { Product } from "@/types";
 import { countProductsForCategory, productMatchesAnySearch } from "@/utils/catalog";
 import { buildCatalogHref, buildCyberCatalogHref } from "@/routes/catalogRouting";
@@ -314,7 +321,9 @@ export default function HomePage() {
   const categoriesGridRef = useRef<HTMLDivElement | null>(null);
 
   const loadProducts = useCallback(() => {
-    fetchPublicProducts()
+    const promise = prefetchedProducts ?? fetchPublicProducts();
+    prefetchedProducts = null;
+    promise
       .then(setProducts)
       .catch(() => setError("No pudimos cargar los productos destacados."))
       .finally(() => setLoading(false));

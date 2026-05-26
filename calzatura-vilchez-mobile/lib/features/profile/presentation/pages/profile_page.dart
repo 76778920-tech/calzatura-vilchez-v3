@@ -12,7 +12,25 @@ class ProfilePage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
+    final authState = ref.watch(authStateProvider);
+
+    // Mientras Firebase Auth no confirmó el estado, evitar flicker al guest
+    if (authState.isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.beige,
+        appBar: AppBar(
+          backgroundColor: AppColors.black,
+          foregroundColor: Colors.white,
+          title: const Text('Mi cuenta'),
+          centerTitle: true,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.gold),
+        ),
+      );
+    }
+
+    final user = authState.valueOrNull;
     if (user == null) {
       return const _ProfileGuestPrompt();
     }
