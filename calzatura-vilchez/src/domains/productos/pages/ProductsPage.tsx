@@ -12,8 +12,10 @@ import { AlertTriangle, ChevronRight, X } from "lucide-react";
 import { fetchProductFamilyGroupCounts, fetchPublicProducts } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import ProductCard from "@/domains/productos/components/ProductCard";
-import cyberWowJuvenilEditorial from "@/assets/home/cyber/cyber-wow-juvenil-editorial.webp";
-import cyberWowZapatillasEditorial from "@/assets/home/cyber/cyber-wow-zapatillas-editorial.webp";
+import {
+  cyberWowJuvenilEditorial,
+  cyberWowZapatillasEditorial,
+} from "@/constants/cloudinaryHomeImages";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import { slugifyCatalogValue, toPublicCategorySlug } from "@/utils/catalog";
 import { categoryLabel } from "@/utils/labels";

@@ -1,12 +1,14 @@
 ﻿import { buildCatalogHref, buildCyberCatalogHref } from "@/routes/catalogRouting";
-import trendNuevaTemporada from "@/assets/home/trends/trend-nueva-temporada-ai.webp";
-import trendPasosRadiantes from "@/assets/home/trends/trend-pasos-radiantes-ai.webp";
-import trendUrbanGlow from "@/assets/home/trends/trend-urban-glow-ai.webp";
-import trendSunsetChic from "@/assets/home/trends/trend-sunset-chic-ai.webp";
-import cyberHombreEditorial from "@/assets/home/cyber/cyber-hombre-editorial.webp";
-import cyberMujerEditorial from "@/assets/home/cyber/cyber-mujer-editorial.webp";
-import cyberInfantilEditorial from "@/assets/home/cyber/cyber-infantil-editorial.webp";
-import cyberZapatillasEditorial from "@/assets/home/cyber/cyber-zapatillas-editorial.webp";
+import {
+  trendNuevaTemporada,
+  trendPasosRadiantes,
+  trendUrbanGlow,
+  trendSunsetChic,
+  cyberHombreEditorial,
+  cyberMujerEditorial,
+  cyberInfantilEditorial,
+  cyberZapatillasEditorial,
+} from "@/constants/cloudinaryHomeImages";
 import type { MegaMenu } from "@/components/layout/headerMegaMenuTypes";
 
 export const WHATSAPP_CONTACT_URL =

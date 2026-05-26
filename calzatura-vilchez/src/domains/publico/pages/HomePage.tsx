@@ -16,20 +16,22 @@ import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import type { Product } from "@/types";
 import { countProductsForCategory, productMatchesAnySearch } from "@/utils/catalog";
 import { buildCatalogHref, buildCyberCatalogHref } from "@/routes/catalogRouting";
-import heroHombreBotin from "@/assets/home/hero-hombre-botin-ai.webp";
-import heroFormal from "@/assets/home/hero-formal-ai.webp";
-import cyberWowCampaign from "@/assets/home/cyber-wow-campaign-ai.webp";
-import cyberWowCampaignMobile from "@/assets/home/cyber-wow-campaign-mobile-ai.webp";
-import cyberEscolarVertical from "@/assets/home/cyber-escolar-vertical-ai.webp";
-import cyberZapatillasVertical from "@/assets/home/cyber-zapatillas-vertical-ai.webp";
-import heroMujer from "@/assets/home/hero-mujer-ai.webp";
-import heroNinos from "@/assets/home/hero-ninos-ai.webp";
-import heroOfertas from "@/assets/home/hero-ofertas-ai.webp";
-import heroZapatillas from "@/assets/home/hero-zapatillas-ai.webp";
-import categoryChildrenEditorial from "@/assets/home/categories/category-children-editorial.webp";
-import categoryMenEditorial from "@/assets/home/categories/category-men-editorial.webp";
-import categorySneakersEditorial from "@/assets/home/categories/category-sneakers-editorial.webp";
-import categoryWomenEditorial from "@/assets/home/categories/category-women-editorial.webp";
+import {
+  heroHombreBotin,
+  heroFormal,
+  cyberWowCampaign,
+  cyberWowCampaignMobile,
+  cyberEscolarVertical,
+  cyberZapatillasVertical,
+  heroMujer,
+  heroNinos,
+  heroOfertas,
+  heroZapatillas,
+  categoryChildrenEditorial,
+  categoryMenEditorial,
+  categorySneakersEditorial,
+  categoryWomenEditorial,
+} from "@/constants/cloudinaryHomeImages";
 
 type HomeCategoryCard = {
   label: string;
