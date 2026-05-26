@@ -303,22 +303,29 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
         <div id="home-hero-carousel-keyboard-help" className="home-hero-progress-sr-only">
           Usa las flechas izquierda y derecha para cambiar de promocion. Usa Inicio y Fin para ir a la primera o ultima promocion.
         </div>
-        {heroSlides.map((slide, index) => (
-          <article
-            key={slide.id}
-            className={`home-hero-slide is-${getHeroSlideState(index)}`}
-            data-slide-id={slide.id}
-            aria-hidden={index !== activeHeroIndex}
-          >
-            <img
-              src={slide.image}
-              alt={slide.alt}
-              loading={index === activeHeroIndex ? "eager" : "lazy"}
-              decoding="async"
-              fetchPriority={index === activeHeroIndex ? "high" : "low"}
-            />
-          </article>
-        ))}
+        {heroSlides.map((slide, index) => {
+          const slideState = getHeroSlideState(index);
+          const isActive = slideState === "active";
+          const shouldRenderImage = slideState !== "hidden";
+          return (
+            <article
+              key={slide.id}
+              className={`home-hero-slide is-${slideState}`}
+              data-slide-id={slide.id}
+              aria-hidden={!isActive}
+            >
+              {shouldRenderImage && (
+                <img
+                  src={slide.image}
+                  alt={slide.alt}
+                  loading={isActive ? "eager" : "lazy"}
+                  decoding="async"
+                  fetchPriority={isActive ? "high" : "low"}
+                />
+              )}
+            </article>
+          );
+        })}
         <div className="home-hero-progress-sr-only" aria-live="polite" aria-atomic="true">
           {`Promocion ${activeHeroIndex + 1} de ${heroSlides.length}: ${activeHero.title}`}
         </div>
