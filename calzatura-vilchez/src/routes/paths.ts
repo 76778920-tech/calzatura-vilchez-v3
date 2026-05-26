@@ -33,7 +33,12 @@ export const CLIENT_ROUTES = {
   favorites: "/favoritos",
 } as const;
 
-const _AP = import.meta.env.VITE_ADMIN_PATH ?? "/admin";
+function ensureLeadingSlash(raw: string): string {
+  const trimmed = raw.replace(/^\/+/, "");
+  return `/${trimmed}`;
+}
+
+const _AP = ensureLeadingSlash(import.meta.env.VITE_ADMIN_PATH ?? "/admin");
 
 export const ADMIN_ROUTES = {
   root: `${_AP}/*`,
@@ -47,7 +52,7 @@ export const ADMIN_ROUTES = {
   data: `${_AP}/datos`,
 } as const;
 
-const _SP = import.meta.env.VITE_STAFF_PATH ?? "/staff";
+const _SP = ensureLeadingSlash(import.meta.env.VITE_STAFF_PATH ?? "/staff");
 
 /** Panel operativo tienda (rol trabajador). */
 export const STAFF_ROUTES = {
