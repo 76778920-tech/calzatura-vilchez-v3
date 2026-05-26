@@ -884,6 +884,108 @@ exports.aiAdminProxy = onRequest(
   }
 );
 
+const CSP_RATE_WINDOW_MS = 10 * 60 * 1000;
+const CSP_RATE_MAX = 30;
+const cspRateByIp = new Map();
+
+function isCspRateLimited(ip) {
+  const now = Date.now();
+  let row = cspRateByIp.get(ip);
+  if (!row || now > row.resetAt) {
+    row = { count: 0, resetAt: now + CSP_RATE_WINDOW_MS };
+  }
+  if (row.count >= CSP_RATE_MAX) {
+    cspRateByIp.set(ip, row);
+    return true;
+  }
+  row.count += 1;
+  cspRateByIp.set(ip, row);
+  if (cspRateByIp.size > 5000) {
+    for (const [k, v] of cspRateByIp) {
+      if (now > v.resetAt) cspRateByIp.delete(k);
+    }
+  }
+  return false;
+}
+
+const CSP_MAX_BODY_BYTES = 8192;
+
+function resolveJsonBody(req) {
+  if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
+    return req.body;
+  }
+  const raw = req.rawBody ?? req.body;
+  if (!raw) return {};
+  const str = Buffer.isBuffer(raw) ? raw.toString("utf8") : String(raw);
+  if (!str.trim()) return {};
+  return JSON.parse(str);
+}
+
+function extractCspReports(parsed) {
+  if (parsed?.["csp-report"]) return [parsed["csp-report"]];
+  if (Array.isArray(parsed)) {
+    const entries = parsed
+      .filter((e) => e?.type === "csp-violation" && e?.body)
+      .map((e) => e.body);
+    return entries.length ? entries : [parsed[0] ?? {}];
+  }
+  return [parsed ?? {}];
+}
+
+function normalizeCspFields(r) {
+  return {
+    blockedUri: strOr(r?.["blocked-uri"] ?? r?.blockedURL),
+    violatedDirective: strOr(r?.["violated-directive"] ?? r?.effectiveDirective),
+    documentUri: strOr(r?.["document-uri"] ?? r?.documentURL),
+    originalPolicy: strOr(r?.["original-policy"] ?? r?.originalPolicy).slice(0, 300),
+    referrer: strOr(r?.referrer),
+    sourceFile: strOr(r?.["source-file"] ?? r?.sourceFile),
+    lineNumber: toN(r?.["line-number"] ?? r?.lineNumber) || undefined,
+    columnNumber: toN(r?.["column-number"] ?? r?.columnNumber) || undefined,
+    statusCode: toN(r?.["status-code"] ?? r?.statusCode) || undefined,
+    disposition: strOr(r?.disposition),
+    sample: strOr(r?.sample ?? r?.["script-sample"]).slice(0, 200),
+  };
+}
+
+exports.cspReport = onRequest(
+  { invoker: "public", memory: "128MiB", timeoutSeconds: 10 },
+  async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+
+    if (req.method === "OPTIONS") return res.status(204).send("");
+    if (req.method !== "POST") return res.status(405).send("");
+
+    const ip = getClientIp(req);
+    if (isCspRateLimited(ip)) return res.status(429).send("");
+
+    const rawLen = Number(req.headers["content-length"]) || 0;
+    if (rawLen > CSP_MAX_BODY_BYTES) return res.status(413).send("");
+
+    try {
+      const parsed = resolveJsonBody(req);
+      const reports = extractCspReports(parsed);
+      const meta = {
+        ip,
+        ua: strOr(req.headers["user-agent"]).slice(0, 200),
+        ts: new Date().toISOString(),
+      };
+
+      for (const raw of reports) {
+        const fields = normalizeCspFields(raw);
+        if (!fields.blockedUri && !fields.violatedDirective) continue;
+        console.warn("[CSP-VIOLATION]", JSON.stringify({ ...fields, ...meta }));
+      }
+    } catch (e) {
+      console.error("[CSP-REPORT] parse error:", e?.message);
+    }
+
+    return res.status(204).send("");
+  }
+);
+
 /**
  * BFF de login: el navegador no llama a identitytoolkit; solo a esta función.
  * Respuesta siempre 200 + JSON genérico (ok) para no exponer códigos de Google en el cliente.
