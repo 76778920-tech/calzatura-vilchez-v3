@@ -16,7 +16,7 @@ import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 
 let prefetchedProducts: Promise<Product[]> | null = null;
 function getPrefetchedProducts() {
-  if (!prefetchedProducts) prefetchedProducts = fetchPublicProducts();
+  prefetchedProducts ??= fetchPublicProducts();
   return prefetchedProducts;
 }
 getPrefetchedProducts();
