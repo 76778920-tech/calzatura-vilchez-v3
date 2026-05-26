@@ -12,8 +12,8 @@ import { AlertTriangle, ChevronRight, X } from "lucide-react";
 import { fetchProductFamilyGroupCounts, fetchPublicProducts } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import ProductCard from "@/domains/productos/components/ProductCard";
-import cyberWowJuvenilEditorial from "@/assets/home/cyber/cyber-wow-juvenil-editorial.png";
-import cyberWowZapatillasEditorial from "@/assets/home/cyber/cyber-wow-zapatillas-editorial.png";
+import cyberWowJuvenilEditorial from "@/assets/home/cyber/cyber-wow-juvenil-editorial.webp";
+import cyberWowZapatillasEditorial from "@/assets/home/cyber/cyber-wow-zapatillas-editorial.webp";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import { slugifyCatalogValue, toPublicCategorySlug } from "@/utils/catalog";
 import { categoryLabel } from "@/utils/labels";
@@ -55,6 +55,7 @@ import {
 import { usePopoverDockEffect } from "@/hooks/usePopoverDockEffect";
 
 const CATALOG_CAMPAIGN_ROTATION_MS = 9000;
+const CATALOG_PAGE_SIZE = 24;
 const PRODUCTS_GRID_SKELETON_KEYS = [
   "product-skeleton-1",
   "product-skeleton-2",
@@ -447,6 +448,19 @@ export default function ProductsPage() {
     [color, descuento, material, precio, routeFiltered, talla]
   );
 
+  const [catalogPage, setCatalogPage] = useState(1);
+  const filterParamsKey = effectiveParams.toString();
+
+  useEffect(() => {
+    setCatalogPage(1);
+  }, [filterParamsKey]);
+
+  const totalCatalogPages = Math.ceil(filtered.length / CATALOG_PAGE_SIZE);
+  const pagedProducts = useMemo(
+    () => filtered.slice((catalogPage - 1) * CATALOG_PAGE_SIZE, catalogPage * CATALOG_PAGE_SIZE),
+    [filtered, catalogPage]
+  );
+
   const pageTitle = useMemo(
     () =>
       resolveProductsPageTitle({
@@ -783,15 +797,65 @@ export default function ProductsPage() {
     );
   } else if (hasAnyProducts) {
     productsMainContent = (
-      <div className="products-grid">
-        {filtered.map((product) => (
-          <ProductCard
-            key={product.id}
-            product={product}
-            familyGroupSize={familyGroupCounts[effectiveFamiliaKey(product)] ?? 1}
-          />
-        ))}
-      </div>
+      <>
+        <div className="products-grid">
+          {pagedProducts.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              familyGroupSize={familyGroupCounts[effectiveFamiliaKey(product)] ?? 1}
+            />
+          ))}
+        </div>
+        {totalCatalogPages > 1 && (
+          <nav className="catalog-pagination" aria-label="Paginación del catálogo">
+            <button
+              type="button"
+              className="catalog-pag-btn"
+              onClick={() => { setCatalogPage((p) => Math.max(1, p - 1)); globalThis.scrollTo({ top: 0, behavior: "smooth" }); }}
+              disabled={catalogPage === 1}
+              aria-label="Página anterior"
+            >
+              ‹
+            </button>
+            {Array.from({ length: totalCatalogPages }, (_, i) => i + 1)
+              .filter((n) => n === 1 || n === totalCatalogPages || Math.abs(n - catalogPage) <= 2)
+              .reduce<Array<number | { gap: string }>>((acc, n, idx, arr) => {
+                if (idx > 0 && n - arr[idx - 1] > 1) acc.push({ gap: `${arr[idx - 1]}-${n}` });
+                acc.push(n);
+                return acc;
+              }, [])
+              .map((item) =>
+                typeof item === "object" ? (
+                  <span key={`gap-${item.gap}`} className="catalog-pag-ellipsis">…</span>
+                ) : (
+                  <button
+                    key={item}
+                    type="button"
+                    className={`catalog-pag-btn${catalogPage === item ? " is-active" : ""}`}
+                    onClick={() => { setCatalogPage(item); globalThis.scrollTo({ top: 0, behavior: "smooth" }); }}
+                    aria-label={`Página ${item}`}
+                    aria-current={catalogPage === item ? "page" : undefined}
+                  >
+                    {item}
+                  </button>
+                )
+              )}
+            <button
+              type="button"
+              className="catalog-pag-btn"
+              onClick={() => { setCatalogPage((p) => Math.min(totalCatalogPages, p + 1)); globalThis.scrollTo({ top: 0, behavior: "smooth" }); }}
+              disabled={catalogPage === totalCatalogPages}
+              aria-label="Página siguiente"
+            >
+              ›
+            </button>
+            <span className="catalog-pag-info">
+              {(catalogPage - 1) * CATALOG_PAGE_SIZE + 1}–{Math.min(catalogPage * CATALOG_PAGE_SIZE, filtered.length)} de {filtered.length}
+            </span>
+          </nav>
+        )}
+      </>
     );
   } else {
     const emptyMessage = trimmedQuery
