@@ -2,6 +2,8 @@ import type { UserRole } from "@/types";
 import { isAdminRole } from "../security/accessControl";
 import { ADMIN_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "./paths";
 
+export type LoginAreaHint = "admin" | "client";
+
 function hasAsciiControlChars(path: string): boolean {
   for (let i = 0; i < path.length; i++) {
     const c = path.codePointAt(i) ?? 0;
@@ -25,6 +27,19 @@ export function isAdminPath(path: string) {
 
 export function isStaffPath(path: string) {
   return path === STAFF_ROUTES.home || path.startsWith(`${STAFF_ROUTES.home}/`);
+}
+
+/** Ruta de login según destino (panel admin vs tienda). */
+export function getLoginUrl(options?: {
+  redirect?: string | null;
+  area?: LoginAreaHint;
+}): string {
+  const redirect = options?.redirect ?? null;
+  const safeRedirect = isSafeInternalRedirect(redirect) ? redirect : null;
+  const qs = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
+  const useAdminLogin =
+    options?.area === "admin" || (safeRedirect != null && isAdminPath(safeRedirect));
+  return useAdminLogin ? `${ADMIN_ROUTES.login}${qs}` : `${PUBLIC_ROUTES.login}${qs}`;
 }
 
 export function getPostLoginRedirect({

@@ -12,8 +12,16 @@ import { normalizeEmailInput, validateEmailFormat } from "@/utils/emailValidatio
 import { clearPendingVerificationEmail, savePendingVerificationEmail } from "@/utils/pendingVerification";
 import type { UserRole } from "@/types";
 
-export default function Login() {
-  useDocumentTitle("Iniciar sesión");
+const NO_BROWSER_AUTOCOMPLETE = "off" as const;
+
+type LoginProps = Readonly<{
+  /** `admin`: sin autocompletado (equipos compartidos en tienda). `client`: comportamiento estándar. */
+  variant?: "client" | "admin";
+}>;
+
+export default function Login({ variant = "client" }: LoginProps) {
+  const isAdminLogin = variant === "admin";
+  useDocumentTitle(isAdminLogin ? "Acceso administrativo" : "Iniciar sesión");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
@@ -104,10 +112,17 @@ export default function Login() {
             <circle cx="20" cy="20" r="5.5" fill="#2d1505" />
           </svg>
         </div>
-        <h1 className="auth-title">Iniciar Sesión</h1>
-        <p className="auth-subtitle">Bienvenido de vuelta</p>
+        <h1 className="auth-title">{isAdminLogin ? "Panel administrativo" : "Iniciar Sesión"}</h1>
+        <p className="auth-subtitle">
+          {isAdminLogin ? "Acceso solo para personal autorizado" : "Bienvenido de vuelta"}
+        </p>
 
-        <form onSubmit={handleLogin} className="auth-form">
+        <form
+          onSubmit={handleLogin}
+          className="auth-form"
+          autoComplete={isAdminLogin ? NO_BROWSER_AUTOCOMPLETE : undefined}
+          data-form-type={isAdminLogin ? "other" : undefined}
+        >
           <div className="input-group">
             <label htmlFor="login-email">Correo electrónico</label>
             <div className="input-wrapper">
@@ -117,7 +132,7 @@ export default function Login() {
                 name="email"
                 type="email"
                 inputMode="email"
-                autoComplete="email"
+                autoComplete={isAdminLogin ? NO_BROWSER_AUTOCOMPLETE : "email"}
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setFieldErrors((prev) => ({ ...prev, email: undefined })); }}
                 required
@@ -139,7 +154,7 @@ export default function Login() {
                 id="login-password"
                 name="password"
                 type={showPass ? "text" : "password"}
-                autoComplete="current-password"
+                autoComplete={isAdminLogin ? NO_BROWSER_AUTOCOMPLETE : "current-password"}
                 value={password}
                 onChange={(e) => { setPassword(e.target.value); setFieldErrors((prev) => ({ ...prev, password: undefined })); }}
                 required
@@ -177,8 +192,17 @@ export default function Login() {
         </form>
 
         <p className="auth-footer">
-          ¿No tienes cuenta?{" "}
-          <Link to="/registro" className="auth-link">Regístrate aquí</Link>
+          {isAdminLogin ? (
+            <>
+              ¿Eres cliente?{" "}
+              <Link to={PUBLIC_ROUTES.login} className="auth-link">Inicia sesión en la tienda</Link>
+            </>
+          ) : (
+            <>
+              ¿No tienes cuenta?{" "}
+              <Link to={PUBLIC_ROUTES.register} className="auth-link">Regístrate aquí</Link>
+            </>
+          )}
         </p>
       </div>
     </main>

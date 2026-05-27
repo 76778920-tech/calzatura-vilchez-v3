@@ -144,6 +144,7 @@ export default function App() {
       />
       <Suspense fallback={<PageLoader />}>
         <Routes>
+          <Route path={ADMIN_ROUTES.login} element={<Login variant="admin" />} />
           <Route
             path={STAFF_ROUTES.root}
             element={<AreaRoute area="trabajadores"><StaffLayout /></AreaRoute>}

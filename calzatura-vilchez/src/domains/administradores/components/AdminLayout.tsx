@@ -4,6 +4,7 @@ import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-route
 import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain, FileSpreadsheet, ChevronLeft, ChevronRight, ShieldCheck, BookOpen } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { ADMIN_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
+import { getLoginUrl } from "@/routes/redirects";
 import { logoutUser } from "@/domains/usuarios/services/auth";
 import { useThemeMode } from "@/hooks/useThemeMode";
 import { maskEmailForDisplay } from "@/utils/maskEmail";
@@ -46,7 +47,9 @@ export default function AdminLayout() {
     );
   }
 
-  if (!user) return <Navigate to={`/login?redirect=${location.pathname}`} replace />;
+  if (!user) {
+    return <Navigate to={getLoginUrl({ redirect: location.pathname, area: "admin" })} replace />;
+  }
   if (!isAdmin) return <Navigate to={PUBLIC_ROUTES.home} replace />;
 
   const pageTitles: Record<string, string> = {

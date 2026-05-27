@@ -4,6 +4,7 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import type { AccessArea } from "../security/accessControl";
 import { canAccessArea } from "../security/accessControl";
 import { PUBLIC_ROUTES } from "./paths";
+import { getLoginUrl } from "./redirects";
 
 function PageLoader() {
   return (
@@ -52,7 +53,8 @@ export function AreaRoute({
 
   const allowed = canAccessArea(area, userProfile?.rol, user?.email);
   if (!allowed && !user) {
-    return <Navigate to={`/login?redirect=${location.pathname}`} replace />;
+    const loginArea = area === "administradores" ? ("admin" as const) : undefined;
+    return <Navigate to={getLoginUrl({ redirect: location.pathname, area: loginArea })} replace />;
   }
   if (!allowed) {
     return <Navigate to="/" replace />;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isSafeInternalRedirect, getPostLoginRedirect } from "@/routes/redirects";
+import { getLoginUrl, isSafeInternalRedirect, getPostLoginRedirect } from "@/routes/redirects";
 
 describe("isSafeInternalRedirect (post-login redirect)", () => {
   it("rechaza URLs absolutas y protocol-relative", () => {
@@ -24,6 +24,22 @@ describe("isSafeInternalRedirect (post-login redirect)", () => {
     expect(isSafeInternalRedirect("/perfil")).toBe(true);
     expect(isSafeInternalRedirect("/admin/pedidos")).toBe(true);
     expect(isSafeInternalRedirect("/producto/abc-123")).toBe(true);
+  });
+});
+
+describe("getLoginUrl", () => {
+  it("usa login de tienda para clientes", () => {
+    expect(getLoginUrl({ redirect: "/perfil" })).toBe("/login?redirect=%2Fperfil");
+  });
+
+  it("usa login admin cuando el destino es el panel", () => {
+    expect(getLoginUrl({ redirect: "/admin/pedidos" })).toBe(
+      "/admin/login?redirect=%2Fadmin%2Fpedidos",
+    );
+  });
+
+  it("fuerza login admin con area admin aunque no haya redirect", () => {
+    expect(getLoginUrl({ area: "admin" })).toBe("/admin/login");
   });
 });
 

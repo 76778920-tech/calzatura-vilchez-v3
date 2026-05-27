@@ -43,6 +43,7 @@ const _AP = ensureLeadingSlash(import.meta.env.VITE_ADMIN_PATH ?? "/admin");
 
 export const ADMIN_ROUTES = {
   root: `${_AP}/*`,
+  login: `${_AP}/login`,
   dashboard: _AP,
   products: `${_AP}/productos`,
   orders: `${_AP}/pedidos`,
