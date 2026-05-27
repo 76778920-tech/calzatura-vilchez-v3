@@ -29,17 +29,29 @@ const ESTADO_COLOR: Record<ComplaintEstado, string> = {
 
 const SKELETON_KEYS = ["c1", "c2", "c3", "c4"] as const;
 
-function renderComplaintsMain(
-  loading: boolean,
-  complaints: ComplaintRecord[],
-  expanded: string | null,
-  setExpanded: (codigo: string | null) => void,
-  savingCodigo: string | null,
-  notasDraft: Record<string, string>,
-  setNotasDraft: React.Dispatch<React.SetStateAction<Record<string, string>>>,
-  handleEstadoChange: (codigo: string, estado: ComplaintEstado) => Promise<void>,
-  handleSaveNotas: (codigo: string) => Promise<void>,
-): ReactNode {
+type ComplaintsMainViewParams = Readonly<{
+  loading: boolean;
+  complaints: ComplaintRecord[];
+  expanded: string | null;
+  setExpanded: (codigo: string | null) => void;
+  savingCodigo: string | null;
+  notasDraft: Record<string, string>;
+  setNotasDraft: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  onEstadoChange: (codigo: string, estado: ComplaintEstado) => Promise<void>;
+  onSaveNotas: (codigo: string) => Promise<void>;
+}>;
+
+function renderComplaintsMain({
+  loading,
+  complaints,
+  expanded,
+  setExpanded,
+  savingCodigo,
+  notasDraft,
+  setNotasDraft,
+  onEstadoChange,
+  onSaveNotas,
+}: ComplaintsMainViewParams): ReactNode {
   if (loading) {
     return (
       <div className="admin-skeleton-list">
@@ -108,7 +120,7 @@ function renderComplaintsMain(
                       value={estado}
                       disabled={savingCodigo === row.codigo}
                       onChange={(e) =>
-                        handleEstadoChange(row.codigo, e.target.value as ComplaintEstado)
+                        onEstadoChange(row.codigo, e.target.value as ComplaintEstado)
                       }
                     >
                       {ESTADOS.map((e) => (
@@ -134,7 +146,7 @@ function renderComplaintsMain(
                     type="button"
                     className="btn-ghost"
                     disabled={savingCodigo === row.codigo}
-                    onClick={() => handleSaveNotas(row.codigo)}
+                    onClick={() => onSaveNotas(row.codigo)}
                   >
                     Guardar notas
                   </button>
@@ -259,7 +271,7 @@ export default function AdminComplaints() {
         </div>
       ) : null}
 
-      {renderComplaintsMain(
+      {renderComplaintsMain({
         loading,
         complaints,
         expanded,
@@ -267,9 +279,9 @@ export default function AdminComplaints() {
         savingCodigo,
         notasDraft,
         setNotasDraft,
-        handleEstadoChange,
-        handleSaveNotas,
-      )}
+        onEstadoChange: handleEstadoChange,
+        onSaveNotas: handleSaveNotas,
+      })}
     </div>
   );
 }
