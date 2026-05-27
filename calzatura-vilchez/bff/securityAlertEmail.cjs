@@ -1,9 +1,6 @@
 "use strict";
 
-const { parseEmailList, loadComplaintNotifyRecipients } = require("./complaintNotifyEmail.cjs");
-
-const ALERT_THROTTLE_MS = 60 * 60 * 1000;
-const alertSentAt = new Map();
+const { parseEmailList } = require("./complaintNotifyEmail.cjs");
 
 function trimStr(v) {
   return typeof v === "string" ? v.trim() : "";
@@ -21,15 +18,19 @@ function loadSecurityAlertRecipients() {
   if (process.env.SECURITY_ALERT_ENABLED === "false") return [];
   const dedicated = parseEmailList(process.env.SECURITY_ALERT_EMAIL);
   if (dedicated.length > 0) return dedicated;
-  return loadComplaintNotifyRecipients();
+  const complaint = parseEmailList(process.env.COMPLAINT_NOTIFY_EMAIL);
+  if (complaint.length > 0) return complaint;
+  if (process.env.COMPLAINT_NOTIFY_USE_SUPERADMIN === "true") {
+    return parseEmailList(process.env.SUPERADMIN_EMAILS);
+  }
+  return [];
 }
 
-function shouldThrottleAlert(throttleKey) {
-  const now = Date.now();
-  const last = alertSentAt.get(throttleKey);
-  if (last != null && now - last < ALERT_THROTTLE_MS) return true;
-  alertSentAt.set(throttleKey, now);
-  return false;
+function resolveSecurityEmailFrom() {
+  return (
+    trimStr(process.env.SECURITY_EMAIL_FROM)
+    || trimStr(process.env.COMPLAINT_EMAIL_FROM)
+  );
 }
 
 function buildSecurityAlertText({ event, ipHash, details }) {
@@ -55,18 +56,15 @@ function buildSecurityAlertText({ event, ipHash, details }) {
 async function sendSecurityAlertEmail({ event, ipHash, details }, logServerError) {
   const recipients = loadSecurityAlertRecipients();
   if (!recipients.length) {
+    logServerError("securityAlertEmail: sin destinatarios (SECURITY_ALERT_EMAIL / COMPLAINT_NOTIFY_EMAIL)");
     return { skipped: true, reason: "no_recipients" };
   }
 
   const apiKey = trimStr(process.env.RESEND_API_KEY);
-  const from = trimStr(process.env.COMPLAINT_EMAIL_FROM);
+  const from = resolveSecurityEmailFrom();
   if (!apiKey || !from) {
+    logServerError("securityAlertEmail: falta RESEND_API_KEY o remitente (SECURITY_EMAIL_FROM)");
     return { skipped: true, reason: "missing_provider_config" };
-  }
-
-  const throttleKey = `${event}:${ipHash || "unknown"}`;
-  if (shouldThrottleAlert(throttleKey)) {
-    return { skipped: true, reason: "throttled" };
   }
 
   const safeEvent = String(event).replace(/[^\w\s-]/g, "").slice(0, 60).trim() || "evento";
@@ -101,6 +99,7 @@ async function sendSecurityAlertEmail({ event, ipHash, details }, logServerError
 
 module.exports = {
   loadSecurityAlertRecipients,
+  resolveSecurityEmailFrom,
   buildSecurityAlertText,
   sendSecurityAlertEmail,
 };

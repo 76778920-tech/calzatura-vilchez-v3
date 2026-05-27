@@ -202,13 +202,16 @@ async function loginThroughAuthProxy(proxyUrl: string, email: string, password: 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  let json: { ok?: boolean; customToken?: string };
+  let json: { ok?: boolean; customToken?: string; code?: string };
   try {
-    json = (await res.json()) as { ok?: boolean; customToken?: string };
+    json = (await res.json()) as { ok?: boolean; customToken?: string; code?: string };
   } catch {
     throw new Error("AUTH_FAILED");
   }
   if (!json.ok || typeof json.customToken !== "string" || json.customToken.length === 0) {
+    if (json.code === "RATE_LIMITED") {
+      throw new Error("LOGIN_RATE_LIMITED");
+    }
     throw new Error("AUTH_FAILED");
   }
   const cred = await signInWithCustomToken(auth, json.customToken);

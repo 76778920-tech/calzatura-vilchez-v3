@@ -1,56 +1,14 @@
 "use strict";
 
 const crypto = require("crypto");
+const { getClientIp, hashIp } = require("./clientIp.cjs");
 const { sendComplaintNotifyEmail } = require("./complaintNotifyEmail.cjs");
-const { sendSecurityAlertEmail } = require("./securityAlertEmail.cjs");
+const { onValidationFailure, SURFACES } = require("./securityMonitor.cjs");
+const { enforceRateLimit } = require("./publicRateLimit.cjs");
 const { isValidPeruPhone, peruPhoneError } = require("./peruPhone.cjs");
 const { emailValidationError, normalizeEmailInput } = require("./emailValidation.cjs");
 
-const COMPLAINT_RATE_WINDOW_MS = 60 * 60 * 1000;
-const COMPLAINT_RATE_MAX = 8;
-const COMPLAINT_VALIDATION_ABUSE_WINDOW_MS = 60 * 60 * 1000;
-const COMPLAINT_VALIDATION_ABUSE_MAX = 5;
-const complaintIpBuckets = new Map();
-const complaintValidationAbuseBuckets = new Map();
-
 const ESTADOS = ["recibido", "en_tramite", "respondido", "cerrado"];
-
-function getClientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.trim()) {
-    return forwarded.split(",")[0].trim();
-  }
-  return req.socket?.remoteAddress || "unknown";
-}
-
-function hashIp(ip) {
-  return crypto.createHash("sha256").update(String(ip)).digest("hex").slice(0, 24);
-}
-
-function isComplaintRateLimited(ip) {
-  const key = `lr:${ip}`;
-  const now = Date.now();
-  const bucket = complaintIpBuckets.get(key);
-  if (!bucket || now - bucket.windowStart >= COMPLAINT_RATE_WINDOW_MS) {
-    complaintIpBuckets.set(key, { windowStart: now, count: 1 });
-    return false;
-  }
-  bucket.count += 1;
-  return bucket.count > COMPLAINT_RATE_MAX;
-}
-
-function recordComplaintValidationAbuse(ip) {
-  const key = hashIp(ip);
-  const now = Date.now();
-  let bucket = complaintValidationAbuseBuckets.get(key);
-  if (!bucket || now - bucket.windowStart >= COMPLAINT_VALIDATION_ABUSE_WINDOW_MS) {
-    bucket = { windowStart: now, count: 1 };
-  } else {
-    bucket.count += 1;
-  }
-  complaintValidationAbuseBuckets.set(key, bucket);
-  return { count: bucket.count, ipHash: key };
-}
 
 function generateComplaintCode(date = new Date()) {
   const ymd = date.toISOString().slice(0, 10).replaceAll("-", "");
@@ -160,19 +118,8 @@ function registerLibroReclamacionesRoutes(app, deps) {
       try {
         const ip = getClientIp(req);
         const ipHash = hashIp(ip);
-        if (isComplaintRateLimited(ip)) {
-          void sendSecurityAlertEmail(
-            {
-              event: "Libro reclamaciones: rate limit",
-              ipHash,
-              details: [
-                "Una IP superó el límite de envíos al formulario virtual (posible spam o prueba automatizada).",
-                `Límite: ${COMPLAINT_RATE_MAX} solicitudes por hora.`,
-                "Acción: revisar logs del BFF en Render si persiste.",
-              ],
-            },
-            logServerError,
-          ).catch(() => {});
+        const { limited } = await enforceRateLimit(req, SURFACES.LIBRO_RECLAMACIONES, logServerError);
+        if (limited) {
           return res.status(429).json({ error: "Demasiados envíos. Intenta más tarde." });
         }
 
@@ -228,22 +175,14 @@ function registerLibroReclamacionesRoutes(app, deps) {
         });
       } catch (error) {
         if (error?.fields) {
-          const ip = getClientIp(req);
-          const abuse = recordComplaintValidationAbuse(ip);
-          if (abuse.count >= COMPLAINT_VALIDATION_ABUSE_MAX) {
-            void sendSecurityAlertEmail(
-              {
-                event: "Libro reclamaciones: intentos inválidos",
-                ipHash: abuse.ipHash,
-                details: [
-                  "Varios envíos con datos inválidos desde la misma referencia IP (posible bot o ataque al formulario).",
-                  `Intentos inválidos en la última hora: ${abuse.count}.`,
-                  `Campos rechazados (último intento): ${Object.keys(error.fields).join(", ")}.`,
-                ],
-              },
-              logServerError,
-            ).catch(() => {});
-          }
+          void onValidationFailure(
+            {
+              surface: SURFACES.LIBRO_RECLAMACIONES,
+              ip: getClientIp(req),
+              fields: error.fields,
+            },
+            logServerError,
+          );
           return res.status(400).json({ error: publicError(error), fields: error.fields });
         }
         logServerError("libro-reclamaciones POST:", error);

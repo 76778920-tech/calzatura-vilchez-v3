@@ -39,6 +39,14 @@ Despliegue ejemplo (Render.com):
      Opcional: VITE_AUTH_PROXY_LOGIN_URL si el login BFF vive en otra URL.
      Desactivar proxy de login con VITE_AUTH_PROXY_LOGIN_URL=0
 
+Seguridad (Resend + Upstash, solo servidor):
+  Rate limits y contadores de abuso compartidos entre réplicas si defines
+  UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN.
+  Superficies: libro-reclamaciones, authLogin, lookup-dni, check-email, ors/*, delivery/*.
+  Arranque: auditoría de config; GET /health/security para diagnóstico.
+  Variables: env.example (SECURITY_*, UPSTASH_*, rate limits).
+  Redeploy del BFF en Render tras cambios (no basta Firebase Hosting).
+
 Nota Firebase Admin (Render suele truncar JSON largo en variables):
   - Preferido: Secret File en Render + FIREBASE_SERVICE_ACCOUNT_FILE=/etc/secrets/<nombre>.json
   - Alternativa: FIREBASE_SERVICE_ACCOUNT_JSON_BASE64 (ver env.example)

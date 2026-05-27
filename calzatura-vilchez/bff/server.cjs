@@ -149,6 +149,23 @@ const {
   idempotencyOrderJson,
 } = require("../functions/fnUtils");
 const { handleLookupDni, verifyDniLookupProof } = require("./lookupDni.cjs");
+const { getClientIp } = require("./clientIp.cjs");
+const {
+  onValidationFailure,
+  onBruteForceAttempt,
+  SURFACES,
+} = require("./securityMonitor.cjs");
+
+function trackDeliveryInputAbuse(req, surface, fields) {
+  void onValidationFailure(
+    { surface, ip: getClientIp(req), fields },
+    logServerError,
+  );
+}
+const { enforceRateLimit } = require("./publicRateLimit.cjs");
+const { auditSecurityMonitoringConfig } = require("./securityConfig.cjs");
+const { getStoreStatus } = require("./securityStore.cjs");
+const { emailValidationError } = require("./emailValidation.cjs");
 const { redactOrderForStaff, maskEmail } = require("./privacy.cjs");
 const { buildCloudinaryUploadSignature } = require("./cloudinarySign.cjs");
 
@@ -199,6 +216,14 @@ function loadFirebaseServiceAccount() {
 
 const serviceAccount = loadFirebaseServiceAccount();
 validateProductionRuntimeConfig(serviceAccount);
+
+let securityMonitoringAudit;
+try {
+  securityMonitoringAudit = auditSecurityMonitoringConfig(console);
+} catch (securityConfigError) {
+  console.error(securityConfigError?.message || securityConfigError);
+  process.exit(1);
+}
 if (serviceAccount) {
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 } else {
@@ -767,56 +792,15 @@ async function supabaseRows(queryPromise, label, fallback = []) {
   throw result.error;
 }
 
-const LOGIN_RATE_WINDOW_MS = 30 * 60 * 1000; // ventana: 30 minutos
-const LOGIN_RATE_MAX = 15; // máximo de POST /authLogin por IP en esa ventana (antes de cortar sin llamar a Google)
-const loginRateByIp = new Map();
+const AUTH_LOGIN_CODE = {
+  RATE_LIMITED: "RATE_LIMITED",
+  INVALID_INPUT: "INVALID_INPUT",
+  INVALID_CREDENTIALS: "INVALID_CREDENTIALS",
+  SERVER_ERROR: "SERVER_ERROR",
+};
 
-function getClientIp(req) {
-  const xf = req.headers["x-forwarded-for"];
-  if (typeof xf === "string" && xf.trim()) {
-    return xf.split(",")[0].trim();
-  }
-  return req.ip || "unknown";
-}
-
-function isLoginRateLimited(ip) {
-  const now = Date.now();
-  let row = loginRateByIp.get(ip);
-  if (!row || now > row.resetAt) {
-    row = { count: 0, resetAt: now + LOGIN_RATE_WINDOW_MS };
-  }
-  if (row.count >= LOGIN_RATE_MAX) {
-    loginRateByIp.set(ip, row);
-    return true;
-  }
-  row.count += 1;
-  loginRateByIp.set(ip, row);
-  if (loginRateByIp.size > 5000) {
-    for (const [k, v] of loginRateByIp) {
-      if (now > v.resetAt) loginRateByIp.delete(k);
-    }
-  }
-  return false;
-}
-
-function isOrsRateLimited(ip) {
-  const now = Date.now();
-  let row = orsRateByIp.get(ip);
-  if (!row || now > row.resetAt) {
-    row = { count: 0, resetAt: now + ORS_RATE_WINDOW_MS };
-  }
-  if (row.count >= ORS_RATE_MAX) {
-    orsRateByIp.set(ip, row);
-    return true;
-  }
-  row.count += 1;
-  orsRateByIp.set(ip, row);
-  if (orsRateByIp.size > 5000) {
-    for (const [k, v] of orsRateByIp) {
-      if (now > v.resetAt) orsRateByIp.delete(k);
-    }
-  }
-  return false;
+function authLoginFailure(res, code) {
+  return res.status(200).json({ ok: false, code });
 }
 
 const LOGIN_EMAIL_RE =
@@ -1489,9 +1473,44 @@ app.get("/", (_req, res) =>
 
 app.get("/health", (_req, res) => res.status(200).type("text/plain").send("ok"));
 
+app.get("/health/security", (req, res) => {
+  const token = process.env.HEALTH_SECURITY_TOKEN?.trim();
+  if (token) {
+    const provided = req.headers["x-health-token"];
+    if (provided !== token) {
+      return res.status(404).end();
+    }
+  } else if (isProductionRuntime()) {
+    return res.status(404).end();
+  }
+  res.status(200).json({
+    monitoring: {
+      enabled: securityMonitoringAudit.enabled,
+      ready: securityMonitoringAudit.ready,
+      distributed: securityMonitoringAudit.distributed,
+      issueCount: securityMonitoringAudit.issues.length,
+      warningCount: securityMonitoringAudit.warnings.length,
+    },
+    store: getStoreStatus(),
+  });
+});
+
 app.get("/check-email", cors, async (req, res) => {
+  const ip = getClientIp(req);
+  const { limited } = await enforceRateLimit(req, SURFACES.CHECK_EMAIL, logServerError);
+  if (limited) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Intenta más tarde." });
+  }
+
   const email = String(req.query.email || "").trim();
-  if (!email) return res.status(400).json({ error: "email requerido" });
+  const emailErr = emailValidationError(email);
+  if (emailErr) {
+    void onValidationFailure(
+      { surface: SURFACES.CHECK_EMAIL, ip, fields: { email: emailErr } },
+      logServerError,
+    );
+    return res.status(400).json({ error: emailErr });
+  }
   try {
     const upstream = await fetch(
       `https://www.disify.com/api/email/${encodeURIComponent(email)}`,
@@ -1510,6 +1529,7 @@ app.post("/lookup-dni", (req, res) => {
     requireAppCheck: requireDniAppCheck(),
     requireProofSecret: requireDniProofSecret(),
     verifyAppCheckToken: verifyFirebaseAppCheckToken,
+    logServerError,
   }));
 });
 
@@ -1525,6 +1545,10 @@ function getOrsApiKey() {
 }
 
 app.get("/delivery/geocode", cors, async (req, res) => {
+  const { limited } = await enforceRateLimit(req, SURFACES.DELIVERY_GEOCODE, logServerError);
+  if (limited) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Intenta más tarde." });
+  }
   try {
     const q = String(req.query.q || req.query.text || "").trim();
     const limit = Math.min(Math.max(Number(req.query.limit) || 15, 1), 20);
@@ -1540,10 +1564,15 @@ app.get("/delivery/geocode", cors, async (req, res) => {
 });
 
 app.get("/delivery/reverse", cors, async (req, res) => {
+  const { limited } = await enforceRateLimit(req, SURFACES.DELIVERY_REVERSE, logServerError);
+  if (limited) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Intenta más tarde." });
+  }
   try {
     const lat = Number(req.query.lat);
     const lng = Number(req.query.lon ?? req.query.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      trackDeliveryInputAbuse(req, SURFACES.DELIVERY_REVERSE, { lat: "invalid", lng: "invalid" });
       return res.status(400).json({ error: "lat/lon requeridos" });
     }
     const label = await deliveryProviders.nominatimReverse(lat, lng);
@@ -1555,12 +1584,17 @@ app.get("/delivery/reverse", cors, async (req, res) => {
 });
 
 app.get("/delivery/route", cors, async (req, res) => {
+  const { limited } = await enforceRateLimit(req, SURFACES.DELIVERY_ROUTE, logServerError);
+  if (limited) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Intenta más tarde." });
+  }
   try {
     const storeLat = Number(req.query.storeLat);
     const storeLng = Number(req.query.storeLng);
     const destLat = Number(req.query.destLat);
     const destLng = Number(req.query.destLng);
     if (![storeLat, storeLng, destLat, destLng].every(Number.isFinite)) {
+      trackDeliveryInputAbuse(req, SURFACES.DELIVERY_ROUTE, { coordinates: "invalid" });
       return res.status(400).json({ error: "coordenadas invalidas" });
     }
     const route = await deliveryProviders.drivingRoute(storeLng, storeLat, destLng, destLat);
@@ -1572,12 +1606,17 @@ app.get("/delivery/route", cors, async (req, res) => {
 });
 
 app.get("/delivery/distance", cors, async (req, res) => {
+  const { limited } = await enforceRateLimit(req, SURFACES.DELIVERY_DISTANCE, logServerError);
+  if (limited) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Intenta más tarde." });
+  }
   try {
     const storeLat = Number(req.query.storeLat);
     const storeLng = Number(req.query.storeLng);
     const destLat = Number(req.query.destLat);
     const destLng = Number(req.query.destLng);
     if (![storeLat, storeLng, destLat, destLng].every(Number.isFinite)) {
+      trackDeliveryInputAbuse(req, SURFACES.DELIVERY_DISTANCE, { coordinates: "invalid" });
       return res.status(400).json({ error: "coordenadas invalidas" });
     }
     const distanceKm = await deliveryProviders.drivingDistanceKm(
@@ -1597,10 +1636,15 @@ app.get("/delivery/distance", cors, async (req, res) => {
 });
 
 app.get("/delivery/quote", cors, async (req, res) => {
+  const { limited } = await enforceRateLimit(req, SURFACES.DELIVERY_QUOTE, logServerError);
+  if (limited) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Intenta más tarde." });
+  }
   try {
     const destLat = Number(req.query.destLat);
     const destLng = Number(req.query.destLng);
     if (!Number.isFinite(destLat) || !Number.isFinite(destLng)) {
+      trackDeliveryInputAbuse(req, SURFACES.DELIVERY_QUOTE, { destLat: "invalid", destLng: "invalid" });
       return res.status(400).json({ error: "destLat/destLng requeridos" });
     }
     const quote = await deliveryPricing.computeDeliveryFeeFromCoords(destLat, destLng);
@@ -1613,8 +1657,8 @@ app.get("/delivery/quote", cors, async (req, res) => {
 
 /** Proxy ORS: la clave queda en el servidor (Render), no en el navegador. */
 app.use("/ors", cors, async (req, res) => {
-  const ip = getClientIp(req);
-  if (isOrsRateLimited(ip)) {
+  const { limited } = await enforceRateLimit(req, SURFACES.ORS_PROXY, logServerError);
+  if (limited) {
     return res.status(429).json({ error: "Demasiadas solicitudes. Intenta nuevamente." });
   }
 
@@ -4044,22 +4088,27 @@ app.all("/authLogin", (req, res) => {
     }
 
     const ip = getClientIp(req);
-    if (isLoginRateLimited(ip)) {
-      return res.status(200).json({ ok: false });
+    const { limited: loginLimited } = await enforceRateLimit(req, SURFACES.AUTH_LOGIN, logServerError);
+    if (loginLimited) {
+      return authLoginFailure(res, AUTH_LOGIN_CODE.RATE_LIMITED);
     }
 
     try {
       const rawEmail = req.body && req.body.email;
       const rawPassword = req.body && req.body.password;
       if (!isValidLoginEmail(rawEmail) || !isValidLoginPassword(rawPassword)) {
-        return res.status(200).json({ ok: false });
+        void onValidationFailure(
+          { surface: SURFACES.AUTH_LOGIN, ip, fields: { credentials: "invalid_format" } },
+          logServerError,
+        );
+        return authLoginFailure(res, AUTH_LOGIN_CODE.INVALID_INPUT);
       }
       const email = String(rawEmail).trim().toLowerCase();
       const password = String(rawPassword);
       const apiKey = process.env.FIREBASE_WEB_API_KEY;
       if (!apiKey) {
         logServerError("authLogin: falta FIREBASE_WEB_API_KEY en entorno del BFF");
-        return res.status(200).json({ ok: false });
+        return authLoginFailure(res, AUTH_LOGIN_CODE.SERVER_ERROR);
       }
 
       const identityUrl =
@@ -4072,14 +4121,15 @@ app.all("/authLogin", (req, res) => {
       });
       const identityJson = await identityRes.json();
       if (!identityRes.ok || !identityJson.localId) {
-        return res.status(200).json({ ok: false });
+        void onBruteForceAttempt({ surface: SURFACES.AUTH_LOGIN, ip }, logServerError);
+        return authLoginFailure(res, AUTH_LOGIN_CODE.INVALID_CREDENTIALS);
       }
 
       const customToken = await admin.auth().createCustomToken(identityJson.localId);
       return res.status(200).json({ ok: true, customToken });
     } catch {
       logServerError("authLogin: error interno");
-      return res.status(200).json({ ok: false });
+      return authLoginFailure(res, AUTH_LOGIN_CODE.SERVER_ERROR);
     }
   });
 });

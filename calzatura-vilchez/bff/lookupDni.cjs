@@ -33,6 +33,12 @@ function loadAllowedOrigins() {
 const allowedOrigins = loadAllowedOrigins();
 
 const crypto = require("crypto");
+const { getClientIp } = require("./clientIp.cjs");
+const {
+  onValidationFailure,
+  onAuthProbeFailure,
+  SURFACES,
+} = require("./securityMonitor.cjs");
 
 const DNI_LOOKUP_PROOF_TTL_MS = 30 * 60 * 1000;
 
@@ -86,9 +92,7 @@ function verifyDniLookupProof(token) {
   }
 }
 
-const RATE_LIMIT_WINDOW_MS = 30 * 60 * 1000;
-const RATE_LIMIT_MAX_WEB = 4;
-const ipBuckets = new Map();
+const { enforceRateLimit } = require("./publicRateLimit.cjs");
 const REQUEST_TIMEOUT_MS = 10_000;
 
 /** Primera variable definida y no vacía (soporta alias en Vercel). */
@@ -98,71 +102,6 @@ function envFirstTrimmed(...names) {
     if (v) return v;
   }
   return "";
-}
-
-function getClientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string" && forwarded.trim()) {
-    return forwarded.split(",")[0].trim();
-  }
-  return req.socket?.remoteAddress || "unknown";
-}
-
-function rateLimitKey(ip) {
-  return `web:${ip}`;
-}
-
-function isRateLimitedInMemory(ip) {
-  const key = rateLimitKey(ip);
-  const max = RATE_LIMIT_MAX_WEB;
-  const now = Date.now();
-  const bucket = ipBuckets.get(key);
-  if (!bucket || now - bucket.windowStart >= RATE_LIMIT_WINDOW_MS) {
-    ipBuckets.set(key, { windowStart: now, count: 1 });
-    return false;
-  }
-  bucket.count += 1;
-  return bucket.count > max;
-}
-
-/** Cupo global entre réplicas Vercel si UPSTASH_REDIS_REST_URL + TOKEN están definidos. */
-async function isRateLimitedUpstash(ip) {
-  const baseUrl = process.env.UPSTASH_REDIS_REST_URL?.replace(/\/$/, "");
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
-  if (!baseUrl || !token) return null;
-
-  const key = rateLimitKey(ip);
-  const max = RATE_LIMIT_MAX_WEB;
-  const windowSec = Math.ceil(RATE_LIMIT_WINDOW_MS / 1000);
-  const bucket = `dni:rl:${key}:${Math.floor(Date.now() / RATE_LIMIT_WINDOW_MS)}`;
-  const headers = { Authorization: `Bearer ${token}` };
-
-  try {
-    const incrRes = await fetch(`${baseUrl}/incr/${encodeURIComponent(bucket)}`, {
-      headers,
-      signal: AbortSignal.timeout(2500),
-    });
-    if (!incrRes.ok) return null;
-    const incrJson = await incrRes.json();
-    const count = Number(incrJson.result);
-    if (!Number.isFinite(count)) return null;
-    if (count === 1) {
-      await fetch(
-        `${baseUrl}/expire/${encodeURIComponent(bucket)}/${windowSec}`,
-        { headers, signal: AbortSignal.timeout(2500) }
-      );
-    }
-    return count > max;
-  } catch (err) {
-    console.warn("[lookup-dni] Upstash rate limit fallback:", err?.message || err);
-    return null;
-  }
-}
-
-async function isRateLimited(ip) {
-  const distributed = await isRateLimitedUpstash(ip);
-  if (distributed !== null) return distributed;
-  return isRateLimitedInMemory(ip);
 }
 
 function setCorsHeaders(req, res) {
@@ -407,6 +346,7 @@ const PROVIDERS = [
 ];
 
 async function handleLookupDni(req, res, options = {}) {
+  const logServerError = options.logServerError || ((label, err) => console.error(label, err));
   setCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
@@ -417,12 +357,27 @@ async function handleLookupDni(req, res, options = {}) {
     return res.status(405).json({ error: "Metodo no permitido" });
   }
 
+  const clientIp = getClientIp(req);
+
+  const { limited: dniRateLimited } = await enforceRateLimit(req, SURFACES.LOOKUP_DNI, logServerError);
+  if (dniRateLimited) {
+    return res.status(429).json({ error: "Demasiadas solicitudes. Intenta nuevamente." });
+  }
+
   if (options.requireProofSecret && !lookupProofSecret()) {
     return res.status(503).json({ error: "Validacion DNI no configurada" });
   }
 
   const authz = authorizeLookupRequest(req);
   if (!authz.ok) {
+    void onAuthProbeFailure(
+      {
+        surface: SURFACES.LOOKUP_DNI,
+        ip: clientIp,
+        reason: authz.error || "Origen no autorizado",
+      },
+      logServerError,
+    );
     return res.status(authz.status).json({ error: authz.error });
   }
 
@@ -435,6 +390,14 @@ async function handleLookupDni(req, res, options = {}) {
         ? await options.verifyAppCheckToken(token)
         : false;
       if (!verified) {
+        void onAuthProbeFailure(
+          {
+            surface: SURFACES.LOOKUP_DNI,
+            ip: clientIp,
+            reason: "App Check inválido o ausente",
+          },
+          logServerError,
+        );
         return res.status(401).json({ error: "App Check requerido" });
       }
     }
@@ -442,13 +405,12 @@ async function handleLookupDni(req, res, options = {}) {
 
   const origin = req.headers.origin;
 
-  const clientIp = getClientIp(req);
-  if (await isRateLimited(clientIp)) {
-    return res.status(429).json({ error: "Demasiadas solicitudes. Intenta nuevamente." });
-  }
-
   const dni = normalizeDni(req.body?.dni);
   if (!/^\d{8}$/.test(dni)) {
+    void onValidationFailure(
+      { surface: SURFACES.LOOKUP_DNI, ip: clientIp, fields: { dni: "invalid" } },
+      logServerError,
+    );
     return res.status(400).json({ error: toPublicError(400) });
   }
 

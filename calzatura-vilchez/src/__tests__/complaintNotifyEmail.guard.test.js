@@ -43,8 +43,9 @@ describe("complaint notify email — seguridad", () => {
     expect(postBlock).not.toContain("COMPLAINT_NOTIFY");
   });
 
-  it("alerta por correo ante rate limit e intentos inválidos", () => {
-    expect(libroSource).toContain("sendSecurityAlertEmail");
+  it("libro delega alertas al monitor central (no sendSecurityAlertEmail directo)", () => {
+    expect(libroSource).toContain("securityMonitor.cjs");
+    expect(libroSource).not.toContain("sendSecurityAlertEmail");
     expect(securitySource).toContain("SECURITY_ALERT_EMAIL");
     expect(securitySource).toContain("[Seguridad]");
   });
