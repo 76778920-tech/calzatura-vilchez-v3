@@ -44,6 +44,11 @@ describe("complaintBook", () => {
     expect(msg).toContain("CV-LR-20260526-ABC123");
   });
 
+  it("rechaza teléfono inválido con mensaje de Perú", () => {
+    const errors = validateComplaintForm({ ...validBase, telefono: "12" }, true);
+    expect(errors.telefono).toBeTruthy();
+  });
+
   it("rechaza correo, DNI y monto inválidos", () => {
     const errors = validateComplaintForm(
       {

@@ -13,6 +13,7 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html", "lcov"],
       include: [
+        "src/context/**/*.{ts,tsx}",
         "src/domains/**/utils/*.ts",
         "src/domains/**/services/*.ts",
         "src/routes/*.ts",

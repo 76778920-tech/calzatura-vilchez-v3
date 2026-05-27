@@ -9,14 +9,23 @@ vi.mock("@/firebase/appCheckConsent", () => ({
 }));
 
 function Probe() {
-  const { bannerOpen, acceptAll, openPreferences, preferencesOpen, closePreferences } =
-    useCookieConsent();
+  const {
+    bannerOpen,
+    acceptAll,
+    rejectNonEssential,
+    openPreferences,
+    preferencesOpen,
+    closePreferences,
+  } = useCookieConsent();
   return (
     <div>
       <span data-testid="banner">{bannerOpen ? "open" : "closed"}</span>
       <span data-testid="prefs">{preferencesOpen ? "open" : "closed"}</span>
       <button type="button" onClick={acceptAll}>
         Aceptar
+      </button>
+      <button type="button" onClick={rejectNonEssential}>
+        Rechazar
       </button>
       <button type="button" onClick={openPreferences}>
         Preferencias
@@ -45,6 +54,9 @@ describe("CookieConsentProvider", () => {
     expect(screen.getByTestId("prefs")).toHaveTextContent("open");
     await user.click(screen.getByRole("button", { name: "Cerrar" }));
     expect(screen.getByTestId("prefs")).toHaveTextContent("closed");
+
+    await user.click(screen.getByRole("button", { name: "Rechazar" }));
+    expect(screen.getByTestId("banner")).toHaveTextContent("closed");
   });
 
   it("useCookieConsent exige provider", () => {
