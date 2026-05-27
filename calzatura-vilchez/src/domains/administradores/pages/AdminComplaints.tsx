@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AlertCircle, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import {
@@ -28,6 +28,125 @@ const ESTADO_COLOR: Record<ComplaintEstado, string> = {
 };
 
 const SKELETON_KEYS = ["c1", "c2", "c3", "c4"] as const;
+
+function renderComplaintsMain(
+  loading: boolean,
+  complaints: ComplaintRecord[],
+  expanded: string | null,
+  setExpanded: (codigo: string | null) => void,
+  savingCodigo: string | null,
+  notasDraft: Record<string, string>,
+  setNotasDraft: React.Dispatch<React.SetStateAction<Record<string, string>>>,
+  handleEstadoChange: (codigo: string, estado: ComplaintEstado) => Promise<void>,
+  handleSaveNotas: (codigo: string) => Promise<void>,
+): ReactNode {
+  if (loading) {
+    return (
+      <div className="admin-skeleton-list">
+        {SKELETON_KEYS.map((k) => (
+          <div key={k} className="admin-skeleton-row" />
+        ))}
+      </div>
+    );
+  }
+  if (complaints.length === 0) {
+    return <p className="admin-empty">No hay hojas registradas con el filtro seleccionado.</p>;
+  }
+  return (
+    <div className="admin-complaints-list">
+      {complaints.map((row) => {
+        const isOpen = expanded === row.codigo;
+        const estado = row.estado as ComplaintEstado;
+        return (
+          <article key={row.codigo} className="admin-complaint-card">
+            <header className="admin-complaint-header">
+              <div>
+                <strong>{row.codigo}</strong>
+                <span className="admin-complaint-meta">
+                  {row.tipo === "reclamo" ? "Reclamo" : "Queja"} · {formatFecha(row.creadoEn)} ·{" "}
+                  {row.canal}
+                </span>
+                <span className="admin-complaint-consumer">
+                  {row.nombres} {row.apellidos} · DNI {row.dni}
+                </span>
+              </div>
+              <span
+                className="admin-status-pill"
+                style={{ backgroundColor: ESTADO_COLOR[estado] ?? "#6b7280" }}
+              >
+                {ESTADO_LABEL[estado] ?? row.estado}
+              </span>
+              <button
+                type="button"
+                className="admin-expand-btn"
+                onClick={() => setExpanded(isOpen ? null : row.codigo)}
+                aria-expanded={isOpen}
+              >
+                {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+              </button>
+            </header>
+            {isOpen ? (
+              <div className="admin-complaint-body">
+                <p>
+                  <strong>Contacto:</strong> {row.email} · {row.telefono}
+                </p>
+                <p>
+                  <strong>Domicilio:</strong> {row.domicilio}
+                </p>
+                <p>
+                  <strong>Bien:</strong> {row.bienContratado}
+                  {row.monto ? ` · S/ ${row.monto}` : ""}
+                  {row.numeroPedido ? ` · Pedido ${row.numeroPedido}` : ""}
+                </p>
+                <p>
+                  <strong>Detalle:</strong> {row.detalle}
+                </p>
+                <div className="admin-complaint-actions">
+                  <label className="admin-field-label">
+                    <span className="admin-field-label-text">Estado</span>
+                    <select
+                      value={estado}
+                      disabled={savingCodigo === row.codigo}
+                      onChange={(e) =>
+                        handleEstadoChange(row.codigo, e.target.value as ComplaintEstado)
+                      }
+                    >
+                      {ESTADOS.map((e) => (
+                        <option key={e} value={e}>
+                          {ESTADO_LABEL[e]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="form-group">
+                  <label htmlFor={`notas-${row.codigo}`}>Notas internas</label>
+                  <textarea
+                    id={`notas-${row.codigo}`}
+                    className="form-input"
+                    rows={3}
+                    value={notasDraft[row.codigo] ?? ""}
+                    onChange={(e) =>
+                      setNotasDraft((prev) => ({ ...prev, [row.codigo]: e.target.value }))
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={savingCodigo === row.codigo}
+                    onClick={() => handleSaveNotas(row.codigo)}
+                  >
+                    Guardar notas
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
 
 function formatFecha(iso: string): string {
   try {
@@ -63,9 +182,7 @@ export default function AdminComplaints() {
           setNotasDraft((prev) => {
             const next = { ...prev };
             for (const row of rows) {
-              if (next[row.codigo] === undefined) {
-                next[row.codigo] = row.notasInternas ?? "";
-              }
+              next[row.codigo] ??= row.notasInternas ?? "";
             }
             return next;
           });
@@ -142,107 +259,16 @@ export default function AdminComplaints() {
         </div>
       ) : null}
 
-      {loading ? (
-        <div className="admin-skeleton-list">
-          {SKELETON_KEYS.map((k) => (
-            <div key={k} className="admin-skeleton-row" />
-          ))}
-        </div>
-      ) : complaints.length === 0 ? (
-        <p className="admin-empty">No hay hojas registradas con el filtro seleccionado.</p>
-      ) : (
-        <div className="admin-complaints-list">
-          {complaints.map((row) => {
-            const isOpen = expanded === row.codigo;
-            const estado = row.estado as ComplaintEstado;
-            return (
-              <article key={row.codigo} className="admin-complaint-card">
-                <header className="admin-complaint-header">
-                  <div>
-                    <strong>{row.codigo}</strong>
-                    <span className="admin-complaint-meta">
-                      {row.tipo === "reclamo" ? "Reclamo" : "Queja"} · {formatFecha(row.creadoEn)} ·{" "}
-                      {row.canal}
-                    </span>
-                    <span className="admin-complaint-consumer">
-                      {row.nombres} {row.apellidos} · DNI {row.dni}
-                    </span>
-                  </div>
-                  <span
-                    className="admin-status-pill"
-                    style={{ backgroundColor: ESTADO_COLOR[estado] ?? "#6b7280" }}
-                  >
-                    {ESTADO_LABEL[estado] ?? row.estado}
-                  </span>
-                  <button
-                    type="button"
-                    className="admin-expand-btn"
-                    onClick={() => setExpanded(isOpen ? null : row.codigo)}
-                    aria-expanded={isOpen}
-                  >
-                    {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-                  </button>
-                </header>
-                {isOpen ? (
-                  <div className="admin-complaint-body">
-                    <p>
-                      <strong>Contacto:</strong> {row.email} · {row.telefono}
-                    </p>
-                    <p>
-                      <strong>Domicilio:</strong> {row.domicilio}
-                    </p>
-                    <p>
-                      <strong>Bien:</strong> {row.bienContratado}
-                      {row.monto ? ` · S/ ${row.monto}` : ""}
-                      {row.numeroPedido ? ` · Pedido ${row.numeroPedido}` : ""}
-                    </p>
-                    <p>
-                      <strong>Detalle:</strong> {row.detalle}
-                    </p>
-                    <div className="admin-complaint-actions">
-                      <label>
-                        Estado
-                        <select
-                          value={estado}
-                          disabled={savingCodigo === row.codigo}
-                          onChange={(e) =>
-                            handleEstadoChange(row.codigo, e.target.value as ComplaintEstado)
-                          }
-                        >
-                          {ESTADOS.map((e) => (
-                            <option key={e} value={e}>
-                              {ESTADO_LABEL[e]}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </div>
-                    <div className="form-group">
-                      <label htmlFor={`notas-${row.codigo}`}>Notas internas</label>
-                      <textarea
-                        id={`notas-${row.codigo}`}
-                        className="form-input"
-                        rows={3}
-                        value={notasDraft[row.codigo] ?? ""}
-                        onChange={(e) =>
-                          setNotasDraft((prev) => ({ ...prev, [row.codigo]: e.target.value }))
-                        }
-                      />
-                      <button
-                        type="button"
-                        className="btn-ghost"
-                        disabled={savingCodigo === row.codigo}
-                        onClick={() => handleSaveNotas(row.codigo)}
-                      >
-                        Guardar notas
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-              </article>
-            );
-          })}
-        </div>
+      {renderComplaintsMain(
+        loading,
+        complaints,
+        expanded,
+        setExpanded,
+        savingCodigo,
+        notasDraft,
+        setNotasDraft,
+        handleEstadoChange,
+        handleSaveNotas,
       )}
     </div>
   );

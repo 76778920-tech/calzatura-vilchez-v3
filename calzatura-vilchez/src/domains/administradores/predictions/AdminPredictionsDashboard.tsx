@@ -41,7 +41,7 @@ export function AdminPredictionsDashboard(props: Readonly<AdminPredictionsModelS
       )}
 
       {!loading && !error && !predictionDataSufficient && (
-        <div className="pred-warnings-banner pred-data-insufficient" role="status">
+        <output className="pred-warnings-banner pred-data-insufficient" aria-live="polite">
           <AlertTriangle size={16} aria-hidden="true" />
           <div>
             <strong>Datos insuficientes para predicciones fiables</strong>
@@ -51,7 +51,7 @@ export function AdminPredictionsDashboard(props: Readonly<AdminPredictionsModelS
               El stock, historial, alertas operativas y el IRE actual siguen visibles.
             </p>
           </div>
-        </div>
+        </output>
       )}
 
       {/* ── Cabecera ────────────────────────────────────────── */}

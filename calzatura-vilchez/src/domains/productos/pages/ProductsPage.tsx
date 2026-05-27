@@ -12,6 +12,7 @@ import {
 import { AlertTriangle, ChevronRight, X } from "lucide-react";
 import { fetchProductFamilyGroupCounts, fetchPublicProducts } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
+import { LoadingStatusRegion } from "@/components/common/LoadingStatusRegion";
 import ProductCard from "@/domains/productos/components/ProductCard";
 import {
   cyberWowJuvenilEditorial,
@@ -777,15 +778,15 @@ export default function ProductsPage() {
   let productsMainContent: ReactNode;
   if (loading) {
     productsMainContent = (
-      <div className="products-grid" role="status" aria-busy="true" aria-label="Cargando productos">
+      <LoadingStatusRegion className="products-grid" label="Cargando productos">
         {PRODUCTS_GRID_SKELETON_KEYS.map((key) => (
           <div key={key} className="skeleton-card" />
         ))}
-      </div>
+      </LoadingStatusRegion>
     );
   } else if (error) {
     productsMainContent = (
-      <div className="empty-state" role="status" aria-live="polite">
+      <output className="empty-state" aria-live="polite">
         <AlertTriangle size={28} />
         <p>{error} Revisa tu conexión y vuelve a intentarlo.</p>
         <button
@@ -799,7 +800,7 @@ export default function ProductsPage() {
         >
           Reintentar
         </button>
-      </div>
+      </output>
     );
   } else if (hasAnyProducts) {
     productsMainContent = (

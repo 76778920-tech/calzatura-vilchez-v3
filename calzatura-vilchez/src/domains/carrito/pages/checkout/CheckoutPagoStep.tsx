@@ -1,7 +1,7 @@
 import { AlertCircle, CreditCard, Truck } from "lucide-react";
 import type { Address } from "@/types";
 
-type CheckoutPagoStepProps = {
+type CheckoutPagoStepProps = Readonly<{
   direccion: Address;
   metodoPago: "stripe" | "contraentrega";
   stripeConfigured: boolean;
@@ -12,7 +12,7 @@ type CheckoutPagoStepProps = {
   onMetodoPagoChange: (metodo: "stripe" | "contraentrega") => void;
   onEditDireccion: () => void;
   onPlaceOrder: () => void;
-};
+}>;
 
 export function CheckoutPagoStep({
   direccion,

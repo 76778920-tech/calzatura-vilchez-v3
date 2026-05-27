@@ -1,7 +1,15 @@
 import { test, expect } from "@playwright/test";
 
+const COOKIE_CONSENT_STORAGE_KEY = "calzatura_cookie_consent";
+
 test.describe("Consentimiento de cookies", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript((key) => {
+      globalThis.localStorage.removeItem(key);
+    }, COOKIE_CONSENT_STORAGE_KEY);
+  });
 
   test("página de política de cookies muestra detalle en texto", async ({ page }) => {
     await page.goto("/legal/politica-cookies");
@@ -34,13 +42,9 @@ test.describe("Consentimiento de cookies", () => {
   test("aceptar todas oculta el banner", async ({ page }) => {
     await page.goto("/");
     const acceptAll = page.getByRole("button", { name: "Aceptar todas" });
-    if (!(await acceptAll.isVisible())) {
-      test.skip(true, "Banner no visible (consentimiento E2E precargado)");
-    }
+    await expect(acceptAll).toBeVisible();
     await acceptAll.click();
     await expect(page.getByRole("dialog", { name: /Tu privacidad en Calzatura Vilchez/i })).toBeHidden();
-    await expect(
-      page.locator(".cookie-consent-banner"),
-    ).toBeHidden();
+    await expect(page.locator(".cookie-consent-banner")).toBeHidden();
   });
 });

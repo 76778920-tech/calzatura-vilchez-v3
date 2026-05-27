@@ -10,6 +10,7 @@ import {
   Shield,
   Truck,
 } from "lucide-react";
+import { LoadingStatusRegion } from "@/components/common/LoadingStatusRegion";
 import ProductCard from "@/domains/productos/components/ProductCard";
 import HomeHeroSection, { type HomeHeroSlide } from "@/domains/publico/components/HomeHeroSection";
 import { fetchPublicProducts } from "@/domains/productos/services/products";
@@ -240,9 +241,14 @@ function renderHomeSpotlightSection({
 }: HomeSpotlightRenderArgs) {
   if (loading) {
     return (
-      <div className="products-skeleton-grid home-spotlight-grid" role="status" aria-busy="true" aria-label="Cargando productos destacados">
-        {HOME_SPOTLIGHT_SKELETON_KEYS.map((key) => <div key={key} className="skeleton-card" />)}
-      </div>
+      <LoadingStatusRegion
+        className="products-skeleton-grid home-spotlight-grid"
+        label="Cargando productos destacados"
+      >
+        {HOME_SPOTLIGHT_SKELETON_KEYS.map((key) => (
+          <div key={key} className="skeleton-card" />
+        ))}
+      </LoadingStatusRegion>
     );
   }
   if (featuredProducts.length === 0) {

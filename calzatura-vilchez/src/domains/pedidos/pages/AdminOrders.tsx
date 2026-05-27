@@ -13,6 +13,7 @@ import { OrderAddressBlock, OrderItemDetails } from "@/domains/pedidos/component
 import { handleProductImageError } from "@/utils/imgUtils";
 import { maskEmailForDisplay } from "@/utils/maskEmail";
 import { AccessibleConfirmDialog } from "@/components/common/AccessibleConfirmDialog";
+import { LoadingStatusRegion } from "@/components/common/LoadingStatusRegion";
 
 const ESTADOS: OrderStatus[] = ["pendiente", "pagado", "enviado", "entregado", "cancelado"];
 const ESTADO_TRANSICIONES: Record<OrderStatus, OrderStatus[]> = {
@@ -136,11 +137,11 @@ export default function AdminOrders() {
   let ordersMain: ReactNode;
   if (loading) {
     ordersMain = (
-      <div className="orders-skeleton" role="status" aria-busy="true" aria-label="Cargando pedidos">
+      <LoadingStatusRegion className="orders-skeleton" label="Cargando pedidos">
         {ADMIN_ORDERS_SKELETON_KEYS.map((id) => (
           <div key={id} className="skeleton-card" style={{ height: "80px" }} />
         ))}
-      </div>
+      </LoadingStatusRegion>
     );
   } else if (loadError) {
     ordersMain = (

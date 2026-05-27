@@ -4846,10 +4846,15 @@ button.cart-overlay {
   margin-top: 0.75rem;
 }
 .complaint-book-channels {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.85rem;
-  margin-bottom: 1rem;
+}
+.complaint-book-channels > li {
+  display: contents;
 }
 .complaint-book-channel {
   border: 1.5px solid var(--border);
@@ -5020,7 +5025,17 @@ button.cart-overlay {
   }
 }
 
+output.loading-status-region,
+output.empty-state,
+output.complaint-book-success {
+  display: block;
+}
+
 .cookie-consent-banner {
+  margin: 0;
+  max-width: none;
+  width: 100%;
+  border: none;
   position: fixed;
   inset: auto 0 0 0;
   z-index: 1200;

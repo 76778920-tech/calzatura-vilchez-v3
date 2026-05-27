@@ -1,11 +1,11 @@
 import type { CartItem } from "@/types";
 
-type CheckoutOrderSummaryProps = {
+type CheckoutOrderSummaryProps = Readonly<{
   items: CartItem[];
   subtotal: number;
   envioSummaryText: string;
   checkoutTotal: number;
-};
+}>;
 
 export function CheckoutOrderSummary({
   items,

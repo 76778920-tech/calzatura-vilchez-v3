@@ -7,7 +7,7 @@ import type { CheckoutFieldErrors } from "@/domains/carrito/utils/checkoutDirecc
 
 type CheckoutGeo = ReturnType<typeof useCheckoutGeocodingEffects>;
 
-type CheckoutDireccionStepProps = {
+type CheckoutDireccionStepProps = Readonly<{
   direccion: Address;
   fieldErrors: CheckoutFieldErrors;
   geo: CheckoutGeo;
@@ -16,7 +16,7 @@ type CheckoutDireccionStepProps = {
   onDireccionChange: (next: Address) => void;
   onClearFieldError: (key: keyof CheckoutFieldErrors) => void;
   onSubmit: (e: { preventDefault: () => void }) => void;
-};
+}>;
 
 export function CheckoutDireccionStep({
   direccion,

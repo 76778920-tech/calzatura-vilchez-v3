@@ -8,6 +8,7 @@ import { useOrdersRealtime } from "@/hooks/useOrdersRealtime";
 import type { Order } from "@/types";
 import { ORDER_STATUS_LABELS, orderItemLineKey } from "@/domains/pedidos/utils/orderUtils";
 import { OrderAddressBlock, OrderItemDetails } from "@/domains/pedidos/components/orderShared";
+import { LoadingStatusRegion } from "@/components/common/LoadingStatusRegion";
 import { handleProductImageError } from "@/utils/imgUtils";
 
 const ORDER_HISTORY_SKELETON_KEYS = ["sk-1", "sk-2", "sk-3"] as const;
@@ -54,11 +55,11 @@ export default function OrderHistoryPage() {
     return (
       <main className="orders-page">
         <h1>Mis Pedidos</h1>
-        <div className="orders-skeleton" role="status" aria-busy="true" aria-label="Cargando pedidos">
+        <LoadingStatusRegion className="orders-skeleton" label="Cargando pedidos">
           {ORDER_HISTORY_SKELETON_KEYS.map((id) => (
             <div key={id} className="skeleton-card" style={{ height: "80px" }} />
           ))}
-        </div>
+        </LoadingStatusRegion>
       </main>
     );
   }

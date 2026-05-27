@@ -11,10 +11,9 @@ export function CookieBanner() {
   return (
     <>
       {bannerOpen ? (
-        <section
+        <dialog
           className="cookie-consent-banner"
-          role="dialog"
-          aria-modal="true"
+          open
           aria-labelledby="cookie-banner-title"
           aria-describedby="cookie-banner-desc"
         >
@@ -64,7 +63,7 @@ export function CookieBanner() {
               </button>
             </div>
           </div>
-        </section>
+        </dialog>
       ) : null}
       <CookiePreferencesModal />
     </>

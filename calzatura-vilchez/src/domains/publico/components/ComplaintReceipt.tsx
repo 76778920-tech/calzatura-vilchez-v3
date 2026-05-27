@@ -7,12 +7,16 @@ import {
   buildComplaintWhatsAppUrl,
   type ComplaintFormData,
 } from "@/domains/publico/utils/complaintBook";
+import {
+  buildComplaintReceiptPrintHtml,
+  printHtmlDocument,
+} from "@/domains/publico/utils/printComplaintReceipt";
 
-type Props = {
+type ComplaintReceiptProps = Readonly<{
   submission: ComplaintFormData & { codigo: string; submittedAt: string };
-};
+}>;
 
-export function ComplaintReceipt({ submission }: Props) {
+export function ComplaintReceipt({ submission }: ComplaintReceiptProps) {
   const printRef = useRef<HTMLDivElement>(null);
   const whatsappUrl = buildComplaintWhatsAppUrl(submission, submission.codigo);
   const tipoLabel = submission.tipo === "reclamo" ? "Reclamo" : "Queja";
@@ -24,27 +28,14 @@ export function ComplaintReceipt({ submission }: Props) {
   const handlePrint = () => {
     const node = printRef.current;
     if (!node) return;
-    const w = window.open("", "_blank", "noopener,noreferrer,width=720,height=900");
-    if (!w) return;
-    w.document.write(`
-      <!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/>
-      <title>Constancia ${submission.codigo}</title>
-      <style>
-        body{font-family:system-ui,sans-serif;padding:24px;color:#111;line-height:1.5}
-        h1{font-size:1.25rem;margin:0 0 8px}
-        .meta{color:#444;font-size:0.9rem;margin-bottom:20px}
-        dl{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;margin:0}
-        dt{font-weight:600;margin:0}
-        dd{margin:0}
-        .foot{margin-top:24px;font-size:0.85rem;color:#555;border-top:1px solid #ddd;padding-top:12px}
-      </style></head><body>${node.innerHTML}</body></html>`);
-    w.document.close();
-    w.focus();
-    w.print();
+    printHtmlDocument(
+      buildComplaintReceiptPrintHtml(node.innerHTML, submission.codigo),
+      `Constancia ${submission.codigo}`,
+    );
   };
 
   return (
-    <div className="complaint-book-success" role="status">
+    <output className="complaint-book-success" aria-live="polite">
       <h3>Hoja registrada en el libro virtual</h3>
       <p className="complaint-book-code">
         Código de referencia: <strong>{submission.codigo}</strong>
@@ -116,6 +107,6 @@ export function ComplaintReceipt({ submission }: Props) {
         <ExternalLink href={BUSINESS_CONTACT.indecopiUrl}>Indecopi</ExternalLink>. Datos personales
         según nuestra <Link to={INFO_ROUTES.legalPrivacidad}>Política de privacidad</Link>.
       </p>
-    </div>
+    </output>
   );
 }

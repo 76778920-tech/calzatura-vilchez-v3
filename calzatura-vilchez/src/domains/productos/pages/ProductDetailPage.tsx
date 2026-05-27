@@ -13,6 +13,7 @@ import {
   ChevronRight,
   Maximize2,
 } from "lucide-react";
+import { LoadingStatusRegion } from "@/components/common/LoadingStatusRegion";
 import { fetchPublicProductById, fetchRelatedProductsInFamily } from "@/domains/productos/services/products";
 import type { Product } from "@/types";
 import { useCart } from "@/domains/carrito/context/CartContext";
@@ -142,14 +143,14 @@ export default function ProductDetailPage() {
 
   if (loading) {
     return (
-      <div className="detail-skeleton" role="status" aria-busy="true" aria-label="Cargando producto">
+      <LoadingStatusRegion className="detail-skeleton" label="Cargando producto">
         <div className="skeleton-img" />
         <div className="skeleton-info">
           <div className="skeleton-line" />
           <div className="skeleton-line short" />
           <div className="skeleton-line" />
         </div>
-      </div>
+      </LoadingStatusRegion>
     );
   }
 
