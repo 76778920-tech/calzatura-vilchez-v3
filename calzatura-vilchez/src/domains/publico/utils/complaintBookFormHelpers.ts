@@ -2,6 +2,7 @@ import type { UserProfile } from "@/types";
 import type { ComplaintFormData } from "@/domains/publico/utils/complaintBook";
 import { submitComplaintToServer } from "@/domains/publico/services/libroReclamaciones";
 import { validateComplaintForm } from "@/domains/publico/utils/complaintBookValidation";
+import { normalizeEmailInput } from "@/utils/emailValidation";
 import { normalizePeruPhoneInput, peruPhoneDigits } from "@/utils/phone";
 
 export type ComplaintSubmission = ComplaintFormData & {
@@ -36,7 +37,7 @@ export function trimComplaintFormData(form: ComplaintFormData): ComplaintFormDat
     dni: form.dni.trim(),
     domicilio: form.domicilio.trim(),
     telefono: peruPhoneDigits(form.telefono),
-    email: form.email.trim(),
+    email: normalizeEmailInput(form.email),
     bienContratado: form.bienContratado.trim(),
     monto: form.monto.trim(),
     numeroPedido: form.numeroPedido.trim(),

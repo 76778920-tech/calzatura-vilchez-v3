@@ -1,9 +1,14 @@
 "use strict";
 
+const {
+  isValidEmail,
+  normalizeEmailInput,
+  NOTIFY_EMAIL_MAX_LENGTH,
+} = require("./emailValidation.cjs");
+
 const MAX_NOTIFY_RECIPIENTS = 5;
 const MAX_TEXT_FIELD = 500;
 const MAX_DETALLE = 4000;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function trimStr(v) {
   return typeof v === "string" ? v.trim() : "";
@@ -30,7 +35,7 @@ function parseEmailList(raw) {
     .filter(Boolean);
   const unique = [];
   for (const email of parts) {
-    if (!EMAIL_RE.test(email) || email.length > 254) continue;
+    if (!isValidEmail(email, NOTIFY_EMAIL_MAX_LENGTH)) continue;
     if (!unique.includes(email)) unique.push(email);
     if (unique.length >= MAX_NOTIFY_RECIPIENTS) break;
   }
@@ -98,14 +103,14 @@ async function sendComplaintNotifyEmail(payload, codigo, logServerError) {
     return { skipped: true, reason: "missing_provider_config" };
   }
 
-  const consumerEmail = trimStr(payload.email).toLowerCase();
+  const consumerEmail = normalizeEmailInput(payload.email);
   const body = {
     from,
     to: recipients,
     subject: `[Libro reclamaciones] ${safeSubjectCodigo(codigo)}`,
     text: buildComplaintEmailText(payload, codigo),
   };
-  if (EMAIL_RE.test(consumerEmail)) {
+  if (isValidEmail(consumerEmail)) {
     body.reply_to = consumerEmail;
   }
 

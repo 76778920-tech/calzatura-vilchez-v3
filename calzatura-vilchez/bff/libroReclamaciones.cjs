@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const { sendComplaintNotifyEmail } = require("./complaintNotifyEmail.cjs");
 const { isValidPeruPhone, peruPhoneError } = require("./peruPhone.cjs");
+const { emailValidationError, normalizeEmailInput } = require("./emailValidation.cjs");
 
 const COMPLAINT_RATE_WINDOW_MS = 60 * 60 * 1000;
 const COMPLAINT_RATE_MAX = 8;
@@ -70,7 +71,8 @@ function validateComplaintPayload(body) {
       errors.telefono = phoneErr || "Teléfono no válido";
     }
   }
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Correo no válido";
+  const emailErr = emailValidationError(email);
+  if (emailErr) errors.email = emailErr;
   if (!bienContratado) errors.bienContratado = "Producto o servicio requerido";
   if (tipo === "reclamo" && !monto) errors.monto = "Monto requerido en reclamo";
   if (monto && !/^\d+(\.\d{1,2})?$/.test(monto)) errors.monto = "Monto no válido";
@@ -92,7 +94,7 @@ function validateComplaintPayload(body) {
     dni,
     domicilio,
     telefono,
-    email,
+    email: normalizeEmailInput(email),
     bienContratado,
     monto: monto || null,
     numeroPedido: trimStr(body?.numeroPedido) || null,

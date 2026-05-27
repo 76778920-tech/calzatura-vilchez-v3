@@ -21,6 +21,13 @@ describe("complaint notify email — seguridad", () => {
     expect(notifySource).toContain("escapePlainText");
     expect(notifySource).toContain("MAX_NOTIFY_RECIPIENTS");
     expect(notifySource).toContain("parseEmailList");
+    expect(notifySource).toContain("emailValidation.cjs");
+    expect(notifySource).toContain("isValidEmail");
+  });
+
+  it("reply_to solo si el correo del consumidor pasa validación estricta", () => {
+    expect(notifySource).toContain("body.reply_to = consumerEmail");
+    expect(notifySource).not.toMatch(/EMAIL_RE\s*=/);
   });
 
   it("la respuesta POST no incluye datos del buzón interno", () => {
