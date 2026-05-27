@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readCheckoutGuardSources } from "./helpers/checkoutGuardSources.js";
 
 const productsHookSource = fs.readFileSync(
   path.resolve(process.cwd(), "src/domains/productos/pages/useAdminProductsPage.tsx"),
@@ -42,10 +43,7 @@ const cartSidebarSource = fs.readFileSync(
   path.resolve(process.cwd(), "src/domains/carrito/components/CartSidebar.tsx"),
   "utf8",
 );
-const checkoutPageSource = fs.readFileSync(
-  path.resolve(process.cwd(), "src/domains/carrito/pages/CheckoutPage.tsx"),
-  "utf8",
-);
+const checkoutPageSource = readCheckoutGuardSources();
 const isoComplianceSource = fs.readFileSync(
   path.resolve(process.cwd(), "docs/ISO-CUMPLIMIENTO-INTERNO.md"),
   "utf8",

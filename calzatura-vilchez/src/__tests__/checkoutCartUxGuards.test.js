@@ -1,11 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readCheckoutGuardSources } from "./helpers/checkoutGuardSources.js";
 
-const checkoutSource = fs.readFileSync(
-  path.resolve(process.cwd(), "src/domains/carrito/pages/CheckoutPage.tsx"),
-  "utf8",
-);
+const checkoutSource = readCheckoutGuardSources();
 const cartSidebarSource = fs.readFileSync(
   path.resolve(process.cwd(), "src/domains/carrito/components/CartSidebar.tsx"),
   "utf8",
@@ -19,7 +17,8 @@ describe("Carrito/Checkout UX guards", () => {
   it("deshabilita Stripe en UI cuando no hay public key y cae en contraentrega", () => {
     expect(checkoutSource).toContain("STRIPE_CONFIGURED");
     expect(checkoutSource).toContain('STRIPE_CONFIGURED ? "stripe" : "contraentrega"');
-    expect(checkoutSource).toContain("disabled={!STRIPE_CONFIGURED}");
+    expect(checkoutSource).toContain("stripeConfigured={STRIPE_CONFIGURED}");
+    expect(checkoutSource).toContain("disabled={!stripeConfigured}");
     expect(checkoutSource).toContain("No disponible: falta configurar Stripe en produccion");
   });
 

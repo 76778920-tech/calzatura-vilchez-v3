@@ -1,12 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { readCheckoutGuardSources } from "./helpers/checkoutGuardSources.js";
 
 const serverSource = fs.readFileSync(path.resolve(process.cwd(), "bff/server.cjs"), "utf8");
-const checkoutSource = fs.readFileSync(
-  path.resolve(process.cwd(), "src/domains/carrito/pages/CheckoutPage.tsx"),
-  "utf8",
-);
+const checkoutSource = readCheckoutGuardSources();
 const realtimeSource = fs.readFileSync(path.resolve(process.cwd(), "src/hooks/useProductsRealtime.ts"), "utf8");
 const financeSource = fs.readFileSync(
   path.resolve(process.cwd(), "src/domains/ventas/services/finance.ts"),
