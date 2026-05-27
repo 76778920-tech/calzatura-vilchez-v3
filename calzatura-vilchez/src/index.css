@@ -3542,7 +3542,7 @@ button.cart-overlay {
 
 .product-card-body { padding: 1rem; flex: 1; display: flex; flex-direction: column; gap: 0.3rem; }
 .product-card-category {
-  font-size: 10px; color: var(--gold); text-transform: uppercase;
+  font-size: 10px; color: var(--primary-text); text-transform: uppercase;
   letter-spacing: 1px; font-weight: 600;
 }
 .product-card-name { font-size: 14px; font-weight: 600; line-height: 1.35; }

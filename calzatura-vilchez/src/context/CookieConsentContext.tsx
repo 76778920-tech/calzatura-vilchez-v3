@@ -1,7 +1,5 @@
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -16,20 +14,10 @@ import {
   type CookieChoices,
 } from "@/config/cookieConsent";
 import type { CookieConsentRecord } from "@/config/cookieConsentPolicy";
+import {
+  CookieConsentContext,
+} from "@/context/CookieConsentStore";
 import { tryInitAppCheckFromConsent } from "@/firebase/appCheckConsent";
-
-type CookieConsentContextValue = {
-  consent: CookieConsentRecord | null;
-  bannerOpen: boolean;
-  preferencesOpen: boolean;
-  openPreferences: () => void;
-  closePreferences: () => void;
-  acceptAll: () => void;
-  rejectNonEssential: () => void;
-  savePreferences: (choices: CookieChoices) => void;
-};
-
-const CookieConsentContext = createContext<CookieConsentContextValue | null>(null);
 
 function applyConsentSideEffects(): void {
   tryInitAppCheckFromConsent();
@@ -87,10 +75,3 @@ export function CookieConsentProvider({ children }: Readonly<{ children: ReactNo
   );
 }
 
-export function useCookieConsent(): CookieConsentContextValue {
-  const ctx = useContext(CookieConsentContext);
-  if (!ctx) {
-    throw new Error("useCookieConsent debe usarse dentro de CookieConsentProvider");
-  }
-  return ctx;
-}

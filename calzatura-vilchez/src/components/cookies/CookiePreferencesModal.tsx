@@ -10,7 +10,7 @@ import {
   type CookieChoices,
 } from "@/config/cookieConsentPolicy";
 import { INFO_ROUTES } from "@/routes/paths";
-import { useCookieConsent } from "@/context/CookieConsentContext";
+import { useCookieConsent } from "@/context/useCookieConsent";
 
 const OPTIONAL_CATEGORIES: CookieCategoryId[] = ["functional", "security", "analytics"];
 
@@ -27,15 +27,27 @@ export function CookiePreferencesModal() {
     useCookieConsent();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState<CookieChoices>(() => choicesFromConsent(consent));
+  const resetDraft = () => setDraft(choicesFromConsent(consent));
+  const handleClose = () => {
+    resetDraft();
+    closePreferences();
+  };
+  const handleAcceptAll = () => {
+    resetDraft();
+    acceptAll();
+  };
+  const handleSave = () => {
+    savePreferences(draft);
+    resetDraft();
+  };
 
   useDialogKeyboardTrap(dialogRef, {
     enabled: preferencesOpen,
-    onEscape: closePreferences,
+    onEscape: handleClose,
   });
 
   useEffect(() => {
     if (preferencesOpen) {
-      setDraft(choicesFromConsent(consent));
       dialogRef.current?.showModal();
     } else {
       dialogRef.current?.close();
@@ -49,7 +61,7 @@ export function CookiePreferencesModal() {
       ref={dialogRef}
       className="cookie-consent-dialog"
       aria-labelledby="cookie-preferences-title"
-      onClose={closePreferences}
+      onClose={handleClose}
     >
       <div className="cookie-consent-dialog-inner">
         <header className="cookie-consent-dialog-header">
@@ -62,7 +74,7 @@ export function CookiePreferencesModal() {
           <button
             type="button"
             className="cookie-consent-dialog-close"
-            onClick={closePreferences}
+            onClick={handleClose}
             aria-label="Cerrar configuración de cookies"
           >
             <X size={18} aria-hidden="true" />
@@ -72,7 +84,7 @@ export function CookiePreferencesModal() {
         <p className="cookie-consent-dialog-intro">
           Selecciona las categorías que autorizas. Las cookies estrictamente necesarias permanecen
           activas para que el sitio funcione. El detalle completo está en la{" "}
-          <Link to={INFO_ROUTES.legalCookies} onClick={closePreferences}>
+          <Link to={INFO_ROUTES.legalCookies} onClick={handleClose}>
             Política de cookies
           </Link>
           .
@@ -123,16 +135,16 @@ export function CookiePreferencesModal() {
         </ul>
 
         <footer className="cookie-consent-dialog-actions">
-          <button type="button" className="btn-ghost" onClick={closePreferences}>
+          <button type="button" className="btn-ghost" onClick={handleClose}>
             Cancelar
           </button>
-          <button type="button" className="btn-ghost" onClick={acceptAll}>
+          <button type="button" className="btn-ghost" onClick={handleAcceptAll}>
             Aceptar todas
           </button>
           <button
             type="button"
             className="btn-primary"
-            onClick={() => savePreferences(draft)}
+            onClick={handleSave}
           >
             Guardar preferencias
           </button>

@@ -1,4 +1,4 @@
-import { useCookieConsent } from "@/context/CookieConsentContext";
+import { useCookieConsent } from "@/context/useCookieConsent";
 
 /** Enlace en el footer para reabrir preferencias de cookies. */
 export function CookieSettingsLink() {

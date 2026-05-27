@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { Shield } from "lucide-react";
 import { COOKIE_POLICY_LAST_UPDATED } from "@/config/cookieConsentPolicy";
 import { INFO_ROUTES } from "@/routes/paths";
-import { useCookieConsent } from "@/context/CookieConsentContext";
+import { useCookieConsent } from "@/context/useCookieConsent";
 import { CookiePreferencesModal } from "@/components/cookies/CookiePreferencesModal";
 
 export function CookieBanner() {

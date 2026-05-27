@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { INFO_ROUTES } from "@/routes/paths";
@@ -28,6 +28,20 @@ const EMPTY_FORM: ComplaintFormData = {
 
 type Submission = ComplaintFormData & { codigo: string; submittedAt: string };
 
+function profileBackfill(form: ComplaintFormData, userProfile: ReturnType<typeof useAuth>["userProfile"]): ComplaintFormData {
+  if (!userProfile) return form;
+  const nombreParts = userProfile.nombre.split(" ");
+  return {
+    ...form,
+    nombres: form.nombres || userProfile.nombres || nombreParts[0] || "",
+    apellidos: form.apellidos || userProfile.apellidos || nombreParts.slice(1).join(" ") || "",
+    dni: form.dni || userProfile.dni || "",
+    email: form.email || userProfile.email || "",
+    telefono: form.telefono || userProfile.telefono || "",
+    domicilio: form.domicilio || userProfile.direcciones?.[0]?.direccion || "",
+  };
+}
+
 export function ComplaintBookForm() {
   const { userProfile } = useAuth();
   const [form, setForm] = useState<ComplaintFormData>(EMPTY_FORM);
@@ -35,20 +49,7 @@ export function ComplaintBookForm() {
   const [aceptaPrivacidad, setAceptaPrivacidad] = useState(false);
   const [submission, setSubmission] = useState<Submission | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (!userProfile) return;
-    setForm((prev) => ({
-      ...prev,
-      nombres: prev.nombres || userProfile.nombres || userProfile.nombre.split(" ")[0] || "",
-      apellidos:
-        prev.apellidos || userProfile.apellidos || userProfile.nombre.split(" ").slice(1).join(" ") || "",
-      dni: prev.dni || userProfile.dni || "",
-      email: prev.email || userProfile.email || "",
-      telefono: prev.telefono || userProfile.telefono || "",
-      domicilio: prev.domicilio || userProfile.direcciones?.[0]?.direccion || "",
-    }));
-  }, [userProfile]);
+  const effectiveForm = useMemo(() => profileBackfill(form, userProfile), [form, userProfile]);
 
   const update = <K extends keyof ComplaintFormData>(key: K, value: ComplaintFormData[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -57,7 +58,7 @@ export function ComplaintBookForm() {
 
   const handleSubmit = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    const errors = validateComplaintForm(form, aceptaPrivacidad);
+    const errors = validateComplaintForm(effectiveForm, aceptaPrivacidad);
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       toast.error("Revisa los campos marcados");
@@ -65,17 +66,17 @@ export function ComplaintBookForm() {
     }
 
     const trimmed: ComplaintFormData = {
-      ...form,
-      nombres: form.nombres.trim(),
-      apellidos: form.apellidos.trim(),
-      dni: form.dni.trim(),
-      domicilio: form.domicilio.trim(),
-      telefono: form.telefono.trim(),
-      email: form.email.trim(),
-      bienContratado: form.bienContratado.trim(),
-      monto: form.monto.trim(),
-      numeroPedido: form.numeroPedido.trim(),
-      detalle: form.detalle.trim(),
+      ...effectiveForm,
+      nombres: effectiveForm.nombres.trim(),
+      apellidos: effectiveForm.apellidos.trim(),
+      dni: effectiveForm.dni.trim(),
+      domicilio: effectiveForm.domicilio.trim(),
+      telefono: effectiveForm.telefono.trim(),
+      email: effectiveForm.email.trim(),
+      bienContratado: effectiveForm.bienContratado.trim(),
+      monto: effectiveForm.monto.trim(),
+      numeroPedido: effectiveForm.numeroPedido.trim(),
+      detalle: effectiveForm.detalle.trim(),
     };
 
     setSubmitting(true);
@@ -135,7 +136,7 @@ export function ComplaintBookForm() {
           <input
             id="lr-nombres"
             className={`form-input${fieldErrors.nombres ? " input-error" : ""}`}
-            value={form.nombres}
+            value={effectiveForm.nombres}
             onChange={(e) => update("nombres", e.target.value)}
             autoComplete="given-name"
             required
@@ -147,7 +148,7 @@ export function ComplaintBookForm() {
           <input
             id="lr-apellidos"
             className={`form-input${fieldErrors.apellidos ? " input-error" : ""}`}
-            value={form.apellidos}
+            value={effectiveForm.apellidos}
             onChange={(e) => update("apellidos", e.target.value)}
             autoComplete="family-name"
             required
@@ -159,7 +160,7 @@ export function ComplaintBookForm() {
           <input
             id="lr-dni"
             className={`form-input${fieldErrors.dni ? " input-error" : ""}`}
-            value={form.dni}
+            value={effectiveForm.dni}
             onChange={(e) => update("dni", e.target.value.replace(/\D/g, "").slice(0, 8))}
             inputMode="numeric"
             required
@@ -171,7 +172,7 @@ export function ComplaintBookForm() {
           <input
             id="lr-domicilio"
             className={`form-input${fieldErrors.domicilio ? " input-error" : ""}`}
-            value={form.domicilio}
+            value={effectiveForm.domicilio}
             onChange={(e) => update("domicilio", e.target.value)}
             autoComplete="street-address"
             required
@@ -183,7 +184,7 @@ export function ComplaintBookForm() {
           <input
             id="lr-telefono"
             className={`form-input${fieldErrors.telefono ? " input-error" : ""}`}
-            value={form.telefono}
+            value={effectiveForm.telefono}
             onChange={(e) => update("telefono", e.target.value)}
             autoComplete="tel"
             required
@@ -196,7 +197,7 @@ export function ComplaintBookForm() {
             id="lr-email"
             type="email"
             className={`form-input${fieldErrors.email ? " input-error" : ""}`}
-            value={form.email}
+            value={effectiveForm.email}
             onChange={(e) => update("email", e.target.value)}
             autoComplete="email"
             required
@@ -210,7 +211,7 @@ export function ComplaintBookForm() {
         <input
           id="lr-bien"
           className={`form-input${fieldErrors.bienContratado ? " input-error" : ""}`}
-          value={form.bienContratado}
+          value={effectiveForm.bienContratado}
           onChange={(e) => update("bienContratado", e.target.value)}
         />
         {fieldErrors.bienContratado ? (
@@ -221,12 +222,12 @@ export function ComplaintBookForm() {
       <div className="complaint-book-grid">
         <div className="form-group">
           <label htmlFor="lr-monto">
-            Monto (S/) {form.tipo === "reclamo" ? "*" : "(opcional)"}
+            Monto (S/) {effectiveForm.tipo === "reclamo" ? "*" : "(opcional)"}
           </label>
           <input
             id="lr-monto"
             className={`form-input${fieldErrors.monto ? " input-error" : ""}`}
-            value={form.monto}
+            value={effectiveForm.monto}
             onChange={(e) => update("monto", e.target.value)}
             inputMode="decimal"
           />
@@ -237,7 +238,7 @@ export function ComplaintBookForm() {
           <input
             id="lr-pedido-num"
             className="form-input"
-            value={form.numeroPedido}
+            value={effectiveForm.numeroPedido}
             onChange={(e) => update("numeroPedido", e.target.value)}
           />
         </div>
@@ -249,7 +250,7 @@ export function ComplaintBookForm() {
           id="lr-detalle"
           className={`form-input complaint-book-textarea${fieldErrors.detalle ? " input-error" : ""}`}
           rows={5}
-          value={form.detalle}
+          value={effectiveForm.detalle}
           onChange={(e) => update("detalle", e.target.value)}
           placeholder="Describe el problema y qué solución solicitas (cambio, reembolso, etc.)"
           required
