@@ -2,12 +2,16 @@
 
 const crypto = require("crypto");
 const { sendComplaintNotifyEmail } = require("./complaintNotifyEmail.cjs");
+const { sendSecurityAlertEmail } = require("./securityAlertEmail.cjs");
 const { isValidPeruPhone, peruPhoneError } = require("./peruPhone.cjs");
 const { emailValidationError, normalizeEmailInput } = require("./emailValidation.cjs");
 
 const COMPLAINT_RATE_WINDOW_MS = 60 * 60 * 1000;
 const COMPLAINT_RATE_MAX = 8;
+const COMPLAINT_VALIDATION_ABUSE_WINDOW_MS = 60 * 60 * 1000;
+const COMPLAINT_VALIDATION_ABUSE_MAX = 5;
 const complaintIpBuckets = new Map();
+const complaintValidationAbuseBuckets = new Map();
 
 const ESTADOS = ["recibido", "en_tramite", "respondido", "cerrado"];
 
@@ -33,6 +37,19 @@ function isComplaintRateLimited(ip) {
   }
   bucket.count += 1;
   return bucket.count > COMPLAINT_RATE_MAX;
+}
+
+function recordComplaintValidationAbuse(ip) {
+  const key = hashIp(ip);
+  const now = Date.now();
+  let bucket = complaintValidationAbuseBuckets.get(key);
+  if (!bucket || now - bucket.windowStart >= COMPLAINT_VALIDATION_ABUSE_WINDOW_MS) {
+    bucket = { windowStart: now, count: 1 };
+  } else {
+    bucket.count += 1;
+  }
+  complaintValidationAbuseBuckets.set(key, bucket);
+  return { count: bucket.count, ipHash: key };
 }
 
 function generateComplaintCode(date = new Date()) {
@@ -142,7 +159,20 @@ function registerLibroReclamacionesRoutes(app, deps) {
     cors(req, res, async () => {
       try {
         const ip = getClientIp(req);
+        const ipHash = hashIp(ip);
         if (isComplaintRateLimited(ip)) {
+          void sendSecurityAlertEmail(
+            {
+              event: "Libro reclamaciones: rate limit",
+              ipHash,
+              details: [
+                "Una IP superó el límite de envíos al formulario virtual (posible spam o prueba automatizada).",
+                `Límite: ${COMPLAINT_RATE_MAX} solicitudes por hora.`,
+                "Acción: revisar logs del BFF en Render si persiste.",
+              ],
+            },
+            logServerError,
+          ).catch(() => {});
           return res.status(429).json({ error: "Demasiados envíos. Intenta más tarde." });
         }
 
@@ -158,7 +188,7 @@ function registerLibroReclamacionesRoutes(app, deps) {
             ...payload,
             estado: "recibido",
             notasInternas: null,
-            ipHash: hashIp(ip),
+            ipHash,
             creadoEn: now,
             actualizadoEn: now,
           };
@@ -198,6 +228,22 @@ function registerLibroReclamacionesRoutes(app, deps) {
         });
       } catch (error) {
         if (error?.fields) {
+          const ip = getClientIp(req);
+          const abuse = recordComplaintValidationAbuse(ip);
+          if (abuse.count >= COMPLAINT_VALIDATION_ABUSE_MAX) {
+            void sendSecurityAlertEmail(
+              {
+                event: "Libro reclamaciones: intentos inválidos",
+                ipHash: abuse.ipHash,
+                details: [
+                  "Varios envíos con datos inválidos desde la misma referencia IP (posible bot o ataque al formulario).",
+                  `Intentos inválidos en la última hora: ${abuse.count}.`,
+                  `Campos rechazados (último intento): ${Object.keys(error.fields).join(", ")}.`,
+                ],
+              },
+              logServerError,
+            ).catch(() => {});
+          }
           return res.status(400).json({ error: publicError(error), fields: error.fields });
         }
         logServerError("libro-reclamaciones POST:", error);

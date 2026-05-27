@@ -10,6 +10,10 @@ const libroSource = fs.readFileSync(
   path.resolve(process.cwd(), "bff/libroReclamaciones.cjs"),
   "utf8",
 );
+const securitySource = fs.readFileSync(
+  path.resolve(process.cwd(), "bff/securityAlertEmail.cjs"),
+  "utf8",
+);
 
 describe("complaint notify email — seguridad", () => {
   it("no usa variables VITE_ para correo de reclamos", () => {
@@ -37,5 +41,11 @@ describe("complaint notify email — seguridad", () => {
     expect(postBlock).toBeTruthy();
     expect(postBlock).not.toContain("notifyEmail");
     expect(postBlock).not.toContain("COMPLAINT_NOTIFY");
+  });
+
+  it("alerta por correo ante rate limit e intentos inválidos", () => {
+    expect(libroSource).toContain("sendSecurityAlertEmail");
+    expect(securitySource).toContain("SECURITY_ALERT_EMAIL");
+    expect(securitySource).toContain("[Seguridad]");
   });
 });
