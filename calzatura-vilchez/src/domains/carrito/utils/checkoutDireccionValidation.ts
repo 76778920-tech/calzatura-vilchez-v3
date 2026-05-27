@@ -21,42 +21,48 @@ export type CheckoutFieldErrors = {
   delivery?: string;
 };
 
-export function getCheckoutFieldErrors({
-  direccion,
-  deliveryPricingActive,
-  locationConfirmed,
-  selectedDelivery,
-  deliveryQuoteLoading,
-  deliveryQuoteError,
-  deliveryQuote,
-}: ValidateArgs): CheckoutFieldErrors {
+function getCheckoutPhoneError(telefono: string): string | undefined {
+  if (!telefono) return "Ingresa un teléfono";
+  const phoneErr = peruPhoneError(telefono);
+  if (phoneErr || !isValidPeruPhone(telefono)) {
+    return phoneErr ?? "Ingresa un teléfono válido";
+  }
+  return undefined;
+}
+
+function getCheckoutDeliveryError(args: ValidateArgs): string | undefined {
+  if (!args.deliveryPricingActive) return undefined;
+
+  const line = buildCheckoutAddressLine(args.direccion);
+  if (line.length >= 8 && !args.locationConfirmed) {
+    return "Confirmá la entrega: elegí una sugerencia, buscá en el mapa o arrastrá el pin azul.";
+  }
+  if (line.length >= 8 && !args.selectedDelivery) {
+    return "Elegí un punto de entrega: una sugerencia de la lista, una búsqueda o el mapa.";
+  }
+  if (args.deliveryQuoteLoading) {
+    return "Espera un momento: estamos calculando el costo de envío.";
+  }
+  if (args.deliveryQuoteError) return args.deliveryQuoteError;
+  if (!args.deliveryQuote || args.deliveryQuote.isOutOfRange) {
+    return `No podemos entregar a esa dirección (máx. ${DELIVERY_CONFIG.maxDeliveryKm} km desde la tienda).`;
+  }
+  return undefined;
+}
+
+export function getCheckoutFieldErrors(args: ValidateArgs): CheckoutFieldErrors {
   const errors: CheckoutFieldErrors = {};
 
-  if (!direccion.direccion) errors.direccion = "Ingresa una dirección";
-  if (!direccion.distrito) errors.distrito = "Ingresa un distrito";
+  if (!args.direccion.direccion) errors.direccion = "Ingresa una dirección";
+  if (!args.direccion.distrito) errors.distrito = "Ingresa un distrito";
 
-  if (!direccion.telefono) {
-    errors.telefono = "Ingresa un teléfono";
-  } else {
-    const phoneErr = peruPhoneError(direccion.telefono);
-    if (phoneErr || !isValidPeruPhone(direccion.telefono)) {
-      errors.telefono = phoneErr ?? "Ingresa un teléfono válido";
-    }
-  }
+  const telefonoError = getCheckoutPhoneError(args.direccion.telefono);
+  if (telefonoError) errors.telefono = telefonoError;
 
-  if (deliveryPricingActive && Object.keys(errors).length === 0) {
-    const line = buildCheckoutAddressLine(direccion);
-    if (line.length >= 8 && !locationConfirmed) {
-      errors.delivery = "Confirmá la entrega: elegí una sugerencia, buscá en el mapa o arrastrá el pin azul.";
-    } else if (line.length >= 8 && !selectedDelivery) {
-      errors.delivery = "Elegí un punto de entrega: una sugerencia de la lista, una búsqueda o el mapa.";
-    } else if (deliveryQuoteLoading) {
-      errors.delivery = "Espera un momento: estamos calculando el costo de envío.";
-    } else if (deliveryQuoteError) {
-      errors.delivery = deliveryQuoteError;
-    } else if (!deliveryQuote || deliveryQuote.isOutOfRange) {
-      errors.delivery = `No podemos entregar a esa dirección (máx. ${DELIVERY_CONFIG.maxDeliveryKm} km desde la tienda).`;
-    }
+  const hasAddressErrors = Boolean(errors.direccion || errors.distrito || errors.telefono);
+  if (!hasAddressErrors) {
+    const deliveryError = getCheckoutDeliveryError(args);
+    if (deliveryError) errors.delivery = deliveryError;
   }
 
   return errors;

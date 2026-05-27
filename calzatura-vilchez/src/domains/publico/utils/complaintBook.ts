@@ -1,6 +1,6 @@
 import { BUSINESS_CONTACT } from "@/config/businessContact";
-import { isValidEmailFormat } from "@/utils/emailValidation";
-import { isValidPeruPhone, peruPhoneError } from "@/utils/phone";
+
+export { validateComplaintForm } from "@/domains/publico/utils/complaintBookValidation";
 
 export type ComplaintType = "reclamo" | "queja";
 
@@ -51,39 +51,6 @@ function randomComplaintSuffix(length = 6): string {
 export function generateComplaintCode(date = new Date()): string {
   const ymd = date.toISOString().slice(0, 10).replaceAll("-", "");
   return `CV-LR-${ymd}-${randomComplaintSuffix()}`;
-}
-
-export function validateComplaintForm(
-  data: ComplaintFormData,
-  aceptaPrivacidad: boolean,
-): ComplaintFieldErrors {
-  const errors: ComplaintFieldErrors = {};
-
-  if (!data.nombres.trim()) errors.nombres = "Ingresa tus nombres";
-  if (!data.apellidos.trim()) errors.apellidos = "Ingresa tus apellidos";
-  if (!/^\d{8}$/.test(data.dni.trim())) errors.dni = "Ingresa un DNI válido de 8 dígitos";
-  if (!data.domicilio.trim()) errors.domicilio = "Ingresa tu domicilio";
-  if (!data.email.trim()) {
-    errors.email = "Ingresa tu correo electrónico";
-  } else if (!isValidEmailFormat(data.email)) {
-    errors.email = "Correo electrónico no válido";
-  }
-  if (!data.telefono.trim()) {
-    errors.telefono = "Ingresa tu teléfono";
-  } else {
-    const phoneErr = peruPhoneError(data.telefono);
-    if (phoneErr || !isValidPeruPhone(data.telefono)) errors.telefono = phoneErr ?? "Teléfono no válido";
-  }
-  if (!data.bienContratado.trim()) errors.bienContratado = "Describe el producto o servicio";
-  if (data.tipo === "reclamo" && !data.monto.trim()) {
-    errors.monto = "Indica el monto reclamado";
-  } else if (data.monto.trim() && !/^\d+(\.\d{1,2})?$/.test(data.monto.trim())) {
-    errors.monto = "Monto no válido";
-  }
-  if (!data.detalle.trim()) errors.detalle = "Describe el problema y qué solución solicitas";
-  if (!aceptaPrivacidad) errors.aceptaPrivacidad = "Debes aceptar el tratamiento de datos";
-
-  return errors;
 }
 
 export function formatComplaintMessage(data: ComplaintFormData, codigo: string): string {
