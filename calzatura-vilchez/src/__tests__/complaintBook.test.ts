@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BUSINESS_CONTACT } from "@/config/businessContact";
 import {
+  buildComplaintWhatsAppUrl,
   formatComplaintMessage,
   generateComplaintCode,
   validateComplaintForm,
@@ -41,5 +42,36 @@ describe("complaintBook", () => {
     const msg = formatComplaintMessage(validBase, "CV-LR-20260526-ABC123");
     expect(msg).toContain(BUSINESS_CONTACT.rucDisplay);
     expect(msg).toContain("CV-LR-20260526-ABC123");
+  });
+
+  it("rechaza correo, DNI y monto inválidos", () => {
+    const errors = validateComplaintForm(
+      {
+        ...validBase,
+        email: "correo-invalido",
+        dni: "123",
+        monto: "abc",
+        telefono: "",
+      },
+      true,
+    );
+    expect(errors.email).toBeTruthy();
+    expect(errors.dni).toBeTruthy();
+    expect(errors.monto).toBeTruthy();
+    expect(errors.telefono).toBeTruthy();
+  });
+
+  it("no exige monto en queja", () => {
+    const errors = validateComplaintForm(
+      { ...validBase, tipo: "queja", monto: "" },
+      true,
+    );
+    expect(errors.monto).toBeUndefined();
+  });
+
+  it("arma URL de WhatsApp con mensaje codificado", () => {
+    const url = buildComplaintWhatsAppUrl(validBase, "CV-LR-20260526-ABC123");
+    expect(url).toContain(BUSINESS_CONTACT.whatsappBaseUrl);
+    expect(url).toContain(encodeURIComponent("CV-LR-20260526-ABC123"));
   });
 });

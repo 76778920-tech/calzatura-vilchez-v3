@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   acceptAllCookies,
   acceptsCookieCategory,
+  canUseAnalytics,
+  canUseFunctionalCookies,
+  canUseSecurityCookies,
   hasValidCookieConsent,
   loadCookieConsent,
   rejectNonEssentialCookies,
@@ -63,5 +66,18 @@ describe("cookieConsent", () => {
     const parsed = JSON.parse(raw!);
     expect(parsed.choices.functional).toBe(true);
     expect(parsed.choices.security).toBe(false);
+  });
+
+  it("expone helpers de categoría según elección guardada", () => {
+    saveCookieConsent({ functional: true, security: true, analytics: false });
+    expect(canUseFunctionalCookies()).toBe(true);
+    expect(canUseSecurityCookies()).toBe(true);
+    expect(canUseAnalytics()).toBe(false);
+    expect(acceptsCookieCategory("essential")).toBe(true);
+  });
+
+  it("ignora JSON corrupto en localStorage", () => {
+    globalThis.localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, "{no-json");
+    expect(loadCookieConsent()).toBeNull();
   });
 });

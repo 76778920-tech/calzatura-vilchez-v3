@@ -1,4 +1,5 @@
 import { BUSINESS_CONTACT } from "@/config/businessContact";
+import { isValidEmailFormat } from "@/utils/emailValidation";
 import { isValidPeruPhone, peruPhoneError } from "@/utils/phone";
 
 export type ComplaintType = "reclamo" | "queja";
@@ -39,10 +40,17 @@ export const COMPLAINT_WHATSAPP_SIMPLE_URL = `${BUSINESS_CONTACT.whatsappBaseUrl
   ].join("\n"),
 )}`;
 
+const COMPLAINT_CODE_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+function randomComplaintSuffix(length = 6): string {
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (byte) => COMPLAINT_CODE_ALPHABET[byte % COMPLAINT_CODE_ALPHABET.length]).join("");
+}
+
 export function generateComplaintCode(date = new Date()): string {
   const ymd = date.toISOString().slice(0, 10).replaceAll("-", "");
-  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `CV-LR-${ymd}-${suffix}`;
+  return `CV-LR-${ymd}-${randomComplaintSuffix()}`;
 }
 
 export function validateComplaintForm(
@@ -57,7 +65,7 @@ export function validateComplaintForm(
   if (!data.domicilio.trim()) errors.domicilio = "Ingresa tu domicilio";
   if (!data.email.trim()) {
     errors.email = "Ingresa tu correo electrónico";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email.trim())) {
+  } else if (!isValidEmailFormat(data.email)) {
     errors.email = "Correo electrónico no válido";
   }
   if (!data.telefono.trim()) {

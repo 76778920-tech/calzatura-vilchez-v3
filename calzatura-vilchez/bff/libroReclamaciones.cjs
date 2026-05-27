@@ -35,7 +35,7 @@ function isComplaintRateLimited(ip) {
 
 function generateComplaintCode(date = new Date()) {
   const ymd = date.toISOString().slice(0, 10).replaceAll("-", "");
-  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  const suffix = crypto.randomBytes(4).toString("hex").toUpperCase().slice(0, 6);
   return `CV-LR-${ymd}-${suffix}`;
 }
 
