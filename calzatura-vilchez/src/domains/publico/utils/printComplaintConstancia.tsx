@@ -1,9 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { flushSync } from "react-dom";
-import {
-  ComplaintConstanciaDocument,
-  type ComplaintConstanciaSubmission,
-} from "@/domains/publico/utils/complaintConstanciaDocument";
+import { ComplaintConstanciaDocument } from "@/domains/publico/utils/complaintConstanciaDocument";
+import type { ComplaintConstanciaSubmission } from "@/domains/publico/utils/complaintConstanciaTypes";
 
 const PRINT_ROOT_ID = "complaint-print-root";
 const PRINT_BODY_CLASS = "complaint-print-active";

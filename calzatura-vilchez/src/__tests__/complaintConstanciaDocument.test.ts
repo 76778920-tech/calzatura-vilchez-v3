@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildComplaintConstanciaHtml,
-} from "@/domains/publico/utils/complaintConstanciaDocument";
+import { buildComplaintConstanciaHtml } from "@/domains/publico/utils/complaintConstanciaHtml";
 
 const submission = {
   tipo: "reclamo" as const,
