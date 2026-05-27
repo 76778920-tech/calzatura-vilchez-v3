@@ -30,7 +30,6 @@ Cazatura Vilchez V3/
     deploy-production.yml        # Firebase Hosting + Render IA (tras CI Integration)
     sonarqube.yml                # Análisis SonarQube (no bloquea deploy)
   docker-compose.yml             # 3 servicios: frontend, ai-service, firebase-emulator
-  railway.toml                   # Legado Railway (producción IA usa Render)
   calzatura-vilchez/             # SPA React + migraciones Supabase
     src/
       domains/                   # 10 dominios (trabajadores/ presente pero sin implementar)
@@ -44,7 +43,6 @@ Cazatura Vilchez V3/
     services/                    # supabase_client.py, firebase_verifier.py, firebase_client.py
     tests/                       # 7 suites pytest
     scripts/                     # verify_ire_historial_schema.py (validación de esquema BD)
-    railway.toml                 # Legado Railway (no usar; IA en Render)
     requirements.txt             # Dependencias de producción
     requirements-dev.txt         # Dependencias de desarrollo y pruebas (pytest)
   firebase-emulator/             # Emulador Firebase Auth para E2E local
@@ -242,8 +240,6 @@ GitHub → Actions → **Deploy — Producción (Firebase + Render)** → **Run 
 | Env | `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `FIREBASE_PROJECT_ID`, `SUPERADMIN_EMAILS`, `AI_SERVICE_BEARER_TOKEN` |
 | Plantilla local | `ai-service/.env.example` |
 
-**Railway (legado):** `railway.toml` en raíz y `ai-service/railway.toml` se conservan solo como referencia histórica; **no** desplegar IA ahí en producción actual.
-
 ### 7.6 Limpieza de artefactos locales
 
 ```bash
@@ -265,4 +261,5 @@ Elimina `n/` (restos Firebase), `calzatura-vilchez-mobile/android/build/` y cove
 |---------|-------|-------------|
 | 1.0 | 2026-05-01 | Versión inicial. |
 | 1.1 | 2026-05-02 | CI GitHub Actions documentado; CU-T08 actualizado con jobs reales. |
-| 1.2 | 2026-05-18 | Deploy unificado (Firebase + Render); 41 migraciones; `RENDER_DEPLOY_HOOK_URL`; SonarQube documentado; Railway legado. |
+| 1.2 | 2026-05-18 | Deploy unificado (Firebase + Render); 41 migraciones; `RENDER_DEPLOY_HOOK_URL`; SonarQube documentado. |
+| 1.3 | 2026-05-26 | Eliminados `railway.toml` y proyectos Railway; producción solo Firebase + Render. |

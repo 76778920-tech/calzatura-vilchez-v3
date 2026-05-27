@@ -1,6 +1,6 @@
 import "@/styles/admin.css";
 import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, CircleDollarSign, LogOut, Store } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, CircleDollarSign, LogOut, Store, BookOpen } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { ADMIN_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "@/routes/paths";
 import { logoutUser } from "@/domains/usuarios/services/auth";
@@ -65,6 +65,10 @@ export default function StaffLayout() {
           <NavLink to={STAFF_ROUTES.sales} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}>
             <CircleDollarSign size={18} />
             <span className="admin-nav-label">Ventas</span>
+          </NavLink>
+          <NavLink to={STAFF_ROUTES.complaints} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}>
+            <BookOpen size={18} />
+            <span className="admin-nav-label">Reclamaciones</span>
           </NavLink>
         </nav>
         <button type="button" className="admin-nav-item w-full" onClick={handleLogout}>

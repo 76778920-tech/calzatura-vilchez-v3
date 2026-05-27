@@ -336,7 +336,7 @@ Los datos personales de clientes (nombre, DNI, teléfono, direcciones) se almace
 El sistema incluye un `docker-compose.yml` que levanta el frontend (Node.js) y el servicio de IA (Python/FastAPI) en contenedores independientes para desarrollo local y entornos de staging.
 
 **RNF-17 — Independencia de plataforma cloud**
-El servicio de IA está diseñado para desplegarse en cualquier plataforma que soporte contenedores Docker (Render.com, Railway, Google Cloud Run, AWS ECS). La configuración se inyecta exclusivamente mediante variables de entorno.
+El servicio de IA está diseñado para desplegarse en cualquier plataforma que soporte contenedores Docker (producción actual: Render.com; alternativas: Google Cloud Run, AWS ECS). La configuración se inyecta exclusivamente mediante variables de entorno.
 
 ---
 

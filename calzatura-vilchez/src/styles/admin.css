@@ -3832,3 +3832,84 @@ dialog.document-preview-modal {
   outline: 2px solid var(--gold); outline-offset: 2px;
 }
 
+.admin-complaints-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.admin-complaint-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--white);
+  overflow: hidden;
+}
+.admin-complaint-header {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 0.65rem 1rem;
+  align-items: start;
+  padding: 0.85rem 1rem;
+}
+.admin-complaint-meta,
+.admin-complaint-consumer {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-top: 0.2rem;
+}
+.admin-complaint-body {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.admin-complaint-actions {
+  margin-top: 0.75rem;
+}
+.admin-complaint-actions label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  max-width: 220px;
+}
+.admin-status-pill {
+  align-self: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #fff;
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.admin-expand-btn {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 0.25rem;
+  align-self: center;
+}
+.admin-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.admin-empty {
+  color: var(--text-muted);
+  padding: 1.5rem 0;
+}
+.admin-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-sm);
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+  margin-bottom: 1rem;
+}
+

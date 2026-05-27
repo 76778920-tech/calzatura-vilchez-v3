@@ -22,6 +22,11 @@ export const CLIENT_STORAGE = {
     backend: "sessionStorage",
     sensitivity: "pii-transient",
   },
+  cookieConsent: {
+    key: "calzatura_cookie_consent",
+    backend: "localStorage",
+    sensitivity: "none",
+  },
 } as const;
 
 const LOCAL_KEY_PREFIXES = [

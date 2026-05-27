@@ -1,7 +1,7 @@
 import { getBackendApiBaseUrl } from "@/config/apiBackend";
 import { assertHttpsInProduction } from "@/utils/requireHttpsInProd";
 import { getToken } from "firebase/app-check";
-import { appCheck } from "@/firebase/config";
+import { getAppCheckInstance } from "@/firebase/appCheckConsent";
 
 export interface DniLookupResult {
   dni: string;
@@ -81,6 +81,7 @@ export async function lookupDni(dni: string): Promise<DniLookupResult> {
   }
 
   const endpoint = resolveDniLookupEndpoint();
+  const appCheck = getAppCheckInstance();
   const appCheckToken = appCheck
     ? await getToken(appCheck, false).then((result) => result.token).catch(() => "")
     : "";

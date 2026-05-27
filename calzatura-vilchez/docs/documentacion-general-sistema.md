@@ -261,7 +261,7 @@ firebase deploy --only hosting
 
 ### Servicio IA
 
-El servicio IA no queda activo si se ejecuta solo con `run.bat` en una computadora local. Para disponibilidad continua debe desplegarse en Render, Railway, Google Cloud Run u otro servidor.
+El servicio IA no queda activo si se ejecuta solo con `run.bat` en una computadora local. Para disponibilidad continua debe desplegarse en Render u otro servidor (p. ej. Google Cloud Run).
 
 ## 13. Mantenibilidad
 

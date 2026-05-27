@@ -1,5 +1,5 @@
 /* Copiado desde ../functions/index.js — al cambiar lógica de API, actualizar ambos o extraer módulo compartido. */
-/* BFF Express: mismo contrato de rutas que Cloud Functions. Desplegar en Render/Fly/Railway (sin plan Blaze). */
+/* BFF Express: mismo contrato de rutas que Cloud Functions. Desplegar en Render/Fly (sin plan Blaze). */
 require("dotenv").config();
 
 const fs = require("fs");
@@ -4082,6 +4082,19 @@ app.all("/authLogin", (req, res) => {
       return res.status(200).json({ ok: false });
     }
   });
+});
+
+const { registerLibroReclamacionesRoutes } = require("./libroReclamaciones.cjs");
+registerLibroReclamacionesRoutes(app, {
+  cors,
+  getSupabaseAdmin,
+  verifyFirebaseUser,
+  assertAdminRole,
+  assertTrabajadorRole,
+  logAuditFn,
+  logServerError,
+  httpErrorStatus,
+  publicError,
 });
 
 const PORT = Number(process.env.PORT || 8787);

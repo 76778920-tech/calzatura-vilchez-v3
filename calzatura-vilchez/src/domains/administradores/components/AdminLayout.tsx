@@ -1,7 +1,7 @@
 import "@/styles/admin.css";
 import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain, FileSpreadsheet, ChevronLeft, ChevronRight, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain, FileSpreadsheet, ChevronLeft, ChevronRight, ShieldCheck, BookOpen } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { ADMIN_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 import { logoutUser } from "@/domains/usuarios/services/auth";
@@ -58,6 +58,7 @@ export default function AdminLayout() {
     [ADMIN_ROUTES.manufacturers]: "Gestion de fabricantes",
     [ADMIN_ROUTES.predictions]: "Predicciones IA",
     [ADMIN_ROUTES.data]: "Datos e importacion",
+    [ADMIN_ROUTES.complaints]: "Libro de reclamaciones",
   };
   const activePageTitle = pageTitles[location.pathname] ?? "Administracion";
 
@@ -107,6 +108,9 @@ export default function AdminLayout() {
           </NavLink>
           <NavLink to={ADMIN_ROUTES.orders} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Pedidos">
             <ShoppingBag size={18} /><span className="admin-nav-label">Pedidos</span>
+          </NavLink>
+          <NavLink to={ADMIN_ROUTES.complaints} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Libro de reclamaciones">
+            <BookOpen size={18} /><span className="admin-nav-label">Reclamaciones</span>
           </NavLink>
           <NavLink to={ADMIN_ROUTES.sales} className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`} title="Ventas">
             <CircleDollarSign size={18} /><span className="admin-nav-label">Ventas</span>

@@ -16,6 +16,7 @@ export const INFO_ROUTES = {
   tesisIso25001: "/tesis/iso-25001-calidad",
   legalTerminos: "/legal/terminos-condiciones",
   legalPrivacidad: "/legal/politica-privacidad",
+  legalCookies: "/legal/politica-cookies",
   legalLibroReclamaciones: "/legal/libro-reclamaciones",
   ayudaContacto: "/ayuda/contactanos",
   ayudaRastreoPedido: "/ayuda/rastreo-pedido",
@@ -50,6 +51,7 @@ export const ADMIN_ROUTES = {
   manufacturers: `${_AP}/fabricantes`,
   predictions: `${_AP}/predicciones`,
   data: `${_AP}/datos`,
+  complaints: `${_AP}/libro-reclamaciones`,
 } as const;
 
 const _SP = ensureLeadingSlash(import.meta.env.VITE_STAFF_PATH ?? "/staff");
@@ -60,6 +62,7 @@ export const STAFF_ROUTES = {
   home: _SP,
   orders: `${_SP}/pedidos`,
   sales: `${_SP}/ventas`,
+  complaints: `${_SP}/libro-reclamaciones`,
 } as const;
 
 export const ROUTE_GROUPS = {

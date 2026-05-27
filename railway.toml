@@ -1,7 +1,0 @@
-# LEGADO — no usar para producción. El servicio IA se despliega en Render
-# (ver documentacion/09-implementacion-despliegue-ci.md §7.5).
-
-[deploy]
-startCommand = "hypercorn main:app --bind [::]:$PORT"
-healthcheckPath = "/api/health"
-healthcheckTimeout = 300

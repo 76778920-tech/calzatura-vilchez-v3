@@ -13,8 +13,10 @@ function ScrollToTop() {
   }, [pathname]);
   return null;
 }
+import { CookieBanner } from "@/components/cookies/CookieBanner";
 import Header from "./components/layout/Header";
 import Footer from "./components/layout/Footer";
+import { CookieConsentProvider } from "@/context/CookieConsentContext";
 import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "./routes/paths";
 import { CATALOG_SHELF } from "./routes/catalogRouting";
 import { AreaRoute, AuthenticatedRoute, PageLoader } from "./routes/RouteGuards";
@@ -30,6 +32,7 @@ const AdminUsers = lazy(() => import("@/domains/usuarios/pages/AdminUsers"));
 const AdminManufacturers = lazy(() => import("@/domains/fabricantes/pages/AdminManufacturers"));
 const AdminPredictions = lazy(() => import("@/domains/administradores/pages/AdminPredictions"));
 const AdminData = lazy(() => import("@/domains/administradores/pages/AdminData"));
+const AdminComplaints = lazy(() => import("@/domains/administradores/pages/AdminComplaints"));
 
 const StaffLayout = lazy(() => import("@/domains/trabajadores/components/StaffLayout"));
 const StaffHomePage = lazy(() => import("@/domains/trabajadores/pages/StaffHomePage"));
@@ -87,6 +90,7 @@ function Storefront() {
             <Route path={INFO_ROUTES.tesisIso25001} element={<ThesisIsoPage />} />
             <Route path={INFO_ROUTES.legalTerminos} element={<InfoPage pageKey="terminos" />} />
             <Route path={INFO_ROUTES.legalPrivacidad} element={<InfoPage pageKey="privacidad" />} />
+            <Route path={INFO_ROUTES.legalCookies} element={<InfoPage pageKey="politicaCookies" />} />
             <Route path={INFO_ROUTES.legalLibroReclamaciones} element={<InfoPage pageKey="libroReclamaciones" />} />
             <Route path={INFO_ROUTES.ayudaContacto} element={<InfoPage pageKey="contactanos" />} />
             <Route path={INFO_ROUTES.ayudaRastreoPedido} element={<InfoPage pageKey="rastreoPedido" />} />
@@ -128,7 +132,9 @@ function Storefront() {
 export default function App() {
   return (
     <BrowserRouter>
+      <CookieConsentProvider>
       <ScrollToTop />
+      <CookieBanner />
       <Toaster
         position="top-right"
         toastOptions={{
@@ -145,6 +151,7 @@ export default function App() {
             <Route index element={<StaffHomePage />} />
             <Route path="pedidos" element={<AdminOrders />} />
             <Route path="ventas" element={<AdminSales />} />
+            <Route path="libro-reclamaciones" element={<AdminComplaints />} />
           </Route>
           <Route
             path={ADMIN_ROUTES.root}
@@ -158,6 +165,7 @@ export default function App() {
             <Route path="fabricantes" element={<AdminManufacturers />} />
             <Route path="predicciones" element={<AdminPredictions />} />
             <Route path="datos" element={<AdminData />} />
+            <Route path="libro-reclamaciones" element={<AdminComplaints />} />
           </Route>
           <Route path="/*" element={
             <CartProvider>
@@ -168,6 +176,7 @@ export default function App() {
           } />
         </Routes>
       </Suspense>
+      </CookieConsentProvider>
     </BrowserRouter>
   );
 }

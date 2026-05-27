@@ -2,6 +2,8 @@ import { Link } from "react-router-dom";
 import { Clock, Globe, MapPin, Phone } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
 import { ExternalLink } from "@/components/common/ExternalLink";
+import { CookieSettingsLink } from "@/components/cookies/CookieSettingsLink";
+import { BUSINESS_CONTACT } from "@/config/businessContact";
 import { INFO_ROUTES } from "@/routes/paths";
 
 const SOCIAL_INSTAGRAM = "https://www.instagram.com/";
@@ -30,6 +32,7 @@ export default function Footer() {
       links: [
         { label: "Términos y condiciones", to: INFO_ROUTES.legalTerminos },
         { label: "Política de privacidad", to: INFO_ROUTES.legalPrivacidad },
+        { label: "Política de cookies", to: INFO_ROUTES.legalCookies },
         { label: "Libro de reclamaciones", to: INFO_ROUTES.legalLibroReclamaciones },
       ],
     },
@@ -141,7 +144,11 @@ export default function Footer() {
               </svg>
             </ExternalLink>
           </div>
-          <p>© {year} Calzatura Vilchez · Todos los derechos reservados</p>
+          <CookieSettingsLink />
+          <p>
+            © {year} {BUSINESS_CONTACT.legalName} · RUC {BUSINESS_CONTACT.rucDisplay} · Todos los
+            derechos reservados
+          </p>
         </div>
       </div>
     </footer>

@@ -24,7 +24,7 @@ def get_db():
         json_env = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
         if json_env:
             cred_dict = json.loads(json_env)
-            # Render/Railway sometimes stores literal \n instead of newlines in private_key
+            # Render sometimes stores literal \n instead of newlines in private_key
             if "private_key" in cred_dict:
                 cred_dict["private_key"] = cred_dict["private_key"].replace("\\n", "\n")
             cred = credentials.Certificate(cred_dict)

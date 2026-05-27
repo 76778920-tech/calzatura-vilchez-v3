@@ -19,5 +19,4 @@ evaluate.py
 requirements-dev.txt
 pytest.ini
 TECHNICAL.md
-railway.toml
 run.bat
