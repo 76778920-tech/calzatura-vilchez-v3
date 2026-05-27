@@ -126,7 +126,7 @@ El workflow se ejecuta en:
 - Pull request hacia `main`.
 - Ejecucion manual con `workflow_dispatch`.
 
-Si `SONAR_TOKEN` no existe, el workflow aun asi genera cobertura, informes ESLint y Bandit, pero omite el analisis SonarQube con una advertencia. Esto evita que CI falle antes de configurar las credenciales.
+Si `SONAR_TOKEN` no existe o SonarCloud lo rechaza (por ejemplo HTTP 403 en `/api/authentication/validate`), el workflow genera cobertura, informes ESLint y Bandit, pero omite el escaneo SonarQube con una advertencia en Actions. Regenera el token en SonarCloud y actualiza el secret del repositorio para reactivar el analisis.
 
 ## 6. Ejecucion local opcional
 

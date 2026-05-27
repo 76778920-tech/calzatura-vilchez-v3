@@ -95,12 +95,23 @@ jobs:
         shell: bash
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
         run: |
+          host="${SONAR_HOST_URL:-https://sonarcloud.io}"
+          host="${host%/}"
+
           if [ -z "$SONAR_TOKEN" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::SonarQube omitido. Configura el secret SONAR_TOKEN para activar el analisis."
-          else
+            echo "::warning::SonarQube omitido. Configura el secret SONAR_TOKEN (SonarCloud → My Account → Security → Generate Token)."
+            exit 0
+          fi
+
+          http_code="$(curl -s -o /dev/null -w "%{http_code}" -u "${SONAR_TOKEN}:" "${host}/api/authentication/validate")"
+          if [ "$http_code" = "200" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SONAR_TOKEN rechazado por SonarCloud (HTTP ${http_code}). Regenera el token de analisis y actualiza el secret del repositorio. Cobertura, ESLint y Bandit se generan igual; el escaneo Sonar queda pendiente hasta corregir credenciales."
           fi
 
       - name: Diagnostico cobertura (logs; revisar si Sonar no baja lineas)
