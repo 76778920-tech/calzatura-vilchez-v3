@@ -73,6 +73,9 @@ export default function AdminLayout() {
 
   return (
     <div className="admin-layout">
+      <a href="#admin-main-content" className="skip-link">
+        Saltar al contenido principal
+      </a>
       <aside id="admin-sidebar" className={`admin-sidebar${collapsed ? " collapsed" : ""}`} aria-label="Menú de administración">
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-brand">
@@ -146,7 +149,7 @@ export default function AdminLayout() {
         {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
       </button>
 
-      <main ref={mainRef} tabIndex={-1} className="admin-main">
+      <main ref={mainRef} tabIndex={-1} className="admin-main" id="admin-main-content">
         <header className="admin-topbar">
           <div>
             {location.pathname !== ADMIN_ROUTES.dashboard && (

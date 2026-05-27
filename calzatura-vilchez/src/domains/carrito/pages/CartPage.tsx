@@ -5,8 +5,10 @@ import { CartSummaryRows, CartItemQtyControls } from "@/domains/carrito/componen
 import { handleProductImageError } from "@/utils/imgUtils";
 import { getSizeStock } from "@/utils/stock";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function CartPage() {
+  useDocumentTitle("Mi carrito");
   const { items, removeItem, updateQuantity, subtotal, total, clearCart } = useCart();
   const { user } = useAuth();
 

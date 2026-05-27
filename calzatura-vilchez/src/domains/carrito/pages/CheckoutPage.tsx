@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useNavigate, Link } from "react-router-dom";
 import { ShoppingBag, CreditCard, Truck, ChevronRight, AlertCircle } from "lucide-react";
 import { useCart } from "@/domains/carrito/context/CartContext";
@@ -14,8 +15,9 @@ import { useCheckoutGeocodingEffects } from "@/domains/carrito/hooks/useCheckout
 import { redirectStripeCheckoutForOrder } from "@/domains/carrito/services/stripeCheckoutRedirect";
 import {
   formatDireccionTelefonoForSubmit,
-  validateCheckoutDireccionStep,
+  getCheckoutFieldErrors,
 } from "@/domains/carrito/utils/checkoutDireccionValidation";
+import type { CheckoutFieldErrors } from "@/domains/carrito/utils/checkoutDireccionValidation";
 import { checkoutEnvioSummaryLabel } from "@/domains/carrito/utils/checkoutEnvioSummaryLabel";
 
 const STRIPE_PK = import.meta.env.VITE_STRIPE_PUBLIC_KEY ?? "";
@@ -84,6 +86,7 @@ function deliveryDegradedNotice(geo: ReturnType<typeof useCheckoutGeocodingEffec
 }
 
 export default function CheckoutPage() {
+  useDocumentTitle("Checkout");
   const { items, subtotal, clearCart } = useCart();
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
@@ -114,6 +117,8 @@ export default function CheckoutPage() {
     telefono: userProfile?.telefono ?? "",
     referencia: "",
   });
+
+  const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
 
   const geo = useCheckoutGeocodingEffects({ direccion });
   const addressLineLen = geo.addressLine().length;
@@ -173,7 +178,7 @@ export default function CheckoutPage() {
 
   const handleDireccionSubmit = (e: { preventDefault: () => void }) => {
     e.preventDefault();
-    const err = validateCheckoutDireccionStep({
+    const errors = getCheckoutFieldErrors({
       direccion,
       deliveryPricingActive: geo.deliveryPricingActive,
       locationConfirmed: geo.locationConfirmed,
@@ -182,10 +187,12 @@ export default function CheckoutPage() {
       deliveryQuoteError: geo.deliveryQuoteError,
       deliveryQuote: geo.deliveryQuote,
     });
-    if (err) {
-      toast.error(err);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      if (errors.delivery) toast.error(errors.delivery);
       return;
     }
+    setFieldErrors({});
     setDireccion(formatDireccionTelefonoForSubmit(direccion));
     setStep("pago");
   };
@@ -269,6 +276,7 @@ export default function CheckoutPage() {
                     required
                     className="form-input"
                     placeholder="Tu nombre"
+                    autoComplete="given-name"
                   />
                 </div>
                 <div className="form-group">
@@ -280,6 +288,7 @@ export default function CheckoutPage() {
                     required
                     className="form-input"
                     placeholder="Tu apellido"
+                    autoComplete="family-name"
                   />
                 </div>
               </div>
@@ -289,11 +298,18 @@ export default function CheckoutPage() {
                 <input
                   id="checkout-direccion"
                   value={direccion.direccion}
-                  onChange={(e) => setDireccion({ ...direccion, direccion: e.target.value })}
+                  onChange={(e) => {
+                    setDireccion({ ...direccion, direccion: e.target.value });
+                    setFieldErrors((prev) => ({ ...prev, direccion: undefined }));
+                  }}
                   required
-                  className="form-input"
+                  className={`form-input${fieldErrors.direccion ? " input-error" : ""}`}
                   placeholder="Av., Calle, Jr..."
+                  aria-invalid={!!fieldErrors.direccion}
+                  aria-describedby={fieldErrors.direccion ? "checkout-direccion-error" : undefined}
+                  autoComplete="street-address"
                 />
+                {fieldErrors.direccion && <p id="checkout-direccion-error" className="field-error" role="alert">{fieldErrors.direccion}</p>}
               </div>
 
               <div className="form-row">
@@ -305,6 +321,7 @@ export default function CheckoutPage() {
                     onChange={(e) => setDireccion({ ...direccion, ciudad: e.target.value })}
                     required
                     className="form-input"
+                    autoComplete="address-level2"
                   />
                 </div>
                 <div className="form-group">
@@ -312,11 +329,18 @@ export default function CheckoutPage() {
                   <input
                     id="checkout-distrito"
                     value={direccion.distrito}
-                    onChange={(e) => setDireccion({ ...direccion, distrito: e.target.value })}
+                    onChange={(e) => {
+                      setDireccion({ ...direccion, distrito: e.target.value });
+                      setFieldErrors((prev) => ({ ...prev, distrito: undefined }));
+                    }}
                     required
-                    className="form-input"
+                    className={`form-input${fieldErrors.distrito ? " input-error" : ""}`}
                     placeholder="Miraflores, SJL..."
+                    aria-invalid={!!fieldErrors.distrito}
+                    aria-describedby={fieldErrors.distrito ? "checkout-distrito-error" : undefined}
+                    autoComplete="address-level3"
                   />
+                  {fieldErrors.distrito && <p id="checkout-distrito-error" className="field-error" role="alert">{fieldErrors.distrito}</p>}
                 </div>
               </div>
 
@@ -326,19 +350,24 @@ export default function CheckoutPage() {
                   id="checkout-telefono"
                   type="tel"
                   value={direccion.telefono}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setDireccion({
                       ...direccion,
                       telefono: normalizePeruPhoneInput(e.target.value),
-                    })
-                  }
+                    });
+                    setFieldErrors((prev) => ({ ...prev, telefono: undefined }));
+                  }}
                   required
                   inputMode="tel"
                   maxLength={15}
                   pattern="(?:\+51\s?)?9[0-9]{2}\s?[0-9]{3}\s?[0-9]{3}"
-                  className="form-input"
+                  className={`form-input${fieldErrors.telefono ? " input-error" : ""}`}
                   placeholder="+51 999 999 999"
+                  aria-invalid={!!fieldErrors.telefono}
+                  aria-describedby={fieldErrors.telefono ? "checkout-telefono-error" : undefined}
+                  autoComplete="tel"
                 />
+                {fieldErrors.telefono && <p id="checkout-telefono-error" className="field-error" role="alert">{fieldErrors.telefono}</p>}
               </div>
 
               <div className="form-group">

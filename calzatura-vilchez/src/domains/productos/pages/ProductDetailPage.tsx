@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ShoppingCart,
@@ -29,10 +30,12 @@ export default function ProductDetailPage() {
   const { addItem } = useCart();
 
   const [product, setProduct] = useState<Product | null>(null);
+  useDocumentTitle(product?.nombre ?? "Producto");
   const [familySiblings, setFamilySiblings] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedColor, setSelectedColor] = useState<string>("");
   const [selectedTalla, setSelectedTalla] = useState<string>("");
+  const [tallaError, setTallaError] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -90,11 +93,22 @@ export default function ProductDetailPage() {
   useEffect(() => {
     if (previewOpen) return;
     if (productImages.length <= 1) return;
+    const mql = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
+    if (mql.matches) return;
+
     const interval = globalThis.setInterval(() => {
       setSelectedImageIndex((current) => (current + 1) % productImages.length);
     }, 4500);
 
-    return () => globalThis.clearInterval(interval);
+    const onMotionChange = () => {
+      if (mql.matches) globalThis.clearInterval(interval);
+    };
+    mql.addEventListener("change", onMotionChange);
+
+    return () => {
+      globalThis.clearInterval(interval);
+      mql.removeEventListener("change", onMotionChange);
+    };
   }, [previewOpen, productImages.length]);
 
   const moveImage = (direction: 1 | -1) => {
@@ -114,20 +128,21 @@ export default function ProductDetailPage() {
       return;
     }
     if (availableSizes.length && !selectedTalla) {
-      toast.error("Selecciona una talla");
+      setTallaError("Selecciona una talla");
       return;
     }
     if (quantity > selectedSizeStock) {
-      toast.error("No hay stock suficiente para esa talla");
+      setTallaError("No hay stock suficiente para esa talla");
       return;
     }
+    setTallaError("");
     addItem(visibleProduct, quantity, selectedTalla || undefined, selectedColor || undefined);
     toast.success("Producto agregado al carrito");
   };
 
   if (loading) {
     return (
-      <div className="detail-skeleton">
+      <div className="detail-skeleton" role="status" aria-busy="true" aria-label="Cargando producto">
         <div className="skeleton-img" />
         <div className="skeleton-info">
           <div className="skeleton-line" />
@@ -329,7 +344,7 @@ export default function ProductDetailPage() {
                   ? <>Talla: <strong>{selectedTalla}</strong> <span className="detail-size-stock">· {selectedSizeStock} disponibles</span></>
                   : <span className="detail-size-hint">SELECCIONE SU TALLA</span>}
               </p>
-              <div className="tallas-grid">
+              <div className="tallas-grid" aria-describedby={tallaError ? "talla-error" : undefined}>
                 {(product.tallaStock
                   ? Object.keys(product.tallaStock).sort((a, b) => Number(a) - Number(b))
                   : (product.tallas ?? [])
@@ -339,7 +354,7 @@ export default function ProductDetailPage() {
                   return (
                     <button
                       key={t}
-                      onClick={() => { if (!outOfStock) { setSelectedTalla(t); setQuantity(1); } }}
+                      onClick={() => { if (!outOfStock) { setSelectedTalla(t); setQuantity(1); setTallaError(""); } }}
                       disabled={outOfStock}
                       className={`talla-btn${selectedTalla === t ? " active" : ""}${outOfStock ? " out-of-stock" : ""}`}
                     >
@@ -348,6 +363,7 @@ export default function ProductDetailPage() {
                   );
                 })}
               </div>
+              {tallaError && <p id="talla-error" className="field-error" role="alert">{tallaError}</p>}
             </div>
           ) : null}
 
@@ -359,6 +375,7 @@ export default function ProductDetailPage() {
                 <button
                   onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                   className="qty-btn-lg"
+                  aria-label="Disminuir cantidad"
                 >
                   <Minus size={14} />
                 </button>
@@ -366,6 +383,7 @@ export default function ProductDetailPage() {
                 <button
                   onClick={() => setQuantity((q) => Math.min(selectedSizeStock, q + 1))}
                   className="qty-btn-lg"
+                  aria-label="Aumentar cantidad"
                 >
                   <Plus size={14} />
                 </button>

@@ -136,7 +136,7 @@ export default function AdminOrders() {
   let ordersMain: ReactNode;
   if (loading) {
     ordersMain = (
-      <div className="orders-skeleton">
+      <div className="orders-skeleton" role="status" aria-busy="true" aria-label="Cargando pedidos">
         {ADMIN_ORDERS_SKELETON_KEYS.map((id) => (
           <div key={id} className="skeleton-card" style={{ height: "80px" }} />
         ))}

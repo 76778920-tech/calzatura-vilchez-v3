@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { IdCard, Mail, Phone, Save, Shield, Trash2, User } from "lucide-react";
+import { AccessibleConfirmDialog } from "@/components/common/AccessibleConfirmDialog";
 import toast from "react-hot-toast";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { deleteOwnAccount } from "@/domains/usuarios/services/auth";
@@ -30,6 +32,7 @@ function roleLabel(role?: UserRole) {
 }
 
 export default function ProfilePage() {
+  useDocumentTitle("Mi perfil");
   const navigate = useNavigate();
   const { user, userProfile, isAdmin, refreshProfile } = useAuth();
   const fallback = splitFallbackName(userProfile?.nombre);
@@ -37,6 +40,7 @@ export default function ProfilePage() {
   const nombres = userProfile?.nombres ?? fallback.nombres;
   const apellidos = userProfile?.apellidos ?? fallback.apellidos;
   const [telefono, setTelefono] = useState(userProfile?.telefono ?? "");
+  const [telefonoError, setTelefonoError] = useState("");
   const [saving, setSaving] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -50,10 +54,11 @@ export default function ProfilePage() {
     if (telefono.trim()) {
       const phoneError = peruPhoneError(telefono);
       if (phoneError || !isValidPeruPhone(telefono)) {
-        toast.error(phoneError ?? "Ingresa un teléfono válido");
+        setTelefonoError(phoneError ?? "Ingresa un teléfono válido");
         return;
       }
     }
+    setTelefonoError("");
 
     setSaving(true);
     const timeout = new Promise<never>((_, reject) => {
@@ -144,8 +149,7 @@ export default function ProfilePage() {
                   type="text"
                   value={maskDniForDisplay(userProfile?.dni)}
                   disabled
-                  className="form-input with-icon"
-                  style={{ opacity: 0.6, cursor: "not-allowed" }}
+                  className="form-input with-icon disabled-field"
                 />
               </div>
             </div>
@@ -160,8 +164,7 @@ export default function ProfilePage() {
                     type="text"
                     value={nombres}
                     disabled
-                    className="form-input with-icon"
-                    style={{ opacity: 0.6, cursor: "not-allowed" }}
+                    className="form-input with-icon disabled-field"
                   />
                 </div>
               </div>
@@ -175,8 +178,7 @@ export default function ProfilePage() {
                     type="text"
                     value={apellidos}
                     disabled
-                    className="form-input with-icon"
-                    style={{ opacity: 0.6, cursor: "not-allowed" }}
+                    className="form-input with-icon disabled-field"
                   />
                 </div>
               </div>
@@ -191,8 +193,7 @@ export default function ProfilePage() {
                   type="email"
                   value={user.email ?? ""}
                   disabled
-                  className="form-input with-icon"
-                  style={{ opacity: 0.6, cursor: "not-allowed" }}
+                  className="form-input with-icon disabled-field"
                 />
               </div>
               <span style={{ fontSize: "12px", color: "var(--text-muted)" }}>
@@ -208,14 +209,18 @@ export default function ProfilePage() {
                   id="profile-telefono"
                   type="tel"
                   value={telefono}
-                  onChange={(e) => setTelefono(normalizePeruPhoneInput(e.target.value))}
-                  className="form-input with-icon"
+                  onChange={(e) => { setTelefono(normalizePeruPhoneInput(e.target.value)); setTelefonoError(""); }}
+                  className={`form-input with-icon${telefonoError ? " input-error" : ""}`}
+                  aria-invalid={!!telefonoError}
+                  aria-describedby={telefonoError ? "profile-telefono-error" : undefined}
                   inputMode="tel"
+                  autoComplete="tel"
                   maxLength={15}
                   pattern="(?:\\+51\\s?)?9[0-9]{2}\\s?[0-9]{3}\\s?[0-9]{3}"
                   placeholder="+51 999 999 999"
                 />
               </div>
+              {telefonoError && <p id="profile-telefono-error" className="field-error" role="alert">{telefonoError}</p>}
             </div>
 
             <button type="submit" disabled={saving} className="btn-primary">
@@ -280,36 +285,16 @@ export default function ProfilePage() {
       </div>
 
       {deleteOpen && (
-        <div className="profile-delete-modal-overlay">
-          <button
-            type="button"
-            className="profile-delete-modal-backdrop"
-            onClick={() => {
-              if (!deleting) resetDeleteForm();
-            }}
-            aria-label="Cerrar confirmacion"
-          />
-          <div className="profile-delete-modal">
-            <div className="profile-delete-modal-header">
-              <div>
-                <h2>Confirmar eliminacion</h2>
-                <p>Estas seguro de que deseas eliminar tu cuenta de forma permanente?</p>
-              </div>
-            </div>
-
-            <div className="profile-delete-modal-body">
-              <button
-                type="button"
-                className="btn-danger profile-delete-confirm-btn"
-                disabled={deleting}
-                onClick={handleDeleteAccount}
-              >
-                <Trash2 size={16} />
-                {deleting ? "Eliminando..." : "Confirmar eliminacion"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <AccessibleConfirmDialog
+          title="Confirmar eliminación"
+          description="¿Estás seguro de que deseas eliminar tu cuenta de forma permanente? Esta acción no se puede deshacer."
+          confirmLabel="Confirmar eliminación"
+          loadingLabel="Eliminando..."
+          cancelLabel="Cancelar"
+          loading={deleting}
+          onCancel={resetDeleteForm}
+          onConfirm={handleDeleteAccount}
+        />
       )}
     </main>
   );

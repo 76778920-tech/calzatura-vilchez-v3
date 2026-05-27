@@ -123,7 +123,7 @@ function OrderDetailModal({ order, onClose }: Readonly<{ order: Order; onClose: 
             <p className="dash-modal-kicker">Detalle del Pedido</p>
             <h2 id="dash-order-modal-title" className="dash-modal-title">#{order.id.slice(-8).toUpperCase()}</h2>
           </div>
-          <button type="button" className="modal-close" onClick={onClose}>
+          <button type="button" className="modal-close" onClick={onClose} aria-label="Cerrar">
             <X size={20} />
           </button>
         </div>

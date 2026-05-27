@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { ensureVerifiedUserProfile, loginUser, resetPassword } from "@/domains/usuarios/services/auth";
@@ -12,22 +13,24 @@ import { clearPendingVerificationEmail, savePendingVerificationEmail } from "@/u
 import type { UserRole } from "@/types";
 
 export default function Login() {
+  useDocumentTitle("Iniciar sesión");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
 
   const handleForgotPassword = async () => {
     const target = email.trim();
     if (!target) {
-      toast.error("Ingresa tu correo primero");
+      setFieldErrors({ email: "Ingresa tu correo para restablecer la contraseña" });
       return;
     }
     const emailErr = validateEmailFormat(target);
     if (emailErr) {
-      toast.error(emailErr);
+      setFieldErrors({ email: emailErr });
       return;
     }
     try {
@@ -48,15 +51,12 @@ export default function Login() {
     e.preventDefault();
 
     const emailErr = validateEmailFormat(email);
-    if (emailErr) {
-      toast.error(emailErr);
-      return;
-    }
     const passErr = validateLoginPasswordLength(password);
-    if (passErr) {
-      toast.error(passErr);
+    if (emailErr || passErr) {
+      setFieldErrors({ email: emailErr || undefined, password: passErr || undefined });
       return;
     }
+    setFieldErrors({});
 
     const emailNorm = normalizeEmailInput(email);
     setLoading(true);
@@ -119,13 +119,16 @@ export default function Login() {
                 inputMode="email"
                 autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setFieldErrors((prev) => ({ ...prev, email: undefined })); }}
                 required
                 maxLength={MAX_AUTH_EMAIL_INPUT_LENGTH}
                 placeholder="tu@correo.com"
-                className="form-input with-icon"
+                className={`form-input with-icon${fieldErrors.email ? " input-error" : ""}`}
+                aria-invalid={!!fieldErrors.email}
+                aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
               />
             </div>
+            {fieldErrors.email && <p id="login-email-error" className="field-error" role="alert">{fieldErrors.email}</p>}
           </div>
 
           <div className="input-group">
@@ -138,27 +141,31 @@ export default function Login() {
                 type={showPass ? "text" : "password"}
                 autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setFieldErrors((prev) => ({ ...prev, password: undefined })); }}
                 required
                 maxLength={MAX_AUTH_PASSWORD_LENGTH}
                 placeholder="••••••••"
-                className="form-input with-icon"
+                className={`form-input with-icon${fieldErrors.password ? " input-error" : ""}`}
+                aria-invalid={!!fieldErrors.password}
+                aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
               />
               <button
                 type="button"
                 onClick={() => setShowPass(!showPass)}
                 className="input-toggle"
+                aria-label={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
               >
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
+            {fieldErrors.password && <p id="login-password-error" className="field-error" role="alert">{fieldErrors.password}</p>}
           </div>
 
           <div style={{ textAlign: "right", marginTop: "-4px" }}>
             <button
               type="button"
               onClick={handleForgotPassword}
-              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontSize: "13px", fontWeight: 600, padding: 0 }}
+              style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary-text)", fontSize: "13px", fontWeight: 600, padding: 0 }}
             >
               ¿Olvidaste tu contraseña?
             </button>

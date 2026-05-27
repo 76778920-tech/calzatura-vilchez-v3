@@ -6,10 +6,12 @@ import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useFavorites } from "@/domains/clientes/context/FavoritesContext";
 import { fetchPublicProductsByIds } from "@/domains/productos/services/products";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import type { Product } from "@/types";
 import toast from "react-hot-toast";
 
 export default function FavoritesPage() {
+  useDocumentTitle("Mis favoritos");
   const { userProfile, user } = useAuth();
   const { favoriteIds, loading: favLoading } = useFavorites();
   const [allProducts, setAllProducts] = useState<Product[]>([]);

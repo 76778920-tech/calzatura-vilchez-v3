@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Clock, Globe, MapPin, Phone } from "lucide-react";
 import BrandLogo from "@/components/brand/BrandLogo";
+import { ExternalLink } from "@/components/common/ExternalLink";
 import { INFO_ROUTES } from "@/routes/paths";
 
 const SOCIAL_INSTAGRAM = "https://www.instagram.com/";
@@ -71,16 +72,15 @@ export default function Footer() {
               Descubre más
             </Link>
             <div className="footer-contact">
-              <a
+              <ExternalLink
                 href={whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
                 className="contact-item footer-contact-link"
                 aria-label="Abrir WhatsApp de Calzatura Vilchez"
+                hideIcon
               >
                 <Phone size={15} />
                 <span>+51 964 052 530</span>
-              </a>
+              </ExternalLink>
               <div className="contact-item">
                 <Clock size={15} />
                 <span>Lunes a domingo, 9:00 a. m. a 7:30 p. m.</span>
@@ -107,16 +107,15 @@ export default function Footer() {
 
         <div className="footer-bottom">
           <div className="footer-bottom-left">
-            <a
+            <ExternalLink
               href={mapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
               className="footer-bottom-link"
               aria-label="Abrir ubicación de Calzatura Vilchez en Google Maps"
+              hideIcon
             >
               <MapPin size={14} />
               Tiendas
-            </a>
+            </ExternalLink>
             <span className="footer-bottom-sep">•</span>
             <span className="footer-bottom-link">
               <Globe size={14} />
@@ -124,23 +123,23 @@ export default function Footer() {
             </span>
           </div>
           <div className="footer-social">
-            <a href={SOCIAL_INSTAGRAM} target="_blank" rel="noopener noreferrer" className="social-link" aria-label="Instagram (sitio oficial)">
+            <ExternalLink href={SOCIAL_INSTAGRAM} className="social-link" aria-label="Instagram (sitio oficial)" hideIcon>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <rect x="2" y="2" width="20" height="20" rx="5" />
                 <circle cx="12" cy="12" r="4" />
                 <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
               </svg>
-            </a>
-            <a href={SOCIAL_FACEBOOK} target="_blank" rel="noopener noreferrer" className="social-link" aria-label="Facebook (sitio oficial)">
+            </ExternalLink>
+            <ExternalLink href={SOCIAL_FACEBOOK} className="social-link" aria-label="Facebook (sitio oficial)" hideIcon>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
               </svg>
-            </a>
-            <a href={SOCIAL_TIKTOK} target="_blank" rel="noopener noreferrer" className="social-link" aria-label="TikTok (sitio oficial)">
+            </ExternalLink>
+            <ExternalLink href={SOCIAL_TIKTOK} className="social-link" aria-label="TikTok (sitio oficial)" hideIcon>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
                 <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
               </svg>
-            </a>
+            </ExternalLink>
           </div>
           <p>© {year} Calzatura Vilchez · Todos los derechos reservados</p>
         </div>

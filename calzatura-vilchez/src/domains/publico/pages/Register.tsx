@@ -1,16 +1,19 @@
 import { useState } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Link, useNavigate } from "react-router-dom";
+import { ExternalLink } from "@/components/common/ExternalLink";
 import { IdCard, User, Mail, Lock, Eye, EyeOff, Search, Smartphone } from "lucide-react";
 import { checkDisposableEmail, registerUser } from "@/domains/usuarios/services/auth";
 import { INFO_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 import { dniLookupFailureMessage, isValidDni, lookupDni, normalizeDni } from "@/domains/usuarios/services/dni";
-import { getNormalizedRegisterEmail, getRegisterBlockingMessage } from "./registerFormValidation";
+import { getNormalizedRegisterEmail, getRegisterFieldErrors, type RegisterFieldErrors } from "./registerFormValidation";
 import { savePendingVerificationEmail } from "@/utils/pendingVerification";
 import toast from "react-hot-toast";
 import { toastRegisterCreateError } from "./registerErrors";
 import { MAX_AUTH_EMAIL_INPUT_LENGTH, MAX_AUTH_PASSWORD_LENGTH } from "@/config/authCredentials";
 
 export default function Register() {
+  useDocumentTitle("Crear cuenta");
   const navigate = useNavigate();
   const [dni, setDni] = useState("");
   const [nombres, setNombres] = useState("");
@@ -25,6 +28,7 @@ export default function Register() {
   const [dniLookupToken, setDniLookupToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<RegisterFieldErrors>({});
 
   const showDniLookupError = (err: unknown) => {
     toast.error(dniLookupFailureMessage(err));
@@ -35,7 +39,7 @@ export default function Register() {
     setDni(normalized);
 
     if (!isValidDni(normalized)) {
-      toast.error("Ingresa un DNI valido de 8 digitos");
+      setFieldErrors((prev) => ({ ...prev, dni: "Ingresa un DNI válido de 8 dígitos" }));
       return;
     }
 
@@ -61,22 +65,14 @@ export default function Register() {
 
   const handleRegister = async (e: { preventDefault(): void }) => {
     e.preventDefault();
-    const blocking = getRegisterBlockingMessage({
-      dni,
-      validatedDni,
-      nombres,
-      apellidos,
-      password,
-      confirmPass,
-      email,
-      celular,
-    });
-    if (blocking) {
-      toast.error(blocking);
+    const errors = getRegisterFieldErrors({ dni, validatedDni, nombres, apellidos, password, confirmPass, email, celular });
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
+    setFieldErrors({});
     if (!dniLookupToken) {
-      toast.error("Vuelve a validar el DNI antes de crear la cuenta");
+      setFieldErrors({ dni: "Vuelve a validar el DNI antes de crear la cuenta" });
       return;
     }
     if (!acceptedTerms) {
@@ -136,6 +132,7 @@ export default function Register() {
                 onChange={(e) => {
                   const nextDni = normalizeDni(e.target.value);
                   setDni(nextDni);
+                  setFieldErrors((prev) => ({ ...prev, dni: undefined }));
                   if (nextDni !== validatedDni) {
                     setValidatedDni("");
                     setDniLookupToken("");
@@ -147,7 +144,9 @@ export default function Register() {
                 minLength={8}
                 maxLength={8}
                 placeholder="12345678"
-                className="form-input with-icon with-action"
+                className={`form-input with-icon with-action${fieldErrors.dni ? " input-error" : ""}`}
+                aria-invalid={!!fieldErrors.dni}
+                aria-describedby={fieldErrors.dni ? "register-dni-error" : undefined}
               />
               <button
                 type="button"
@@ -159,6 +158,7 @@ export default function Register() {
                 <Search size={15} />
               </button>
             </div>
+            {fieldErrors.dni && <p id="register-dni-error" className="field-error" role="alert">{fieldErrors.dni}</p>}
           </div>
 
           <div className="form-row">
@@ -173,8 +173,7 @@ export default function Register() {
                   value={nombres}
                   disabled
                   placeholder="Se completa con el DNI"
-                  className="form-input with-icon"
-                  style={{ opacity: 0.6, cursor: "not-allowed" }}
+                  className="form-input with-icon disabled-field"
                 />
               </div>
             </div>
@@ -190,8 +189,7 @@ export default function Register() {
                   value={apellidos}
                   disabled
                   placeholder="Se completa con el DNI"
-                  className="form-input with-icon"
-                  style={{ opacity: 0.6, cursor: "not-allowed" }}
+                  className="form-input with-icon disabled-field"
                 />
               </div>
             </div>
@@ -208,13 +206,16 @@ export default function Register() {
                 inputMode="email"
                 autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => { setEmail(e.target.value); setFieldErrors((prev) => ({ ...prev, email: undefined })); }}
                 required
                 maxLength={MAX_AUTH_EMAIL_INPUT_LENGTH}
                 placeholder="tu@correo.com"
-                className="form-input with-icon"
+                className={`form-input with-icon${fieldErrors.email ? " input-error" : ""}`}
+                aria-invalid={!!fieldErrors.email}
+                aria-describedby={fieldErrors.email ? "register-email-error" : undefined}
               />
             </div>
+            {fieldErrors.email && <p id="register-email-error" className="field-error" role="alert">{fieldErrors.email}</p>}
           </div>
 
           <div className="input-group">
@@ -228,13 +229,16 @@ export default function Register() {
                 inputMode="numeric"
                 autoComplete="tel"
                 value={celular}
-                onChange={(e) => setCelular(e.target.value.replace(/\D/g, "").slice(0, 9))}
+                onChange={(e) => { setCelular(e.target.value.replace(/\D/g, "").slice(0, 9)); setFieldErrors((prev) => ({ ...prev, celular: undefined })); }}
                 required
                 maxLength={9}
                 placeholder="9XXXXXXXX"
-                className="form-input with-icon"
+                className={`form-input with-icon${fieldErrors.celular ? " input-error" : ""}`}
+                aria-invalid={!!fieldErrors.celular}
+                aria-describedby={fieldErrors.celular ? "register-celular-error" : undefined}
               />
             </div>
+            {fieldErrors.celular && <p id="register-celular-error" className="field-error" role="alert">{fieldErrors.celular}</p>}
           </div>
 
           <div className="form-row">
@@ -248,16 +252,24 @@ export default function Register() {
                   type={showPass ? "text" : "password"}
                   autoComplete="new-password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setFieldErrors((prev) => ({ ...prev, password: undefined })); }}
                   required
                   maxLength={MAX_AUTH_PASSWORD_LENGTH}
                   placeholder="Minimo 8 caracteres"
-                  className="form-input with-icon"
+                  className={`form-input with-icon${fieldErrors.password ? " input-error" : ""}`}
+                  aria-invalid={!!fieldErrors.password}
+                  aria-describedby={fieldErrors.password ? "register-password-error" : undefined}
                 />
-                <button type="button" onClick={() => setShowPass(!showPass)} className="input-toggle">
+                <button
+                  type="button"
+                  onClick={() => setShowPass(!showPass)}
+                  className="input-toggle"
+                  aria-label={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+                >
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {fieldErrors.password && <p id="register-password-error" className="field-error" role="alert">{fieldErrors.password}</p>}
             </div>
 
             <div className="input-group">
@@ -270,13 +282,16 @@ export default function Register() {
                   type={showPass ? "text" : "password"}
                   autoComplete="new-password"
                   value={confirmPass}
-                  onChange={(e) => setConfirmPass(e.target.value)}
+                  onChange={(e) => { setConfirmPass(e.target.value); setFieldErrors((prev) => ({ ...prev, confirmPass: undefined })); }}
                   required
                   maxLength={MAX_AUTH_PASSWORD_LENGTH}
                   placeholder="Repite tu contraseña"
-                  className="form-input with-icon"
+                  className={`form-input with-icon${fieldErrors.confirmPass ? " input-error" : ""}`}
+                  aria-invalid={!!fieldErrors.confirmPass}
+                  aria-describedby={fieldErrors.confirmPass ? "register-confirm-error" : undefined}
                 />
               </div>
+              {fieldErrors.confirmPass && <p id="register-confirm-error" className="field-error" role="alert">{fieldErrors.confirmPass}</p>}
             </div>
           </div>
 
@@ -289,13 +304,13 @@ export default function Register() {
             />
             <span>
               Acepto los{" "}
-              <Link to={INFO_ROUTES.legalTerminos} className="auth-link" target="_blank" rel="noopener noreferrer">
+              <ExternalLink href={INFO_ROUTES.legalTerminos} className="auth-link">
                 Términos y condiciones
-              </Link>{" "}
+              </ExternalLink>{" "}
               y la{" "}
-              <Link to={INFO_ROUTES.legalPrivacidad} className="auth-link" target="_blank" rel="noopener noreferrer">
+              <ExternalLink href={INFO_ROUTES.legalPrivacidad} className="auth-link">
                 Política de privacidad
-              </Link>
+              </ExternalLink>
             </span>
           </label>
 

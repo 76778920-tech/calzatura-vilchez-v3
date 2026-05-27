@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 import { Home, ArrowLeft } from "lucide-react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 export default function NotFoundPage() {
+  useDocumentTitle("Página no encontrada");
   return (
     <main className="not-found-page">
       <div className="not-found-inner">

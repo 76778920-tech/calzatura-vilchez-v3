@@ -38,6 +38,7 @@ import type { BrandLogoVariant } from "@/components/brand/BrandLogo";
 import toast from "react-hot-toast";
 import type { MegaLink, MegaMenu, MobileMenuMode } from "@/components/layout/headerMegaMenuTypes";
 import { megaMenus, WHATSAPP_CONTACT_URL } from "@/components/layout/headerMenuData";
+import { ExternalLink } from "@/components/common/ExternalLink";
 import HeaderMobileNav from "@/components/layout/HeaderMobileNav";
 
 function normalizeRouteToken(value: string | null | undefined) {
@@ -208,7 +209,7 @@ function MegaMenuPanel({
           <div className="mega-service-links">
             <Link to={PUBLIC_ROUTES.stores} onClick={onClose}><MapPin size={18} /> Tiendas</Link>
             <Link to={INFO_ROUTES.ayudaRastreoPedido} onClick={onClose}><Box size={18} /> Localiza tu pedido</Link>
-            <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noopener noreferrer" onClick={onClose}><Phone size={18} /> Contáctanos</a>
+            <ExternalLink href={WHATSAPP_CONTACT_URL} onClick={onClose}><Phone size={18} /> Contáctanos</ExternalLink>
             <hr />
             <Link to={CLIENT_ROUTES.profile} onClick={onClose}><User size={18} /> Mi cuenta</Link>
             <Link to={CLIENT_ROUTES.favorites} onClick={onClose}><Heart size={18} /> Favoritos</Link>

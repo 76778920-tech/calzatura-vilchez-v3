@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Link } from "react-router-dom";
 import { AlertCircle, Package, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { fetchOrdersByUser } from "@/domains/pedidos/services/orders";
@@ -12,6 +13,7 @@ import { handleProductImageError } from "@/utils/imgUtils";
 const ORDER_HISTORY_SKELETON_KEYS = ["sk-1", "sk-2", "sk-3"] as const;
 
 export default function OrderHistoryPage() {
+  useDocumentTitle("Mis pedidos");
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +54,7 @@ export default function OrderHistoryPage() {
     return (
       <main className="orders-page">
         <h1>Mis Pedidos</h1>
-        <div className="orders-skeleton">
+        <div className="orders-skeleton" role="status" aria-busy="true" aria-label="Cargando pedidos">
           {ORDER_HISTORY_SKELETON_KEYS.map((id) => (
             <div key={id} className="skeleton-card" style={{ height: "80px" }} />
           ))}

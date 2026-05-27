@@ -42,6 +42,9 @@ export default function StaffLayout() {
 
   return (
     <div className="admin-layout">
+      <a href="#staff-main-content" className="skip-link">
+        Saltar al contenido principal
+      </a>
       <aside className="admin-sidebar" aria-label="Menú de tienda">
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-brand">
@@ -69,7 +72,7 @@ export default function StaffLayout() {
           <span className="admin-nav-label">Salir</span>
         </button>
       </aside>
-      <main className="admin-main">
+      <main className="admin-main" id="staff-main-content" tabIndex={-1}>
         <Outlet />
       </main>
     </div>

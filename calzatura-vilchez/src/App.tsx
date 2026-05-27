@@ -6,7 +6,11 @@ import { FavoritesProvider } from "@/domains/clientes/context/FavoritesContext";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useEffect(() => { globalThis.scrollTo(0, 0); }, [pathname]);
+  useEffect(() => {
+    globalThis.scrollTo(0, 0);
+    const main = document.getElementById("main-content");
+    if (main) main.focus({ preventScroll: true });
+  }, [pathname]);
   return null;
 }
 import Header from "./components/layout/Header";
@@ -52,8 +56,11 @@ const NotFoundPage = lazy(() => import("@/domains/publico/pages/NotFoundPage"));
 function Storefront() {
   return (
     <div className="app-shell">
+      <a href="#main-content" className="skip-link">
+        Saltar al contenido principal
+      </a>
       <Header />
-      <div className="app-content">
+      <div className="app-content" id="main-content" tabIndex={-1}>
         <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path={PUBLIC_ROUTES.home} element={<HomePage />} />

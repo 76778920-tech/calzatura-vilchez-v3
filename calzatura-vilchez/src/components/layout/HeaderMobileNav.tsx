@@ -4,6 +4,7 @@ import type { Dispatch, SetStateAction } from "react";
 import { Box, Heart, MapPin, Phone, User as UserIcon, ChevronDown } from "lucide-react";
 import type { MegaMenu } from "@/components/layout/headerMegaMenuTypes";
 import { WHATSAPP_CONTACT_URL } from "@/components/layout/headerMenuData";
+import { ExternalLink } from "@/components/common/ExternalLink";
 import { CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 
 
@@ -152,9 +153,9 @@ export default function HeaderMobileNav({
         <Link to={INFO_ROUTES.ayudaRastreoPedido} className="nav-mobile-link" onClick={onClose}>
           <Box size={18} /> Localiza tu pedido
         </Link>
-        <a href={WHATSAPP_CONTACT_URL} target="_blank" rel="noopener noreferrer" className="nav-mobile-link" onClick={onClose}>
+        <ExternalLink href={WHATSAPP_CONTACT_URL} className="nav-mobile-link" onClick={onClose}>
           <Phone size={18} /> Contáctanos
-        </a>
+        </ExternalLink>
         <span className="nav-mobile-divider" aria-hidden="true" />
         <Link to={accountHref} className="nav-mobile-link" onClick={onClose}>
           <UserIcon size={18} /> {accountLabel}

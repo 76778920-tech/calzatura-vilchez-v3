@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
@@ -239,7 +240,7 @@ function renderHomeSpotlightSection({
 }: HomeSpotlightRenderArgs) {
   if (loading) {
     return (
-      <div className="products-skeleton-grid home-spotlight-grid">
+      <div className="products-skeleton-grid home-spotlight-grid" role="status" aria-busy="true" aria-label="Cargando productos destacados">
         {HOME_SPOTLIGHT_SKELETON_KEYS.map((key) => <div key={key} className="skeleton-card" />)}
       </div>
     );
@@ -312,6 +313,7 @@ function renderHomeSpotlightSection({
 }
 
 export default function HomePage() {
+  useDocumentTitle("Inicio");
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

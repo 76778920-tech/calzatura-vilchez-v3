@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   buildCanonicalCatalogLocation,
@@ -145,6 +146,7 @@ const COLOR_SWATCH_ORDER = [
 ] as const;
 
 export default function ProductsPage() {
+  useDocumentTitle("Productos");
   const catalogDescriptionId = useId();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -775,7 +777,7 @@ export default function ProductsPage() {
   let productsMainContent: ReactNode;
   if (loading) {
     productsMainContent = (
-      <div className="products-grid">
+      <div className="products-grid" role="status" aria-busy="true" aria-label="Cargando productos">
         {PRODUCTS_GRID_SKELETON_KEYS.map((key) => (
           <div key={key} className="skeleton-card" />
         ))}

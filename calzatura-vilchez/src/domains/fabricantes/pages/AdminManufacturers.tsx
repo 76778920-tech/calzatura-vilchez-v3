@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
+import { useDialogKeyboardTrap } from "@/hooks/useDialogKeyboardTrap";
 import {
   BadgeDollarSign,
   Eye,
@@ -86,9 +87,21 @@ export default function AdminManufacturers() {
   const [detailManufacturer, setDetailManufacturer] = useState<Manufacturer | null>(null);
   const [deleteCandidate, setDeleteCandidate] = useState<Manufacturer | null>(null);
   const [deleteSaving, setDeleteSaving] = useState(false);
+  const editDialogRef = useRef<HTMLDialogElement | null>(null);
+  const detailDialogRef = useRef<HTMLDialogElement | null>(null);
   const fileInputRefs = useRef<Record<DocumentType, HTMLInputElement | null>>({
     boleta: null,
     guia: null,
+  });
+
+  useDialogKeyboardTrap(editDialogRef, {
+    enabled: showModal,
+    onEscape: () => { if (!saving && !uploading) setShowModal(false); },
+  });
+
+  useDialogKeyboardTrap(detailDialogRef, {
+    enabled: !!detailManufacturer && !previewDocument,
+    onEscape: () => setDetailManufacturer(null),
   });
 
   const loadManufacturers = async () => {
@@ -478,9 +491,9 @@ export default function AdminManufacturers() {
       {showModal && (
         <div className="modal-overlay">
           <button type="button" className="manufacturer-modal-backdrop" aria-label="Cerrar" onClick={() => setShowModal(false)} />
-          <div className="modal manufacturer-modal">
+          <dialog ref={editDialogRef} open aria-modal="true" aria-labelledby="mfr-modal-title" className="modal manufacturer-modal">
             <div className="modal-header">
-              <h2>{editingId ? "Editar fabricante" : "Nuevo fabricante"}</h2>
+              <h2 id="mfr-modal-title">{editingId ? "Editar fabricante" : "Nuevo fabricante"}</h2>
               <button onClick={() => setShowModal(false)} className="modal-close" aria-label="Cerrar">
                 <X size={20} />
               </button>
@@ -688,7 +701,7 @@ export default function AdminManufacturers() {
                 </button>
               </div>
             </form>
-          </div>
+          </dialog>
         </div>
       )}
 
@@ -721,12 +734,12 @@ export default function AdminManufacturers() {
       {detailManufacturer && !previewDocument && (
         <div className="sale-modal-overlay">
           <button type="button" className="manufacturer-modal-backdrop" aria-label="Cerrar" onClick={() => setDetailManufacturer(null)} />
-          <div className="sale-modal mfr-detail-modal">
+          <dialog ref={detailDialogRef} open aria-modal="true" aria-labelledby="mfr-detail-title" className="sale-modal mfr-detail-modal">
 
             <div className="sale-modal-header">
               <div className="mfr-detail-title">
                 <div>
-                  <h2>{fullName(detailManufacturer)}</h2>
+                  <h2 id="mfr-detail-title">{fullName(detailManufacturer)}</h2>
                   <span className="admin-soft-badge">{detailManufacturer.marca}</span>
                 </div>
                 <span className={`admin-status-badge ${detailManufacturer.activo ? "featured" : "muted"}`}>
@@ -842,7 +855,7 @@ export default function AdminManufacturers() {
                 <span>Actualizado: {new Date(detailManufacturer.actualizadoEn).toLocaleDateString("es-PE", { day: "numeric", month: "short", year: "numeric" })}</span>
               </div>
             </div>
-          </div>
+          </dialog>
         </div>
       )}
     </div>

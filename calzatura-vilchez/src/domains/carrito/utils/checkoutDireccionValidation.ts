@@ -14,8 +14,14 @@ type ValidateArgs = {
   deliveryQuote: DeliveryQuote | null;
 };
 
-/** Devuelve mensaje de error para `toast.error`, o `null` si puede pasar al paso pago. */
-export function validateCheckoutDireccionStep({
+export type CheckoutFieldErrors = {
+  direccion?: string;
+  distrito?: string;
+  telefono?: string;
+  delivery?: string;
+};
+
+export function getCheckoutFieldErrors({
   direccion,
   deliveryPricingActive,
   locationConfirmed,
@@ -23,33 +29,43 @@ export function validateCheckoutDireccionStep({
   deliveryQuoteLoading,
   deliveryQuoteError,
   deliveryQuote,
-}: ValidateArgs): string | null {
-  if (!direccion.direccion || !direccion.distrito || !direccion.telefono) {
-    return "Completa todos los campos requeridos";
-  }
-  const phoneError = peruPhoneError(direccion.telefono);
-  if (phoneError || !isValidPeruPhone(direccion.telefono)) {
-    return phoneError ?? "Ingresa un teléfono válido";
-  }
-  if (!deliveryPricingActive) return null;
+}: ValidateArgs): CheckoutFieldErrors {
+  const errors: CheckoutFieldErrors = {};
 
-  const line = buildCheckoutAddressLine(direccion);
-  if (line.length >= 8 && !locationConfirmed) {
-    return "Confirmá la entrega: elegí una sugerencia, buscá en el mapa o arrastrá el pin azul.";
+  if (!direccion.direccion) errors.direccion = "Ingresa una dirección";
+  if (!direccion.distrito) errors.distrito = "Ingresa un distrito";
+
+  if (!direccion.telefono) {
+    errors.telefono = "Ingresa un teléfono";
+  } else {
+    const phoneErr = peruPhoneError(direccion.telefono);
+    if (phoneErr || !isValidPeruPhone(direccion.telefono)) {
+      errors.telefono = phoneErr ?? "Ingresa un teléfono válido";
+    }
   }
-  if (line.length >= 8 && !selectedDelivery) {
-    return "Elegí un punto de entrega: una sugerencia de la lista, una búsqueda o el mapa.";
+
+  if (deliveryPricingActive && Object.keys(errors).length === 0) {
+    const line = buildCheckoutAddressLine(direccion);
+    if (line.length >= 8 && !locationConfirmed) {
+      errors.delivery = "Confirmá la entrega: elegí una sugerencia, buscá en el mapa o arrastrá el pin azul.";
+    } else if (line.length >= 8 && !selectedDelivery) {
+      errors.delivery = "Elegí un punto de entrega: una sugerencia de la lista, una búsqueda o el mapa.";
+    } else if (deliveryQuoteLoading) {
+      errors.delivery = "Espera un momento: estamos calculando el costo de envío.";
+    } else if (deliveryQuoteError) {
+      errors.delivery = deliveryQuoteError;
+    } else if (!deliveryQuote || deliveryQuote.isOutOfRange) {
+      errors.delivery = `No podemos entregar a esa dirección (máx. ${DELIVERY_CONFIG.maxDeliveryKm} km desde la tienda).`;
+    }
   }
-  if (deliveryQuoteLoading) {
-    return "Espera un momento: estamos calculando el costo de envío.";
-  }
-  if (deliveryQuoteError) {
-    return deliveryQuoteError;
-  }
-  if (!deliveryQuote || deliveryQuote.isOutOfRange) {
-    return `No podemos entregar a esa dirección (máx. ${DELIVERY_CONFIG.maxDeliveryKm} km desde la tienda).`;
-  }
-  return null;
+
+  return errors;
+}
+
+/** Devuelve mensaje de error para `toast.error`, o `null` si puede pasar al paso pago. */
+export function validateCheckoutDireccionStep(args: ValidateArgs): string | null {
+  const errors = getCheckoutFieldErrors(args);
+  return errors.direccion ?? errors.distrito ?? errors.telefono ?? errors.delivery ?? null;
 }
 
 export function formatDireccionTelefonoForSubmit(direccion: Address): Address {

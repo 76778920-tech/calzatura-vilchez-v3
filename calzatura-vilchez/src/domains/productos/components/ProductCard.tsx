@@ -102,6 +102,8 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
           <img
             src={imageSrc}
             alt={product.nombre}
+            loading="lazy"
+            decoding="async"
             className="product-card-img product-card-img-primary"
             onError={(event) => {
               const image = event.target as HTMLImageElement;
@@ -113,6 +115,8 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
             <img
               src={hoverImageSrc}
               alt=""
+              loading="lazy"
+              decoding="async"
               className="product-card-img product-card-img-hover"
               onError={(event) => {
                 const image = event.target as HTMLImageElement;
