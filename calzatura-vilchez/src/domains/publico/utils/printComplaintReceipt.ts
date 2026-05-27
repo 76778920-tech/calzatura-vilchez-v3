@@ -1,19 +1,23 @@
 /** Abre ventana de impresión sin document.write (API obsoleta). */
 export function printHtmlDocument(html: string, title: string): void {
-  const w = window.open("", "_blank", "noopener,noreferrer,width=720,height=900");
-  if (!w) return;
+  const preview = globalThis.open("", "_blank", "width=720,height=900");
+  if (!preview) return;
 
-  const blob = new Blob([html], { type: "text/html" });
-  const url = URL.createObjectURL(blob);
+  const parsed = new DOMParser().parseFromString(html, "text/html");
+  preview.document.open();
+  preview.document.replaceChild(
+    preview.document.importNode(parsed.documentElement, true),
+    preview.document.documentElement,
+  );
+  preview.document.close();
+  if (preview.document.title !== title) {
+    preview.document.title = title;
+  }
+  preview.focus();
 
-  const cleanup = () => URL.revokeObjectURL(url);
-  w.addEventListener("afterprint", cleanup, { once: true });
-  w.addEventListener("load", () => {
-    w.document.title = title;
-    w.focus();
-    w.print();
-  }, { once: true });
-  w.location.href = url;
+  globalThis.setTimeout(() => {
+    if (!preview.closed) preview.print();
+  }, 350);
 }
 
 export function buildComplaintReceiptPrintHtml(bodyHtml: string, codigo: string): string {
@@ -27,5 +31,11 @@ dl{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;margin:0}
 dt{font-weight:600;margin:0}
 dd{margin:0}
 .foot{margin-top:24px;font-size:0.85rem;color:#555;border-top:1px solid #ddd;padding-top:12px}
-</style></head><body>${bodyHtml}</body></html>`;
+</style></head><body>${bodyHtml}
+<script>
+globalThis.addEventListener("load", function () {
+  globalThis.setTimeout(function () { globalThis.print(); }, 350);
+});
+</script>
+</body></html>`;
 }
