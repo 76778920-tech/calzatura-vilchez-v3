@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink } from "@/components/common/ExternalLink";
 import { BUSINESS_CONTACT } from "@/config/businessContact";
@@ -7,32 +6,18 @@ import {
   buildComplaintWhatsAppUrl,
   type ComplaintFormData,
 } from "@/domains/publico/utils/complaintBook";
-import {
-  buildComplaintReceiptPrintHtml,
-  printHtmlDocument,
-} from "@/domains/publico/utils/printComplaintReceipt";
 
 type ComplaintReceiptProps = Readonly<{
   submission: ComplaintFormData & { codigo: string; submittedAt: string };
 }>;
 
 export function ComplaintReceipt({ submission }: ComplaintReceiptProps) {
-  const printRef = useRef<HTMLDivElement>(null);
   const whatsappUrl = buildComplaintWhatsAppUrl(submission, submission.codigo);
   const tipoLabel = submission.tipo === "reclamo" ? "Reclamo" : "Queja";
   const fecha = new Date(submission.submittedAt).toLocaleString("es-PE", {
     dateStyle: "long",
     timeStyle: "short",
   });
-
-  const handlePrint = () => {
-    const node = printRef.current;
-    if (!node) return;
-    printHtmlDocument(
-      buildComplaintReceiptPrintHtml(node.innerHTML, submission.codigo),
-      `Constancia ${submission.codigo}`,
-    );
-  };
 
   return (
     <output className="complaint-book-success" aria-live="polite">
@@ -50,7 +35,7 @@ export function ComplaintReceipt({ submission }: ComplaintReceiptProps) {
         es obligatorio si ya completaste este formulario.
       </p>
 
-      <div ref={printRef} className="complaint-receipt-printable" hidden aria-hidden="true">
+      <section className="complaint-receipt-printable" aria-label="Constancia para imprimir o guardar en PDF">
         <h1>Constancia — Libro de reclamaciones</h1>
         <p className="meta">
           {BUSINESS_CONTACT.legalName} · RUC {BUSINESS_CONTACT.rucDisplay} · {fecha}
@@ -92,13 +77,13 @@ export function ComplaintReceipt({ submission }: ComplaintReceiptProps) {
         <p className="foot">
           {BUSINESS_CONTACT.address} · {BUSINESS_CONTACT.phoneDisplay}
         </p>
-      </div>
+      </section>
 
       <div className="complaint-book-success-actions">
         <ExternalLink href={whatsappUrl} className="btn-primary">
           Enviar copia por WhatsApp (opcional)
         </ExternalLink>
-        <button type="button" className="btn-ghost" onClick={handlePrint}>
+        <button type="button" className="btn-ghost" onClick={() => globalThis.print()}>
           Imprimir constancia
         </button>
       </div>
