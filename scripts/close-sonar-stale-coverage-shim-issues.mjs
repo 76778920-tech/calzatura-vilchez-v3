@@ -2,9 +2,9 @@
 /**
  * Closes ghost issues from the deleted ai-service/scripts/fix_coverage_xml_for_sonar.py.
  *
- * SonarCloud can keep deleted-file issues as status=CLOSED/resolution=REMOVED but
- * issueStatus=OPEN, which still appears as "Open" in the UI. The documented
- * bulk_change parameter is do_transition, not doTransition.
+ * SonarCloud bug: resolution=REMOVED but issueStatus stays OPEN → list shows "Open"
+ * and the issue page says "The component has been removed or never existed."
+ * `do_transition=close` alone often does not clear issueStatus; try wontfix/falsepositive first.
  */
 const SONAR_HOST = (process.env.SONAR_HOST_URL ?? "https://sonarcloud.io").replace(/\/$/, "");
 const ORGANIZATION = "76778920-tech";
@@ -53,6 +53,10 @@ function isStaleIssue(issue) {
   return (issue.component ?? "").includes(STALE_PATH);
 }
 
+function isGhostStillOpen(issue) {
+  return issue.issueStatus === "OPEN" || issue.status === "OPEN";
+}
+
 function uniqueIssues(issues) {
   return [...new Map(issues.map((issue) => [issue.key, issue])).values()];
 }
@@ -60,6 +64,13 @@ function uniqueIssues(issues) {
 async function searchIssues(path) {
   const data = await sonarGet(path);
   return data.issues ?? [];
+}
+
+async function fetchIssueByKey(key) {
+  const issues = await searchIssues(
+    `/api/issues/search?organization=${ORGANIZATION}&issues=${encodeURIComponent(key)}&ps=1`,
+  );
+  return issues[0] ?? null;
 }
 
 async function searchByComponentKeys(branchQuery) {
@@ -106,7 +117,7 @@ async function searchRemovedGhosts(branchQuery) {
         `${branchQuery}` +
         `&ps=${pageSize}&p=${page}`,
     );
-    found.push(...(data.issues ?? []).filter((issue) => isStaleIssue(issue) && issue.issueStatus === "OPEN"));
+    found.push(...(data.issues ?? []).filter((issue) => isStaleIssue(issue) && isGhostStillOpen(issue)));
     const total = data.paging?.total ?? 0;
     if (page * pageSize >= total) break;
     page += 1;
@@ -147,21 +158,31 @@ async function fetchAllStaleIssues() {
   return [];
 }
 
-async function closeIssue(issue) {
-  const transitions = ["close", "falsepositive", "accept", "wontfix", "resolve"];
+async function tryTransition(issueKey, transition) {
+  await sonarPost("/api/issues/do_transition", { issue: issueKey, transition });
+}
+
+async function forceCloseGhost(issue) {
+  const transitions = ["wontfix", "falsepositive", "resolve", "close"];
   for (const transition of transitions) {
     try {
-      await sonarPost("/api/issues/do_transition", {
-        issue: issue.key,
-        transition,
-      });
-      console.log(`closed ${issue.key} (${issue.rule}) via do_transition=${transition}`);
-      return;
-    } catch {
-      // Try the next transition supported by this issue state.
+      await tryTransition(issue.key, transition);
+      const updated = await fetchIssueByKey(issue.key);
+      if (!updated) {
+        console.log(`ghost ${issue.key}: no longer returned by API`);
+        return true;
+      }
+      if (!isGhostStillOpen(updated)) {
+        console.log(
+          `ghost ${issue.key}: closed via ${transition} (issueStatus=${updated.issueStatus}, status=${updated.status}, resolution=${updated.resolution})`,
+        );
+        return true;
+      }
+    } catch (error) {
+      console.warn(`ghost ${issue.key}: transition ${transition} failed: ${error.message}`);
     }
   }
-  throw new Error(`could not close ${issue.key} (${issue.rule})`);
+  return false;
 }
 
 const stale = await fetchAllStaleIssues();
@@ -171,17 +192,33 @@ if (stale.length === 0) {
   process.exit(0);
 }
 
-const keys = stale.map((issue) => issue.key).join(",");
+console.log(
+  `close-sonar-stale-coverage-shim-issues: attempting to close ${stale.length} issue(s): ${stale.map((i) => i.key).join(", ")}`,
+);
 
-try {
-  await sonarPost("/api/issues/bulk_change", {
-    issues: keys,
-    do_transition: "close",
-  });
-  console.log(`closed ${stale.length} -> do_transition=close (bulk): ${keys}`);
-} catch (bulkError) {
-  console.warn(`bulk_change failed: ${bulkError.message}; trying do_transition per issue`);
-  for (const issue of stale) {
-    await closeIssue(issue);
+let closed = 0;
+for (const issue of stale) {
+  if (await forceCloseGhost(issue)) {
+    closed += 1;
   }
 }
+
+const remaining = await fetchAllStaleIssues();
+if (remaining.length === 0) {
+  console.log(`close-sonar-stale-coverage-shim-issues: all ${stale.length} ghost(s) cleared`);
+  process.exit(0);
+}
+
+console.warn(
+  `close-sonar-stale-coverage-shim-issues: ${remaining.length} ghost(s) still OPEN in API after transitions`,
+);
+for (const issue of remaining) {
+  console.warn(
+    `  - ${issue.key} rule=${issue.rule} issueStatus=${issue.issueStatus} status=${issue.status} resolution=${issue.resolution}`,
+  );
+}
+console.warn(
+  "SonarCloud UI may still list them under Open even when the file is gone. " +
+    "Quality Gate is unaffected. Contact SonarCloud support with these keys if needed.",
+);
+process.exit(closed > 0 ? 0 : 1);

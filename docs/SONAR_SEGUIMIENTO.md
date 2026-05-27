@@ -9,12 +9,24 @@ npm run test
 npm run lint
 ```
 
-## Issues del script Python eliminado
+## Issues fantasma del script Python eliminado
 
-SonarCloud puede seguir mostrando **3 issues** en `ai-service/scripts/fix_coverage_xml_for_sonar.py` (archivo **ya no existe**). El workflow `.github/workflows/sonarqube.yml` ejecuta `scripts/close-sonar-stale-coverage-shim-issues.mjs` antes y después del scan para cerrarlos. Si persisten en la UI:
+Si ves **3 issues Open** en `ai-service/scripts/fix_coverage_xml_for_sonar.py` pero al abrirlos dice *"The component has been removed or never existed"*, **no es código roto**: es un bug de SonarCloud.
 
-1. Disparar manualmente **SonarQube Analysis** en GitHub Actions (`workflow_dispatch`).
-2. En SonarCloud → Issues, filtrar por esa ruta y marcar como cerrados si el bulk script no los alcanzó.
+| Qué ves | Qué significa |
+|---------|----------------|
+| Lista → **Open** | Sonar dejó `issueStatus=OPEN` aunque el archivo ya no existe. |
+| Detalle → componente eliminado | El `.py` se borró hace días; el issue quedó huérfano. |
+| CI → `closed 3 -> do_transition=close` | El workflow **sí** llamó a la API; la UI a veces no actualiza. |
+
+**No bloquean el Quality Gate** si el workflow SonarQube termina en verde.
+
+### Qué hacer
+
+1. **GitHub Actions** → **SonarQube Analysis** → **Run workflow** (vuelve a ejecutar `close-sonar-stale-coverage-shim-issues.mjs` con `wontfix`/`falsepositive`).
+2. En **Issues**, cambia el filtro de **Open** a **Accepted** o **False Positive** por si ya se movieron ahí.
+3. Si siguen en Open tras 24 h, abre ticket a [SonarCloud Support](https://sonarcloud.io/support) con las claves del log de CI (p. ej. `AZ42k4CnbrWrxHmetXD8`).
+4. El script vivo de cobertura es `scripts/fix-ai-service-coverage-xml-for-sonar.py` (excluido del análisis).
 
 ## Checklist post-push (CI verde)
 
