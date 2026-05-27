@@ -12,8 +12,18 @@ function isBrowser(): boolean {
   return typeof globalThis.window !== "undefined" && typeof globalThis.localStorage !== "undefined";
 }
 
+/** Playwright puede forzar el banner con localStorage (cookie-consent.spec.ts). */
+export const E2E_FORCE_COOKIE_BANNER_KEY = "calzatura_e2e_force_cookie_banner";
+
 function isE2eBypass(): boolean {
-  return import.meta.env.VITE_E2E === "true";
+  if (import.meta.env.VITE_E2E !== "true") return false;
+  if (
+    isBrowser() &&
+    globalThis.localStorage.getItem(E2E_FORCE_COOKIE_BANNER_KEY) === "1"
+  ) {
+    return false;
+  }
+  return true;
 }
 
 function parseRecord(raw: string): CookieConsentRecord | null {
