@@ -2,9 +2,7 @@ import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
-const { validateComplaintPayload } = require("../../bff/libroReclamaciones.cjs") as {
-  validateComplaintPayload: (body: Record<string, unknown>) => Record<string, string>;
-};
+const { validateComplaintPayload } = require("../../bff/libroReclamaciones.cjs");
 
 const validBody = {
   tipo: "reclamo",
@@ -30,8 +28,7 @@ describe("validateComplaintPayload (BFF)", () => {
     try {
       validateComplaintPayload({ ...validBody, telefono: "12" });
     } catch (err) {
-      const fields = (err as Error & { fields?: Record<string, string> }).fields;
-      expect(fields?.telefono).toBe("El teléfono debe tener 9 dígitos.");
+      expect(err.fields?.telefono).toBe("El teléfono debe tener 9 dígitos.");
     }
   });
 
@@ -39,8 +36,7 @@ describe("validateComplaintPayload (BFF)", () => {
     try {
       validateComplaintPayload({ ...validBody, telefono: "887654321" });
     } catch (err) {
-      const fields = (err as Error & { fields?: Record<string, string> }).fields;
-      expect(fields?.telefono).toBe("El teléfono debe empezar con 9.");
+      expect(err.fields?.telefono).toBe("El teléfono debe empezar con 9.");
     }
   });
 });
