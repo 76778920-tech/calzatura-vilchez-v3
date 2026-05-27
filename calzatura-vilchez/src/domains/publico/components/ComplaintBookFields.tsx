@@ -30,7 +30,13 @@ export function ComplaintBookFields({
   const sectionProps = { form, effectiveForm, fieldErrors, onFieldChange };
 
   return (
-    <form className="complaint-book-form" onSubmit={onSubmit} noValidate>
+    <form
+      className="complaint-book-form"
+      onSubmit={onSubmit}
+      noValidate
+      autoComplete="off"
+      data-form-type="other"
+    >
       <p className="complaint-book-form-lead">
         Al enviar, tu hoja se registra en nuestro libro virtual con un código de referencia. El
         trámite es gratuito y no sustituye la atención presencial ni por WhatsApp.

@@ -2,6 +2,9 @@ import { Link } from "react-router-dom";
 import { INFO_ROUTES } from "@/routes/paths";
 import type { ComplaintFieldErrors, ComplaintFormData, ComplaintType } from "@/domains/publico/utils/complaintBook";
 
+/** Evita que el navegador muestre datos guardados (privacidad en equipos compartidos). */
+const NO_BROWSER_AUTOCOMPLETE = "off" as const;
+
 const COMPLAINT_TIPO_OPTIONS = [
   ["reclamo", "Reclamo (producto o servicio)"],
   ["queja", "Queja (atención recibida)"],
@@ -50,7 +53,7 @@ export function ComplaintBookIdentityFields({
           className={`form-input${fieldErrors.nombres ? " input-error" : ""}`}
           value={effectiveForm.nombres}
           onChange={(e) => onFieldChange("nombres", e.target.value)}
-          autoComplete="given-name"
+          autoComplete={NO_BROWSER_AUTOCOMPLETE}
           required
         />
         {fieldErrors.nombres ? <p className="field-error">{fieldErrors.nombres}</p> : null}
@@ -62,7 +65,7 @@ export function ComplaintBookIdentityFields({
           className={`form-input${fieldErrors.apellidos ? " input-error" : ""}`}
           value={effectiveForm.apellidos}
           onChange={(e) => onFieldChange("apellidos", e.target.value)}
-          autoComplete="family-name"
+          autoComplete={NO_BROWSER_AUTOCOMPLETE}
           required
         />
         {fieldErrors.apellidos ? <p className="field-error">{fieldErrors.apellidos}</p> : null}
@@ -75,6 +78,7 @@ export function ComplaintBookIdentityFields({
           value={effectiveForm.dni}
           onChange={(e) => onFieldChange("dni", e.target.value.replace(/\D/g, "").slice(0, 8))}
           inputMode="numeric"
+          autoComplete={NO_BROWSER_AUTOCOMPLETE}
           required
         />
         {fieldErrors.dni ? <p className="field-error">{fieldErrors.dni}</p> : null}
@@ -86,7 +90,7 @@ export function ComplaintBookIdentityFields({
           className={`form-input${fieldErrors.domicilio ? " input-error" : ""}`}
           value={effectiveForm.domicilio}
           onChange={(e) => onFieldChange("domicilio", e.target.value)}
-          autoComplete="street-address"
+          autoComplete={NO_BROWSER_AUTOCOMPLETE}
           required
         />
         {fieldErrors.domicilio ? <p className="field-error">{fieldErrors.domicilio}</p> : null}
@@ -98,7 +102,7 @@ export function ComplaintBookIdentityFields({
           className={`form-input${fieldErrors.telefono ? " input-error" : ""}`}
           value={effectiveForm.telefono}
           onChange={(e) => onFieldChange("telefono", e.target.value)}
-          autoComplete="tel"
+          autoComplete={NO_BROWSER_AUTOCOMPLETE}
           required
         />
         {fieldErrors.telefono ? <p className="field-error">{fieldErrors.telefono}</p> : null}
@@ -111,7 +115,7 @@ export function ComplaintBookIdentityFields({
           className={`form-input${fieldErrors.email ? " input-error" : ""}`}
           value={effectiveForm.email}
           onChange={(e) => onFieldChange("email", e.target.value)}
-          autoComplete="email"
+          autoComplete={NO_BROWSER_AUTOCOMPLETE}
           required
         />
         {fieldErrors.email ? <p className="field-error">{fieldErrors.email}</p> : null}
@@ -134,6 +138,7 @@ export function ComplaintBookClaimFields({
           className={`form-input${fieldErrors.bienContratado ? " input-error" : ""}`}
           value={effectiveForm.bienContratado}
           onChange={(e) => onFieldChange("bienContratado", e.target.value)}
+          autoComplete={NO_BROWSER_AUTOCOMPLETE}
         />
         {fieldErrors.bienContratado ? (
           <p className="field-error">{fieldErrors.bienContratado}</p>
@@ -151,6 +156,7 @@ export function ComplaintBookClaimFields({
             value={effectiveForm.monto}
             onChange={(e) => onFieldChange("monto", e.target.value)}
             inputMode="decimal"
+            autoComplete={NO_BROWSER_AUTOCOMPLETE}
           />
           {fieldErrors.monto ? <p className="field-error">{fieldErrors.monto}</p> : null}
         </div>
@@ -161,6 +167,7 @@ export function ComplaintBookClaimFields({
             className="form-input"
             value={effectiveForm.numeroPedido}
             onChange={(e) => onFieldChange("numeroPedido", e.target.value)}
+            autoComplete={NO_BROWSER_AUTOCOMPLETE}
           />
         </div>
       </div>
@@ -174,6 +181,7 @@ export function ComplaintBookClaimFields({
           value={effectiveForm.detalle}
           onChange={(e) => onFieldChange("detalle", e.target.value)}
           placeholder="Describe el problema y qué solución solicitas (cambio, reembolso, etc.)"
+          autoComplete={NO_BROWSER_AUTOCOMPLETE}
           required
         />
         {fieldErrors.detalle ? <p className="field-error">{fieldErrors.detalle}</p> : null}
