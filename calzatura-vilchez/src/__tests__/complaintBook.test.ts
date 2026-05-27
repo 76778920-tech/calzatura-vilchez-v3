@@ -46,7 +46,12 @@ describe("complaintBook", () => {
 
   it("rechaza teléfono inválido con mensaje de Perú", () => {
     const errors = validateComplaintForm({ ...validBase, telefono: "12" }, true);
-    expect(errors.telefono).toBeTruthy();
+    expect(errors.telefono).toBe("El teléfono debe tener 9 dígitos.");
+  });
+
+  it("rechaza teléfono que no empieza en 9", () => {
+    const errors = validateComplaintForm({ ...validBase, telefono: "887654321" }, true);
+    expect(errors.telefono).toBe("El teléfono debe empezar con 9.");
   });
 
   it("rechaza correo, DNI y monto inválidos", () => {

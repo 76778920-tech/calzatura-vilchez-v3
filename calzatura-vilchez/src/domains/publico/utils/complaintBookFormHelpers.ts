@@ -2,6 +2,7 @@ import type { UserProfile } from "@/types";
 import type { ComplaintFormData } from "@/domains/publico/utils/complaintBook";
 import { submitComplaintToServer } from "@/domains/publico/services/libroReclamaciones";
 import { validateComplaintForm } from "@/domains/publico/utils/complaintBookValidation";
+import { normalizePeruPhoneInput, peruPhoneDigits } from "@/utils/phone";
 
 export type ComplaintSubmission = ComplaintFormData & {
   codigo: string;
@@ -20,7 +21,9 @@ export function profileBackfillComplaintForm(
     apellidos: form.apellidos || userProfile.apellidos || nombreParts.slice(1).join(" ") || "",
     dni: form.dni || userProfile.dni || "",
     email: form.email || userProfile.email || "",
-    telefono: form.telefono || userProfile.telefono || "",
+    telefono:
+      form.telefono ||
+      (userProfile.telefono ? normalizePeruPhoneInput(userProfile.telefono) : ""),
     domicilio: form.domicilio || userProfile.direcciones?.[0]?.direccion || "",
   };
 }
@@ -32,7 +35,7 @@ export function trimComplaintFormData(form: ComplaintFormData): ComplaintFormDat
     apellidos: form.apellidos.trim(),
     dni: form.dni.trim(),
     domicilio: form.domicilio.trim(),
-    telefono: form.telefono.trim(),
+    telefono: peruPhoneDigits(form.telefono),
     email: form.email.trim(),
     bienContratado: form.bienContratado.trim(),
     monto: form.monto.trim(),

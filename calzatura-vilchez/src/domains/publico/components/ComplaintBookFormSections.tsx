@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { INFO_ROUTES } from "@/routes/paths";
 import type { ComplaintFieldErrors, ComplaintFormData, ComplaintType } from "@/domains/publico/utils/complaintBook";
+import { normalizePeruPhoneInput } from "@/utils/phone";
 
 /** Evita que el navegador muestre datos guardados (privacidad en equipos compartidos). */
 const NO_BROWSER_AUTOCOMPLETE = "off" as const;
@@ -99,9 +100,14 @@ export function ComplaintBookIdentityFields({
         <label htmlFor="lr-telefono">Teléfono *</label>
         <input
           id="lr-telefono"
+          type="tel"
+          inputMode="tel"
           className={`form-input${fieldErrors.telefono ? " input-error" : ""}`}
           value={effectiveForm.telefono}
-          onChange={(e) => onFieldChange("telefono", e.target.value)}
+          onChange={(e) => onFieldChange("telefono", normalizePeruPhoneInput(e.target.value))}
+          placeholder="999 999 999"
+          maxLength={14}
+          pattern="9[0-9]{2}\s?[0-9]{3}\s?[0-9]{3}"
           autoComplete={NO_BROWSER_AUTOCOMPLETE}
           required
         />
