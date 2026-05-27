@@ -6,10 +6,9 @@ test.describe("Consentimiento de cookies", () => {
   test("página de política de cookies muestra detalle en texto", async ({ page }) => {
     await page.goto("/legal/politica-cookies");
     await expect(page.getByRole("heading", { name: "Política de cookies" })).toBeVisible();
-    await expect(
-      page.getByRole("heading", { name: /Inventario detallado de cookies/i }),
-    ).toBeVisible();
-    await expect(page.getByText("Preferencias de privacidad")).toBeVisible();
+    await expect(page.getByText(/Detalle por categoría/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Estrictamente necesarias" })).toBeVisible();
+    await expect(page.getByText("Elementos incluidos en esta categoría:").first()).toBeVisible();
     await expect(page.locator(".cookie-policy-table")).toHaveCount(0);
   });
 
