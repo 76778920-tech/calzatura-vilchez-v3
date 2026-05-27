@@ -4830,71 +4830,168 @@ button.cart-overlay {
 .complaint-provider-hours {
   color: var(--text-muted);
 }
-.complaint-receipt-printable {
-  margin-top: 1rem;
-  padding: 1.15rem 1.25rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--white);
+.complaint-book-success-screen {
+  margin-bottom: 1rem;
+}
+
+.complaint-receipt-preview {
+  margin-top: 0.5rem;
+  padding: 0;
+  overflow-x: auto;
+}
+
+.complaint-constancia-document {
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 1.25rem 1.35rem;
+  border: 1px solid #333;
+  background: #fff;
   color: #111;
-  line-height: 1.5;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: 11pt;
+  line-height: 1.45;
 }
-.complaint-receipt-printable h1 {
-  font-size: 1.15rem;
-  margin: 0 0 0.5rem;
-  color: var(--text);
+
+.complaint-constancia-header {
+  text-align: center;
+  border-bottom: 2px solid #111;
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
 }
-.complaint-receipt-printable .meta {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  margin: 0 0 1rem;
+
+.complaint-constancia-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 8.5pt;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #444;
 }
-.complaint-receipt-printable dl {
-  display: grid;
-  grid-template-columns: minmax(120px, 140px) 1fr;
-  gap: 0.35rem 0.75rem;
+
+.complaint-constancia-header h1 {
   margin: 0;
+  font-size: 16pt;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
-.complaint-receipt-printable dt {
+
+.complaint-constancia-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 10pt;
+  color: #333;
+}
+
+.complaint-constancia-block {
+  margin-bottom: 0.85rem;
+  page-break-inside: avoid;
+}
+
+.complaint-constancia-block h2 {
+  margin: 0 0 0.4rem;
+  font-size: 10pt;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #111;
+}
+
+.complaint-constancia-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+
+.complaint-constancia-table th,
+.complaint-constancia-table td {
+  border: 1px solid #999;
+  padding: 0.35rem 0.5rem;
+  vertical-align: top;
+  text-align: left;
+}
+
+.complaint-constancia-table th {
+  width: 38%;
   font-weight: 600;
-  margin: 0;
+  background: #f5f5f5;
+  color: #222;
 }
-.complaint-receipt-printable dd {
-  margin: 0;
+
+.complaint-constancia-detail-box {
+  border: 1px solid #999;
+  padding: 0.5rem 0.65rem;
+  min-height: 3.5rem;
+  white-space: pre-wrap;
+  background: #fafafa;
 }
-.complaint-receipt-printable .foot {
-  margin: 1rem 0 0;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--border);
-  font-size: 0.85rem;
-  color: var(--text-muted);
+
+.complaint-constancia-legal {
+  margin-top: 1rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #333;
+  font-size: 9pt;
+  color: #222;
+}
+
+.complaint-constancia-legal h2 {
+  margin: 0 0 0.35rem;
+  font-size: 9.5pt;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.complaint-constancia-legal ul {
+  margin: 0 0 0.65rem;
+  padding-left: 1.15rem;
+}
+
+.complaint-constancia-legal li {
+  margin-bottom: 0.25rem;
+}
+
+.complaint-constancia-footnote {
+  margin: 0;
+  font-size: 8.5pt;
+  color: #444;
+}
+
+#complaint-print-root {
+  display: none;
+}
+
+body.complaint-print-active > *:not(#complaint-print-root) {
+  display: none !important;
+}
+
+body.complaint-print-active #complaint-print-root {
+  display: block !important;
 }
 
 @media print {
-  header,
-  footer,
-  .skip-link,
-  .cookie-consent-banner {
-    display: none !important;
+  @page {
+    size: A4 portrait;
+    margin: 14mm 12mm;
   }
-  .complaint-book-success > h3,
-  .complaint-book-success > p,
-  .complaint-book-success-actions,
-  .complaint-book-note {
-    display: none !important;
-  }
-  .complaint-book-success,
-  .complaint-receipt-printable {
-    border: none;
-    background: #fff;
-    padding: 0;
+
+  body.complaint-print-active {
     margin: 0;
+    background: #fff !important;
   }
-  .complaint-book-panel .complaint-book-form,
-  .complaint-book-panel .complaint-book-channels,
-  .complaint-book-panel > p,
-  .complaint-book-panel > h2 {
-    display: none !important;
+
+  body.complaint-print-active #complaint-print-root {
+    display: block !important;
+  }
+
+  body.complaint-print-active .complaint-constancia-document {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  .complaint-receipt-preview .complaint-constancia-document {
+    border: none;
+    padding: 0;
   }
 }
 
