@@ -1,6 +1,5 @@
 import { createContext } from "react";
-import type { CookieChoices } from "@/config/cookieConsent";
-import type { CookieConsentRecord } from "@/config/cookieConsentPolicy";
+import type { CookieChoices, CookieConsentRecord } from "@/config/cookieConsentPolicy";
 
 export type CookieConsentContextValue = {
   consent: CookieConsentRecord | null;

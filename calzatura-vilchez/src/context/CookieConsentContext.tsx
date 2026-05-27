@@ -11,9 +11,8 @@ import {
   loadCookieConsent,
   rejectNonEssentialCookies,
   saveCookieConsent,
-  type CookieChoices,
 } from "@/config/cookieConsent";
-import type { CookieConsentRecord } from "@/config/cookieConsentPolicy";
+import type { CookieChoices, CookieConsentRecord } from "@/config/cookieConsentPolicy";
 import {
   CookieConsentContext,
 } from "@/context/CookieConsentStore";

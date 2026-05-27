@@ -12,7 +12,8 @@ import {
 import { INFO_ROUTES } from "@/routes/paths";
 import { useCookieConsent } from "@/context/useCookieConsent";
 
-const OPTIONAL_CATEGORIES: CookieCategoryId[] = ["functional", "security", "analytics"];
+type OptionalCookieCategoryId = Exclude<CookieCategoryId, "essential">;
+const OPTIONAL_CATEGORIES: OptionalCookieCategoryId[] = ["functional", "security", "analytics"];
 
 function choicesFromConsent(consent: ReturnType<typeof useCookieConsent>["consent"]): CookieChoices {
   return {
