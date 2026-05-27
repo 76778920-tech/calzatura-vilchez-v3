@@ -1,21 +1,18 @@
-"use strict";
-
-const { describe, it } = require("node:test");
-const assert = require("node:assert/strict");
-const {
+import { describe, it, expect } from "vitest";
+import {
   escapePlainText,
   parseEmailList,
   buildComplaintEmailText,
   loadComplaintNotifyRecipients,
-} = require("./complaintNotifyEmail.cjs");
+} from "./complaintNotifyEmail.cjs";
 
 describe("complaintNotifyEmail", () => {
   it("escapePlainText elimina saltos y tags", () => {
-    assert.equal(escapePlainText("a\nb<script>"), "a b‹script›");
+    expect(escapePlainText("a\nb<script>")).toBe("a b‹script›");
   });
 
   it("parseEmailList valida y deduplica", () => {
-    assert.deepEqual(parseEmailList(" A@b.com , invalid , a@b.com "), ["a@b.com"]);
+    expect(parseEmailList(" A@b.com , invalid , a@b.com ")).toEqual(["a@b.com"]);
   });
 
   it("buildComplaintEmailText incluye código", () => {
@@ -35,8 +32,8 @@ describe("complaintNotifyEmail", () => {
       },
       "CV-LR-20260526-ABC123",
     );
-    assert.match(text, /CV-LR-20260526-ABC123/);
-    assert.match(text, /ana@test.com/);
+    expect(text).toMatch(/CV-LR-20260526-ABC123/);
+    expect(text).toMatch(/ana@test.com/);
   });
 
   it("loadComplaintNotifyRecipients prioriza COMPLAINT_NOTIFY_EMAIL", () => {
@@ -47,7 +44,7 @@ describe("complaintNotifyEmail", () => {
       process.env.COMPLAINT_NOTIFY_EMAIL = "reclamos@empresa.pe";
       process.env.SUPERADMIN_EMAILS = "admin@empresa.pe";
       process.env.COMPLAINT_NOTIFY_USE_SUPERADMIN = "true";
-      assert.deepEqual(loadComplaintNotifyRecipients(), ["reclamos@empresa.pe"]);
+      expect(loadComplaintNotifyRecipients()).toEqual(["reclamos@empresa.pe"]);
     } finally {
       process.env.COMPLAINT_NOTIFY_EMAIL = prevNotify;
       process.env.SUPERADMIN_EMAILS = prevSuper;
