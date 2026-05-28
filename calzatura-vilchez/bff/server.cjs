@@ -2399,6 +2399,7 @@ app.post("/updateProductAtomic", (req, res) => {
         decodedToken.email || "",
         { source: "updateProductAtomic" },
       );
+      schedulePublicCatalogCacheBump();
       return res.status(200).json({ ok: true, id: p_id });
     } catch (error) {
       logServerError("updateProductAtomic error:", error);
@@ -2423,6 +2424,7 @@ app.post("/createProductVariantsAtomic", (req, res) => {
       const { data, error } = await supabase.rpc("create_product_variants_atomic", { variants });
       if (error) handleAdminRpcError(error);
       const ids = Array.isArray(data?.ids) ? data.ids : [];
+      schedulePublicCatalogCacheBump();
       return res.status(200).json({ ok: true, ids });
     } catch (error) {
       logServerError("createProductVariantsAtomic error:", error);
@@ -2446,6 +2448,7 @@ app.post("/deleteProductAtomic", (req, res) => {
       }
       const { error } = await supabase.rpc("delete_product_atomic", { p_id });
       if (error) handleAdminRpcError(error);
+      schedulePublicCatalogCacheBump();
       return res.status(200).json({ ok: true, id: p_id });
     } catch (error) {
       logServerError("deleteProductAtomic error:", error);
@@ -2483,6 +2486,7 @@ app.post("/registrarIngresoStock", (req, res) => {
         p_registrado_por: p_registrado_por || decodedToken.email || null,
       });
       if (error) handleAdminRpcError(error);
+      schedulePublicCatalogCacheBump();
       return res.status(200).json(data);
     } catch (error) {
       logServerError("registrarIngresoStock error:", error);
@@ -2506,6 +2510,7 @@ app.post("/admin/products/decrementStock", (req, res) => {
         p_lines: lines,
       });
       if (error) handleAdminRpcError(error);
+      schedulePublicCatalogCacheBump();
       return res.status(200).json({ ok: true });
     } catch (error) {
       logServerError("admin/products/decrementStock error:", error);
@@ -2530,6 +2535,7 @@ app.post("/admin/products/restoreStock", (req, res) => {
         p_cantidad: Number(cantidad),
       });
       if (error) handleAdminRpcError(error);
+      schedulePublicCatalogCacheBump();
       return res.status(200).json({ ok: true });
     } catch (error) {
       logServerError("admin/products/restoreStock error:", error);
@@ -3315,6 +3321,7 @@ app.post("/admin/products", (req, res) => {
         decodedToken.email || "",
         { source: "admin/products" },
       );
+      schedulePublicCatalogCacheBump();
       return res.status(200).json({ ok: true, id: data.id });
     } catch (error) {
       logServerError("admin/products POST error:", error);
@@ -3389,6 +3396,7 @@ app.patch("/admin/products/:productId", (req, res) => {
         decodedToken.email || "",
         { source: "admin/products/:id", campos: Object.keys(data) },
       );
+      schedulePublicCatalogCacheBump();
       return res.status(200).json({ ok: true });
     } catch (error) {
       logServerError("admin/products PATCH error:", error);
@@ -4145,6 +4153,21 @@ registerLibroReclamacionesRoutes(app, {
   logServerError,
   httpErrorStatus,
   publicError,
+});
+
+const { registerPublicCatalogRoutes } = require("./publicCatalog.cjs");
+const { bumpPublicCatalogCache } = require("./catalogCache.cjs");
+
+function schedulePublicCatalogCacheBump() {
+  void bumpPublicCatalogCache().catch((err) => {
+    logServerError("bumpPublicCatalogCache:", err?.message || err);
+  });
+}
+
+registerPublicCatalogRoutes(app, {
+  cors,
+  getSupabaseAdmin,
+  logServerError,
 });
 
 const PORT = Number(process.env.PORT || 8787);

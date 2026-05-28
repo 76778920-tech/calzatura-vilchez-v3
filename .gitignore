@@ -116,5 +116,10 @@ calzatura-vilchez-mobile/android/build/
 # Local screenshots and manual verification artifacts
 emulator-home-check.png
 
+# k6 load tests — secretos locales y reportes
+load-tests/config.env
+artifacts/load-tests/*.json
+artifacts/load-tests/*.html
+
 # dataconnect generated files
 .dataconnect

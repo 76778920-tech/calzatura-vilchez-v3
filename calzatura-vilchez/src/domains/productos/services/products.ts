@@ -4,10 +4,32 @@ import { logAudit } from "@/services/audit";
 import { postAdminBff } from "@/domains/productos/services/adminProductsBff";
 import type { PanelFetchScope } from "@/security/panelScope";
 import { bffFetch } from "@/utils/bffClient";
+import {
+  hasPublicBff,
+  publicBffFetch,
+  type PublicCatalogBrowseResult,
+  type PublicCatalogPage,
+} from "@/utils/publicBffClient";
 import type { Product } from "@/types";
 import { effectiveFamiliaKey, tallyFamilyGroupSizes } from "@/utils/productFamily";
+import { browsePublicCatalogFromUrl } from "@/domains/productos/utils/productsPageCatalogDerivations";
 
 const COL = "productos";
+
+async function tryPublicBff<T>(path: string): Promise<T | null> {
+  if (!hasPublicBff()) return null;
+  try {
+    return await publicBffFetch<T>(path);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchActiveFromSupabase(): Promise<Product[]> {
+  const { data, error } = await supabase.from(COL).select("*").eq("activo", true);
+  if (error) throw error;
+  return data as Product[];
+}
 
 /** Panel admin: todos los productos. Staff: solo activos. Público: `fetchPublicProducts`. */
 export async function fetchProducts(scope: PanelFetchScope = "admin"): Promise<Product[]> {
@@ -19,11 +41,51 @@ export async function fetchProducts(scope: PanelFetchScope = "admin"): Promise<P
   return fetchPublicProducts();
 }
 
+/** Índice ligero para búsqueda/header/home (menor payload que listado completo). */
+export async function fetchPublicCatalogIndex(): Promise<Product[]> {
+  const fromBff = await tryPublicBff<{ products: Product[] }>("/public/catalog/index");
+  if (fromBff?.products) return fromBff.products;
+  return fetchActiveFromSupabase();
+}
+
 /** Solo productos visibles en tienda (activo = true). Usar en catálogo público. */
 export async function fetchPublicProducts(): Promise<Product[]> {
-  const { data, error } = await supabase.from(COL).select("*").eq("activo", true);
-  if (error) throw error;
-  return data as Product[];
+  const fromBff = await tryPublicBff<{ products: Product[] }>("/public/catalog/active");
+  if (fromBff?.products) return fromBff.products;
+  return fetchActiveFromSupabase();
+}
+
+/** Catálogo paginado sin filtros de URL (k6 / listados simples). */
+export async function fetchPublicProductsPage(page = 1, limit = 48): Promise<PublicCatalogPage> {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+  const fromBff = await tryPublicBff<PublicCatalogPage>(`/public/catalog?${params}`);
+  if (fromBff) return fromBff;
+  const all = await fetchActiveFromSupabase();
+  const total = all.length;
+  const from = (page - 1) * limit;
+  return {
+    products: all.slice(from, from + limit),
+    page,
+    limit,
+    total,
+    totalPages: total > 0 ? Math.ceil(total / limit) : 0,
+  };
+}
+
+/** Catálogo con filtros de URL y paginación server-side (ProductsPage). */
+export async function fetchPublicCatalogBrowse(
+  params: URLSearchParams,
+  page = 1,
+  limit = 24,
+): Promise<PublicCatalogBrowseResult> {
+  const qs = new URLSearchParams(params);
+  qs.set("page", String(page));
+  qs.set("limit", String(limit));
+  const fromBff = await tryPublicBff<PublicCatalogBrowseResult>(`/public/catalog/browse?${qs}`);
+  if (fromBff) return fromBff;
+
+  const all = await fetchActiveFromSupabase();
+  return browsePublicCatalogFromUrl(all, qs, page, limit);
 }
 
 export async function fetchProductById(id: string, scope: PanelFetchScope = "admin"): Promise<Product | null> {
@@ -41,6 +103,10 @@ export async function fetchProductById(id: string, scope: PanelFetchScope = "adm
 
 /** Ficha en tienda pública: solo existe si el producto está visible (`activo`). */
 export async function fetchPublicProductById(id: string): Promise<Product | null> {
+  const fromBff = await tryPublicBff<{ product: Product | null }>(
+    `/public/catalog/product/${encodeURIComponent(id)}`,
+  );
+  if (fromBff) return fromBff.product;
   const { data, error } = await supabase.from(COL).select("*").eq("id", id).eq("activo", true).maybeSingle();
   if (error) return null;
   return (data as Product) ?? null;
@@ -50,6 +116,12 @@ export async function fetchPublicProductById(id: string): Promise<Product | null
 export async function fetchRelatedProductsInFamily(product: Pick<Product, "id" | "familiaId">): Promise<Product[]> {
   const key = effectiveFamiliaKey(product);
   if (!key) return [];
+  const qs = new URLSearchParams({
+    productId: product.id,
+    familyKey: key,
+  });
+  const fromBff = await tryPublicBff<{ products: Product[] }>(`/public/catalog/related?${qs}`);
+  if (fromBff?.products) return fromBff.products;
   const { data, error } = await supabase.from(COL).select("*").eq("activo", true).or(`id.eq.${key},familiaId.eq.${key}`);
   if (error) throw error;
   return ((data ?? []) as Product[]).filter((row) => row.id !== product.id);
@@ -57,6 +129,8 @@ export async function fetchRelatedProductsInFamily(product: Pick<Product, "id" |
 
 /** Recuento por clave de familia solo entre productos visibles en tienda (badges en catálogo público). */
 export async function fetchProductFamilyGroupCounts(): Promise<Record<string, number>> {
+  const fromBff = await tryPublicBff<{ counts: Record<string, number> }>("/public/catalog/family-counts");
+  if (fromBff?.counts) return fromBff.counts;
   const { data, error } = await supabase.from(COL).select("id, familiaId").eq("activo", true);
   if (error) throw error;
   return tallyFamilyGroupSizes(data ?? []);
@@ -74,6 +148,10 @@ export async function fetchProductsByIds(ids: string[]): Promise<Product[]> {
 export async function fetchPublicProductsByIds(ids: string[]): Promise<Product[]> {
   const uniqueIds = Array.from(new Set(ids)).filter(Boolean);
   if (!uniqueIds.length) return [];
+  const fromBff = await tryPublicBff<{ products: Product[] }>(
+    `/public/catalog/by-ids?ids=${uniqueIds.map(encodeURIComponent).join(",")}`,
+  );
+  if (fromBff?.products) return fromBff.products;
   const { data, error } = await supabase.from(COL).select("*").in("id", uniqueIds).eq("activo", true);
   if (error) throw error;
   const rows = (data ?? []) as Product[];
@@ -87,8 +165,15 @@ export async function fetchProductsByCategory(categoria: string): Promise<Produc
   return data as Product[];
 }
 
-export async function fetchFeaturedProducts(): Promise<Product[]> {
-  const { data, error } = await supabase.from(COL).select("*").eq("destacado", true).eq("activo", true);
+export async function fetchFeaturedProducts(limit = 24): Promise<Product[]> {
+  const fromBff = await tryPublicBff<{ products: Product[] }>(`/public/catalog/featured?limit=${limit}`);
+  if (fromBff?.products) return fromBff.products;
+  const { data, error } = await supabase
+    .from(COL)
+    .select("*")
+    .eq("destacado", true)
+    .eq("activo", true)
+    .limit(limit);
   if (error) throw error;
   return data as Product[];
 }

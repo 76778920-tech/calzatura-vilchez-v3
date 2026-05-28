@@ -26,6 +26,7 @@ const SURFACES = {
   DELIVERY_ROUTE: "delivery_route",
   DELIVERY_DISTANCE: "delivery_distance",
   DELIVERY_QUOTE: "delivery_quote",
+  PUBLIC_CATALOG: "public_catalog",
 };
 
 const SURFACE_LABELS = {
@@ -39,6 +40,7 @@ const SURFACE_LABELS = {
   delivery_route: "Ruta de envío (delivery/route)",
   delivery_distance: "Distancia (delivery/distance)",
   delivery_quote: "Cotización envío (delivery/quote)",
+  public_catalog: "Catálogo público (lectura)",
 };
 
 function surfaceLabel(surface) {

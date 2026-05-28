@@ -59,7 +59,29 @@
 |-----|--------|---------------|
 | RNF-SEG-01 | Rutas admin bloqueadas | Playwright sin auth |
 | RNF-PER-01 | Latencia catálogo | Lighthouse / DevTools |
+| RNF-CAP-02 | Capacidad lectura 2.000 concurrentes | k6 en `load-tests/` — ver README |
 | RNF-USA-01 | Checkout | Test usuario externo + cuestionario SUS opcional |
+
+### 5.1 RNF-CAP-02 — Capacidad de lectura (2.000 usuarios concurrentes)
+
+**Objetivo:** Evitar caídas en campañas o picos de tráfico validando lecturas críticas antes de producción.
+
+| Apartado | VUs meta | Lecturas simuladas |
+|----------|----------|-------------------|
+| Catálogo BFF (caché) | 1.400 | `GET /public/catalog/active` y paginado (`fetchPublicProducts` vía BFF) |
+| Navegación / detalle | 350 | Detalle por id, familias, destacados |
+| BFF | 200 | `/health`, `/delivery/quote` |
+| Hosting estático | 50 | Página principal Firebase |
+
+**Herramienta:** [Grafana k6](https://k6.io) — scripts en `load-tests/scenarios/`.
+
+**Criterios de éxito (staging):** tasa de fallo HTTP &lt; 2 %; p95 catálogo &lt; 3 s; p95 detalle &lt; 2,5 s.
+
+**Ejecución:** `npm run load:smoke` → `npm run load:mixed1000` (meta 1.000 VUs) → `npm run load:mixed2000` (requiere `load-tests/config.env` y **no** disparar picos en producción sin ventana aprobada).
+
+**Evidencia:** JSON en `artifacts/load-tests/`.
+
+**Prioridad 1 (implementado):** rutas `GET /public/catalog/*` en BFF con caché Upstash (`PUBLIC_CATALOG_CACHE_TTL_SEC`), frontend usa BFF cuando `VITE_BACKEND_API_URL` está definido; pooler Supabase en despliegue (ver `bff/README.txt`).
 
 ## 6. Regresión y humo
 

@@ -118,7 +118,7 @@ describe("getProductSizes / inferProductMaterials / MATERIAL_RULES", () => {
         descripcion: "",
       })
     );
-    expect(mats.some((m) => m.slug === "cuero")).toBe(true);
+    expect(mats.some((m: { slug: string }) => m.slug === "cuero")).toBe(true);
     expect(MATERIAL_RULES.length).toBeGreaterThan(0);
   });
 });
@@ -145,7 +145,7 @@ describe("buildRouteFilteredCatalogProducts", () => {
       vista: "marcas",
       marca: "nike",
     });
-    expect(r.every((x) => x.marca?.toLowerCase() === "nike")).toBe(true);
+    expect(r.every((x: { marca?: string }) => x.marca?.toLowerCase() === "nike")).toBe(true);
   });
 
   it("marcaSlug campana promocion taxonomías y color simple", () => {

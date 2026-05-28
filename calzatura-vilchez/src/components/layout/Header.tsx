@@ -20,7 +20,7 @@ import {
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { useCart } from "@/domains/carrito/context/CartContext";
 import { logoutUser } from "@/domains/usuarios/services/auth";
-import { fetchPublicProducts } from "@/domains/productos/services/products";
+import { fetchPublicCatalogIndex } from "@/domains/productos/services/products";
 import { useThemeMode } from "@/hooks/useThemeMode";
 import { ADMIN_ROUTES, CLIENT_ROUTES, INFO_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "@/routes/paths";
 import {
@@ -393,7 +393,7 @@ export default function Header() {
   useEffect(() => {
     if (!searchFocused || productsFetchedRef.current) return;
     productsFetchedRef.current = true;
-    fetchPublicProducts()
+    fetchPublicCatalogIndex()
       .then(setProducts)
       .catch(() => setProducts([]));
   }, [searchFocused]);

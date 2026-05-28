@@ -10,7 +10,12 @@ import {
   mergeCatalogSearchParams,
 } from "@/routes/catalogRouting";
 import { AlertTriangle, ChevronRight, X } from "lucide-react";
-import { fetchProductFamilyGroupCounts, fetchPublicProducts } from "@/domains/productos/services/products";
+import {
+  fetchPublicCatalogBrowse,
+  fetchProductFamilyGroupCounts,
+  fetchPublicProducts,
+} from "@/domains/productos/services/products";
+import { hasPublicBff, type PublicCatalogBrowseResult } from "@/utils/publicBffClient";
 import type { Product } from "@/types";
 import { LoadingStatusRegion } from "@/components/common/LoadingStatusRegion";
 import ProductCard from "@/domains/productos/components/ProductCard";
@@ -60,6 +65,7 @@ import { usePopoverDockEffect } from "@/hooks/usePopoverDockEffect";
 
 const CATALOG_CAMPAIGN_ROTATION_MS = 9000;
 const CATALOG_PAGE_SIZE = 24;
+const USE_BFF_CATALOG_BROWSE = hasPublicBff();
 const PRODUCTS_GRID_SKELETON_KEYS = [
   "product-skeleton-1",
   "product-skeleton-2",
@@ -164,10 +170,12 @@ export default function ProductsPage() {
     navigate(`${target.pathname}${target.search}`, { replace: true });
   }, [location.pathname, location.search, routeParams, navigate]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [browse, setBrowse] = useState<PublicCatalogBrowseResult | null>(null);
   const [familyGroupCounts, setFamilyGroupCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  const [catalogPage, setCatalogPage] = useState(1);
   useProductsRealtime(() => setReloadToken((t) => t + 1));
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [draftPriceMin, setDraftPriceMin] = useState(0);
@@ -255,8 +263,38 @@ export default function ProductsPage() {
     rangoEdad,
   ]);
 
+  const filterParamsKey = effectiveParams.toString();
+  const [prevFilterParamsKey, setPrevFilterParamsKey] = useState(filterParamsKey);
+
+  if (prevFilterParamsKey !== filterParamsKey) {
+    setPrevFilterParamsKey(filterParamsKey);
+    setCatalogPage(1);
+  }
+
   useEffect(() => {
     let isMounted = true;
+    setLoading(true);
+    setError(null);
+
+    if (USE_BFF_CATALOG_BROWSE) {
+      fetchPublicCatalogBrowse(effectiveParams, catalogPage, CATALOG_PAGE_SIZE)
+        .then((data) => {
+          if (!isMounted) return;
+          setBrowse(data);
+          setFamilyGroupCounts(data.familyGroupCounts);
+        })
+        .catch(() => {
+          if (!isMounted) return;
+          setBrowse(null);
+          setError("No pudimos cargar el catálogo en este momento.");
+        })
+        .finally(() => {
+          if (isMounted) setLoading(false);
+        });
+      return () => {
+        isMounted = false;
+      };
+    }
 
     Promise.all([
       fetchPublicProducts(),
@@ -266,6 +304,7 @@ export default function ProductsPage() {
         if (!isMounted) return;
         setProducts(nextProducts);
         setFamilyGroupCounts(counts);
+        setBrowse(null);
       })
       .catch(() => {
         if (!isMounted) return;
@@ -278,7 +317,7 @@ export default function ProductsPage() {
     return () => {
       isMounted = false;
     };
-  }, [reloadToken]);
+  }, [reloadToken, effectiveParams, catalogPage]);
 
   useEffect(() => {
     const handlePointerDown = (event: MouseEvent) => {
@@ -350,9 +389,9 @@ export default function ProductsPage() {
   usePopoverDockEffect(activeMenu === "descuento", discountTriggerRef, discountPopoverFrameRef, setDiscountPopoverStyle, layoutDiscountPopover);
   usePopoverDockEffect(activeMenu === "marcaSlug", marcaTriggerRef, marcaPopoverFrameRef, setMarcaPopoverStyle, layoutMarcaPopover);
 
-  const routeFiltered = useMemo(
-    () =>
-      buildRouteFilteredCatalogProducts({
+  const routeFiltered = useMemo((): Product[] => {
+    if (USE_BFF_CATALOG_BROWSE) return [];
+    return buildRouteFilteredCatalogProducts({
         products,
         categoria,
         vista,
@@ -368,8 +407,9 @@ export default function ProductsPage() {
         rangoEdad,
         color,
         trimmedQuery,
-      }),
-    [
+      });
+  }, [
+      USE_BFF_CATALOG_BROWSE,
       products,
       categoria,
       vista,
@@ -388,7 +428,7 @@ export default function ProductsPage() {
     ]
   );
 
-  const marcas = useMemo(() => {
+  const marcasClient = useMemo(() => {
     const names = routeFiltered
       .map((product) => product.marca?.trim())
       .filter((value): value is string => Boolean(value));
@@ -396,6 +436,7 @@ export default function ProductsPage() {
       .sort((left, right) => left.localeCompare(right))
       .map((value) => ({ label: value, value: slugifyCatalogValue(value) }));
   }, [routeFiltered]);
+  const marcas = USE_BFF_CATALOG_BROWSE ? (browse?.meta.marcas ?? []) : marcasClient;
 
   const availableColors = useMemo(() => {
     return COLOR_SWATCH_ORDER.map((value) => ({
@@ -405,7 +446,7 @@ export default function ProductsPage() {
     }));
   }, []);
 
-  const availableSizes = useMemo(() => {
+  const availableSizesClient = useMemo(() => {
     const numericSizes = routeFiltered
       .flatMap((product) => getProductSizes(product))
       .map(Number)
@@ -414,6 +455,7 @@ export default function ProductsPage() {
       .sort((left, right) => left - right)
       .map(String);
   }, [routeFiltered]);
+  const availableSizes = USE_BFF_CATALOG_BROWSE ? (browse?.meta.availableSizes ?? []) : availableSizesClient;
 
   const availableMaterials = useMemo(() => {
     return MATERIAL_FILTER_ORDER
@@ -423,7 +465,7 @@ export default function ProductsPage() {
       }));
   }, []);
 
-  const priceBounds = useMemo(() => {
+  const priceBoundsClient = useMemo(() => {
     if (routeFiltered.length === 0) {
       return { min: 0, max: 0, low: 0, high: 0 };
     }
@@ -440,33 +482,30 @@ export default function ProductsPage() {
 
     return { min, max, low, high: Math.min(high, max) };
   }, [routeFiltered]);
+  const priceBounds = USE_BFF_CATALOG_BROWSE
+    ? (browse?.meta.priceBounds ?? { min: 0, max: 0, low: 0, high: 0 })
+    : priceBoundsClient;
 
-  const filtered = useMemo(
-    () =>
-      buildFacetFilteredCatalogProducts(routeFiltered, {
-        precio,
-        talla,
-        color,
-        material,
-        descuento,
-      }),
-    [color, descuento, material, precio, routeFiltered, talla]
-  );
+  const filtered = useMemo(() => {
+    if (USE_BFF_CATALOG_BROWSE) return [];
+    return buildFacetFilteredCatalogProducts(routeFiltered, {
+      precio,
+      talla,
+      color,
+      material,
+      descuento,
+    });
+  }, [color, descuento, material, precio, routeFiltered, talla]);
 
-  const [catalogPage, setCatalogPage] = useState(1);
-  const filterParamsKey = effectiveParams.toString();
-  const [prevFilterParamsKey, setPrevFilterParamsKey] = useState(filterParamsKey);
-
-  if (prevFilterParamsKey !== filterParamsKey) {
-    setPrevFilterParamsKey(filterParamsKey);
-    setCatalogPage(1);
-  }
-
-  const totalCatalogPages = Math.ceil(filtered.length / CATALOG_PAGE_SIZE);
-  const pagedProducts = useMemo(
+  const catalogTotal = USE_BFF_CATALOG_BROWSE ? (browse?.total ?? 0) : filtered.length;
+  const totalCatalogPages = USE_BFF_CATALOG_BROWSE
+    ? (browse?.totalPages ?? 0)
+    : Math.ceil(filtered.length / CATALOG_PAGE_SIZE);
+  const pagedProductsClient = useMemo(
     () => filtered.slice((catalogPage - 1) * CATALOG_PAGE_SIZE, catalogPage * CATALOG_PAGE_SIZE),
-    [filtered, catalogPage]
+    [filtered, catalogPage],
   );
+  const pagedProducts: Product[] = USE_BFF_CATALOG_BROWSE ? (browse?.products ?? []) : pagedProductsClient;
 
   const pageTitle = useMemo(
     () =>
@@ -487,7 +526,7 @@ export default function ProductsPage() {
   );
 
   const pageSubtitle = useMemo(() => {
-    const visibleCount = productCountLabel(filtered.length);
+    const visibleCount = productCountLabel(catalogTotal);
 
     if (campana || promocion || coleccion) {
       return `${visibleCount} visibles dentro de la selección activa. Explora por filtros rápidos sin perder la línea visual de la colección.`;
@@ -498,7 +537,7 @@ export default function ProductsPage() {
     }
 
     return `${visibleCount} listos para explorar dentro de ${categoryLabel(categoria).toLowerCase()}. Usa los menús horizontales para afinar color, talla, material o promociones.`;
-  }, [campana, categoria, coleccion, filtered.length, promocion]);
+  }, [campana, categoria, coleccion, catalogTotal, promocion]);
 
   const catalogCampaignSlides = useMemo(
     () => [
@@ -680,8 +719,8 @@ export default function ProductsPage() {
   }, [categoria, vista]);
 
   const visibleBrandCount = useMemo(() => {
-    return new Set(filtered.map((product) => product.marca).filter(Boolean)).size;
-  }, [filtered]);
+    return new Set(pagedProducts.map((product) => product.marca).filter(Boolean)).size;
+  }, [pagedProducts]);
 
   const filterMenus = useMemo<FilterMenuConfig[]>(() => {
     return [
@@ -762,7 +801,7 @@ export default function ProductsPage() {
     [applyFacetFilter, categoria, color, descuento, marcaSlug, material, precio, priceBounds.max, priceBounds.min, talla, vista]
   );
 
-  const hasAnyProducts = filtered.length > 0;
+  const hasAnyProducts = catalogTotal > 0;
 
   const fillRangeLeft = (() => {
     if (priceBounds.max <= priceBounds.min) return "10px";
@@ -858,7 +897,7 @@ export default function ProductsPage() {
               ›
             </button>
             <span className="catalog-pag-info">
-              {(catalogPage - 1) * CATALOG_PAGE_SIZE + 1}–{Math.min(catalogPage * CATALOG_PAGE_SIZE, filtered.length)} de {filtered.length}
+              {(catalogPage - 1) * CATALOG_PAGE_SIZE + 1}–{Math.min(catalogPage * CATALOG_PAGE_SIZE, catalogTotal)} de {catalogTotal}
             </span>
           </nav>
         )}

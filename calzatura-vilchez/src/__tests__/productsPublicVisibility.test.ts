@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, afterAll } from "vitest";
 import { supabase } from "@/supabase/client";
+
+vi.mock("@/config/apiBackend", () => ({
+  getBackendApiBaseUrl: () => "",
+}));
 import {
   fetchPublicProducts,
   fetchPublicProductById,

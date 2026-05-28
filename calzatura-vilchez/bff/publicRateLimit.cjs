@@ -56,6 +56,11 @@ function buildRateLimitSpecs() {
       windowMs: parseThreshold(process.env.DELIVERY_RATE_WINDOW_MS, 30 * 60 * 1000),
       label: "40/30min",
     },
+    [SURFACES.PUBLIC_CATALOG]: {
+      max: parseThreshold(process.env.PUBLIC_CATALOG_RATE_MAX, 240),
+      windowMs: parseThreshold(process.env.PUBLIC_CATALOG_RATE_WINDOW_MS, 60 * 1000),
+      label: "240/min",
+    },
   };
 }
 

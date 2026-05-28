@@ -1,14 +1,32 @@
 import { CYBER_WOW_DEFAULT_DESCUENTO } from "@/routes/catalogRouting";
 import type { Product } from "@/types";
-import { getProductColors } from "@/utils/colors";
-import {
-  productMatchesBrandSlug,
-  productMatchesCategory,
-  productMatchesSearch,
-  productMatchesTaxonomy,
-  slugifyCatalogValue,
-} from "@/utils/catalog";
 import { categoryLabel } from "@/utils/labels";
+import type { PublicCatalogBrowseResult } from "@/utils/publicBffClient";
+import { tallyFamilyGroupSizes } from "@/utils/productFamily";
+// Misma lógica que el BFF (`shared/catalogPublicFilter.cjs`) para filtros de catálogo.
+import {
+  MATERIAL_FILTER_ORDER as SHARED_MATERIAL_ORDER,
+  MATERIAL_RULES as SHARED_MATERIAL_RULES,
+  browseCatalogProducts,
+  buildFacetFilteredCatalogProducts,
+  buildRouteFilteredCatalogProducts,
+  getProductSizes,
+  inferProductMaterials,
+} from "../../../../shared/catalogPublicFilter.cjs";
+
+export function browsePublicCatalogFromUrl(
+  products: Product[],
+  params: URLSearchParams,
+  page: number,
+  limit: number,
+): PublicCatalogBrowseResult {
+  const query = Object.fromEntries(params.entries());
+  const browse = browseCatalogProducts(products, query, page, limit);
+  return {
+    ...browse,
+    familyGroupCounts: tallyFamilyGroupSizes(products),
+  };
+}
 
 export type CatalogQuickFilter = {
   label: string;
@@ -25,23 +43,10 @@ export type CatalogBreadcrumb = {
   params: Record<string, string | undefined>;
 };
 
-type MaterialRule = {
-  slug: string;
-  label: string;
-  terms: string[];
-};
+type MaterialRule = { slug: string; label: string; terms: string[] };
 
-export const MATERIAL_RULES: MaterialRule[] = [
-  { slug: "cuero", label: "Cuero", terms: ["cuero", "leather"] },
-  { slug: "charol", label: "Charol", terms: ["charol", "patent"] },
-  { slug: "nubuk", label: "Nubuk", terms: ["nubuk"] },
-  { slug: "sintetico", label: "Sintético", terms: ["sintetico", "sintética", "synthetic"] },
-  { slug: "textil", label: "Textil", terms: ["textil", "mesh", "tejido"] },
-  { slug: "gamuza", label: "Gamuza", terms: ["gamuza", "suede"] },
-  { slug: "lona", label: "Lona", terms: ["lona", "canvas"] },
-];
-
-export const MATERIAL_FILTER_ORDER = ["cuero", "gamuza", "charol", "nubuk", "sintetico", "textil"] as const;
+export const MATERIAL_RULES = SHARED_MATERIAL_RULES as MaterialRule[];
+export const MATERIAL_FILTER_ORDER = SHARED_MATERIAL_ORDER as readonly string[];
 
 export const DISCOUNT_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "10", label: "10 %" },
@@ -49,14 +54,6 @@ export const DISCOUNT_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "30", label: "30 %" },
   { value: "all", label: "Todo con descuento" },
 ];
-
-function normalizeText(value = "") {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
-}
 
 export function humanizeSlug(value: string) {
   return value
@@ -66,21 +63,7 @@ export function humanizeSlug(value: string) {
     .join(" ");
 }
 
-export function inferProductMaterials(product: Product) {
-  const haystack = normalizeText(
-    [product.nombre, product.descripcion, product.tipoCalzado, product.color, product.marca]
-      .filter(Boolean)
-      .join(" ")
-  );
-
-  return MATERIAL_RULES.filter((rule) => rule.terms.some((term) => haystack.includes(normalizeText(term))));
-}
-
-export function getProductSizes(product: Product) {
-  const fromTallas = Array.isArray(product.tallas) ? product.tallas : [];
-  const fromStock = product.tallaStock ? Object.keys(product.tallaStock) : [];
-  return Array.from(new Set([...fromTallas, ...fromStock].map((value) => value.trim()).filter(Boolean)));
-}
+export { inferProductMaterials, getProductSizes, buildRouteFilteredCatalogProducts, buildFacetFilteredCatalogProducts };
 
 function parsePriceParts(value: string) {
   const [mode, rawFirst, rawSecond] = value.split(":");
@@ -95,20 +78,6 @@ export function getPriceLabel(value: string, min: number, max: number) {
   if (mode === "over" && Number.isFinite(first)) return `Desde S/ ${first}`;
   if (mode === "range" && Number.isFinite(first) && Number.isFinite(second)) return `S/ ${first} - ${second}`;
   return min === max ? `S/ ${min}` : "";
-}
-
-function matchesPriceBucket(price: number, bucket: string) {
-  if (!bucket) return true;
-  const { mode, first, second } = parsePriceParts(bucket);
-  if (mode === "under" && Number.isFinite(first)) return price <= first;
-  if (mode === "between" && Number.isFinite(first) && Number.isFinite(second)) {
-    return price >= first && price <= second;
-  }
-  if (mode === "over" && Number.isFinite(first)) return price >= first;
-  if (mode === "range" && Number.isFinite(first) && Number.isFinite(second)) {
-    return price >= Math.min(first, second) && price <= Math.max(first, second);
-  }
-  return true;
 }
 
 export function parsePriceRange(value: string, fallbackMin: number, fallbackMax: number) {
@@ -131,146 +100,8 @@ export const parseColorSelection = parseCommaSeparatedTokens;
 export const parseMaterialSelection = parseCommaSeparatedTokens;
 export const parseDiscountSelection = parseCommaSeparatedTokens;
 
-export function inferProductDiscountPercent(product: Product) {
-  return product.descuento ?? null;
-}
-
-export type CatalogRouteFilterInput = {
-  products: Product[];
-  categoria: string;
-  vista: string | null;
-  marca: string;
-  marcaSlug: string;
-  campana: string;
-  promocion: string;
-  coleccion: string;
-  tipo: string;
-  linea: string;
-  estilo: string;
-  segmento: string;
-  rangoEdad: string;
-  color: string;
-  trimmedQuery: string;
-};
-
-export function buildRouteFilteredCatalogProducts(input: CatalogRouteFilterInput): Product[] {
-  let result = [...input.products];
-  const {
-    categoria,
-    vista,
-    marca,
-    marcaSlug,
-    campana,
-    promocion,
-    coleccion,
-    tipo,
-    linea,
-    estilo,
-    segmento,
-    rangoEdad,
-    color,
-    trimmedQuery,
-  } = input;
-
-  if (categoria !== "todos") {
-    result = result.filter((product) => productMatchesCategory(product.categoria, categoria));
-  }
-
-  if (vista === "marcas" && marca !== "todas") {
-    result = result.filter((product) => product.marca?.toLowerCase() === marca.toLowerCase());
-  }
-
-  if (marcaSlug) {
-    result = result.filter((product) => productMatchesBrandSlug(product, marcaSlug));
-  }
-
-  const taxonomyFilters = [
-    { key: "campana" as const, value: campana },
-    { key: "promocion" as const, value: promocion },
-    { key: "coleccion" as const, value: coleccion },
-    { key: "tipo" as const, value: tipo },
-    { key: "linea" as const, value: linea },
-    { key: "estilo" as const, value: estilo },
-    { key: "segmento" as const, value: segmento },
-    { key: "rangoEdad" as const, value: rangoEdad },
-  ];
-  for (const { key, value } of taxonomyFilters) {
-    if (value) result = result.filter((p) => productMatchesTaxonomy(p, key, value));
-  }
-
-  if (color && !color.includes(",")) {
-    result = result.filter((product) => productMatchesTaxonomy(product, "color", color));
-  }
-
-  if (trimmedQuery) {
-    result = result.filter((product) => productMatchesSearch(product, trimmedQuery));
-  }
-
-  return result;
-}
-
-export type CatalogFacetFilterInput = {
-  precio: string;
-  talla: string;
-  color: string;
-  material: string;
-  descuento: string;
-};
-
-export function buildFacetFilteredCatalogProducts(routeFiltered: Product[], facets: CatalogFacetFilterInput): Product[] {
-  let result = [...routeFiltered];
-  const { precio, talla, color, material, descuento } = facets;
-
-  if (precio) {
-    result = result.filter((product) => matchesPriceBucket(product.precio, precio));
-  }
-
-  if (talla) {
-    const selectedSizes = parseSizeSelection(talla);
-    result = result.filter((product) => {
-      const productSizes = getProductSizes(product);
-      return selectedSizes.some((size) => productSizes.includes(size));
-    });
-  }
-
-  if (color?.includes(",")) {
-    const selectedColors = parseColorSelection(color);
-    result = result.filter((product) => {
-      const productColorSet = new Set(getProductColors(product).map((value) => slugifyCatalogValue(value)));
-      return selectedColors.some((selected) => productColorSet.has(selected));
-    });
-  }
-
-  if (material) {
-    const selectedMaterials = parseMaterialSelection(material);
-    result = result.filter((product) =>
-      inferProductMaterials(product).some((rule) => selectedMaterials.includes(rule.slug))
-    );
-  }
-
-  if (descuento) {
-    const selectedDiscounts = parseDiscountSelection(descuento);
-    const hasAllDiscount = selectedDiscounts.includes("all");
-    const selectedPercents = selectedDiscounts
-      .filter((item) => item !== "all")
-      .map(Number)
-      .filter(Number.isFinite);
-
-    result = result.filter((product) => {
-      const fieldPercent = inferProductDiscountPercent(product);
-
-      if (hasAllDiscount) {
-        return fieldPercent !== null;
-      }
-
-      if (selectedPercents.length === 0) return true;
-      if (fieldPercent === null) return false;
-      return selectedPercents.some((percent) => fieldPercent >= percent);
-    });
-  }
-
-  return result;
-}
+export type CatalogRouteFilterInput = Parameters<typeof buildRouteFilteredCatalogProducts>[0];
+export type CatalogFacetFilterInput = Parameters<typeof buildFacetFilteredCatalogProducts>[1];
 
 export type ProductsPageTitleInput = {
   vista: string | null;

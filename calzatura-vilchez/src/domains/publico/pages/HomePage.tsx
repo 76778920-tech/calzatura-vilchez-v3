@@ -13,15 +13,15 @@ import {
 import { LoadingStatusRegion } from "@/components/common/LoadingStatusRegion";
 import ProductCard from "@/domains/productos/components/ProductCard";
 import HomeHeroSection, { type HomeHeroSlide } from "@/domains/publico/components/HomeHeroSection";
-import { fetchPublicProducts } from "@/domains/productos/services/products";
+import { fetchFeaturedProducts, fetchPublicCatalogIndex } from "@/domains/productos/services/products";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 
-let prefetchedProducts: Promise<Product[]> | null = null;
-function getPrefetchedProducts() {
-  prefetchedProducts ??= fetchPublicProducts();
-  return prefetchedProducts;
+let prefetchedCatalogIndex: Promise<Product[]> | null = null;
+function getPrefetchedCatalogIndex() {
+  prefetchedCatalogIndex ??= fetchPublicCatalogIndex();
+  return prefetchedCatalogIndex;
 }
-getPrefetchedProducts();
+getPrefetchedCatalogIndex();
 import type { Product } from "@/types";
 import { countProductsForCategory, productMatchesAnySearch } from "@/utils/catalog";
 import { buildCatalogHref, buildCyberCatalogHref } from "@/routes/catalogRouting";
@@ -321,6 +321,7 @@ function renderHomeSpotlightSection({
 export default function HomePage() {
   useDocumentTitle("Inicio");
   const [products, setProducts] = useState<Product[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
@@ -329,10 +330,13 @@ export default function HomePage() {
   const categoriesGridRef = useRef<HTMLDivElement | null>(null);
 
   const loadProducts = useCallback(() => {
-    const promise = prefetchedProducts ?? fetchPublicProducts();
-    prefetchedProducts = null;
-    promise
-      .then(setProducts)
+    const indexPromise = prefetchedCatalogIndex ?? fetchPublicCatalogIndex();
+    prefetchedCatalogIndex = null;
+    Promise.all([indexPromise, fetchFeaturedProducts(32)])
+      .then(([indexRows, featuredRows]) => {
+        setProducts(indexRows);
+        setFeaturedProducts(featuredRows.filter((product) => product.stock > 0));
+      })
       .catch(() => setError("No pudimos cargar los productos destacados."))
       .finally(() => setLoading(false));
   }, []);
@@ -378,19 +382,20 @@ export default function HomePage() {
     if (productCount > 0) return String(productCount);
     return "Nuevo";
   })();
-  const featuredProducts = useMemo(() => {
+  const spotlightFeatured = useMemo(() => {
+    if (featuredProducts.length > 0) return featuredProducts;
     const inStock = products.filter((product) => product.stock > 0);
     const selected = inStock.filter((product) => product.destacado);
     return selected.length > 0 ? selected : inStock;
-  }, [products]);
+  }, [featuredProducts, products]);
 
   const spotlightPages = useMemo(() => {
-    const pages: (typeof featuredProducts)[] = [];
-    for (let i = 0; i < featuredProducts.length; i += 4) {
-      pages.push(featuredProducts.slice(i, i + 4));
+    const pages: (typeof spotlightFeatured)[] = [];
+    for (let i = 0; i < spotlightFeatured.length; i += 4) {
+      pages.push(spotlightFeatured.slice(i, i + 4));
     }
-    return pages;
-  }, [featuredProducts]);
+    return pages.length > 0 ? pages : [[]];
+  }, [spotlightFeatured]);
 
   const spotlightTotalPages = spotlightPages.length;
   const effectiveSpotlightPage = Math.min(spotlightPage, Math.max(spotlightTotalPages - 1, 0));
@@ -476,7 +481,7 @@ export default function HomePage() {
           {renderHomeSpotlightSection({
             loading,
             error,
-            featuredProducts,
+            featuredProducts: spotlightFeatured,
             spotlightPages,
             spotlightTotalPages,
             effectiveSpotlightPage,

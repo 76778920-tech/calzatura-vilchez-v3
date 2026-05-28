@@ -66,6 +66,39 @@ async function setNxEx(key, value, exSeconds) {
   return out.result === "OK";
 }
 
+/** SET con EX (segundos). Devuelve true si Redis aceptó el valor. */
+async function setEx(key, value, exSeconds) {
+  const sec = Math.max(1, Math.floor(Number(exSeconds) || 1));
+  const serialized = typeof value === "string" ? value : String(value);
+  if (serialized.length > 8000) {
+    return setExPost(key, serialized, sec);
+  }
+  const out = await restCommand(["set", key, serialized], { EX: String(sec) });
+  if (!out.ok) return false;
+  return out.result === "OK";
+}
+
+/** SET grande vía POST (evita límite de URL en REST GET). */
+async function setExPost(key, value, exSeconds) {
+  const cfg = getConfig();
+  if (!cfg) return false;
+  const sec = Math.max(1, Math.floor(Number(exSeconds) || 1));
+  const url = `${cfg.baseUrl}/set/${encodeURIComponent(key)}?EX=${sec}`;
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { ...cfg.headers, "Content-Type": "application/octet-stream" },
+      body: value,
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!res.ok) return false;
+    const json = await res.json();
+    return json.result === "OK";
+  } catch {
+    return false;
+  }
+}
+
 async function rpush(key, value) {
   const out = await restCommand(["rpush", key, value]);
   if (!out.ok) return null;
@@ -90,6 +123,8 @@ module.exports = {
   expire,
   get,
   setNxEx,
+  setEx,
+  setExPost,
   rpush,
   lrange,
   del,

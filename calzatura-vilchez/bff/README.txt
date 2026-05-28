@@ -26,6 +26,15 @@ Rutas (igual que antes en Firebase):
   GET  /delivery/distance   (misma prioridad que /delivery/route)
   ALL  /ors/*   (proxy OpenRouteService legado; opcional)
   GET  /health
+  GET  /public/catalog/browse       (filtros URL + paginación — ProductsPage)
+  GET  /public/catalog              (paginado simple)
+  GET  /public/catalog/active       (listado activo completo — checkout)
+  GET  /public/catalog/index        (índice ligero — header/home)
+  GET  /public/catalog/featured     (destacados)
+  GET  /public/catalog/product/:id  (ficha pública)
+  GET  /public/catalog/related      (variantes familia)
+  GET  /public/catalog/by-ids       (favoritos)
+  GET  /public/catalog/family-counts
 
 Despliegue ejemplo (Render.com):
   1. Nuevo "Web Service", conectar repo, root: calzatura-vilchez/bff
@@ -42,7 +51,8 @@ Despliegue ejemplo (Render.com):
 Seguridad (Resend + Upstash, solo servidor):
   Rate limits y contadores de abuso compartidos entre réplicas si defines
   UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN.
-  Superficies: libro-reclamaciones, authLogin, lookup-dni, check-email, ors/*, delivery/*.
+  Superficies: libro-reclamaciones, authLogin, lookup-dni, check-email, ors/*, delivery/*, public/catalog.
+  Catálogo público: PUBLIC_CATALOG_CACHE_TTL_SEC (default 60). Usar pooler Supabase (puerto 6543) en producción.
   Arranque: auditoría de config; GET /health/security para diagnóstico.
   Variables: env.example (SECURITY_*, UPSTASH_*, rate limits).
   Redeploy del BFF en Render tras cambios (no basta Firebase Hosting).
