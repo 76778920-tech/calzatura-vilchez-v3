@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { startTransition, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
@@ -9,7 +8,7 @@ import {
   getCatalogCanonicalRedirect,
   mergeCatalogSearchParams,
 } from "@/routes/catalogRouting";
-import { AlertTriangle, ChevronRight, X } from "lucide-react";
+import { ChevronRight, X } from "lucide-react";
 import {
   fetchPublicCatalogBrowse,
   fetchProductFamilyGroupCounts,
@@ -17,8 +16,6 @@ import {
 } from "@/domains/productos/services/products";
 import { hasPublicBff, type PublicCatalogBrowseResult } from "@/utils/publicBffClient";
 import type { Product } from "@/types";
-import { LoadingStatusRegion } from "@/components/common/LoadingStatusRegion";
-import ProductCard from "@/domains/productos/components/ProductCard";
 import {
   cyberWowJuvenilEditorial,
   cyberWowZapatillasEditorial,
@@ -26,7 +23,6 @@ import {
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import { slugifyCatalogValue, toPublicCategorySlug } from "@/utils/catalog";
 import { categoryLabel } from "@/utils/labels";
-import { effectiveFamiliaKey } from "@/utils/productFamily";
 import { CatalogFilterRail } from "@/domains/productos/components/CatalogFilterRail";
 import {
   buildActiveCatalogFacetChips,
@@ -35,9 +31,6 @@ import {
   buildFacetFilteredCatalogProducts,
   buildRouteFilteredCatalogProducts,
   DISCOUNT_OPTIONS,
-  filterParsedColorsForCatalogDraft,
-  filterParsedMaterialsForCatalogDraft,
-  filterParsedSizesForCatalogDraft,
   getPriceLabel,
   getProductSizes,
   humanizeSlug,
@@ -46,13 +39,15 @@ import {
   parseColorSelection,
   parseDiscountSelection,
   parseMaterialSelection,
-  parsePriceRange,
   parseSizeSelection,
   resolveProductsPageTitle,
   toggleCatalogStringListMember,
   type CatalogFilterGroup,
 } from "@/domains/productos/utils/productsPageCatalogDerivations";
 import { useCatalogCampaignCarousel } from "@/domains/productos/hooks/useCatalogCampaignCarousel";
+import { useCatalogMenuDismiss } from "@/domains/productos/hooks/useCatalogMenuDismiss";
+import { buildProductsPageMainContent } from "@/domains/productos/pages/productsPageMainContent";
+import { primeCatalogMenuDraft } from "@/domains/productos/utils/catalogMenuDraft";
 import {
   measureColorCatalogPopover,
   measureDiscountCatalogPopover,
@@ -66,16 +61,6 @@ import { usePopoverDockEffect } from "@/hooks/usePopoverDockEffect";
 const CATALOG_CAMPAIGN_ROTATION_MS = 9000;
 const CATALOG_PAGE_SIZE = 24;
 const USE_BFF_CATALOG_BROWSE = hasPublicBff();
-const PRODUCTS_GRID_SKELETON_KEYS = [
-  "product-skeleton-1",
-  "product-skeleton-2",
-  "product-skeleton-3",
-  "product-skeleton-4",
-  "product-skeleton-5",
-  "product-skeleton-6",
-  "product-skeleton-7",
-  "product-skeleton-8",
-];
 
 function productCountLabel(count: number): string {
   const suffix = count === 1 ? "" : "s";
@@ -321,43 +306,24 @@ export default function ProductsPage() {
     };
   }, [reloadToken, effectiveParams, catalogPage]);
 
-  useEffect(() => {
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) {
-        setActiveMenu(null);
-        return;
-      }
-      if (pricePopoverRef.current?.contains(target)) return;
-      if (priceTriggerRef.current?.contains(target)) return;
-      if (sizePopoverRef.current?.contains(target)) return;
-      if (sizeTriggerRef.current?.contains(target)) return;
-      if (colorPopoverRef.current?.contains(target)) return;
-      if (colorTriggerRef.current?.contains(target)) return;
-      if (materialPopoverRef.current?.contains(target)) return;
-      if (materialTriggerRef.current?.contains(target)) return;
-      if (discountPopoverRef.current?.contains(target)) return;
-      if (discountTriggerRef.current?.contains(target)) return;
-      if (marcaPopoverRef.current?.contains(target)) return;
-      if (marcaTriggerRef.current?.contains(target)) return;
-      if (filterRailRef.current?.contains(target)) {
-        setActiveMenu(null);
-        return;
-      }
-      setActiveMenu(null);
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setActiveMenu(null);
-    };
-
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleEscape);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleEscape);
-    };
-  }, []);
+  useCatalogMenuDismiss(
+    {
+      filterRailRef,
+      pricePopoverRef,
+      priceTriggerRef,
+      sizePopoverRef,
+      sizeTriggerRef,
+      colorPopoverRef,
+      colorTriggerRef,
+      materialPopoverRef,
+      materialTriggerRef,
+      discountPopoverRef,
+      discountTriggerRef,
+      marcaPopoverRef,
+      marcaTriggerRef,
+    },
+    setActiveMenu,
+  );
 
   const layoutPricePopover = useCallback(
     (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measurePriceCatalogPopover(rect, viewport),
@@ -437,7 +403,10 @@ export default function ProductsPage() {
       .sort((left, right) => left.localeCompare(right))
       .map((value) => ({ label: value, value: slugifyCatalogValue(value) }));
   }, [routeFiltered]);
-  const marcas = USE_BFF_CATALOG_BROWSE ? (browse?.meta.marcas ?? []) : marcasClient;
+  const marcas = useMemo(
+    () => (USE_BFF_CATALOG_BROWSE ? (browse?.meta.marcas ?? []) : marcasClient),
+    [browse, marcasClient],
+  );
 
   const availableColors = useMemo(() => {
     return COLOR_SWATCH_ORDER.map((value) => ({
@@ -456,7 +425,10 @@ export default function ProductsPage() {
       .sort((left, right) => left - right)
       .map(String);
   }, [routeFiltered]);
-  const availableSizes = USE_BFF_CATALOG_BROWSE ? (browse?.meta.availableSizes ?? []) : availableSizesClient;
+  const availableSizes = useMemo(
+    () => (USE_BFF_CATALOG_BROWSE ? (browse?.meta.availableSizes ?? []) : availableSizesClient),
+    [browse, availableSizesClient],
+  );
 
   const availableMaterials = useMemo(() => {
     return MATERIAL_FILTER_ORDER
@@ -483,9 +455,13 @@ export default function ProductsPage() {
 
     return { min, max, low, high: Math.min(high, max) };
   }, [routeFiltered]);
-  const priceBounds = USE_BFF_CATALOG_BROWSE
-    ? (browse?.meta.priceBounds ?? { min: 0, max: 0, low: 0, high: 0 })
-    : priceBoundsClient;
+  const priceBounds = useMemo(
+    () =>
+      USE_BFF_CATALOG_BROWSE
+        ? (browse?.meta.priceBounds ?? { min: 0, max: 0, low: 0, high: 0 })
+        : priceBoundsClient,
+    [browse, priceBoundsClient],
+  );
 
   const filtered = useMemo(() => {
     if (USE_BFF_CATALOG_BROWSE) return [];
@@ -506,7 +482,10 @@ export default function ProductsPage() {
     () => filtered.slice((catalogPage - 1) * CATALOG_PAGE_SIZE, catalogPage * CATALOG_PAGE_SIZE),
     [filtered, catalogPage],
   );
-  const pagedProducts: Product[] = USE_BFF_CATALOG_BROWSE ? (browse?.products ?? []) : pagedProductsClient;
+  const pagedProducts = useMemo(
+    (): Product[] => (USE_BFF_CATALOG_BROWSE ? (browse?.products ?? []) : pagedProductsClient),
+    [browse, pagedProductsClient],
+  );
 
   const pageTitle = useMemo(
     () =>
@@ -661,34 +640,48 @@ export default function ProductsPage() {
     [effectiveParams, navigate]
   );
 
-  const toggleMenu = useCallback((menuKey: string) => {
-    setActiveMenu((current) => {
-      if (current === menuKey) return null;
-      if (menuKey === "precio") {
-        setPricePopoverStyle(null);
-        const nextRange = parsePriceRange(precio, priceBounds.min, priceBounds.max);
-        setDraftPriceMin(nextRange.min);
-        setDraftPriceMax(nextRange.max);
-      }
-      if (menuKey === "talla") {
-        setSizePopoverStyle(null);
-        setDraftSelectedSizes(filterParsedSizesForCatalogDraft(parseSizeSelection(talla), availableSizes));
-      }
-      if (menuKey === "color") {
-        setColorPopoverStyle(null);
-        setDraftSelectedColors(filterParsedColorsForCatalogDraft(parseColorSelection(color), availableColors));
-      }
-      if (menuKey === "material") {
-        setMaterialPopoverStyle(null);
-        setDraftSelectedMaterials(filterParsedMaterialsForCatalogDraft(parseMaterialSelection(material), availableMaterials));
-      }
-      if (menuKey === "descuento") {
-        setDiscountPopoverStyle(null);
-        setDraftSelectedDiscounts(parseDiscountSelection(descuento));
-      }
-      return menuKey;
-    });
-  }, [availableColors, availableMaterials, availableSizes, color, descuento, material, precio, priceBounds.max, priceBounds.min, talla]);
+  const menuDraftSetters = useMemo(
+    () => ({
+      setPricePopoverStyle,
+      setDraftPriceMin,
+      setDraftPriceMax,
+      setSizePopoverStyle,
+      setDraftSelectedSizes,
+      setColorPopoverStyle,
+      setDraftSelectedColors,
+      setMaterialPopoverStyle,
+      setDraftSelectedMaterials,
+      setDiscountPopoverStyle,
+      setDraftSelectedDiscounts,
+    }),
+    [],
+  );
+
+  const toggleMenu = useCallback(
+    (menuKey: string) => {
+      setActiveMenu((current) => {
+        if (current === menuKey) return null;
+        primeCatalogMenuDraft(
+          menuKey,
+          { precio, talla, color, material, descuento, priceBounds, availableSizes, availableColors, availableMaterials },
+          menuDraftSetters,
+        );
+        return menuKey;
+      });
+    },
+    [
+      availableColors,
+      availableMaterials,
+      availableSizes,
+      color,
+      descuento,
+      material,
+      menuDraftSetters,
+      precio,
+      priceBounds,
+      talla,
+    ],
+  );
 
   const breadcrumbs = useMemo(
     () =>
@@ -815,109 +808,27 @@ export default function ProductsPage() {
     return `calc(${((1 - r) * 100).toFixed(2)}% + ${(r * 20 - 10).toFixed(2)}px)`;
   })();
 
-  let productsMainContent: ReactNode;
-  if (loading) {
-    productsMainContent = (
-      <LoadingStatusRegion className="products-grid" label="Cargando productos">
-        {PRODUCTS_GRID_SKELETON_KEYS.map((key) => (
-          <div key={key} className="skeleton-card" />
-        ))}
-      </LoadingStatusRegion>
-    );
-  } else if (error) {
-    productsMainContent = (
-      <output className="empty-state" aria-live="polite">
-        <AlertTriangle size={28} />
-        <p>{error} Revisa tu conexión y vuelve a intentarlo.</p>
-        <button
-          type="button"
-          onClick={() => {
-            setLoading(true);
-            setError(null);
-            setReloadToken((current) => current + 1);
-          }}
-          className="btn-primary"
-        >
-          Reintentar
-        </button>
-      </output>
-    );
-  } else if (hasAnyProducts) {
-    productsMainContent = (
-      <>
-        <div className="products-grid">
-          {pagedProducts.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              familyGroupSize={familyGroupCounts[effectiveFamiliaKey(product)] ?? 1}
-            />
-          ))}
-        </div>
-        {totalCatalogPages > 1 && (
-          <nav className="catalog-pagination" aria-label="Paginación del catálogo">
-            <button
-              type="button"
-              className="catalog-pag-btn"
-              onClick={() => { setCatalogPage((p) => Math.max(1, p - 1)); globalThis.scrollTo({ top: 0, behavior: "smooth" }); }}
-              disabled={catalogPage === 1}
-              aria-label="Página anterior"
-            >
-              ‹
-            </button>
-            {Array.from({ length: totalCatalogPages }, (_, i) => i + 1)
-              .filter((n) => n === 1 || n === totalCatalogPages || Math.abs(n - catalogPage) <= 2)
-              .reduce<Array<number | { gap: string }>>((acc, n, idx, arr) => {
-                if (idx > 0 && n - arr[idx - 1] > 1) acc.push({ gap: `${arr[idx - 1]}-${n}` });
-                acc.push(n);
-                return acc;
-              }, [])
-              .map((item) =>
-                typeof item === "object" ? (
-                  <span key={`gap-${item.gap}`} className="catalog-pag-ellipsis">…</span>
-                ) : (
-                  <button
-                    key={item}
-                    type="button"
-                    className={`catalog-pag-btn${catalogPage === item ? " is-active" : ""}`}
-                    onClick={() => { setCatalogPage(item); globalThis.scrollTo({ top: 0, behavior: "smooth" }); }}
-                    aria-label={`Página ${item}`}
-                    aria-current={catalogPage === item ? "page" : undefined}
-                  >
-                    {item}
-                  </button>
-                )
-              )}
-            <button
-              type="button"
-              className="catalog-pag-btn"
-              onClick={() => { setCatalogPage((p) => Math.min(totalCatalogPages, p + 1)); globalThis.scrollTo({ top: 0, behavior: "smooth" }); }}
-              disabled={catalogPage === totalCatalogPages}
-              aria-label="Página siguiente"
-            >
-              ›
-            </button>
-            <span className="catalog-pag-info">
-              {(catalogPage - 1) * CATALOG_PAGE_SIZE + 1}–{Math.min(catalogPage * CATALOG_PAGE_SIZE, catalogTotal)} de {catalogTotal}
-            </span>
-          </nav>
-        )}
-      </>
-    );
-  } else {
-    const emptyMessage = trimmedQuery
-      ? `No encontramos resultados para "${trimmedQuery}" con los filtros actuales.`
-      : "No encontramos productos con la combinación actual de filtros.";
+  const handleCatalogRetry = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    setReloadToken((current) => current + 1);
+  }, []);
 
-    productsMainContent = (
-      <div className="empty-state">
-        <p>{emptyMessage}</p>
-        <button type="button" onClick={() => navigate(CATALOG_SHELF.products)} className="btn-primary">
-          Ver todo el catálogo
-        </button>
-      </div>
-    );
-  }
+  const productsMainContent = buildProductsPageMainContent({
+    loading,
+    error,
+    hasAnyProducts,
+    trimmedQuery,
+    pagedProducts,
+    familyGroupCounts,
+    catalogTotal,
+    catalogPage,
+    totalCatalogPages,
+    pageSize: CATALOG_PAGE_SIZE,
+    onRetry: handleCatalogRetry,
+    onGoToFullCatalog: () => navigate(CATALOG_SHELF.products),
+    onPageChange: setCatalogPage,
+  });
 
   return (
     <main className="products-page products-page-modern">
