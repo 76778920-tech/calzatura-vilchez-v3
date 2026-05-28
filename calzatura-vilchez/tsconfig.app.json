@@ -17,7 +17,8 @@
     "allowJs": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@shared/*": ["./shared/*"]
+      "@shared/*": ["./shared/*"],
+      "@shared/catalogPublicFilter": ["./shared/catalogPublicFilter.ts"]
     },
 
     /* Linting */

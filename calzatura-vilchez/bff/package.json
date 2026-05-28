@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "prestart": "node ../scripts/build-shared-cjs.mjs",
     "start": "node server.cjs",
     "check": "node --check server.cjs"
   },

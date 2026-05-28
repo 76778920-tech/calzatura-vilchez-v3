@@ -8,6 +8,8 @@ npm run test:e2e
 
 El servidor de desarrollo arranca con variables de `playwright.config.ts` (`VITE_E2E`, `VITE_BACKEND_API_URL`, `VITE_AI_SERVICE_URL` en `http://127.0.0.1:5173`) para que **`page.route` intercepte BFF e IA** sin llamar a Render.
 
+Con `VITE_E2E=true`, las lecturas de **catálogo público** no usan `/public/catalog/*` (ver `hasPublicBff()`): los specs siguen mockeando `**/rest/v1/productos*`. El BFF admin (`/admin/*`, mutaciones) sigue en el mismo origen y se intercepta con `mirrorAdminDataRoutes` / `mockAdminBff`.
+
 ## Arquitectura de mocks
 
 | Helper | Uso |

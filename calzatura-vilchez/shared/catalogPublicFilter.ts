@@ -1,68 +1,54 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
-var catalogPublicFilter_exports = {};
-__export(catalogPublicFilter_exports, {
-  MATERIAL_FILTER_ORDER: () => MATERIAL_FILTER_ORDER,
-  MATERIAL_RULES: () => MATERIAL_RULES,
-  browseCatalogProducts: () => browseCatalogProducts,
-  buildBrowseMeta: () => buildBrowseMeta,
-  buildFacetFilteredCatalogProducts: () => buildFacetFilteredCatalogProducts,
-  buildRouteFilteredCatalogProducts: () => buildRouteFilteredCatalogProducts,
-  getProductSizes: () => getProductSizes,
-  inferProductDiscountPercent: () => inferProductDiscountPercent,
-  inferProductMaterials: () => inferProductMaterials,
-  matchesPriceBucket: () => matchesPriceBucket,
-  normalizeText: () => normalizeText,
-  parseBrowseQuery: () => parseBrowseQuery,
-  parseCommaSeparatedTokens: () => parseCommaSeparatedTokens,
-  parsePriceParts: () => parsePriceParts
-});
-module.exports = __toCommonJS(catalogPublicFilter_exports);
-var import_catalogMatch = require("./catalogMatch");
-const MATERIAL_RULES = [
+import type { Product } from "../src/types";
+import {
+  slugifyCatalogValue,
+  productMatchesCategory,
+  productMatchesSearch,
+  productMatchesBrandSlug,
+  productMatchesTaxonomy,
+  getProductColors,
+} from "./catalogMatch";
+
+export const MATERIAL_RULES = [
   { slug: "cuero", label: "Cuero", terms: ["cuero", "leather"] },
   { slug: "charol", label: "Charol", terms: ["charol", "patent"] },
   { slug: "nubuk", label: "Nubuk", terms: ["nubuk"] },
-  { slug: "sintetico", label: "Sint\xE9tico", terms: ["sintetico", "sint\xE9tica", "synthetic"] },
+  { slug: "sintetico", label: "Sintético", terms: ["sintetico", "sintética", "synthetic"] },
   { slug: "textil", label: "Textil", terms: ["textil", "mesh", "tejido"] },
   { slug: "gamuza", label: "Gamuza", terms: ["gamuza", "suede"] },
-  { slug: "lona", label: "Lona", terms: ["lona", "canvas"] }
+  { slug: "lona", label: "Lona", terms: ["lona", "canvas"] },
 ];
-const MATERIAL_FILTER_ORDER = ["cuero", "gamuza", "charol", "nubuk", "sintetico", "textil"];
-function normalizeText(value = "") {
-  return value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+export const MATERIAL_FILTER_ORDER = ["cuero", "gamuza", "charol", "nubuk", "sintetico", "textil"];
+
+export function normalizeText(value: string = "") {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 }
-function inferProductMaterials(product) {
+
+export function inferProductMaterials(product: Product) {
   const haystack = normalizeText(
-    [product.nombre, product.descripcion, product.tipoCalzado, product.color, product.marca].filter(Boolean).join(" ")
+    [product.nombre, product.descripcion, product.tipoCalzado, product.color, product.marca]
+      .filter(Boolean)
+      .join(" "),
   );
   return MATERIAL_RULES.filter((rule) => rule.terms.some((term) => haystack.includes(normalizeText(term))));
 }
-function getProductSizes(product) {
+
+export function getProductSizes(product: Product) {
   const fromTallas = Array.isArray(product.tallas) ? product.tallas : [];
   const fromStock = product.tallaStock ? Object.keys(product.tallaStock) : [];
   return Array.from(new Set([...fromTallas, ...fromStock].map((value) => value.trim()).filter(Boolean)));
 }
-function parsePriceParts(value) {
+
+export function parsePriceParts(value: string) {
   const [mode, rawFirst, rawSecond] = value.split(":");
   return { mode, first: Number(rawFirst), second: Number(rawSecond) };
 }
-function matchesPriceBucket(price, bucket) {
+
+export function matchesPriceBucket(price: number, bucket: string) {
   if (!bucket) return true;
   const { mode, first, second } = parsePriceParts(bucket);
   if (mode === "under" && Number.isFinite(first)) return price <= first;
@@ -75,13 +61,35 @@ function matchesPriceBucket(price, bucket) {
   }
   return true;
 }
-function parseCommaSeparatedTokens(value) {
-  return String(value || "").split(",").map((item) => item.trim()).filter(Boolean);
+
+export function parseCommaSeparatedTokens(value: string) {
+  return String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
-function inferProductDiscountPercent(product) {
+
+export function inferProductDiscountPercent(product: Product) {
   return product.descuento ?? null;
 }
-function buildRouteFilteredCatalogProducts(input) {
+
+export function buildRouteFilteredCatalogProducts(input: {
+  products: Product[];
+  categoria: string;
+  vista: string | null;
+  marca: string;
+  marcaSlug: string;
+  campana: string;
+  promocion: string;
+  coleccion: string;
+  tipo: string;
+  linea: string;
+  estilo: string;
+  segmento: string;
+  rangoEdad: string;
+  color: string;
+  trimmedQuery: string;
+}) {
   let result = [...input.products];
   const {
     categoria,
@@ -97,17 +105,21 @@ function buildRouteFilteredCatalogProducts(input) {
     segmento,
     rangoEdad,
     color,
-    trimmedQuery
+    trimmedQuery,
   } = input;
+
   if (categoria !== "todos") {
-    result = result.filter((product) => (0, import_catalogMatch.productMatchesCategory)(product.categoria, categoria));
+    result = result.filter((product) => productMatchesCategory(product.categoria, categoria));
   }
+
   if (vista === "marcas" && marca !== "todas") {
     result = result.filter((product) => product.marca?.toLowerCase() === marca.toLowerCase());
   }
+
   if (marcaSlug) {
-    result = result.filter((product) => (0, import_catalogMatch.productMatchesBrandSlug)(product, marcaSlug));
+    result = result.filter((product) => productMatchesBrandSlug(product, marcaSlug));
   }
+
   const taxonomyFilters = [
     { key: "campana", value: campana },
     { key: "promocion", value: promocion },
@@ -116,25 +128,40 @@ function buildRouteFilteredCatalogProducts(input) {
     { key: "linea", value: linea },
     { key: "estilo", value: estilo },
     { key: "segmento", value: segmento },
-    { key: "rangoEdad", value: rangoEdad }
+    { key: "rangoEdad", value: rangoEdad },
   ];
   for (const { key, value } of taxonomyFilters) {
-    if (value) result = result.filter((p) => (0, import_catalogMatch.productMatchesTaxonomy)(p, key, value));
+    if (value) result = result.filter((p) => productMatchesTaxonomy(p, key, value));
   }
+
   if (color && !color.includes(",")) {
-    result = result.filter((product) => (0, import_catalogMatch.productMatchesTaxonomy)(product, "color", color));
+    result = result.filter((product) => productMatchesTaxonomy(product, "color", color));
   }
+
   if (trimmedQuery) {
-    result = result.filter((product) => (0, import_catalogMatch.productMatchesSearch)(product, trimmedQuery));
+    result = result.filter((product) => productMatchesSearch(product, trimmedQuery));
   }
+
   return result;
 }
-function buildFacetFilteredCatalogProducts(routeFiltered, facets) {
+
+export function buildFacetFilteredCatalogProducts(
+  routeFiltered: Product[],
+  facets: {
+    precio: string;
+    talla: string;
+    color: string;
+    material: string;
+    descuento: string;
+  },
+) {
   let result = [...routeFiltered];
   const { precio, talla, color, material, descuento } = facets;
+
   if (precio) {
     result = result.filter((product) => matchesPriceBucket(product.precio, precio));
   }
+
   if (talla) {
     const selectedSizes = parseCommaSeparatedTokens(talla);
     result = result.filter((product) => {
@@ -142,23 +169,30 @@ function buildFacetFilteredCatalogProducts(routeFiltered, facets) {
       return selectedSizes.some((size) => productSizes.includes(size));
     });
   }
+
   if (color?.includes(",")) {
     const selectedColors = parseCommaSeparatedTokens(color);
     result = result.filter((product) => {
-      const productColorSet = new Set((0, import_catalogMatch.getProductColors)(product).map((value) => (0, import_catalogMatch.slugifyCatalogValue)(value)));
+      const productColorSet = new Set(getProductColors(product).map((value: string) => slugifyCatalogValue(value)));
       return selectedColors.some((selected) => productColorSet.has(selected));
     });
   }
+
   if (material) {
     const selectedMaterials = parseCommaSeparatedTokens(material);
-    result = result.filter(
-      (product) => inferProductMaterials(product).some((rule) => selectedMaterials.includes(rule.slug))
+    result = result.filter((product) =>
+      inferProductMaterials(product).some((rule) => selectedMaterials.includes(rule.slug)),
     );
   }
+
   if (descuento) {
     const selectedDiscounts = parseCommaSeparatedTokens(descuento);
     const hasAllDiscount = selectedDiscounts.includes("all");
-    const selectedPercents = selectedDiscounts.filter((item) => item !== "all").map(Number).filter(Number.isFinite);
+    const selectedPercents = selectedDiscounts
+      .filter((item) => item !== "all")
+      .map(Number)
+      .filter(Number.isFinite);
+
     result = result.filter((product) => {
       const fieldPercent = inferProductDiscountPercent(product);
       if (hasAllDiscount) return fieldPercent !== null;
@@ -167,16 +201,29 @@ function buildFacetFilteredCatalogProducts(routeFiltered, facets) {
       return selectedPercents.some((percent) => fieldPercent >= percent);
     });
   }
+
   return result;
 }
-function buildBrowseMeta(routeFiltered) {
+
+export function buildBrowseMeta(routeFiltered: Product[]) {
   const marcas = Array.from(
     new Set(
-      routeFiltered.map((p) => p.marca?.trim()).filter((m) => typeof m === "string" && m.length > 0)
-    )
-  ).sort((a, b) => a.localeCompare(b)).map((value) => ({ label: value, value: (0, import_catalogMatch.slugifyCatalogValue)(value) }));
-  const numericSizes = routeFiltered.flatMap((product) => getProductSizes(product)).map(Number).filter(Number.isFinite);
-  const availableSizes = Array.from(new Set(numericSizes)).sort((a, b) => a - b).map(String);
+      routeFiltered
+        .map((p) => p.marca?.trim())
+        .filter((m): m is string => typeof m === "string" && m.length > 0),
+    ),
+  )
+    .sort((a, b) => a.localeCompare(b))
+    .map((value) => ({ label: value, value: slugifyCatalogValue(value) }));
+
+  const numericSizes = routeFiltered
+    .flatMap((product) => getProductSizes(product))
+    .map(Number)
+    .filter(Number.isFinite);
+  const availableSizes = Array.from(new Set(numericSizes))
+    .sort((a, b) => a - b)
+    .map(String);
+
   let priceBounds = { min: 0, max: 0, low: 0, high: 0 };
   if (routeFiltered.length > 0) {
     const prices = routeFiltered.map((p) => p.precio).filter(Number.isFinite);
@@ -188,10 +235,12 @@ function buildBrowseMeta(routeFiltered) {
       priceBounds = { min, max, low, high: Math.min(high, max) };
     }
   }
+
   return { marcas, availableSizes, priceBounds };
 }
-function parseBrowseQuery(query) {
-  const str = (key) => String(query[key] ?? "").trim();
+
+export function parseBrowseQuery(query: Record<string, string>) {
+  const str = (key: string) => String(query[key] ?? "").trim();
   return {
     categoria: str("categoria") || "todos",
     vista: str("vista") || null,
@@ -210,10 +259,16 @@ function parseBrowseQuery(query) {
     precio: str("precio"),
     talla: str("talla"),
     material: str("material"),
-    descuento: str("descuento")
+    descuento: str("descuento"),
   };
 }
-function browseCatalogProducts(allProducts, query, page, limit) {
+
+export function browseCatalogProducts(
+  allProducts: Product[],
+  query: Record<string, string>,
+  page: number,
+  limit: number,
+) {
   const filters = parseBrowseQuery(query);
   const routeFiltered = buildRouteFilteredCatalogProducts({
     products: allProducts,
@@ -230,42 +285,28 @@ function browseCatalogProducts(allProducts, query, page, limit) {
     segmento: filters.segmento,
     rangoEdad: filters.rangoEdad,
     color: filters.color,
-    trimmedQuery: filters.buscar
+    trimmedQuery: filters.buscar,
   });
+
   const filtered = buildFacetFilteredCatalogProducts(routeFiltered, {
     precio: filters.precio,
     talla: filters.talla,
     color: filters.color,
     material: filters.material,
-    descuento: filters.descuento
+    descuento: filters.descuento,
   });
+
   const total = filtered.length;
   const totalPages = total > 0 ? Math.ceil(total / limit) : 0;
   const from = (page - 1) * limit;
   const products = filtered.slice(from, from + limit);
+
   return {
     products,
     page,
     limit,
     total,
     totalPages,
-    meta: buildBrowseMeta(routeFiltered)
+    meta: buildBrowseMeta(routeFiltered),
   };
 }
-// Annotate the CommonJS export names for ESM import in node:
-0 && (module.exports = {
-  MATERIAL_FILTER_ORDER,
-  MATERIAL_RULES,
-  browseCatalogProducts,
-  buildBrowseMeta,
-  buildFacetFilteredCatalogProducts,
-  buildRouteFilteredCatalogProducts,
-  getProductSizes,
-  inferProductDiscountPercent,
-  inferProductMaterials,
-  matchesPriceBucket,
-  normalizeText,
-  parseBrowseQuery,
-  parseCommaSeparatedTokens,
-  parsePriceParts
-});

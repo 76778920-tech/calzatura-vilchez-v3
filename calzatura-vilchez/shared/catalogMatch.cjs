@@ -1,16 +1,45 @@
-"use strict";
-
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var catalogMatch_exports = {};
+__export(catalogMatch_exports, {
+  capitalizeWords: () => capitalizeWords,
+  countProductsForCategory: () => countProductsForCategory,
+  getProductColors: () => getProductColors,
+  getTaxonomyTerms: () => getTaxonomyTerms,
+  normalizeCategorySlug: () => normalizeCategorySlug,
+  normalizeSlug: () => normalizeSlug,
+  parseColorList: () => parseColorList,
+  productMatchesAnySearch: () => productMatchesAnySearch,
+  productMatchesBrandSlug: () => productMatchesBrandSlug,
+  productMatchesCategory: () => productMatchesCategory,
+  productMatchesColorTaxonomy: () => productMatchesColorTaxonomy,
+  productMatchesPromocionTaxonomy: () => productMatchesPromocionTaxonomy,
+  productMatchesSearch: () => productMatchesSearch,
+  productMatchesTaxonomy: () => productMatchesTaxonomy,
+  productMatchesTipoOrLineaTaxonomy: () => productMatchesTipoOrLineaTaxonomy,
+  slugifyCatalogValue: () => slugifyCatalogValue,
+  trimHyphens: () => trimHyphens
+});
+module.exports = __toCommonJS(catalogMatch_exports);
 const CATEGORY_ALIASES = { mujer: "dama" };
-const PUBLIC_CATEGORY_ALIASES = { dama: "mujer" };
-
 function normalizeSlug(value = "") {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "");
+  return value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
-
 function trimHyphens(s) {
   let i = 0;
   let j = s.length;
@@ -18,43 +47,29 @@ function trimHyphens(s) {
   while (j > i && s[j - 1] === "-") j -= 1;
   return s.slice(i, j);
 }
-
 function slugifyCatalogValue(value = "") {
   return trimHyphens(normalizeSlug(value).replace(/[^a-z0-9]+/g, "-"));
 }
-
 function normalizeCategorySlug(category = "") {
   const normalized = normalizeSlug(category);
   return CATEGORY_ALIASES[normalized] ?? normalized;
 }
-
 function capitalizeWords(value = "") {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/(^|\s)([a-záéíóúñ])/g, (_, space, letter) => `${space}${letter.toUpperCase()}`);
+  return value.trim().toLowerCase().replace(/\s+/g, " ").replace(/(^|\s)([a-záéíóúñ])/g, (_, space, letter) => `${space}${letter.toUpperCase()}`);
 }
-
 function parseColorList(value = "") {
-  const unique = new Map();
-  value
-    .split(",")
-    .map(capitalizeWords)
-    .filter(Boolean)
-    .forEach((color) => {
-      unique.set(color.toLowerCase(), color);
-    });
+  const unique = /* @__PURE__ */ new Map();
+  value.split(",").map(capitalizeWords).filter(Boolean).forEach((color) => {
+    unique.set(color.toLowerCase(), color);
+  });
   return Array.from(unique.values()).slice(0, 5);
 }
-
 function getProductColors(product) {
   if (Array.isArray(product.colores) && product.colores.length > 0) {
     return product.colores.map(capitalizeWords).filter(Boolean).slice(0, 5);
   }
   return parseColorList(product.color ?? "");
 }
-
 const TAXONOMY_TERM_MAP = {
   campana: {
     cyber: ["cyber"],
@@ -62,7 +77,7 @@ const TAXONOMY_TERM_MAP = {
     "nueva-temporada": ["nueva temporada", "nuevo", "nuevos"],
     lanzamiento: ["lanzamiento"],
     "club-calzado": ["club calzado"],
-    outlet: ["outlet"],
+    outlet: ["outlet"]
   },
   coleccion: {
     "pasos-radiantes": ["pasos radiantes"],
@@ -72,7 +87,7 @@ const TAXONOMY_TERM_MAP = {
     "paso-ejecutivo": ["paso ejecutivo", "formal", "vestir"],
     "weekend-flow": ["weekend flow", "casual"],
     "vuelta-al-cole": ["vuelta al cole", "escolar"],
-    "mini-aventuras": ["mini aventuras", "infantil"],
+    "mini-aventuras": ["mini aventuras", "infantil"]
   },
   estilo: {
     urbanas: ["urbanas", "urbano"],
@@ -81,7 +96,7 @@ const TAXONOMY_TERM_MAP = {
     casuales: ["casuales", "casual"],
     outdoor: ["outdoor"],
     ejecutivo: ["ejecutivo", "formal", "vestir"],
-    weekend: ["casual"],
+    weekend: ["casual"]
   },
   tipo: {
     zapatillas: ["zapatillas"],
@@ -97,60 +112,54 @@ const TAXONOMY_TERM_MAP = {
     casual: ["casual", "casuales"],
     seguridad: ["seguridad"],
     escolar: ["escolar"],
-    accesorios: ["accesorios"],
+    accesorios: ["accesorios"]
   },
   linea: { zapatillas: ["zapatillas"] },
   segmento: {
-    ninos: ["ninos", "niños"],
-    ninas: ["ninas", "niñas"],
+    ninos: ["ninos", "ni\xF1os"],
+    ninas: ["ninas", "ni\xF1as"],
     infantil: ["infantil"],
     junior: ["junior"],
-    juvenil: ["juvenil", "junior"],
+    juvenil: ["juvenil", "junior"]
   },
   color: {
     blanco: ["blanco", "blanca", "blancas", "white"],
     negro: ["negro", "negra", "black"],
     beige: ["beige"],
-    marron: ["marron", "marrón", "brown"],
-    azul: ["azul", "blue"],
+    marron: ["marron", "marr\xF3n", "brown"],
+    azul: ["azul", "blue"]
   },
   promocion: {
     destacados: ["destacado", "destacados"],
-    oferta: ["oferta", "ofertas"],
+    oferta: ["oferta", "ofertas"]
   },
   rangoEdad: {
     "1-3": ["infantil", "1-3"],
-    "4-6": ["ninos", "niños", "4-6"],
-    "7-10": ["junior", "juvenil", "7-10"],
-  },
+    "4-6": ["ninos", "ni\xF1os", "4-6"],
+    "7-10": ["junior", "juvenil", "7-10"]
+  }
 };
-
+const taxonomyMap = TAXONOMY_TERM_MAP;
 function getTaxonomyTerms(key, value) {
   const normalized = slugifyCatalogValue(value);
-  const mapped = TAXONOMY_TERM_MAP[key]?.[normalized];
+  const mapped = taxonomyMap[key]?.[normalized];
   if (mapped) return mapped;
   const fallback = normalized.replace(/-/g, " ").trim();
   return fallback ? [fallback] : [];
 }
-
 function productMatchesCategory(productCategory, selectedCategory) {
   const normalizedSelected = normalizeCategorySlug(selectedCategory || "todos");
   if (normalizedSelected === "todos") return true;
   return normalizeCategorySlug(productCategory) === normalizedSelected;
 }
-
 function productMatchesSearch(product, searchTerm) {
   const query = normalizeSlug(searchTerm);
   if (!query) return true;
-
-  if (
-    ["destacado", "destacados", "oferta", "ofertas", "cyber", "nuevo", "nuevos", "tendencia", "tendencias"].includes(
-      query,
-    )
-  ) {
+  if (["destacado", "destacados", "oferta", "ofertas", "cyber", "nuevo", "nuevos", "tendencia", "tendencias"].includes(
+    query
+  )) {
     return Boolean(product.destacado) && product.stock > 0;
   }
-
   const searchableFields = [
     product.nombre,
     product.descripcion,
@@ -159,46 +168,36 @@ function productMatchesSearch(product, searchTerm) {
     product.tipoCalzado,
     product.color,
     product.categoria,
-    ...getProductColors(product),
+    ...getProductColors(product)
   ];
-
   return searchableFields.some((value) => typeof value === "string" && value.toLowerCase().includes(query));
 }
-
 function productMatchesAnySearch(product, terms) {
   const normalizedTerms = terms.map(normalizeSlug).filter(Boolean);
   if (normalizedTerms.length === 0) return false;
   return normalizedTerms.some((term) => productMatchesSearch(product, term));
 }
-
 function productMatchesBrandSlug(product, brandSlug) {
   if (!brandSlug) return true;
   return slugifyCatalogValue(product.marca ?? "") === slugifyCatalogValue(brandSlug);
 }
-
 function productMatchesColorTaxonomy(product, value) {
   const normalized = slugifyCatalogValue(value);
-  const colors = [product.color, ...getProductColors(product)]
-    .filter((entry) => typeof entry === "string" && entry.trim().length > 0)
-    .map(slugifyCatalogValue);
+  const colors = [product.color, ...getProductColors(product)].filter((entry) => typeof entry === "string" && entry.trim().length > 0).map(slugifyCatalogValue);
   return colors.some((color) => color.includes(normalized));
 }
-
 function productMatchesTipoOrLineaTaxonomy(product, value) {
   const normalized = slugifyCatalogValue(value);
   const tipoValue = slugifyCatalogValue(product.tipoCalzado ?? "");
   return tipoValue.includes(normalized);
 }
-
 function productMatchesPromocionTaxonomy(product, value) {
   if (value === "destacados") return Boolean(product.destacado) && product.stock > 0;
   if (value === "oferta") return (product.descuento ?? 0) > 0;
-  return undefined;
+  return void 0;
 }
-
 function productMatchesTaxonomy(product, key, value) {
   if (!value.trim()) return true;
-
   if (key === "color") return productMatchesColorTaxonomy(product, value);
   if (key === "tipo" || key === "linea") {
     if (productMatchesTipoOrLineaTaxonomy(product, value)) return true;
@@ -211,24 +210,30 @@ function productMatchesTaxonomy(product, key, value) {
   }
   if (key === "promocion") {
     const promo = productMatchesPromocionTaxonomy(product, value);
-    if (promo !== undefined) return promo;
+    if (promo !== void 0) return promo;
   }
-
   return productMatchesAnySearch(product, getTaxonomyTerms(key, value));
 }
-
 function countProductsForCategory(products, category) {
   return products.filter((product) => productMatchesCategory(product.categoria, category)).length;
 }
-
-module.exports = {
-  slugifyCatalogValue,
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  capitalizeWords,
+  countProductsForCategory,
+  getProductColors,
+  getTaxonomyTerms,
   normalizeCategorySlug,
-  productMatchesCategory,
-  productMatchesSearch,
+  normalizeSlug,
+  parseColorList,
   productMatchesAnySearch,
   productMatchesBrandSlug,
+  productMatchesCategory,
+  productMatchesColorTaxonomy,
+  productMatchesPromocionTaxonomy,
+  productMatchesSearch,
   productMatchesTaxonomy,
-  getProductColors,
-  countProductsForCategory,
-};
+  productMatchesTipoOrLineaTaxonomy,
+  slugifyCatalogValue,
+  trimHyphens
+});

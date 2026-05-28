@@ -32,6 +32,9 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       '@shared': fileURLToPath(new URL('./shared', import.meta.url)),
+      '@shared/catalogPublicFilter': fileURLToPath(
+        new URL('./shared/catalogPublicFilter.ts', import.meta.url),
+      ),
     },
   },
   test: {

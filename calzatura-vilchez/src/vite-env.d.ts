@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
+  /** Playwright: desactiva lecturas públicas vía BFF (mocks en /rest/v1/productos). */
+  readonly VITE_E2E?: string;
   /** Base del BFF Express (Render, etc.): /createOrder, /authLogin, /createCheckoutSession, … */
   readonly VITE_BACKEND_API_URL?: string;
   /** URL completa del proxy de login si difiere de `VITE_BACKEND_API_URL/authLogin`. 0|false desactiva. */

@@ -20,7 +20,9 @@ export type PublicCatalogBrowseResult = PublicCatalogPage & {
   meta: PublicCatalogBrowseMeta;
 };
 
+/** En E2E el BFF admin se mockea con `page.route`; el catálogo público sigue en Supabase REST. */
 export function hasPublicBff(): boolean {
+  if (import.meta.env.VITE_E2E === "true") return false;
   return Boolean(getBackendApiBaseUrl());
 }
 
