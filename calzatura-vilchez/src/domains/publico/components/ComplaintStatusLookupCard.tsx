@@ -29,8 +29,7 @@ export function ComplaintStatusLookupCard() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ComplaintLookupRecord | null>(null);
 
-  const onSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
-    event.preventDefault();
+  const runLookup = async () => {
     setLoading(true);
     setError(null);
     setResult(null);
@@ -50,7 +49,13 @@ export function ComplaintStatusLookupCard() {
       <p className="complaint-book-note">
         Ingresa el código de constancia y el DNI del titular. Solo mostraremos tipo, estado y fecha de registro.
       </p>
-      <form className="complaint-book-form" onSubmit={onSubmit}>
+      <form
+        className="complaint-book-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void runLookup();
+        }}
+      >
         <div className="complaint-book-grid complaint-book-grid--two">
           <div className="form-group">
             <label htmlFor="lookup-codigo">Código</label>

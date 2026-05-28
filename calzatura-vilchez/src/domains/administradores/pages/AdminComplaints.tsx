@@ -260,8 +260,7 @@ export default function AdminComplaints() {
     }
   };
 
-  const handleCreateComplaint: React.FormEventHandler<HTMLFormElement> = async (event) => {
-    event.preventDefault();
+  const createComplaint = async () => {
     setCreatingComplaint(true);
     try {
       const payload = {
@@ -310,7 +309,13 @@ export default function AdminComplaints() {
       </div>
 
       {newFormOpen ? (
-        <form className="complaint-book-form" onSubmit={handleCreateComplaint}>
+        <form
+          className="complaint-book-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void createComplaint();
+          }}
+        >
           <p className="complaint-book-form-lead">
             Registra una hoja recibida por canal presencial o WhatsApp. Se guarda en el mismo libro
             virtual y genera código.
