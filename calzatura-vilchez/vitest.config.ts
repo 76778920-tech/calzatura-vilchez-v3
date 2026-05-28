@@ -31,6 +31,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
+      "@shared/catalogPublicFilter": resolve(__dirname, "./shared/catalogPublicFilter.ts"),
     },
   },
 });
