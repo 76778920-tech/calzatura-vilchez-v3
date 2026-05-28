@@ -21,8 +21,8 @@ describe("complaintLegalPlazos — sync BFF", () => {
 });
 
 describe("complaintLegalPlazos — coherencia en código fuente", () => {
-  it("InfoPage importa el módulo legal y no conserva el texto obsoleto de plazos", () => {
-    const source = read("src/domains/publico/pages/InfoPage.tsx");
+  it("contenido legal del libro de reclamaciones usa plazos centralizados", () => {
+    const source = read("src/domains/publico/content/infoPagesLegalContent.ts");
     expect(source).toContain("complaintPlazosInfoPageBody");
     expect(source).not.toContain("Respuesta definitiva: hasta 30 días calendario");
   });
