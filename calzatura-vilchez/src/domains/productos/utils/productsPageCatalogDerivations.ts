@@ -10,8 +10,6 @@ import {
   browseCatalogProducts,
   buildFacetFilteredCatalogProducts,
   buildRouteFilteredCatalogProducts,
-  getProductSizes,
-  inferProductMaterials,
 } from "@shared/catalogPublicFilter";
 
 export function browsePublicCatalogFromUrl(
@@ -63,7 +61,8 @@ export function humanizeSlug(value: string) {
     .join(" ");
 }
 
-export { inferProductMaterials, getProductSizes, buildRouteFilteredCatalogProducts, buildFacetFilteredCatalogProducts };
+export { inferProductMaterials, getProductSizes } from "@shared/catalogPublicFilter";
+export { buildRouteFilteredCatalogProducts, buildFacetFilteredCatalogProducts };
 
 function parsePriceParts(value: string) {
   const [mode, rawFirst, rawSecond] = value.split(":");
