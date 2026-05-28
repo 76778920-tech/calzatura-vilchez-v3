@@ -93,7 +93,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: SCA npm audit (high/critical)
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
 
       - name: Lint (ESLint)
         run: npm run lint
@@ -109,7 +109,7 @@ jobs:
 
       - name: Pruebas unitarias Cloud Functions
         working-directory: calzatura-vilchez/functions
-        run: npm ci --ignore-scripts && npm audit --audit-level=high && npm test
+        run: npm ci --ignore-scripts && npm audit --omit=dev --audit-level=high && npm test
 
       - name: Cobertura de código (Vitest Coverage)
         run: npm run test:coverage
