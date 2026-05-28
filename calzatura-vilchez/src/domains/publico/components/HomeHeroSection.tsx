@@ -7,6 +7,7 @@ import {
 } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 
 export type HomeHeroSlide = {
   id: string;
@@ -42,7 +43,7 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
   const [isHeroDragging, setIsHeroDragging] = useState(false);
   const [heroDragOffset, setHeroDragOffset] = useState(0);
   const [heroParallax, setHeroParallax] = useState({ x: 0, y: 0 });
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const heroCarouselRef = useRef<HTMLElement | null>(null);
   const heroDragStartXRef = useRef<number | null>(null);
   const heroDragStartYRef = useRef<number | null>(null);
@@ -75,16 +76,6 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
     setIsHeroInteractionPaused(true);
     action();
   };
-
-  useEffect(() => {
-    const mediaQuery = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncPreference = () => setPrefersReducedMotion(mediaQuery.matches);
-
-    syncPreference();
-    mediaQuery.addEventListener("change", syncPreference);
-
-    return () => mediaQuery.removeEventListener("change", syncPreference);
-  }, []);
 
   useEffect(() => {
     if (!isHeroAutoRotationActive) return undefined;

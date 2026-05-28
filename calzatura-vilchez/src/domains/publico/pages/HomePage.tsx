@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { Link } from "react-router-dom";
 import {
-  ArrowRight,
   BadgeCheck,
   ChevronLeft,
   ChevronRight,
@@ -13,6 +12,8 @@ import {
 import { LoadingStatusRegion } from "@/components/common/LoadingStatusRegion";
 import ProductCard from "@/domains/productos/components/ProductCard";
 import HomeHeroSection, { type HomeHeroSlide } from "@/domains/publico/components/HomeHeroSection";
+import { HomeSectionHeader } from "@/domains/publico/components/HomeSectionHeader";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { fetchFeaturedProducts, fetchPublicCatalogIndex } from "@/domains/productos/services/products";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 
@@ -324,7 +325,7 @@ export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [categoriesVisible, setCategoriesVisible] = useState(false);
   const [spotlightPage, setSpotlightPage] = useState(0);
   const categoriesGridRef = useRef<HTMLDivElement | null>(null);
@@ -346,16 +347,6 @@ export default function HomePage() {
   }, [loadProducts]);
 
   useProductsRealtime(loadProducts);
-
-  useEffect(() => {
-    const mediaQuery = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
-    const syncPreference = () => setPrefersReducedMotion(mediaQuery.matches);
-
-    syncPreference();
-    mediaQuery.addEventListener("change", syncPreference);
-
-    return () => mediaQuery.removeEventListener("change", syncPreference);
-  }, []);
 
   useEffect(() => {
     const grid = categoriesGridRef.current;
@@ -468,15 +459,13 @@ export default function HomePage() {
 
       <section className="section home-spotlight-section">
         <div className="home-spotlight-shell">
-          <div className="home-spotlight-topbar">
-            <div>
-              <span className="section-eyebrow">Más destacados</span>
-              <h2 className="section-title">Lo más fuerte del catálogo, sin rodeos.</h2>
-            </div>
-            <Link to={buildCatalogHref({ promocion: "destacados" })} className="section-link">
-              Ver destacados <ArrowRight size={14} />
-            </Link>
-          </div>
+          <HomeSectionHeader
+            className="home-spotlight-topbar"
+            eyebrow="Más destacados"
+            title="Lo más fuerte del catálogo, sin rodeos."
+            linkTo={buildCatalogHref({ promocion: "destacados" })}
+            linkLabel="Ver destacados"
+          />
 
           {renderHomeSpotlightSection({
             loading,
@@ -491,15 +480,12 @@ export default function HomePage() {
       </section>
 
       <section className="section home-categories-section">
-        <div className="section-header">
-          <div>
-            <span className="section-eyebrow">Explora por uso</span>
-            <h2 className="section-title">Encuentra tu siguiente par</h2>
-          </div>
-          <Link to={buildCatalogHref({})} className="section-link">
-            Catálogo completo <ArrowRight size={14} />
-          </Link>
-        </div>
+        <HomeSectionHeader
+          eyebrow="Explora por uso"
+          title="Encuentra tu siguiente par"
+          linkTo={buildCatalogHref({})}
+          linkLabel="Catálogo completo"
+        />
 
         <div
           ref={categoriesGridRef}
