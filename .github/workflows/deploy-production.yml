@@ -59,6 +59,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   CI_WORKFLOW_NAME: CI — Sistema Web con IA para Predicción de Riesgo Empresarial — Calzatura Vilchez
   CI_INTEGRATION_NAME: CI Integration — Calzatura Vilchez (main only, secrets reales)
+  SONAR_WORKFLOW_NAME: SonarQube Analysis
+  SECURITY_WORKFLOW_NAME: Security — DevSecOps Gates
 
 jobs:
   gate:
@@ -121,7 +123,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
-          REQUIRED_WORKFLOWS: ${{ env.CI_WORKFLOW_NAME }}
+          REQUIRED_WORKFLOWS: ${{ env.CI_WORKFLOW_NAME }}|${{ env.SONAR_WORKFLOW_NAME }}|${{ env.SECURITY_WORKFLOW_NAME }}
+          WORKFLOW_GATE_WAIT_SEC: 900
+          WORKFLOW_GATE_POLL_SEC: 15
         run: node scripts/github-verify-workflows-for-sha.mjs
 
       - name: Exigir CI + CI Integration en success para deploy manual
@@ -129,7 +133,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ steps.sha.outputs.head_sha }}
-          REQUIRED_WORKFLOWS: ${{ env.CI_WORKFLOW_NAME }}|${{ env.CI_INTEGRATION_NAME }}
+          REQUIRED_WORKFLOWS: ${{ env.CI_WORKFLOW_NAME }}|${{ env.CI_INTEGRATION_NAME }}|${{ env.SONAR_WORKFLOW_NAME }}|${{ env.SECURITY_WORKFLOW_NAME }}
+          WORKFLOW_GATE_WAIT_SEC: 900
+          WORKFLOW_GATE_POLL_SEC: 15
         run: node scripts/github-verify-workflows-for-sha.mjs
 
       - name: Verificar runbook post-deploy Supabase

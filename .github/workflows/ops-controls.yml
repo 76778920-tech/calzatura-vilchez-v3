@@ -23,6 +23,10 @@ on:
         options:
           - "false"
           - "true"
+      exception_ticket:
+        description: "Ticket obligatorio si backtest_warn_only=true (ej. RISK-123)"
+        required: false
+        default: ""
       max_mape_pct:
         description: "Max accepted average RF MAPE"
         required: true
@@ -89,10 +93,16 @@ jobs:
           MAX_MAPE_PCT: ${{ inputs.max_mape_pct }}
           MIN_WINS_MAPE_RATIO: ${{ inputs.min_wins_mape_ratio }}
           BACKTEST_WARN_ONLY: ${{ inputs.backtest_warn_only }}
+          EXCEPTION_TICKET: ${{ inputs.exception_ticket }}
         run: |
           set -euo pipefail
           warn_flag=""
           if [ "$BACKTEST_WARN_ONLY" = "true" ]; then
+            if [ -z "$EXCEPTION_TICKET" ]; then
+              echo "::error::backtest_warn_only=true requiere exception_ticket (ej. RISK-123)."
+              exit 1
+            fi
+            echo "::warning::Excepcion manual aplicada: $EXCEPTION_TICKET"
             warn_flag="--warn-only"
           fi
           node scripts/ai-backtest-gate.mjs \

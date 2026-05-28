@@ -23,6 +23,36 @@ const required = [
   ["RENDER_BFF_DEPLOY_HOOK_URL", "RENDER_BFF_DEPLOY_HOOK_URL"],
 ];
 
+const PLACEHOLDER_PATTERNS = [
+  /ci-placeholder/i,
+  /placeholder/i,
+  /example/i,
+  /changeme/i,
+  /dummy/i,
+  /test[-_]?key/i,
+];
+
+function assertNotPlaceholder(envKey, value) {
+  for (const pattern of PLACEHOLDER_PATTERNS) {
+    if (pattern.test(value)) {
+      console.error(`::error::${envKey} parece valor de prueba/placeholder (${value}).`);
+      process.exit(1);
+    }
+  }
+}
+
+function assertHttpsUrl(envKey, value) {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "https:") {
+      throw new Error("Protocol must be https");
+    }
+  } catch {
+    console.error(`::error::${envKey} debe ser URL https válida.`);
+    process.exit(1);
+  }
+}
+
 for (const [envKey, label] of required) {
   const value = process.env[envKey]?.trim();
   if (!value) {
@@ -37,6 +67,24 @@ for (const [envKey, label] of required) {
     }
     process.exit(1);
   }
+
+  if (envKey !== "FIREBASE_SERVICE_ACCOUNT") {
+    assertNotPlaceholder(envKey, value);
+  }
+
+  if (envKey.endsWith("_URL")) {
+    assertHttpsUrl(envKey, value);
+  }
+}
+
+try {
+  const svc = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  if (!svc?.project_id || !svc?.client_email || !svc?.private_key) {
+    throw new Error("Missing required JSON fields");
+  }
+} catch {
+  console.error("::error::FIREBASE_SERVICE_ACCOUNT no es un JSON válido de Service Account.");
+  process.exit(1);
 }
 
 console.log("Secrets de produccion OK: build, BFF y deploy.");

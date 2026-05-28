@@ -73,6 +73,9 @@ jobs:
       - name: Instalar dependencias
         run: npm ci --ignore-scripts
 
+      - name: SCA npm audit (high/critical)
+        run: npm audit --audit-level=high
+
       - name: Lint (ESLint)
         run: npm run lint
 
