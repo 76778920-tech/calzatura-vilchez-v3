@@ -1,5 +1,36 @@
 import type { InfoContent, InfoFaqItem, InfoSection } from "./infoPageTypes";
 
+/** [título, ...párrafos] — evita repetir `{ title, body }` en páginas legales. */
+export type LegalSectionInput = readonly [title: string, ...paragraphs: string[]];
+
+export function legalSections(...sections: LegalSectionInput[]): InfoSection[] {
+  return sections.map(([title, ...body]) => ({ title, body: [...body] }));
+}
+
+export function buildInfoProsePage(config: {
+  group: InfoContent["group"];
+  kicker: string;
+  title: string;
+  intro: string;
+  accent: string;
+  note: string;
+  highlights: readonly string[];
+  sections: InfoSection[];
+  faq?: readonly InfoFaqItem[];
+}): InfoContent {
+  return {
+    group: config.group,
+    kicker: config.kicker,
+    title: config.title,
+    intro: config.intro,
+    accent: config.accent,
+    note: config.note,
+    highlights: [...config.highlights],
+    sections: config.sections,
+    faq: config.faq ? [...config.faq] : undefined,
+  };
+}
+
 export type InfoBlock = {
   title: string;
   paragraphs: readonly [string, string];
