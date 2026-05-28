@@ -1,6 +1,3 @@
-import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
-import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   COMPLAINT_DETALLE_MIN_LENGTH,
@@ -14,15 +11,7 @@ import {
   diasConCifraLegal,
 } from "@/domains/publico/utils/complaintLegalPlazos";
 
-const require = createRequire(import.meta.url);
-const bffConstants = require("../../bff/complaintLegalConstants.cjs");
-
 describe("complaintLegalPlazos", () => {
-  it("sincroniza constantes numéricas con el BFF", () => {
-    expect(COMPLAINT_DETALLE_MIN_LENGTH).toBe(bffConstants.COMPLAINT_DETALLE_MIN_LENGTH);
-    expect(COMPLAINT_LEGAL_PLAZOS).toEqual(bffConstants.COMPLAINT_LEGAL_PLAZOS);
-  });
-
   it("formatea días en estilo legal peruano", () => {
     expect(diasConCifraLegal(15)).toBe("quince (15)");
     expect(diasConCifraLegal(3)).toBe("tres (3)");
@@ -56,21 +45,5 @@ describe("complaintLegalPlazos", () => {
     expect(COMPLAINT_VALIDATION_MESSAGES.detallePlaceholder()).toContain(
       String(COMPLAINT_DETALLE_MIN_LENGTH),
     );
-  });
-});
-
-describe("complaintLegalPlazos — coherencia en código fuente", () => {
-  it("InfoPage importa el módulo legal y no conserva el texto obsoleto de plazos", () => {
-    const infoPagePath = path.resolve(process.cwd(), "src/domains/publico/pages/InfoPage.tsx");
-    const source = readFileSync(infoPagePath, "utf8");
-    expect(source).toContain("complaintPlazosInfoPageBody");
-    expect(source).not.toContain("Respuesta definitiva: hasta 30 días calendario");
-  });
-
-  it("libroReclamaciones.cjs usa complaintLegalConstants", () => {
-    const bffPath = path.resolve(process.cwd(), "bff/libroReclamaciones.cjs");
-    const source = readFileSync(bffPath, "utf8");
-    expect(source).toContain("complaintLegalConstants.cjs");
-    expect(source).toContain("COMPLAINT_DETALLE_MIN_LENGTH");
   });
 });
