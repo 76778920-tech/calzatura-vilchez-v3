@@ -6,6 +6,7 @@ import {
   type ComplaintFormData,
 } from "@/domains/publico/utils/complaintBook";
 import { ComplaintConstanciaDocument } from "@/domains/publico/utils/complaintConstanciaDocument";
+import { complaintPlazosResumenCorto } from "@/domains/publico/utils/complaintLegalPlazos";
 import { printComplaintConstancia } from "@/domains/publico/utils/printComplaintConstancia";
 
 type ComplaintReceiptProps = Readonly<{
@@ -28,8 +29,7 @@ export function ComplaintReceipt({ submission }: ComplaintReceiptProps) {
         </p>
         <p>
           Tu hoja quedó registrada en nuestro libro de reclamaciones con fecha {fecha}. Conserva
-          este código para seguimiento. Acuse de recibo en hasta 3 días hábiles; respuesta definitiva
-          en hasta 30 días calendario. El trámite es gratuito.
+          este código para seguimiento. {complaintPlazosResumenCorto()} El trámite es gratuito.
         </p>
         <p>
           Revisa la constancia siguiente. Puedes imprimirla o guardarla como PDF desde el diálogo

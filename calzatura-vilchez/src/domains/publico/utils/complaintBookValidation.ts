@@ -1,6 +1,10 @@
+import type { ComplaintFieldErrors, ComplaintFormData } from "@/domains/publico/utils/complaintBook";
+import {
+  COMPLAINT_DETALLE_MIN_LENGTH,
+  COMPLAINT_VALIDATION_MESSAGES,
+} from "@/domains/publico/utils/complaintLegalPlazos";
 import { isValidEmailFormat } from "@/utils/emailValidation";
 import { isValidPeruPhone, peruPhoneError } from "@/utils/phone";
-import type { ComplaintFieldErrors, ComplaintFormData } from "@/domains/publico/utils/complaintBook";
 
 export function validateComplaintConsumerFields(
   data: ComplaintFormData,
@@ -62,7 +66,12 @@ export function validateComplaintForm(
   validateComplaintPhoneField(data, errors);
   if (!data.bienContratado.trim()) errors.bienContratado = "Describe el producto o servicio";
   validateComplaintMontoField(data, errors);
-  if (!data.detalle.trim()) errors.detalle = "Describe el problema y qué solución solicitas";
+  const detalle = data.detalle.trim();
+  if (!detalle) {
+    errors.detalle = COMPLAINT_VALIDATION_MESSAGES.detalleRequired;
+  } else if (detalle.length < COMPLAINT_DETALLE_MIN_LENGTH) {
+    errors.detalle = COMPLAINT_VALIDATION_MESSAGES.detalleMinLength();
+  }
   if (!aceptaPrivacidad) errors.aceptaPrivacidad = "Debes aceptar el tratamiento de datos";
   return errors;
 }

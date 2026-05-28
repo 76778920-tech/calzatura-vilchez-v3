@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 import { INFO_ROUTES } from "@/routes/paths";
 import type { ComplaintFieldErrors, ComplaintFormData, ComplaintType } from "@/domains/publico/utils/complaintBook";
+import {
+  COMPLAINT_DETALLE_MIN_LENGTH,
+  COMPLAINT_VALIDATION_MESSAGES,
+} from "@/domains/publico/utils/complaintLegalPlazos";
 import { normalizePeruPhoneInput } from "@/utils/phone";
 
 /** Evita que el navegador muestre datos guardados (privacidad en equipos compartidos). */
@@ -186,7 +190,8 @@ export function ComplaintBookClaimFields({
           rows={5}
           value={effectiveForm.detalle}
           onChange={(e) => onFieldChange("detalle", e.target.value)}
-          placeholder="Describe el problema y qué solución solicitas (cambio, reembolso, etc.)"
+          placeholder={COMPLAINT_VALIDATION_MESSAGES.detallePlaceholder()}
+          minLength={COMPLAINT_DETALLE_MIN_LENGTH}
           autoComplete={NO_BROWSER_AUTOCOMPLETE}
           required
         />

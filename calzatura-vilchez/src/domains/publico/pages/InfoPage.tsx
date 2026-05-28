@@ -1,6 +1,11 @@
 import { Link } from "react-router-dom";
 import { CookiePolicyProse } from "@/components/cookies/CookiePolicyProse";
 import { ComplaintBookPanel } from "@/domains/publico/components/ComplaintBookPanel";
+import {
+  complaintPlazosInfoPageAccent,
+  complaintPlazosInfoPageBody,
+  complaintPlazosTerminosReferencia,
+} from "@/domains/publico/utils/complaintLegalPlazos";
 import { providerIdentificationParagraphs } from "@/config/businessContact";
 import { INFO_ROUTES } from "@/routes/paths";
 
@@ -233,6 +238,7 @@ const INFO_CONTENT: Record<string, InfoContent> = {
         body: [
           "Disponemos de un Libro de reclamaciones conforme a la Ley N.° 29571, accesible desde el enlace correspondiente en el sitio y en atención presencial.",
           "Te invitamos a contactarnos primero por WhatsApp o en tienda para resolver cualquier incidencia de forma directa. Si no obtienes respuesta satisfactoria, puedes acudir al Instituto Nacional de Defensa de la Competencia y de la Protección de la Propiedad Intelectual (Indecopi) u otras vías previstas por ley.",
+          complaintPlazosTerminosReferencia(),
         ],
       },
       {
@@ -562,7 +568,7 @@ const INFO_CONTENT: Record<string, InfoContent> = {
     title: "Libro de reclamaciones",
     intro:
       "Conforme a la Ley N.° 29571, Calzatura Vilchez dispone de libro de reclamaciones físico en tienda y canales de atención en línea. Puedes presentar tu hoja de forma presencial, por WhatsApp o, si lo prefieres, mediante el formulario virtual.",
-    accent: "Trámite gratuito · Plazos legales de respuesta",
+    accent: complaintPlazosInfoPageAccent(),
     note: "Última actualización: 26 de mayo de 2026. También puedes acudir a Indecopi si lo consideras necesario.",
     highlights: [],
     sections: [
@@ -582,10 +588,7 @@ const INFO_CONTENT: Record<string, InfoContent> = {
       },
       {
         title: "3. Plazos y costo",
-        body: [
-          "Acuse de recibo: hasta 3 días hábiles desde la presentación. Respuesta definitiva: hasta 30 días calendario.",
-          "El trámite es gratuito. Los datos se tratan según nuestra Política de privacidad.",
-        ],
+        body: [...complaintPlazosInfoPageBody()],
       },
       {
         title: "4. Indecopi",

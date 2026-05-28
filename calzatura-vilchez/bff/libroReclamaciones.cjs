@@ -7,6 +7,7 @@ const { onValidationFailure, SURFACES } = require("./securityMonitor.cjs");
 const { enforceRateLimit } = require("./publicRateLimit.cjs");
 const { isValidPeruPhone, peruPhoneError } = require("./peruPhone.cjs");
 const { emailValidationError, normalizeEmailInput } = require("./emailValidation.cjs");
+const { COMPLAINT_DETALLE_MIN_LENGTH } = require("./complaintLegalConstants.cjs");
 
 const ESTADOS = ["recibido", "en_tramite", "respondido", "cerrado"];
 
@@ -51,7 +52,9 @@ function validateComplaintPayload(body) {
   if (!bienContratado) errors.bienContratado = "Producto o servicio requerido";
   if (tipo === "reclamo" && !monto) errors.monto = "Monto requerido en reclamo";
   if (monto && !/^\d+(\.\d{1,2})?$/.test(monto)) errors.monto = "Monto no válido";
-  if (!detalle || detalle.length < 10) errors.detalle = "Detalle insuficiente";
+  if (!detalle || detalle.length < COMPLAINT_DETALLE_MIN_LENGTH) {
+    errors.detalle = "Detalle insuficiente";
+  }
   if (body?.aceptaPrivacidad !== true) errors.aceptaPrivacidad = "Debes aceptar la política de privacidad";
 
   if (Object.keys(errors).length > 0) {

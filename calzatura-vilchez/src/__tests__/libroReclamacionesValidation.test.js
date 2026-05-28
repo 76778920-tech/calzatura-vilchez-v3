@@ -39,4 +39,21 @@ describe("validateComplaintPayload (BFF)", () => {
       expect(err.fields?.telefono).toBe("El teléfono debe empezar con 9.");
     }
   });
+
+  it("rechaza detalle vacío o menor a 10 caracteres", () => {
+    for (const detalle of ["", "   ", "123456789"]) {
+      try {
+        validateComplaintPayload({ ...validBody, detalle });
+        throw new Error("expected validation throw");
+      } catch (err) {
+        expect(err.fields?.detalle).toBe("Detalle insuficiente");
+      }
+    }
+  });
+
+  it("acepta detalle con exactamente 10 caracteres tras trim", () => {
+    expect(() =>
+      validateComplaintPayload({ ...validBody, detalle: " 1234567890 " }),
+    ).not.toThrow();
+  });
 });

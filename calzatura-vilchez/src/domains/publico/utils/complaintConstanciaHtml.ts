@@ -1,5 +1,9 @@
 import { BUSINESS_CONTACT } from "@/config/businessContact";
 import {
+  COMPLAINT_LAW_FULL,
+  COMPLAINT_LEGAL_CONSTANCIA_BULLETS,
+} from "@/domains/publico/utils/complaintLegalPlazos";
+import {
   formatConstanciaFecha,
   type ComplaintConstanciaSubmission,
 } from "@/domains/publico/utils/complaintConstanciaTypes";
@@ -24,7 +28,7 @@ export function buildComplaintConstanciaHtml(submission: ComplaintConstanciaSubm
 
   return `<article class="complaint-constancia-document">
 <header class="complaint-constancia-header">
-<p class="complaint-constancia-eyebrow">Ley N.° 29571 — Código de Protección y Defensa del Consumidor</p>
+<p class="complaint-constancia-eyebrow">${escapeHtml(COMPLAINT_LAW_FULL)}</p>
 <h1>Constancia de registro</h1>
 <p class="complaint-constancia-subtitle">Libro de reclamaciones — formato virtual</p>
 </header>
@@ -61,10 +65,7 @@ ${submission.numeroPedido ? tableRow("N.° de pedido (si aplica)", submission.nu
 <div class="complaint-constancia-detail-box">${escapeHtml(submission.detalle)}</div></section>
 <footer class="complaint-constancia-legal"><h2>VI. Información al consumidor</h2>
 <ul>
-<li>El proveedor dará respuesta al consumidor en un plazo no mayor de quince (15) días hábiles, prorrogables hasta por treinta (30) días calendario adicionales cuando el caso lo justifique.</li>
-<li>Se entregará acuse de recibo en un plazo máximo de tres (3) días hábiles desde la presentación.</li>
-<li>El trámite ante el libro de reclamaciones es gratuito para el consumidor.</li>
-<li>La presentación de esta hoja no impide acudir a otras vías de solución de controversias ni a Indecopi.</li>
+${COMPLAINT_LEGAL_CONSTANCIA_BULLETS.map((line) => `<li>${escapeHtml(line)}</li>`).join("")}
 </ul>
 <p class="complaint-constancia-footnote">Documento generado electrónicamente por ${escapeHtml(BUSINESS_CONTACT.legalName)} (RUC ${escapeHtml(BUSINESS_CONTACT.rucDisplay)}). Código de verificación: <strong>${escapeHtml(submission.codigo)}</strong>. Fecha de emisión: ${escapeHtml(fecha)} — ${escapeHtml(hora)}.</p>
 </footer></article>`;

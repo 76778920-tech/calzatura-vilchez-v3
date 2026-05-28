@@ -6,6 +6,7 @@ import { INFO_ROUTES } from "@/routes/paths";
 import { COMPLAINT_WHATSAPP_SIMPLE_URL } from "@/domains/publico/utils/complaintBook";
 import { ComplaintBookForm } from "@/domains/publico/components/ComplaintBookForm";
 import { ComplaintProviderCard } from "@/domains/publico/components/ComplaintProviderCard";
+import { complaintPlazosNotaPanel } from "@/domains/publico/utils/complaintLegalPlazos";
 
 /**
  * Canales de presentación alineados al uso real en Perú: tienda física y WhatsApp primero;
@@ -72,8 +73,7 @@ export function ComplaintBookPanel() {
       </details>
 
       <p className="complaint-book-note">
-        Trámite gratuito. Plazos: acuse de recibo hasta 3 días hábiles; respuesta hasta 30 días
-        calendario. También puedes acudir a{" "}
+        {complaintPlazosNotaPanel()} También puedes acudir a{" "}
         <ExternalLink href="https://www.indecopi.gob.pe/">Indecopi</ExternalLink>. Datos personales
         según nuestra <Link to={INFO_ROUTES.legalPrivacidad}>Política de privacidad</Link>.
       </p>

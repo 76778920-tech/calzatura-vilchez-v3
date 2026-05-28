@@ -79,6 +79,11 @@ describe("complaintBook", () => {
     expect(errors.monto).toBeUndefined();
   });
 
+  it("exige detalle con al menos 10 caracteres", () => {
+    const errors = validateComplaintForm({ ...validBase, detalle: "corto" }, true);
+    expect(errors.detalle).toMatch(/al menos 10 caracteres/);
+  });
+
   it("arma URL de WhatsApp con mensaje codificado", () => {
     const url = buildComplaintWhatsAppUrl(validBase, "CV-LR-20260526-ABC123");
     expect(url).toContain(BUSINESS_CONTACT.whatsappBaseUrl);
