@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
@@ -273,8 +273,10 @@ export default function ProductsPage() {
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
-    setError(null);
+    startTransition(() => {
+      setLoading(true);
+      setError(null);
+    });
 
     if (USE_BFF_CATALOG_BROWSE) {
       fetchPublicCatalogBrowse(effectiveParams, catalogPage, CATALOG_PAGE_SIZE)
@@ -409,7 +411,6 @@ export default function ProductsPage() {
         trimmedQuery,
       });
   }, [
-      USE_BFF_CATALOG_BROWSE,
       products,
       categoria,
       vista,
