@@ -3,6 +3,7 @@
 const crypto = require("crypto");
 const { getClientIp, hashIp } = require("./clientIp.cjs");
 const { sendComplaintNotifyEmail } = require("./complaintNotifyEmail.cjs");
+const { sendComplaintConsumerEmail } = require("./complaintConsumerEmail.cjs");
 const { onValidationFailure, SURFACES } = require("./securityMonitor.cjs");
 const { enforceRateLimit } = require("./publicRateLimit.cjs");
 const { isValidPeruPhone, peruPhoneError } = require("./peruPhone.cjs");
@@ -170,6 +171,7 @@ function registerLibroReclamacionesRoutes(app, deps) {
         );
 
         void sendComplaintNotifyEmail(payload, codigo, logServerError).catch(() => {});
+        void sendComplaintConsumerEmail(payload, codigo, now, logServerError).catch(() => {});
 
         return res.status(201).json({
           complaint: mapComplaintRow(inserted),

@@ -30,7 +30,8 @@ describe("complaint notify email — seguridad", () => {
   });
 
   it("reply_to solo si el correo del consumidor pasa validación estricta", () => {
-    expect(notifySource).toContain("body.reply_to = consumerEmail");
+    expect(notifySource).toContain("isValidEmail(consumerEmail)");
+    expect(notifySource).toContain("replyTo");
     expect(notifySource).not.toMatch(/EMAIL_RE\s*=/);
   });
 

@@ -33,7 +33,8 @@ export function ComplaintReceipt({ submission }: ComplaintReceiptProps) {
         </p>
         <p>
           Revisa la constancia siguiente. Puedes imprimirla o guardarla como PDF desde el diálogo
-          de impresión del navegador.
+          de impresión del navegador. Si indicaste un correo electrónico válido, también te enviaremos
+          un mensaje con este código y los plazos legales.
         </p>
 
         <div className="complaint-book-success-actions">

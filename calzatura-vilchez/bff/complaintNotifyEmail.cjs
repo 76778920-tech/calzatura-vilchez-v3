@@ -5,6 +5,7 @@ const {
   normalizeEmailInput,
   NOTIFY_EMAIL_MAX_LENGTH,
 } = require("./emailValidation.cjs");
+const { sendResendEmail } = require("./complaintEmailResend.cjs");
 
 const MAX_NOTIFY_RECIPIENTS = 5;
 const MAX_TEXT_FIELD = 500;
@@ -104,36 +105,18 @@ async function sendComplaintNotifyEmail(payload, codigo, logServerError) {
   }
 
   const consumerEmail = normalizeEmailInput(payload.email);
-  const body = {
+  const replyTo = isValidEmail(consumerEmail) ? consumerEmail : undefined;
+
+  return sendResendEmail({
+    apiKey,
     from,
     to: recipients,
     subject: `[Libro reclamaciones] ${safeSubjectCodigo(codigo)}`,
     text: buildComplaintEmailText(payload, codigo),
-  };
-  if (isValidEmail(consumerEmail)) {
-    body.reply_to = consumerEmail;
-  }
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(12_000),
-    });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      logServerError(`complaintNotifyEmail: Resend HTTP ${res.status}`, errText.slice(0, 200));
-      return { ok: false, reason: "provider_error" };
-    }
-    return { ok: true };
-  } catch (err) {
-    logServerError("complaintNotifyEmail:", err?.message || err);
-    return { ok: false, reason: "network_error" };
-  }
+    replyTo,
+    logServerError,
+    logPrefix: "complaintNotifyEmail",
+  });
 }
 
 module.exports = {

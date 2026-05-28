@@ -8,6 +8,10 @@ const {
   parseEmailList,
   buildComplaintEmailText,
 } = require("../../bff/complaintNotifyEmail.cjs");
+const {
+  buildComplaintConsumerEmailHtml,
+  buildComplaintConsumerEmailText,
+} = require("../../bff/complaintConsumerEmail.cjs");
 const { isValidEmail, hasEmailControlChars } = require("../../bff/emailValidation.cjs");
 
 const validBody = {
@@ -79,5 +83,21 @@ describe("libro reclamaciones — correo frente a abusos", () => {
 
   it("isValidEmail rechaza null bytes", () => {
     expect(isValidEmail("user@test.com\u0000.evil.com")).toBe(false);
+  });
+
+  it("correo al consumidor no incluye detalle completo ni HTML sin escapar", () => {
+    const body = {
+      ...validBody,
+      detalle: '<img src=x onerror="alert(1)">',
+      bienContratado: "Zapato <b>test</b>",
+    };
+    const text = buildComplaintConsumerEmailText(body, "CV-LR-TEST", "2026-05-27T12:00:00.000Z");
+    const html = buildComplaintConsumerEmailHtml(body, "CV-LR-TEST", "2026-05-27T12:00:00.000Z");
+    expect(text).not.toContain("onerror");
+    expect(text).not.toContain("<img");
+    expect(html).not.toContain('onerror="alert');
+    expect(html).toContain("‹b›");
+    expect(html).not.toContain("<b>");
+    expect(html).not.toContain(body.detalle);
   });
 });
