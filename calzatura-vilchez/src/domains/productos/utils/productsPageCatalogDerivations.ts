@@ -12,7 +12,7 @@ import {
   buildRouteFilteredCatalogProducts,
   getProductSizes,
   inferProductMaterials,
-} from "../../../../shared/catalogPublicFilter";
+} from "@shared/catalogPublicFilter";
 
 export function browsePublicCatalogFromUrl(
   products: Product[],
