@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { LOGIN_PASSWORD_INPUT_TYPE } from "@/config/authCredentials";
 import { requestPasswordReset, validateLoginFields } from "@/domains/publico/utils/loginPageFlow";
 import { buildLoginPageViewModel } from "@/domains/publico/utils/loginPageViewModel";
 
@@ -17,6 +18,7 @@ describe("loginPageViewModel", () => {
     const vm = buildLoginPageViewModel(false, true, true);
     expect(vm.pageTitle).toBe("Iniciar sesión");
     expect(vm.passwordInputType).toBe("text");
+    expect(LOGIN_PASSWORD_INPUT_TYPE).toBe("password");
     expect(vm.submitLabel).toBe("Ingresando...");
   });
 });

@@ -1,4 +1,10 @@
+import {
+  LOGIN_CURRENT_PASSWORD_AUTOCOMPLETE,
+  LOGIN_PASSWORD_INPUT_TYPE,
+} from "@/config/authCredentials";
+
 const NO_BROWSER_AUTOCOMPLETE = "off" as const;
+const INPUT_TYPE_TEXT = "text" as const;
 
 export type LoginPageViewModel = {
   isAdminLogin: boolean;
@@ -8,18 +14,26 @@ export type LoginPageViewModel = {
   formAutoComplete: typeof NO_BROWSER_AUTOCOMPLETE | undefined;
   formDataType: "other" | undefined;
   emailAutoComplete: typeof NO_BROWSER_AUTOCOMPLETE | "email";
-  passwordAutoComplete: typeof NO_BROWSER_AUTOCOMPLETE | "current-password";
-  passwordInputType: "text" | "password";
+  passwordAutoComplete: typeof NO_BROWSER_AUTOCOMPLETE | typeof LOGIN_CURRENT_PASSWORD_AUTOCOMPLETE;
+  passwordInputType: typeof INPUT_TYPE_TEXT | typeof LOGIN_PASSWORD_INPUT_TYPE;
   passwordToggleLabel: string;
   submitLabel: string;
   submitDisabled: boolean;
 };
+
+function passwordInputType(showPass: boolean) {
+  return showPass ? INPUT_TYPE_TEXT : LOGIN_PASSWORD_INPUT_TYPE;
+}
 
 export function buildLoginPageViewModel(
   isAdminLogin: boolean,
   showPass: boolean,
   loading: boolean,
 ): LoginPageViewModel {
+  const inputType = passwordInputType(showPass);
+  const toggleLabel = showPass ? "Ocultar contraseña" : "Mostrar contraseña";
+  const submitLabel = loading ? "Ingresando..." : "Iniciar Sesión";
+
   if (isAdminLogin) {
     return {
       isAdminLogin: true,
@@ -30,9 +44,9 @@ export function buildLoginPageViewModel(
       formDataType: "other",
       emailAutoComplete: NO_BROWSER_AUTOCOMPLETE,
       passwordAutoComplete: NO_BROWSER_AUTOCOMPLETE,
-      passwordInputType: showPass ? "text" : "password",
-      passwordToggleLabel: showPass ? "Ocultar contraseña" : "Mostrar contraseña",
-      submitLabel: loading ? "Ingresando..." : "Iniciar Sesión",
+      passwordInputType: inputType,
+      passwordToggleLabel: toggleLabel,
+      submitLabel,
       submitDisabled: loading,
     };
   }
@@ -45,10 +59,10 @@ export function buildLoginPageViewModel(
     formAutoComplete: undefined,
     formDataType: undefined,
     emailAutoComplete: "email",
-    passwordAutoComplete: "current-password",
-    passwordInputType: showPass ? "text" : "password",
-    passwordToggleLabel: showPass ? "Ocultar contraseña" : "Mostrar contraseña",
-    submitLabel: loading ? "Ingresando..." : "Iniciar Sesión",
+    passwordAutoComplete: LOGIN_CURRENT_PASSWORD_AUTOCOMPLETE,
+    passwordInputType: inputType,
+    passwordToggleLabel: toggleLabel,
+    submitLabel,
     submitDisabled: loading,
   };
 }

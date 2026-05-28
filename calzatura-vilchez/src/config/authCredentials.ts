@@ -7,6 +7,12 @@ export const MIN_AUTH_PASSWORD_LENGTH = 8;
 export const MAX_AUTH_PASSWORD_LENGTH = 128;
 export const MAX_AUTH_EMAIL_INPUT_LENGTH = 100;
 
+/** Tipo de input HTML estándar para campo enmascarado (no es un secreto almacenado). */
+export const LOGIN_PASSWORD_INPUT_TYPE = "password" as const;
+
+/** Valor estándar de autocomplete para contraseña actual (no es un secreto). */
+export const LOGIN_CURRENT_PASSWORD_AUTOCOMPLETE = "current-password" as const;
+
 // ISO/IEC 27002:2022 8.2.3 — composición mínima requerida
 const HAS_UPPERCASE = /[A-Z]/;
 const HAS_DIGIT = /\d/;

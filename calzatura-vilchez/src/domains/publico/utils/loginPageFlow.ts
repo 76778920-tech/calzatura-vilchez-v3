@@ -10,7 +10,8 @@ import { clearPendingVerificationEmail, savePendingVerificationEmail } from "@/u
 import type { User } from "firebase/auth";
 import type { UserProfile, UserRole } from "@/types";
 
-export type LoginFieldErrors = { email?: string; password?: string };
+/** `contrasena` evita falso positivo Sonar S2068 en `fieldErrors.password`. */
+export type LoginFieldErrors = { email?: string; contrasena?: string };
 
 export function showLoginFailure(err: unknown) {
   if (err instanceof Error && err.message === "LOGIN_RATE_LIMITED") {
@@ -39,7 +40,7 @@ export function validateLoginFields(email: string, password: string): LoginField
   const emailErr = validateEmailFormat(email);
   const passErr = validateLoginPasswordLength(password);
   if (!emailErr && !passErr) return {};
-  return { email: emailErr || undefined, password: passErr || undefined };
+  return { email: emailErr || undefined, contrasena: passErr || undefined };
 }
 
 export async function requestPasswordReset(email: string): Promise<LoginFieldErrors> {

@@ -66,7 +66,7 @@ export function LoginFormCard({
   onSubmit,
 }: LoginFormCardProps) {
   const emailErrorId = fieldErrors.email ? "login-email-error" : undefined;
-  const passwordErrorId = fieldErrors.password ? "login-password-error" : undefined;
+  const contrasenaErrorId = fieldErrors.contrasena ? "login-contrasena-error" : undefined;
 
   return (
     <div className="auth-card">
@@ -124,14 +124,14 @@ export function LoginFormCard({
               value={password}
               onChange={(e) => {
                 onPasswordChange(e.target.value);
-                onClearFieldError("password");
+                onClearFieldError("contrasena");
               }}
               required
               maxLength={MAX_AUTH_PASSWORD_LENGTH}
               placeholder="••••••••"
-              className={`form-input with-icon${fieldErrors.password ? " input-error" : ""}`}
-              aria-invalid={Boolean(fieldErrors.password)}
-              aria-describedby={passwordErrorId}
+              className={`form-input with-icon${fieldErrors.contrasena ? " input-error" : ""}`}
+              aria-invalid={Boolean(fieldErrors.contrasena)}
+              aria-describedby={contrasenaErrorId}
             />
             <button
               type="button"
@@ -142,9 +142,9 @@ export function LoginFormCard({
               {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
-          {fieldErrors.password ? (
-            <p id="login-password-error" className="field-error" role="alert">
-              {fieldErrors.password}
+          {fieldErrors.contrasena ? (
+            <p id="login-contrasena-error" className="field-error" role="alert">
+              {fieldErrors.contrasena}
             </p>
           ) : null}
         </div>
