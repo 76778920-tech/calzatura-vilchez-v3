@@ -22,7 +22,8 @@ function trimStr(v) {
   return typeof v === "string" ? v.trim() : "";
 }
 
-function validateComplaintPayload(body) {
+function validateComplaintPayload(body, options = {}) {
+  const { requirePrivacyConsent = true, allowedCanales = ["web", "whatsapp", "tienda"] } = options;
   const errors = {};
   const tipo = trimStr(body?.tipo);
   const nombres = trimStr(body?.nombres);
@@ -56,7 +57,14 @@ function validateComplaintPayload(body) {
   if (!detalle || detalle.length < COMPLAINT_DETALLE_MIN_LENGTH) {
     errors.detalle = "Detalle insuficiente";
   }
-  if (body?.aceptaPrivacidad !== true) errors.aceptaPrivacidad = "Debes aceptar la política de privacidad";
+  const rawCanal = trimStr(body?.canal);
+  const canal = rawCanal || (allowedCanales.includes("web") ? "web" : "");
+  if (!allowedCanales.includes(canal)) {
+    errors.canal = "Canal no válido";
+  }
+  if (requirePrivacyConsent && body?.aceptaPrivacidad !== true) {
+    errors.aceptaPrivacidad = "Debes aceptar la política de privacidad";
+  }
 
   if (Object.keys(errors).length > 0) {
     const err = new Error("Datos del formulario incompletos o no válidos");
@@ -67,7 +75,7 @@ function validateComplaintPayload(body) {
 
   return {
     tipo,
-    canal: ["web", "whatsapp", "tienda"].includes(trimStr(body?.canal)) ? trimStr(body.canal) : "web",
+    canal,
     nombres,
     apellidos,
     dni,
@@ -79,6 +87,21 @@ function validateComplaintPayload(body) {
     numeroPedido: trimStr(body?.numeroPedido) || null,
     detalle,
   };
+}
+
+function validateComplaintLookupQuery(query) {
+  const codigo = trimStr(query?.codigo).toUpperCase();
+  const dni = trimStr(query?.dni);
+  const errors = {};
+  if (!/^CV-LR-\d{8}-[A-Z0-9]{6}$/.test(codigo)) errors.codigo = "Código no válido";
+  if (!/^\d{8}$/.test(dni)) errors.dni = "DNI no válido";
+  if (Object.keys(errors).length > 0) {
+    const err = new Error("Datos de consulta inválidos");
+    err.status = 400;
+    err.fields = errors;
+    throw err;
+  }
+  return { codigo, dni };
 }
 
 function mapComplaintRow(row) {
@@ -104,6 +127,36 @@ function mapComplaintRow(row) {
   };
 }
 
+async function insertComplaintRecord({ supabase, payload, ipHash }) {
+  const now = new Date().toISOString();
+  let codigo = generateComplaintCode();
+  let inserted = null;
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const row = {
+      codigo,
+      ...payload,
+      estado: "recibido",
+      notasInternas: null,
+      ipHash,
+      creadoEn: now,
+      actualizadoEn: now,
+    };
+    const { data, error } = await supabase.from("libro_reclamaciones").insert(row).select("*").single();
+    if (!error) {
+      inserted = data;
+      break;
+    }
+    if (error.code === "23505") {
+      codigo = generateComplaintCode();
+      continue;
+    }
+    throw error;
+  }
+
+  return { inserted, codigo, now };
+}
+
 function registerLibroReclamacionesRoutes(app, deps) {
   const {
     cors,
@@ -127,33 +180,12 @@ function registerLibroReclamacionesRoutes(app, deps) {
           return res.status(429).json({ error: "Demasiados envíos. Intenta más tarde." });
         }
 
-        const payload = validateComplaintPayload(req.body);
+        const payload = validateComplaintPayload(req.body, {
+          requirePrivacyConsent: true,
+          allowedCanales: ["web"],
+        });
         const supabase = getSupabaseAdmin();
-        const now = new Date().toISOString();
-        let codigo = generateComplaintCode();
-        let inserted = null;
-
-        for (let attempt = 0; attempt < 3; attempt += 1) {
-          const row = {
-            codigo,
-            ...payload,
-            estado: "recibido",
-            notasInternas: null,
-            ipHash,
-            creadoEn: now,
-            actualizadoEn: now,
-          };
-          const { data, error } = await supabase.from("libro_reclamaciones").insert(row).select("*").single();
-          if (!error) {
-            inserted = data;
-            break;
-          }
-          if (error.code === "23505") {
-            codigo = generateComplaintCode();
-            continue;
-          }
-          throw error;
-        }
+        const { inserted, codigo, now } = await insertComplaintRecord({ supabase, payload, ipHash });
 
         if (!inserted) {
           return res.status(503).json({ error: "No se pudo registrar la hoja. Intenta de nuevo." });
@@ -194,6 +226,106 @@ function registerLibroReclamacionesRoutes(app, deps) {
         return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
       }
     });
+  });
+
+  app.get("/libro-reclamaciones/consulta-codigo", (req, res) => {
+    cors(req, res, async () => {
+      try {
+        const { limited } = await enforceRateLimit(req, SURFACES.LIBRO_RECLAMACIONES, logServerError);
+        if (limited) {
+          return res.status(429).json({ error: "Demasiadas consultas. Intenta más tarde." });
+        }
+        const { codigo, dni } = validateComplaintLookupQuery(req.query);
+        const supabase = getSupabaseAdmin();
+        const { data, error } = await supabase
+          .from("libro_reclamaciones")
+          .select("codigo, tipo, estado, dni, creadoEn")
+          .eq("codigo", codigo)
+          .eq("dni", dni)
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) {
+          return res.status(404).json({ error: "No encontramos una hoja con ese código y DNI." });
+        }
+        return res.status(200).json({
+          complaint: {
+            codigo: data.codigo,
+            tipo: data.tipo,
+            estado: data.estado,
+            creadoEn: data.creadoEn,
+          },
+        });
+      } catch (error) {
+        if (error?.fields) {
+          void onValidationFailure(
+            {
+              surface: SURFACES.LIBRO_RECLAMACIONES,
+              ip: getClientIp(req),
+              fields: error.fields,
+            },
+            logServerError,
+          );
+          return res.status(400).json({ error: publicError(error), fields: error.fields });
+        }
+        logServerError("libro-reclamaciones consulta-codigo:", error);
+        return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+      }
+    });
+  });
+
+  async function createComplaintByRole(req, res, role) {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      if (role === "admin") {
+        await assertAdminRole(supabase, decodedToken.uid);
+      } else {
+        await assertTrabajadorRole(supabase, decodedToken.uid);
+      }
+      const ipHash = hashIp(getClientIp(req));
+      const payload = validateComplaintPayload(req.body, {
+        requirePrivacyConsent: false,
+        allowedCanales: ["tienda", "whatsapp"],
+      });
+      const { inserted, codigo, now } = await insertComplaintRecord({ supabase, payload, ipHash });
+      if (!inserted) {
+        return res.status(503).json({ error: "No se pudo registrar la hoja. Intenta de nuevo." });
+      }
+
+      await logAuditFn(
+        supabase,
+        "libro_reclamacion_creada",
+        "libro_reclamaciones",
+        codigo,
+        `${payload.nombres} ${payload.apellidos}`,
+        decodedToken.uid,
+        decodedToken.email || null,
+        { tipo: payload.tipo, canal: payload.canal, origen: role },
+      );
+
+      void sendComplaintNotifyEmail(payload, codigo, logServerError).catch(() => {});
+      void sendComplaintConsumerEmail(payload, codigo, now, logServerError).catch(() => {});
+
+      return res.status(201).json({
+        complaint: mapComplaintRow(inserted),
+        codigo,
+        submittedAt: now,
+      });
+    } catch (error) {
+      if (error?.fields) {
+        return res.status(400).json({ error: publicError(error), fields: error.fields });
+      }
+      logServerError(`libro-reclamaciones create (${role}):`, error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  }
+
+  app.post("/admin/libro-reclamaciones", (req, res) => {
+    cors(req, res, () => createComplaintByRole(req, res, "admin"));
+  });
+
+  app.post("/staff/libro-reclamaciones", (req, res) => {
+    cors(req, res, () => createComplaintByRole(req, res, "staff"));
   });
 
   async function listComplaints(req, res, role) {

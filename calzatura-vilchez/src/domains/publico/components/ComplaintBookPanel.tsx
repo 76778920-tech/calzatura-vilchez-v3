@@ -6,6 +6,7 @@ import { INFO_ROUTES } from "@/routes/paths";
 import { COMPLAINT_WHATSAPP_SIMPLE_URL } from "@/domains/publico/utils/complaintBook";
 import { ComplaintBookForm } from "@/domains/publico/components/ComplaintBookForm";
 import { ComplaintProviderCard } from "@/domains/publico/components/ComplaintProviderCard";
+import { ComplaintStatusLookupCard } from "@/domains/publico/components/ComplaintStatusLookupCard";
 import { complaintPlazosNotaPanel } from "@/domains/publico/utils/complaintLegalPlazos";
 
 /**
@@ -71,6 +72,8 @@ export function ComplaintBookPanel() {
         <summary>Usar formulario virtual (opcional)</summary>
         <ComplaintBookForm />
       </details>
+
+      <ComplaintStatusLookupCard />
 
       <p className="complaint-book-note">
         {complaintPlazosNotaPanel()} También puedes acudir a{" "}

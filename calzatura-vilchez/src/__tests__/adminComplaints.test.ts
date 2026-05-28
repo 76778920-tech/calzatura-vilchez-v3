@@ -9,6 +9,7 @@ vi.mock("@/utils/bffClient", () => ({
 }));
 
 import {
+  createComplaintFromPanel,
   complaintPatchPath,
   complaintsListPath,
   fetchComplaints,
@@ -49,6 +50,32 @@ describe("adminComplaints", () => {
     expect(bffFetchMock).toHaveBeenCalledWith(
       "/admin/libro-reclamaciones/CV-LR-2",
       expect.objectContaining({ method: "PATCH" }),
+    );
+  });
+
+  it("crea hoja desde panel staff/admin", async () => {
+    bffFetchMock.mockResolvedValue({
+      complaint: { codigo: "CV-LR-NEW-01", canal: "tienda", estado: "recibido" },
+    });
+    await expect(
+      createComplaintFromPanel("staff", {
+        tipo: "reclamo",
+        canal: "tienda",
+        nombres: "Ana",
+        apellidos: "Perez",
+        dni: "12345678",
+        domicilio: "Jr. Lima 100",
+        telefono: "987654321",
+        email: "ana@example.com",
+        bienContratado: "Zapato escolar",
+        monto: "120",
+        numeroPedido: "",
+        detalle: "Producto con costura defectuosa",
+      }),
+    ).resolves.toEqual({ codigo: "CV-LR-NEW-01", canal: "tienda", estado: "recibido" });
+    expect(bffFetchMock).toHaveBeenCalledWith(
+      "/staff/libro-reclamaciones",
+      expect.objectContaining({ method: "POST" }),
     );
   });
 });

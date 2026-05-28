@@ -9,7 +9,10 @@ vi.mock("@/config/apiBackend", () => ({
   getBackendApiBaseUrl: getBackendApiBaseUrlMock,
 }));
 
-import { submitComplaintToServer } from "@/domains/publico/services/libroReclamaciones";
+import {
+  lookupComplaintByCode,
+  submitComplaintToServer,
+} from "@/domains/publico/services/libroReclamaciones";
 
 const validPayload: ComplaintFormData = {
   tipo: "reclamo",
@@ -71,6 +74,32 @@ describe("libroReclamaciones", () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new Error("network")) as typeof fetch;
     await expect(submitComplaintToServer(validPayload, true)).rejects.toThrow(
       /No se pudo conectar/i,
+    );
+  });
+
+  it("consulta estado por codigo + dni", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        complaint: {
+          codigo: "CV-LR-20260527-ABC123",
+          tipo: "reclamo",
+          estado: "en_tramite",
+          creadoEn: "2026-05-27T12:00:00.000Z",
+        },
+      }),
+    });
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    await expect(lookupComplaintByCode("cv-lr-20260527-abc123", "12345678")).resolves.toEqual({
+      codigo: "CV-LR-20260527-ABC123",
+      tipo: "reclamo",
+      estado: "en_tramite",
+      creadoEn: "2026-05-27T12:00:00.000Z",
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://bff.test/libro-reclamaciones/consulta-codigo?codigo=CV-LR-20260527-ABC123&dni=12345678",
+      expect.objectContaining({ method: "GET" }),
     );
   });
 });

@@ -5058,6 +5058,32 @@ body.complaint-print-active #complaint-print-root {
 .complaint-book-virtual[open] summary {
   margin-bottom: 0.5rem;
 }
+.complaint-lookup-card {
+  margin-top: 1rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1rem 1rem;
+  background: var(--white);
+}
+.complaint-lookup-card h3 {
+  margin: 0;
+  font-size: 0.96rem;
+}
+.complaint-status-result {
+  margin-top: 0.75rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--primary) 8%, var(--white));
+  border: 1px solid color-mix(in srgb, var(--primary) 25%, var(--border));
+}
+.complaint-status-result p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+.complaint-status-result p + p {
+  margin-top: 0.3rem;
+}
 .complaint-book-note {
   margin-top: 1rem;
   font-size: 0.84rem;
@@ -5117,6 +5143,9 @@ body.complaint-print-active #complaint-print-root {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+}
+.complaint-book-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .complaint-book-grid-full {
   grid-column: 1 / -1;

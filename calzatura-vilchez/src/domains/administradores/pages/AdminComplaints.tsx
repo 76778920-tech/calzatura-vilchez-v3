@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { AlertCircle, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import {
+  createComplaintFromPanel,
   fetchComplaints,
   updateComplaintStatus,
   type ComplaintEstado,
+  type PanelComplaintCreateInput,
 } from "@/domains/administradores/services/adminComplaints";
 import type { ComplaintRecord } from "@/domains/publico/services/libroReclamaciones";
 import { panelFetchScopeForRole } from "@/security/accessControl";
@@ -28,6 +30,21 @@ const ESTADO_COLOR: Record<ComplaintEstado, string> = {
 };
 
 const SKELETON_KEYS = ["c1", "c2", "c3", "c4"] as const;
+
+const NEW_FORM_INITIAL: PanelComplaintCreateInput = {
+  tipo: "reclamo",
+  canal: "tienda",
+  nombres: "",
+  apellidos: "",
+  dni: "",
+  domicilio: "",
+  telefono: "",
+  email: "",
+  bienContratado: "",
+  monto: "",
+  numeroPedido: "",
+  detalle: "",
+};
 
 type ComplaintsMainViewParams = Readonly<{
   loading: boolean;
@@ -181,6 +198,9 @@ export default function AdminComplaints() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [savingCodigo, setSavingCodigo] = useState<string | null>(null);
   const [notasDraft, setNotasDraft] = useState<Record<string, string>>({});
+  const [newFormOpen, setNewFormOpen] = useState(false);
+  const [creatingComplaint, setCreatingComplaint] = useState(false);
+  const [newComplaint, setNewComplaint] = useState<PanelComplaintCreateInput>(NEW_FORM_INITIAL);
 
   const load = useCallback(
     (showSpinner = false) => {
@@ -240,6 +260,28 @@ export default function AdminComplaints() {
     }
   };
 
+  const handleCreateComplaint = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setCreatingComplaint(true);
+    try {
+      const payload = {
+        ...newComplaint,
+        dni: newComplaint.dni.replace(/\D/g, "").slice(0, 8),
+      };
+      const created = await createComplaintFromPanel(panelScope, payload);
+      setComplaints((prev) => [created, ...prev]);
+      setExpanded(created.codigo);
+      setNotasDraft((prev) => ({ ...prev, [created.codigo]: created.notasInternas ?? "" }));
+      setNewComplaint(NEW_FORM_INITIAL);
+      setNewFormOpen(false);
+      toast.success("Hoja registrada en el libro virtual");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "No se pudo registrar la hoja");
+    } finally {
+      setCreatingComplaint(false);
+    }
+  };
+
   return (
     <div className="admin-page admin-complaints">
       <div className="admin-toolbar">
@@ -262,7 +304,152 @@ export default function AdminComplaints() {
           <RefreshCw size={16} aria-hidden="true" />
           Actualizar
         </button>
+        <button type="button" className="btn-primary" onClick={() => setNewFormOpen((v) => !v)}>
+          {newFormOpen ? "Cerrar registro" : "Registrar hoja (tienda/WhatsApp)"}
+        </button>
       </div>
+
+      {newFormOpen ? (
+        <form className="complaint-book-form" onSubmit={handleCreateComplaint}>
+          <p className="complaint-book-form-lead">
+            Registra una hoja recibida por canal presencial o WhatsApp. Se guarda en el mismo libro
+            virtual y genera código.
+          </p>
+          <div className="complaint-book-grid complaint-book-grid--two">
+            <label className="form-group">
+              <span>Tipo</span>
+              <select
+                className="form-input"
+                value={newComplaint.tipo}
+                onChange={(e) =>
+                  setNewComplaint((prev) => ({ ...prev, tipo: e.target.value as "reclamo" | "queja" }))
+                }
+              >
+                <option value="reclamo">Reclamo</option>
+                <option value="queja">Queja</option>
+              </select>
+            </label>
+            <label className="form-group">
+              <span>Canal</span>
+              <select
+                className="form-input"
+                value={newComplaint.canal}
+                onChange={(e) =>
+                  setNewComplaint((prev) => ({
+                    ...prev,
+                    canal: e.target.value as "tienda" | "whatsapp",
+                  }))
+                }
+              >
+                <option value="tienda">Tienda</option>
+                <option value="whatsapp">WhatsApp</option>
+              </select>
+            </label>
+            <label className="form-group">
+              <span>Nombres</span>
+              <input
+                className="form-input"
+                value={newComplaint.nombres}
+                onChange={(e) => setNewComplaint((prev) => ({ ...prev, nombres: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-group">
+              <span>Apellidos</span>
+              <input
+                className="form-input"
+                value={newComplaint.apellidos}
+                onChange={(e) => setNewComplaint((prev) => ({ ...prev, apellidos: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-group">
+              <span>DNI</span>
+              <input
+                className="form-input"
+                value={newComplaint.dni}
+                onChange={(e) =>
+                  setNewComplaint((prev) => ({
+                    ...prev,
+                    dni: e.target.value.replace(/\D/g, "").slice(0, 8),
+                  }))
+                }
+                inputMode="numeric"
+                pattern="\d{8}"
+                required
+              />
+            </label>
+            <label className="form-group">
+              <span>Teléfono</span>
+              <input
+                className="form-input"
+                value={newComplaint.telefono}
+                onChange={(e) => setNewComplaint((prev) => ({ ...prev, telefono: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-group complaint-book-grid-full">
+              <span>Domicilio</span>
+              <input
+                className="form-input"
+                value={newComplaint.domicilio}
+                onChange={(e) => setNewComplaint((prev) => ({ ...prev, domicilio: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-group">
+              <span>Correo</span>
+              <input
+                className="form-input"
+                type="email"
+                value={newComplaint.email}
+                onChange={(e) => setNewComplaint((prev) => ({ ...prev, email: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="form-group">
+              <span>N. pedido (opcional)</span>
+              <input
+                className="form-input"
+                value={newComplaint.numeroPedido}
+                onChange={(e) => setNewComplaint((prev) => ({ ...prev, numeroPedido: e.target.value }))}
+              />
+            </label>
+            <label className="form-group">
+              <span>Bien/servicio</span>
+              <input
+                className="form-input"
+                value={newComplaint.bienContratado}
+                onChange={(e) =>
+                  setNewComplaint((prev) => ({ ...prev, bienContratado: e.target.value }))
+                }
+                required
+              />
+            </label>
+            <label className="form-group">
+              <span>Monto (solo reclamo)</span>
+              <input
+                className="form-input"
+                value={newComplaint.monto}
+                onChange={(e) => setNewComplaint((prev) => ({ ...prev, monto: e.target.value }))}
+              />
+            </label>
+            <label className="form-group complaint-book-grid-full">
+              <span>Detalle</span>
+              <textarea
+                className="form-input complaint-book-textarea"
+                rows={4}
+                value={newComplaint.detalle}
+                onChange={(e) => setNewComplaint((prev) => ({ ...prev, detalle: e.target.value }))}
+                required
+              />
+            </label>
+          </div>
+          <button type="submit" className="btn-primary complaint-book-submit" disabled={creatingComplaint}>
+            {creatingComplaint ? "Registrando..." : "Registrar hoja"}
+          </button>
+        </form>
+      ) : null}
 
       {loadError ? (
         <div className="admin-error-banner" role="alert">

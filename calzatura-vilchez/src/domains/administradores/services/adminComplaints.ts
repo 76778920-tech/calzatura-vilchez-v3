@@ -1,5 +1,6 @@
 import { bffFetch } from "@/utils/bffClient";
 import type { ComplaintRecord } from "@/domains/publico/services/libroReclamaciones";
+import type { ComplaintFormData } from "@/domains/publico/utils/complaintBook";
 import type { PanelFetchScope } from "@/security/panelScope";
 
 export type ComplaintEstado = "recibido" | "en_tramite" | "respondido" | "cerrado";
@@ -44,5 +45,21 @@ export async function updateComplaintStatus(
       body: JSON.stringify(patch),
     },
   );
+  return complaint;
+}
+
+export type PanelComplaintCreateInput = ComplaintFormData & {
+  canal: "tienda" | "whatsapp";
+};
+
+export async function createComplaintFromPanel(
+  scope: PanelFetchScope,
+  payload: PanelComplaintCreateInput,
+): Promise<ComplaintRecord> {
+  const base = scope === "admin" ? "/admin/libro-reclamaciones" : "/staff/libro-reclamaciones";
+  const { complaint } = await bffFetch<{ complaint: ComplaintRecord }>(base, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
   return complaint;
 }
