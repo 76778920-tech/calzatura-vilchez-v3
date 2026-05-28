@@ -49,6 +49,7 @@
     "protobufjs": "^7.6.1",
     "retry-request": "^8.0.2",
     "teeny-request": "^10.1.2",
+    "tmp": "^0.2.6",
     "uuid": "^11.1.1",
     "ws": "^8.20.1"
   },
