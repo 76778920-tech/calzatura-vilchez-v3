@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { AlertCircle, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import {
@@ -260,7 +260,7 @@ export default function AdminComplaints() {
     }
   };
 
-  const handleCreateComplaint = async (event: FormEvent<HTMLFormElement>) => {
+  const handleCreateComplaint: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
     setCreatingComplaint(true);
     try {

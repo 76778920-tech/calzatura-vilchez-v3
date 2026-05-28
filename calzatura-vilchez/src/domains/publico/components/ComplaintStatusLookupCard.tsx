@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { Search } from "lucide-react";
 import { lookupComplaintByCode, type ComplaintLookupRecord } from "@/domains/publico/services/libroReclamaciones";
 
@@ -29,7 +29,7 @@ export function ComplaintStatusLookupCard() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ComplaintLookupRecord | null>(null);
 
-  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit: React.FormEventHandler<HTMLFormElement> = async (event) => {
     event.preventDefault();
     setLoading(true);
     setError(null);
