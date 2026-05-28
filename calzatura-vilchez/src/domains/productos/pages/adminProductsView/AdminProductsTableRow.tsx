@@ -1,6 +1,7 @@
 import { Copy, PackagePlus, Pencil, Trash2 } from "lucide-react";
 import { categoryLabel } from "@/utils/labels";
 import { isStockTallaIncoherent, sumTallaStockUnits } from "../adminProductStockCoherence";
+import { getProductPrimaryImage } from "@/utils/imgUtils";
 import { FALLBACK_PRODUCT_IMAGE, LOW_STOCK_LIMIT, type AdminProduct } from "../adminProductsInternals";
 
 type Props = Readonly<{
@@ -20,7 +21,7 @@ export function AdminProductsTableRow({
   openStockEntry,
   handleDelete,
 }: Props) {
-  const thumb = product.imagen || FALLBACK_PRODUCT_IMAGE;
+  const thumb = getProductPrimaryImage(product, FALLBACK_PRODUCT_IMAGE);
   let stockClass = "stock-badge in";
   if (product.stock === 0) stockClass = "stock-badge out";
   else if (product.stock <= LOW_STOCK_LIMIT) stockClass = "stock-badge low";

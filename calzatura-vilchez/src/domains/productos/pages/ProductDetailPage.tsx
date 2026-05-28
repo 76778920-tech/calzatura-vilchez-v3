@@ -22,6 +22,7 @@ import { getAvailableSizes, getSizeStock } from "@/utils/stock";
 import { useProductsRealtime } from "@/hooks/useProductsRealtime";
 import ImagePreviewModal from "@/domains/administradores/components/ImagePreviewModal";
 import toast from "react-hot-toast";
+import { getProductGalleryImages, getProductPrimaryImage } from "@/utils/imgUtils";
 
 const FALLBACK_PRODUCT_IMAGE = "/placeholder-product.svg";
 
@@ -86,10 +87,10 @@ export default function ProductDetailPage() {
   const selectedSizeStock = product ? getSizeStock(product, selectedTalla || undefined) : 0;
   const productImages = useMemo(() => {
     if (!product) return [];
-    const images = (product.imagenes?.length ? product.imagenes : [product.imagen]).filter(Boolean);
+    const images = getProductGalleryImages(product);
     return images.length ? images : [FALLBACK_PRODUCT_IMAGE];
   }, [product]);
-  const activeImage = productImages[selectedImageIndex] ?? product?.imagen ?? FALLBACK_PRODUCT_IMAGE;
+  const activeImage = productImages[selectedImageIndex] ?? FALLBACK_PRODUCT_IMAGE;
 
   useEffect(() => {
     if (previewOpen) return;
@@ -299,7 +300,7 @@ export default function ProductDetailPage() {
               <p className="detail-section-label">También disponible en</p>
               <ul className="detail-family-list">
                 {familySiblings.map((s) => {
-                  const thumb = (s.imagenes?.length ? s.imagenes[0] : s.imagen) || FALLBACK_PRODUCT_IMAGE;
+                  const thumb = getProductPrimaryImage(s, FALLBACK_PRODUCT_IMAGE);
                   const label = s.color?.trim() || "Ver producto";
                   return (
                     <li key={s.id}>
