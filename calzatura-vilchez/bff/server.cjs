@@ -1972,6 +1972,27 @@ function stripClientFinancialFields(sale) {
   return payload;
 }
 
+function assertSaleDocumentCustomer(sale) {
+  const tipo = String(sale?.documentoTipo || "ninguno");
+  if (tipo !== "nota_venta" && tipo !== "guia_remision") return;
+  const cliente = sale?.cliente;
+  const dni = String(cliente?.dni || "").replace(/\D/g, "");
+  if (!/^\d{8}$/.test(dni)) {
+    throw Object.assign(
+      new Error("Nota o guía requiere DNI del cliente (8 dígitos)"),
+      { status: 400 },
+    );
+  }
+  const nombres = String(cliente?.nombres || "").trim();
+  const apellidos = String(cliente?.apellidos || "").trim();
+  if (!nombres || !apellidos) {
+    throw Object.assign(
+      new Error("Nota o guía requiere nombres y apellidos del cliente"),
+      { status: 400 },
+    );
+  }
+}
+
 /**
  * Validación server-side (ISO 27001): precio en rango, producto activo (staff), encargado y cantidades.
  */
@@ -2005,6 +2026,8 @@ async function validateDailySalesRegister(supabase, sales, options = {}) {
     if (!Number.isFinite(precioVenta) || precioVenta <= 0) {
       throw Object.assign(new Error("Precio de venta invalido"), { status: 400 });
     }
+
+    assertSaleDocumentCustomer(sale);
 
     const { data: product, error: productError } = await supabase
       .from("productos")

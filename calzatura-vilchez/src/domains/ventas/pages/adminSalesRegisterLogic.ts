@@ -72,6 +72,21 @@ export function toastFromSalesError(err: unknown): string {
   return salesOperationErrorToast(err);
 }
 
+/** Nota/guía: exige DNI validado con el botón (no solo texto en el campo). */
+export function isSaleCustomerReadyForDocument(
+  requiresCustomer: boolean,
+  customer: SaleCustomer,
+  validatedDni: string,
+): boolean {
+  if (!requiresCustomer) return true;
+  const dni = normalizeDni(customer.dni);
+  return (
+    isValidDni(dni) &&
+    validatedDni === dni &&
+    Boolean(customer.nombres.trim() && customer.apellidos.trim())
+  );
+}
+
 type AddSaleLineValidation = {
   selectedProduct: SaleProduct | undefined;
   availableColors: string[];
@@ -223,6 +238,7 @@ export type RegisterPendingSalesParams = {
   documentType: SaleDocumentType;
   requiresCustomer: boolean;
   customer: SaleCustomer;
+  validatedDni: string;
   operator: SaleOperator;
   financeScope: FinanceFetchScope;
   setSaving: (v: boolean) => void;
@@ -241,6 +257,7 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
     documentType,
     requiresCustomer,
     customer,
+    validatedDni,
     operator,
     financeScope,
     setSaving,
@@ -257,6 +274,11 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
   }
   if (!operator.uid || !operator.nombre) {
     toast.error("No se pudo identificar al encargado de la venta");
+    return;
+  }
+
+  if (!isSaleCustomerReadyForDocument(requiresCustomer, customer, validatedDni)) {
+    toast.error("Valida el DNI del cliente con el botón «Validar DNI» antes de registrar");
     return;
   }
 

@@ -378,9 +378,22 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
             )}
           </div>
 
-          <button type="button" onClick={p.registerPendingLines} disabled={p.saving || p.pendingLines.length === 0} className="btn-primary">
+          <button
+            type="button"
+            onClick={p.registerPendingLines}
+            disabled={p.saving || p.pendingLines.length === 0 || (p.requiresCustomer && !p.customerIsValidated)}
+            className="btn-primary"
+            title={
+              p.requiresCustomer && !p.customerIsValidated
+                ? "Valida el DNI del cliente antes de registrar"
+                : undefined
+            }
+          >
             <Plus size={16} /> {p.saving ? "Registrando..." : "Registrar venta completa"}
           </button>
+          {p.requiresCustomer && !p.customerIsValidated && p.pendingLines.length > 0 && (
+            <p className="admin-empty" style={{ marginTop: "0.5rem" }}>Valida el DNI del cliente para emitir nota o guía.</p>
+          )}
         </div>
 
         <AdminSalesHistorialTable

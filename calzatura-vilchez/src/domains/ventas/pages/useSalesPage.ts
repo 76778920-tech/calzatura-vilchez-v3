@@ -397,6 +397,7 @@ export function useSalesPage(config: SalesPageConfig): SalesPageModel {
       documentType,
       requiresCustomer,
       customer,
+      validatedDni,
       operator,
       financeScope,
       setSaving,
@@ -458,11 +459,12 @@ export function useSalesPage(config: SalesPageConfig): SalesPageModel {
     setReturnConfirmOpen(false);
     setReturning(true);
     try {
-      const returned = await returnDailySaleAtomic(selectedSale.id, motivo, financeScope);
+      await returnDailySaleAtomic(selectedSale.id, motivo, financeScope);
       await load(date);
-      setSelectedSale((prev) => prev ? { ...prev, ...returned } : null);
+      setSelectedSale(null);
+      setReturnConfirmOpen(false);
       setReturnMotivo("");
-      toast.success("Devolución registrada y stock restaurado");
+      toast.success(`Devolución registrada (${selectedSale.codigo}) y stock restaurado`);
     } catch (err: unknown) {
       toast.error(toastFromSalesError(err));
     } finally {

@@ -1,5 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { toastFromSalesError } from "@/domains/ventas/pages/adminSalesRegisterLogic";
+import {
+  isSaleCustomerReadyForDocument,
+  toastFromSalesError,
+} from "@/domains/ventas/pages/adminSalesRegisterLogic";
+
+describe("isSaleCustomerReadyForDocument", () => {
+  it("venta simple no exige cliente", () => {
+    expect(isSaleCustomerReadyForDocument(false, { dni: "", nombres: "", apellidos: "" }, "")).toBe(true);
+  });
+
+  it("nota exige DNI validado y nombres completos", () => {
+    const customer = { dni: "12345678", nombres: "Juan", apellidos: "Perez" };
+    expect(isSaleCustomerReadyForDocument(true, customer, "")).toBe(false);
+    expect(isSaleCustomerReadyForDocument(true, customer, "12345678")).toBe(true);
+    expect(isSaleCustomerReadyForDocument(true, { dni: "12345678", nombres: "", apellidos: "Perez" }, "12345678")).toBe(false);
+  });
+});
 
 describe("toastFromSalesError", () => {
   it("muestra stock insuficiente para errores de concurrencia", () => {
