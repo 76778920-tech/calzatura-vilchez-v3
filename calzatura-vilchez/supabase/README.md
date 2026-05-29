@@ -1,5 +1,8 @@
 # Supabase runbook
 
+Checklist operativa para cerrar seguridad en producción:  
+`docs/ops/checklist-verde-seguridad-produccion.md`
+
 ## Migraciones en CI
 
 Cada push/PR ejecuta `node scripts/validate-supabase-migrations.mjs` (workflow CI):

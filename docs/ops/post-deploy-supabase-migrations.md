@@ -1,5 +1,8 @@
 # Post-deploy — migraciones Supabase
 
+Checklist completa de seguridad en producción (Render, Stripe, CI, linter):  
+**[checklist-verde-seguridad-produccion.md](./checklist-verde-seguridad-produccion.md)**
+
 Tras cada despliegue a **main** que incluya archivos nuevos en `calzatura-vilchez/supabase/migrations/`:
 
 1. Revisar que **CI Integration** haya pasado `supabase-remote-parity` (paridad Local/Remote).
