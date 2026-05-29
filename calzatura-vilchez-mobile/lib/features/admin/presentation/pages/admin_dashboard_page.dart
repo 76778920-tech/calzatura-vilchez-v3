@@ -502,30 +502,33 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                   color: AppColors.black,
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const CVLogo(size: 48),
-                          const SizedBox(width: 14),
+                          const CVLogo(size: 38),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
+                                // Saludo — fila completa
                                 Text(
                                   _greetingWithName(
                                     displayName.isEmpty ? null : displayName,
                                   ),
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.3,
+                                    letterSpacing: 0.2,
                                   ),
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 3),
+                                const SizedBox(height: 2),
+                                // Fecha
                                 Text(
                                   _todayLabel(),
                                   style: const TextStyle(
@@ -533,92 +536,127 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                     fontSize: 11,
                                   ),
                                 ),
-                                const SizedBox(height: 5),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.gold.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: AppColors.gold.withValues(alpha: 0.4),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    role == 'trabajador'
-                                        ? 'TRABAJADOR'
-                                        : 'ADMINISTRADOR',
-                                    style: const TextStyle(
-                                      color: AppColors.gold,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.notifications_outlined,
-                                  color: Colors.white70,
-                                ),
-                                tooltip: 'Actividad de trabajadores',
-                                onPressed: _showNotifSheet,
-                              ),
-                              if (_unreadCount > 0)
-                                Positioned(
-                                  right: 6,
-                                  top: 6,
-                                  child: Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFB91C1C),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: Center(
+                                const SizedBox(height: 6),
+                                // Badge + iconos en la misma fila
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.gold.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: AppColors.gold.withValues(
+                                            alpha: 0.4,
+                                          ),
+                                        ),
+                                      ),
                                       child: Text(
-                                        _unreadCount > 9
-                                            ? '9+'
-                                            : '$_unreadCount',
+                                        role == 'trabajador'
+                                            ? 'TRABAJADOR'
+                                            : 'ADMINISTRADOR',
                                         style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.gold,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 1.1,
                                         ),
                                       ),
                                     ),
-                                  ),
+                                    const Spacer(),
+                                    // Campana con badge
+                                    Stack(
+                                      alignment: Alignment.center,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.notifications_outlined,
+                                            color: Colors.white70,
+                                            size: 20,
+                                          ),
+                                          tooltip: 'Actividad de trabajadores',
+                                          padding: const EdgeInsets.all(4),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 30,
+                                            minHeight: 30,
+                                          ),
+                                          onPressed: _showNotifSheet,
+                                        ),
+                                        if (_unreadCount > 0)
+                                          Positioned(
+                                            right: 2,
+                                            top: 2,
+                                            child: Container(
+                                              width: 14,
+                                              height: 14,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFFB91C1C),
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: Center(
+                                                child: Text(
+                                                  _unreadCount > 9
+                                                      ? '9+'
+                                                      : '$_unreadCount',
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 8,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    // Tienda
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.storefront_outlined,
+                                        color: Colors.white70,
+                                        size: 20,
+                                      ),
+                                      tooltip: 'Ver tienda',
+                                      padding: const EdgeInsets.all(4),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 30,
+                                        minHeight: 30,
+                                      ),
+                                      onPressed: () => context.go('/home'),
+                                    ),
+                                    // Cerrar sesión
+                                    IconButton(
+                                      icon: const Icon(
+                                        Icons.logout_rounded,
+                                        color: Colors.white54,
+                                        size: 20,
+                                      ),
+                                      tooltip: 'Cerrar sesión',
+                                      padding: const EdgeInsets.all(4),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 30,
+                                        minHeight: 30,
+                                      ),
+                                      onPressed: () async {
+                                        await ref
+                                            .read(
+                                              authNotifierProvider.notifier,
+                                            )
+                                            .signOut();
+                                        if (context.mounted) {
+                                          context.go('/login');
+                                        }
+                                      },
+                                    ),
+                                  ],
                                 ),
-                            ],
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.storefront_outlined,
-                              color: Colors.white70,
+                              ],
                             ),
-                            tooltip: 'Ver tienda',
-                            onPressed: () => context.go('/home'),
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.logout_rounded,
-                              color: Colors.white54,
-                            ),
-                            tooltip: 'Cerrar sesión',
-                            onPressed: () async {
-                              await ref
-                                  .read(authNotifierProvider.notifier)
-                                  .signOut();
-                              if (context.mounted) context.go('/login');
-                            },
                           ),
                         ],
                       ),
