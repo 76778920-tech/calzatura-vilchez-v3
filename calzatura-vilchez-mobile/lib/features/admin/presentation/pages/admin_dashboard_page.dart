@@ -466,6 +466,15 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
     );
   }
 
+  void _showAuditSheet(List<Map<String, dynamic>> entries) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AuditLogSheet(entries: entries),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final displayName = ref.watch(userDisplayNameProvider).valueOrNull ?? '';
@@ -905,48 +914,25 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                       ),
                     ),
 
-                    // Historial de auditoría ISO 9001
+                    // Historial de auditoría ISO 9001 — botón compacto
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _SectionTitle('Trazabilidad ISO 9001'),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'Actividad reciente',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    SliverToBoxAdapter(
-                      child: auditAsync.when(
-                        loading: () => const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.gold,
-                            ),
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
+                        child: auditAsync.when(
+                          loading: () => _AuditButton(
+                            count: null,
+                            onTap: null,
+                          ),
+                          error: (_, _) => _AuditButton(
+                            count: null,
+                            onTap: null,
+                            isError: true,
+                          ),
+                          data: (entries) => _AuditButton(
+                            count: entries.length,
+                            onTap: () => _showAuditSheet(entries),
                           ),
                         ),
-                        error: (_, _) => const Padding(
-                          padding: EdgeInsets.fromLTRB(16, 0, 16, 100),
-                          child: Text(
-                            'No se pudo cargar el historial de actividad.',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        data: (entries) => _AuditLog(entries: entries),
                       ),
                     ),
                   ],
@@ -1974,142 +1960,347 @@ class _TotalRow extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Historial de auditoría ISO 9001
+// Botón compacto de auditoría ISO 9001
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _AuditLog extends StatelessWidget {
-  const _AuditLog({required this.entries});
+class _AuditButton extends StatelessWidget {
+  const _AuditButton({
+    required this.count,
+    required this.onTap,
+    this.isError = false,
+  });
+
+  final int? count;
+  final VoidCallback? onTap;
+  final bool isError;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.gold.withValues(alpha: 0.25),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: AppColors.gold.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.verified_outlined,
+                color: AppColors.gold,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'TRAZABILIDAD ISO 9001',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.1,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    isError
+                        ? 'Error al cargar actividad'
+                        : 'Actividad reciente',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isError
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (count != null && !isError) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.gold.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '$count',
+                  style: const TextStyle(
+                    color: AppColors.gold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (count == null && !isError)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.gold,
+                ),
+              )
+            else
+              Icon(
+                Icons.chevron_right_rounded,
+                color: isError
+                    ? AppColors.textSecondary.withValues(alpha: 0.3)
+                    : AppColors.textSecondary,
+                size: 20,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sheet completo de auditoría ISO 9001
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AuditLogSheet extends StatelessWidget {
+  const _AuditLogSheet({required this.entries});
   final List<Map<String, dynamic>> entries;
 
-  Color _actionColor(String action) {
-    switch (action) {
-      case 'crear':
-        return const Color(0xFF10B981);
-      case 'editar':
-        return const Color(0xFF6366F1);
-      case 'eliminar':
-        return AppColors.error;
-      case 'cambiar_estado':
-        return AppColors.warning;
-      case 'importar':
-        return const Color(0xFF0EA5E9);
-      default:
-        return AppColors.textSecondary;
+  static Color _accionColor(String a) => switch (a) {
+        'crear' => const Color(0xFF10B981),
+        'editar' => const Color(0xFF6366F1),
+        'eliminar' => AppColors.error,
+        'cambiar_estado' => const Color(0xFFF59E0B),
+        'importar' => const Color(0xFF0EA5E9),
+        _ => AppColors.textSecondary,
+      };
+
+  static String _fmtDate(String? iso) {
+    if (iso == null) return '—';
+    try {
+      final dt = DateTime.parse(iso).toLocal();
+      final d = dt.day.toString().padLeft(2, '0');
+      final mo = dt.month.toString().padLeft(2, '0');
+      final h = dt.hour.toString().padLeft(2, '0');
+      final mi = dt.minute.toString().padLeft(2, '0');
+      return '$d/$mo/${dt.year} $h:$mi';
+    } catch (_) {
+      return iso.length > 16 ? iso.substring(0, 16) : iso;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (entries.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, 100),
-        child: Text(
-          'Sin actividad registrada aún.',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-      child: Column(
-        children: entries.map((entry) {
-          final accion = entry['accion'] as String? ?? '—';
-          final entidad = entry['entidad'] as String? ?? '—';
-          final entidadNombre = entry['entidadNombre'] as String? ?? '—';
-          final usuarioEmail = entry['usuarioEmail'] as String?;
-          final realizadoEn = entry['realizadoEn'] as String?;
-
-          String fechaStr = '—';
-          if (realizadoEn != null) {
-            try {
-              final fecha = DateTime.parse(realizadoEn).toLocal();
-              final d = fecha.day.toString().padLeft(2, '0');
-              final mo = fecha.month.toString().padLeft(2, '0');
-              final h = fecha.hour.toString().padLeft(2, '0');
-              final mi = fecha.minute.toString().padLeft(2, '0');
-              fechaStr = '$d/$mo/${fecha.year} $h:$mi';
-            } catch (_) {
-              fechaStr = realizadoEn.length > 16
-                  ? realizadoEn.substring(0, 16)
-                  : realizadoEn;
-            }
-          }
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 6,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
+    return DraggableScrollableSheet(
+      initialChildSize: 0.65,
+      maxChildSize: 0.95,
+      minChildSize: 0.35,
+      builder: (context, scrollCtrl) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.beige,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Container(
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
-                    color: _actionColor(accion).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    accion.toUpperCase(),
-                    style: TextStyle(
-                      color: _actionColor(accion),
-                      fontSize: 9,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                    ),
+                    color: AppColors.textSecondary.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '$entidad · $entidadNombre',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 16, 14),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.gold.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      if (usuarioEmail != null)
-                        Text(
-                          _maskEmail(usuarioEmail),
-                          style: const TextStyle(
-                            fontSize: 11,
+                      child: const Icon(
+                        Icons.verified_outlined,
+                        color: AppColors.gold,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'TRAZABILIDAD ISO 9001',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          Text(
+                            '${entries.length} registros recientes',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20),
+                      onPressed: () => Navigator.of(context).pop(),
+                      color: AppColors.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Lista
+              Expanded(
+                child: entries.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Sin actividad registrada aún.',
+                          style: TextStyle(
                             color: AppColors.textSecondary,
+                            fontSize: 13,
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  fechaStr,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
-      ),
+                      )
+                    : ListView.separated(
+                        controller: scrollCtrl,
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                        itemCount: entries.length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (_, i) {
+                          final e = entries[i];
+                          final accion = e['accion'] as String? ?? '—';
+                          final entidad = e['entidad'] as String? ?? '—';
+                          final nombre =
+                              e['entidadNombre'] as String? ?? '—';
+                          final email = e['usuarioEmail'] as String?;
+                          final fecha = _fmtDate(
+                            e['realizadoEn'] as String?,
+                          );
+                          final color = _accionColor(accion);
+
+                          return Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(14),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.03),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Pill de acción
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: color.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: color.withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    accion.toUpperCase(),
+                                    style: TextStyle(
+                                      color: color,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.6,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Contenido
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '$entidad · $nombre',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        email != null
+                                            ? '$email · $fecha'
+                                            : fecha,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
