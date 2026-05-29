@@ -17,6 +17,14 @@ import {
 import { aiAdminFetch } from "@/services/aiAdminClient";
 import { calculatePriceRange } from "@/domains/ventas/services/finance";
 import { AccessibleConfirmDialog } from "@/components/common/AccessibleConfirmDialog";
+import {
+  CATEGORIAS,
+  MATERIAL_PRESETS,
+  STYLE_OPTIONS,
+  footwearTypesForCategory,
+  materialIsAllowed,
+  styleIsAllowedForType,
+} from "@/domains/productos/utils/commercialRules";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -196,6 +204,19 @@ function parseBooleanCell(value: unknown): boolean {
   return ["true", "1", "si", "sí", "yes"].includes(normalized);
 }
 
+function parseBooleanCellWithDefault(value: unknown, fallback: boolean): boolean {
+  const normalized = cellString(value).trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (["true", "1", "si", "sÃ­", "yes", "activo"].includes(normalized)) return true;
+  if (["false", "0", "no", "inactivo"].includes(normalized)) return false;
+  return fallback;
+}
+
+function parseDiscountCell(value: unknown): 10 | 20 | 30 | undefined {
+  const discount = Number(cellString(value).trim());
+  return discount === 10 || discount === 20 || discount === 30 ? discount : undefined;
+}
+
 function parseJsonCell<T>(value: unknown, fallback: T): T {
   if (value === undefined || value === null || value === "") return fallback;
   if (typeof value === "object") return value as T;
@@ -225,6 +246,46 @@ function parseNumberMapCell(value: unknown): Record<string, number> {
   );
 }
 
+function parseColorStockCell(row: Row): Record<string, Record<string, number>> {
+  const parsed = parseJsonCell<Record<string, Record<string, number>>>(row.colorStock, {});
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
+    return parsed;
+  }
+  const color = cellString(row.color).trim();
+  const tallaStock = parseNumberMapCell(row.tallaStock);
+  return color && Object.keys(tallaStock).length > 0 ? { [color]: tallaStock } : {};
+}
+
+function validateCommercialImportRow(row: Row): string | null {
+  const categoria = cellString(row.categoria).trim();
+  const tipoCalzado = cellString(row.tipoCalzado).trim();
+  const material = cellString(row.material).trim();
+  const estilos = cellString(row.estilo)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!CATEGORIAS.includes(categoria)) {
+    return `La categoria debe ser una de: ${CATEGORIAS.join(", ")}`;
+  }
+  if (!tipoCalzado) return "Falta el campo 'tipoCalzado'";
+  if (!footwearTypesForCategory(categoria).includes(tipoCalzado)) {
+    return `El tipoCalzado '${tipoCalzado}' no corresponde a la categoria '${categoria}'`;
+  }
+  if (material && !materialIsAllowed(material)) {
+    return `El material debe ser uno de: ${MATERIAL_PRESETS.join(", ")}`;
+  }
+  for (const estilo of estilos) {
+    if (!STYLE_OPTIONS.includes(estilo as (typeof STYLE_OPTIONS)[number])) {
+      return `El estilo debe ser uno de: ${STYLE_OPTIONS.join(", ")}`;
+    }
+    if (!styleIsAllowedForType(tipoCalzado, estilo)) {
+      return `El estilo '${estilo}' no corresponde al tipoCalzado '${tipoCalzado}'`;
+    }
+  }
+  return null;
+}
+
 
 async function invalidateAICache(): Promise<void> {
   try {
@@ -244,7 +305,8 @@ const COLLECTIONS: CollectionConfig[] = [
     canImport: true,
     templateHeaders: [
       "id", "codigo", "nombre", "precio", "stock", "categoria", "tipoCalzado",
-      "descripcion", "marca", "color", "familiaId", "tallas", "tallaStock", "destacado",
+      "descripcion", "marca", "material", "estilo", "color", "familiaId", "tallas",
+      "tallaStock", "colorStock", "destacado", "activo", "descuento", "campana", "imagen", "imagenes",
     ],
     templateExample: {
       id: "PRUEBA_CV001",
@@ -252,15 +314,23 @@ const COLLECTIONS: CollectionConfig[] = [
       nombre: "Zapatilla Deportiva",
       precio: 89.9,
       stock: 10,
-      categoria: "Deportivo",
+      categoria: "hombre",
       tipoCalzado: "Zapatillas",
       descripcion: "Descripcion del producto (opcional)",
       marca: "Nike",
+      material: "Textil",
+      estilo: "Deportivas",
       color: "Negro",
       familiaId: "",
       tallas: "[\"39\",\"40\",\"41\"]",
       tallaStock: "{\"39\":3,\"40\":4,\"41\":3}",
+      colorStock: "{\"Negro\":{\"39\":3,\"40\":4,\"41\":3}}",
       destacado: false,
+      activo: true,
+      descuento: "",
+      campana: "normal",
+      imagen: "",
+      imagenes: "[]",
     },
     exportTransform: (d, extra) => {
       const id = cellString(d.id);
@@ -274,11 +344,19 @@ const COLLECTIONS: CollectionConfig[] = [
         tipoCalzado: cellString(d.tipoCalzado),
         descripcion: cellString(d.descripcion),
         marca: cellString(d.marca),
+        material: cellString(d.material),
+        estilo: cellString(d.estilo),
         color: cellString(d.color),
         familiaId: cellString(d.familiaId),
         tallas: JSON.stringify(d.tallas ?? []),
         tallaStock: JSON.stringify(d.tallaStock ?? {}),
+        colorStock: JSON.stringify(d.colorStock ?? {}),
         destacado: d.destacado ?? false,
+        activo: d.activo ?? true,
+        descuento: d.descuento ?? "",
+        campana: cellString(d.campana),
+        imagen: cellString(d.imagen),
+        imagenes: JSON.stringify(d.imagenes ?? []),
       };
     },
     importTransform: (row, context) => ({
@@ -289,13 +367,19 @@ const COLLECTIONS: CollectionConfig[] = [
       tipoCalzado: cellString(row.tipoCalzado).trim(),
       descripcion: cellString(row.descripcion).trim(),
       marca: cellString(row.marca).trim(),
+      material: cellString(row.material).trim() || undefined,
+      estilo: cellString(row.estilo).trim() || undefined,
       color: cellString(row.color).trim(),
       familiaId: cellString(row.familiaId).trim() || undefined,
       tallas: parseStringArrayCell(row.tallas),
       tallaStock: parseNumberMapCell(row.tallaStock),
+      colorStock: parseColorStockCell(row),
       destacado: parseBooleanCell(row.destacado),
-      imagen: "",
-      imagenes: [],
+      activo: parseBooleanCellWithDefault(row.activo, true),
+      descuento: parseDiscountCell(row.descuento),
+      campana: cellString(row.campana).trim() || undefined,
+      imagen: cellString(row.imagen).trim(),
+      imagenes: parseStringArrayCell(row.imagenes),
       esDePrueba: true,
       importadoEn: context.importadoEn,
       loteImportacion: context.loteImportacion,
@@ -307,7 +391,9 @@ const COLLECTIONS: CollectionConfig[] = [
       if (row.precio === undefined || Number.isNaN(Number(row.precio))) return "El campo 'precio' debe ser un número";
       if (row.stock === undefined || Number.isNaN(Number(row.stock))) return "El campo 'stock' debe ser un número";
       if (!row.categoria) return "Falta el campo 'categoria'";
-      return null;
+      if (Number(row.precio) <= 0) return "El campo 'precio' debe ser mayor que cero";
+      if (Number(row.stock) < 0) return "El campo 'stock' no puede ser negativo";
+      return validateCommercialImportRow(row);
     },
     importDocId: deriveProductImportId,
   },
@@ -569,9 +655,10 @@ async function importRows(
 
   rows.forEach((row, i) => {
     const err = config.importValidate(row);
-    const isVentas = config.id === "ventasDiarias";
-    const productId = isVentas ? cellString(row.productId).trim() : "";
-    const productMissingInCatalog = isVentas && productId.length > 0 && !(validProductIds?.has(productId) ?? false);
+    const requiresExistingProduct = config.id === "ventasDiarias" || config.id === "productoFinanzas";
+    const productId = requiresExistingProduct ? cellString(row.productId).trim() : "";
+    const productMissingInCatalog =
+      requiresExistingProduct && productId.length > 0 && !(validProductIds?.has(productId) ?? false);
 
     if (err) {
       errors.push(`Fila ${i + 2}: ${err}`);
@@ -672,14 +759,14 @@ async function deleteSalesUpToDate(dateStr: string): Promise<number> {
 // ── Escenarios de prueba (≈ 500 filas c/u) ───────────────────────────────────
 
 const BASE_PRODUCTS = [
-  { id: "PRUEBA_CV001", nombre: "Zapatilla Running Pro",  precio: 119.9, costo: 75,   cat: "Deportivo", marca: "Adidas",     color: "Azul",   talla: "40", baseProb: 0.65, minQ: 1, maxQ: 3 },
-  { id: "PRUEBA_CV002", nombre: "Bota de Cuero Casual",   precio: 159.9, costo: 95,   cat: "Casual",    marca: "Clarks",     color: "Marron", talla: "42", baseProb: 0.5,  minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV003", nombre: "Sandalia Verano",        precio:  49.9, costo: 28,   cat: "Casual",    marca: "Crocs",      color: "Beige",  talla: "38", baseProb: 0.45, minQ: 1, maxQ: 4 },
-  { id: "PRUEBA_CV004", nombre: "Mocasin Ejecutivo",      precio: 129.9, costo: 80,   cat: "Formal",    marca: "Bata",       color: "Negro",  talla: "41", baseProb: 0.55, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV005", nombre: "Zapatilla Escolar",      precio:  79.9, costo: 50,   cat: "Escolar",   marca: "Kolosh",     color: "Blanco", talla: "36", baseProb: 0.6,  minQ: 1, maxQ: 3 },
-  { id: "PRUEBA_CV006", nombre: "Bota Urbana Negra",      precio: 189.9, costo: 120,  cat: "Urbano",    marca: "Timberland", color: "Negro",  talla: "43", baseProb: 0.4,  minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV007", nombre: "Zapato Formal Clasico",  precio: 149.9, costo: 90,   cat: "Formal",    marca: "Bata",       color: "Cafe",   talla: "40", baseProb: 0.45, minQ: 1, maxQ: 2 },
-  { id: "PRUEBA_CV008", nombre: "Chancleta Playera",      precio:  29.9, costo: 15,   cat: "Playa",     marca: "Rider",      color: "Verde",  talla: "39", baseProb: 0.55, minQ: 1, maxQ: 5 },
+  { id: "PRUEBA_CV001", nombre: "Zapatilla Running Pro",  precio: 119.9, costo: 75,   categoria: "hombre",  tipoCalzado: "Zapatillas",        marca: "Adidas",     material: "Textil", estilo: "Deportivas", color: "Azul",   talla: "40", baseProb: 0.65, minQ: 1, maxQ: 3 },
+  { id: "PRUEBA_CV002", nombre: "Bota de Cuero Casual",   precio: 159.9, costo: 95,   categoria: "hombre",  tipoCalzado: "Botines",            marca: "Clarks",     material: "Cuero",  estilo: "Casuales",   color: "Marron", talla: "42", baseProb: 0.5,  minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV003", nombre: "Sandalia Verano",        precio:  49.9, costo: 28,   categoria: "dama",    tipoCalzado: "Sandalias",          marca: "Crocs",      material: "SintÃ©tico", estilo: "Casuales", color: "Beige",  talla: "38", baseProb: 0.45, minQ: 1, maxQ: 4 },
+  { id: "PRUEBA_CV004", nombre: "Mocasin Ejecutivo",      precio: 129.9, costo: 80,   categoria: "hombre",  tipoCalzado: "Zapatos de Vestir",  marca: "Bata",       material: "Cuero",  estilo: "Ejecutivo",  color: "Negro",  talla: "41", baseProb: 0.55, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV005", nombre: "Zapatilla Escolar",      precio:  79.9, costo: 50,   categoria: "juvenil", tipoCalzado: "Escolar",            marca: "Kolosh",     material: "Textil", estilo: "Ejecutivo",  color: "Blanco", talla: "36", baseProb: 0.6,  minQ: 1, maxQ: 3 },
+  { id: "PRUEBA_CV006", nombre: "Bota Urbana Negra",      precio: 189.9, costo: 120,  categoria: "hombre",  tipoCalzado: "Botines",            marca: "Timberland", material: "Nubuk",  estilo: "Outdoor",    color: "Negro",  talla: "43", baseProb: 0.4,  minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV007", nombre: "Zapato Formal Clasico",  precio: 149.9, costo: 90,   categoria: "hombre",  tipoCalzado: "Zapatos de Vestir",  marca: "Bata",       material: "Cuero",  estilo: "Ejecutivo",  color: "Cafe",   talla: "40", baseProb: 0.45, minQ: 1, maxQ: 2 },
+  { id: "PRUEBA_CV008", nombre: "Chancleta Playera",      precio:  29.9, costo: 15,   categoria: "dama",    tipoCalzado: "Flip Flops",         marca: "Rider",      material: "SintÃ©tico", estilo: "",          color: "Verde",  talla: "39", baseProb: 0.55, minQ: 1, maxQ: 5 },
 ] as const;
 
 interface ScenarioCfg {
@@ -784,23 +871,28 @@ function downloadScenario(sc: ScenarioCfg): void {
       ? Math.round(p.precio * (1 - sc.priceDiscount) * 100) / 100
       : p.precio;
     const inventory = buildScenarioColorStock(p.talla, sc.stocks[i]);
-    let tipoCalzado = "Casual";
-    if (p.cat === "Formal") tipoCalzado = "Zapatos de Vestir";
-    else if (p.cat === "Deportivo") tipoCalzado = "Zapatillas";
     return {
       id: p.id,
       codigo: removePrefix(p.id, "PRUEBA_"),
       nombre: p.nombre,
       precio,
       stock: sc.stocks[i],
-      categoria: p.cat,
-      tipoCalzado,
+      categoria: p.categoria,
+      tipoCalzado: p.tipoCalzado,
       descripcion: `Producto de prueba — escenario ${sc.label}`,
       marca: p.marca,
+      material: p.material,
+      estilo: p.estilo,
       color: p.color,
       tallas: JSON.stringify(inventory.tallas),
       tallaStock: JSON.stringify(inventory.tallaStock),
+      colorStock: JSON.stringify({ [p.color]: inventory.tallaStock }),
       destacado: false,
+      activo: true,
+      descuento: sc.priceDiscount > 0 ? 10 : "",
+      campana: sc.key,
+      imagen: "",
+      imagenes: "[]",
     };
   });
   void downloadXlsx(`productos_${sc.key}.xlsx`, "Productos", productRows);
@@ -1099,7 +1191,7 @@ export default function AdminData() {
         description: (
           <p>
             Se eliminaran los datos de prueba del escenario <strong>{scenarioLabel(pendingDelete.scenario)}</strong> en productos,
-            fabricantes y ventas diarias. Esta accion no afecta datos reales.
+            finanzas, fabricantes y ventas diarias. Esta accion no afecta datos reales.
           </p>
         ),
       };
@@ -1354,7 +1446,8 @@ export default function AdminData() {
         </div>
 
         <p className="data-clean-note">
-          Este borrado afecta datos marcados como prueba en <code>productos</code>, <code>fabricantes</code> y <code>ventasDiarias</code>.
+          Este borrado afecta datos marcados como prueba en <code>productos</code>, <code>productoFinanzas</code>,{" "}
+          <code>fabricantes</code> y <code>ventasDiarias</code>.
         </p>
       </div>
 
@@ -1446,7 +1539,8 @@ export default function AdminData() {
                     : `Descargar escenario ${sc.label}`}
                 </button>
                 <p className="data-clean-note" style={{ marginTop: "0.5rem" }}>
-                  Archivos: <code>productos_{sc.key}.xlsx</code> y <code>ventas_{sc.key}.xlsx</code>
+                  Archivos: <code>productos_{sc.key}.xlsx</code>, <code>finanzas_{sc.key}.xlsx</code> y{" "}
+                  <code>ventas_{sc.key}.xlsx</code>
                 </p>
               </div>
             </div>

@@ -337,13 +337,13 @@ const ADMIN_DATA_MAX_IMPORT_ROWS = 5000;
 /** Columnas permitidas en export admin (sin PII cruda; redacción adicional en redactAdminExportRow). */
 const ADMIN_DATA_EXPORT_COLUMNS = {
   productos:
-    "id,nombre,precio,stock,categoria,tipoCalzado,descripcion,marca,color,familiaId,tallas,tallaStock,destacado,esDePrueba,importadoEn,loteImportacion,escenario",
+    "id,nombre,precio,stock,categoria,tipoCalzado,descripcion,imagen,imagenes,marca,material,estilo,color,familiaId,tallas,tallaStock,colorStock,destacado,activo,descuento,campana,esDePrueba,importadoEn,loteImportacion,escenario",
   productoFinanzas:
     "productId,costoCompra,margenMinimo,margenObjetivo,margenMaximo,precioMinimo,precioSugerido,precioMaximo,actualizadoEn,esDePrueba,importadoEn,loteImportacion,escenario",
   fabricantes:
     "id,dni,nombres,apellidos,marca,telefono,activo,observaciones,creadoEn,actualizadoEn,esDePrueba,importadoEn,loteImportacion,escenario",
   ventasDiarias:
-    "id,productId,codigo,nombre,color,talla,fecha,cantidad,precioVenta,total,costoUnitario,costoTotal,ganancia,documentoTipo,documentoNumero,devuelto,creadoEn,esDePrueba,importadoEn,loteImportacion,escenario",
+    "id,productId,codigo,nombre,color,talla,fecha,cantidad,precioVenta,total,costoUnitario,costoTotal,ganancia,documentoTipo,documentoNumero,devuelto,canal,encargadoUid,encargadoNombre,encargadoEmail,creadoEn,esDePrueba,importadoEn,loteImportacion,escenario",
   pedidos:
     "id,userId,userEmail,total,subtotal,envio,estado,metodoPago,notas,creadoEn",
   usuarios: "uid,nombres,apellidos,nombre,email,rol,creadoEn,telefono",
@@ -377,6 +377,33 @@ async function loadProductIdSet(supabase) {
     throw error;
   }
   return new Set((data ?? []).map((item) => String(item.id || "").trim()).filter(Boolean));
+}
+
+async function loadTestProductIds(supabase, filter) {
+  let query = supabase.from("productos").select("id").eq("esDePrueba", true);
+  for (const [key, value] of Object.entries(filter)) {
+    query = query.eq(key, value);
+  }
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []).map((item) => String(item.id || "").trim()).filter(Boolean);
+}
+
+async function deleteProductCodesForProductIds(supabase, productIds) {
+  const ids = [...new Set(productIds)].filter(Boolean);
+  const CHUNK = 500;
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const { error } = await supabase
+      .from("productoCodigos")
+      .delete()
+      .in("productoId", ids.slice(i, i + CHUNK));
+    if (error) throw error;
+  }
+}
+
+function throwFirstSupabaseError(results) {
+  const failed = results.find((result) => result?.error);
+  if (failed?.error) throw failed.error;
 }
 
 async function assertOrderResponseForRole(supabase, decodedToken, order) {
@@ -3026,6 +3053,9 @@ app.post("/admin/data/import", (req, res) => {
         decodedToken.email || "",
         { rows: imported },
       );
+      if (table === "productos") {
+        schedulePublicCatalogCacheBump();
+      }
       return res.status(200).json({ ok: true, imported });
     } catch (error) {
       logServerError("admin/data/import error:", error);
@@ -3069,11 +3099,17 @@ app.delete("/admin/data/test-data", (req, res) => {
         if (!escenario) {
           return res.status(400).json({ error: "escenario requerido" });
         }
-        await Promise.all(
+        const productIds = await loadTestProductIds(supabase, { escenario });
+        const results = await Promise.all(
           Array.from(ADMIN_DATA_IMPORT_COLLECTIONS).map((colId) =>
             supabase.from(colId).delete().eq("esDePrueba", true).eq("escenario", escenario),
           ),
         );
+        throwFirstSupabaseError(results);
+        await deleteProductCodesForProductIds(supabase, productIds);
+        if (productIds.length > 0) {
+          schedulePublicCatalogCacheBump();
+        }
         return res.status(200).json({ ok: true });
       }
 
@@ -3081,7 +3117,8 @@ app.delete("/admin/data/test-data", (req, res) => {
         if (!loteImportacion) {
           return res.status(400).json({ error: "loteImportacion requerido" });
         }
-        await Promise.all(
+        const productIds = await loadTestProductIds(supabase, { loteImportacion });
+        const results = await Promise.all(
           Array.from(ADMIN_DATA_IMPORT_COLLECTIONS).map((colId) =>
             supabase
               .from(colId)
@@ -3090,6 +3127,11 @@ app.delete("/admin/data/test-data", (req, res) => {
               .eq("loteImportacion", loteImportacion),
           ),
         );
+        throwFirstSupabaseError(results);
+        await deleteProductCodesForProductIds(supabase, productIds);
+        if (productIds.length > 0) {
+          schedulePublicCatalogCacheBump();
+        }
         return res.status(200).json({ ok: true });
       }
 

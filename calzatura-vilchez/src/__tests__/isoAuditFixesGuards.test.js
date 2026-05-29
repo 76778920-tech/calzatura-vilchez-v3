@@ -27,8 +27,16 @@ describe("ISO audit remediation guards", () => {
 
   it("export admin usa columnas whitelist y auditoria exportar", () => {
     expect(serverSource).toContain("ADMIN_DATA_EXPORT_COLUMNS");
+    expect(serverSource).toContain("colorStock");
+    expect(serverSource).toContain("campana");
     expect(serverSource).toContain('"exportar"');
     expect(serverSource).toContain("redactAdminExportRows");
+  });
+
+  it("limpieza Excel elimina codigos de productos de prueba y refresca cache publico", () => {
+    expect(serverSource).toContain("deleteProductCodesForProductIds");
+    expect(serverSource).toContain('.from("productoCodigos")');
+    expect(serverSource).toContain("schedulePublicCatalogCacheBump");
   });
 
   it("GET admin audit sanitiza respuestas", () => {

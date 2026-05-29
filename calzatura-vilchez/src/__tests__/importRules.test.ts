@@ -103,7 +103,10 @@ describe("validateProducto", () => {
     nombre: "Zapatilla",
     precio: 89.90,
     stock: 10,
-    categoria: "Deportivo",
+    categoria: "hombre",
+    tipoCalzado: "Zapatillas",
+    material: "Textil",
+    estilo: "Deportivas",
   };
 
   it("retorna null para una fila válida", () => {
@@ -133,6 +136,25 @@ describe("validateProducto", () => {
 });
 
 // ── validateFabricante ────────────────────────────────────────────────────────
+
+describe("validateProducto comercial actual", () => {
+  const base = {
+    id: "PRUEBA_CV001",
+    nombre: "Zapatilla",
+    precio: 89.90,
+    stock: 10,
+    categoria: "hombre",
+    tipoCalzado: "Zapatillas",
+  };
+
+  it("rechaza categoria antigua que ya no cumple reglas comerciales", () => {
+    expect(validateProducto({ ...base, categoria: "Deportivo" })).toMatch(/categoria/i);
+  });
+
+  it("rechaza tipoCalzado que no corresponde a la categoria", () => {
+    expect(validateProducto({ ...base, categoria: "hombre", tipoCalzado: "Ballerinas" })).toMatch(/tipoCalzado/i);
+  });
+});
 
 describe("validateFabricante", () => {
   const base = {
@@ -211,7 +233,7 @@ describe("validateVentaDiaria", () => {
 
 describe("transformProducto", () => {
   it("convierte precio y stock a número", () => {
-    const row = { id: "P1", nombre: "Zapato", precio: "89.90", stock: "10", categoria: "Deportivo" };
+    const row = { id: "P1", nombre: "Zapato", precio: "89.90", stock: "10", categoria: "hombre", tipoCalzado: "Zapatillas" };
     const result = transformProducto(row, CTX);
     expect(result.precio).toBe(89.9);
     expect(result.stock).toBe(10);
@@ -231,6 +253,29 @@ describe("transformProducto", () => {
   it("recorta espacios en nombre", () => {
     const result = transformProducto({ nombre: "  Zapatilla  " }, CTX);
     expect(result.nombre).toBe("Zapatilla");
+  });
+
+  it("conserva campos comerciales actuales del producto", () => {
+    const result = transformProducto({
+      id: "P1",
+      nombre: "Zapato",
+      precio: "89.90",
+      stock: "10",
+      categoria: "hombre",
+      tipoCalzado: "Zapatillas",
+      material: "Textil",
+      estilo: "Deportivas",
+      color: "Negro",
+      tallaStock: "{\"40\":2}",
+      activo: "si",
+      descuento: "10",
+      campana: "normal",
+    }, CTX);
+    expect(result.tipoCalzado).toBe("Zapatillas");
+    expect(result.colorStock).toEqual({ Negro: { "40": 2 } });
+    expect(result.activo).toBe(true);
+    expect(result.descuento).toBe(10);
+    expect(result.campana).toBe("normal");
   });
 });
 

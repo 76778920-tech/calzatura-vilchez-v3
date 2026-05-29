@@ -1,6 +1,15 @@
 // Lógica pura de validación y transformación para importación de Excel.
 // Sin dependencias de Firebase ni React — 100% testeable.
 
+import {
+  CATEGORIAS,
+  MATERIAL_PRESETS,
+  STYLE_OPTIONS,
+  footwearTypesForCategory,
+  materialIsAllowed,
+  styleIsAllowedForType,
+} from "@/domains/productos/utils/commercialRules";
+
 export type Row = Record<string, unknown>;
 export type ScenarioKey = "crisis" | "normal" | "buenas" | "general";
 
@@ -36,6 +45,85 @@ export function deriveProductImportId(row: Row): string | null {
   return fromCode || null;
 }
 
+function parseJsonCell<T>(value: unknown, fallback: T): T {
+  if (value === undefined || value === null || value === "") return fallback;
+  if (typeof value === "object") return value as T;
+  try {
+    return JSON.parse(cellText(value)) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function parseStringArrayCell(value: unknown): string[] {
+  const parsed = parseJsonCell<unknown>(value, []);
+  if (Array.isArray(parsed)) {
+    return parsed.map((item) => cellText(item).trim()).filter(Boolean);
+  }
+  return cellText(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function parseNumberMapCell(value: unknown): Record<string, number> {
+  const parsed = parseJsonCell<Record<string, unknown>>(value, {});
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  return Object.fromEntries(
+    Object.entries(parsed).map(([key, amount]) => [cellText(key).trim(), Number(cellText(amount) || 0)])
+  );
+}
+
+function parseColorStockCell(row: Row): Record<string, Record<string, number>> {
+  const parsed = parseJsonCell<Record<string, Record<string, number>>>(row.colorStock, {});
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && Object.keys(parsed).length > 0) {
+    return parsed;
+  }
+  const color = cellText(row.color).trim();
+  const tallaStock = parseNumberMapCell(row.tallaStock);
+  return color && Object.keys(tallaStock).length > 0 ? { [color]: tallaStock } : {};
+}
+
+function parseBooleanCell(value: unknown, fallback = false): boolean {
+  if (typeof value === "boolean") return value;
+  const normalized = cellText(value).trim().toLowerCase();
+  if (!normalized) return fallback;
+  if (["true", "1", "si", "sÃ­", "yes", "activo"].includes(normalized)) return true;
+  if (["false", "0", "no", "inactivo"].includes(normalized)) return false;
+  return fallback;
+}
+
+function parseDiscountCell(value: unknown): 10 | 20 | 30 | undefined {
+  const discount = Number(cellText(value).trim());
+  return discount === 10 || discount === 20 || discount === 30 ? discount : undefined;
+}
+
+function validateCommercialImportRow(row: Row): string | null {
+  const categoria = cellText(row.categoria).trim();
+  const tipoCalzado = cellText(row.tipoCalzado).trim();
+  const material = cellText(row.material).trim();
+  const estilos = cellText(row.estilo)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!CATEGORIAS.includes(categoria)) return `La categoria debe ser una de: ${CATEGORIAS.join(", ")}`;
+  if (!tipoCalzado) return "Falta el campo 'tipoCalzado'";
+  if (!footwearTypesForCategory(categoria).includes(tipoCalzado)) {
+    return `El tipoCalzado '${tipoCalzado}' no corresponde a la categoria '${categoria}'`;
+  }
+  if (material && !materialIsAllowed(material)) return `El material debe ser uno de: ${MATERIAL_PRESETS.join(", ")}`;
+  for (const estilo of estilos) {
+    if (!STYLE_OPTIONS.includes(estilo as (typeof STYLE_OPTIONS)[number])) {
+      return `El estilo debe ser uno de: ${STYLE_OPTIONS.join(", ")}`;
+    }
+    if (!styleIsAllowedForType(tipoCalzado, estilo)) {
+      return `El estilo '${estilo}' no corresponde al tipoCalzado '${tipoCalzado}'`;
+    }
+  }
+  return null;
+}
+
 // ── Escenario ─────────────────────────────────────────────────────────────────
 
 export function inferScenario(fileName: string): ScenarioKey {
@@ -67,7 +155,9 @@ export function validateProducto(row: Row): string | null {
   if (row.stock === undefined || Number.isNaN(Number(row.stock)))
     return "El campo 'stock' debe ser un número";
   if (!row.categoria) return "Falta el campo 'categoria'";
-  return null;
+  if (Number(row.precio) <= 0) return "El campo 'precio' debe ser mayor que cero";
+  if (Number(row.stock) < 0) return "El campo 'stock' no puede ser negativo";
+  return validateCommercialImportRow(row);
 }
 
 export function transformProducto(row: Row, ctx: ImportContext): Row {
@@ -77,12 +167,22 @@ export function transformProducto(row: Row, ctx: ImportContext): Row {
     precio: Number(row.precio ?? 0),
     stock: Number(row.stock ?? 0),
     categoria: cellText(row.categoria).trim(),
+    tipoCalzado: cellText(row.tipoCalzado).trim(),
     descripcion: cellText(row.descripcion).trim(),
     marca: cellText(row.marca).trim(),
+    material: cellText(row.material).trim() || undefined,
+    estilo: cellText(row.estilo).trim() || undefined,
     color: cellText(row.color).trim(),
-    destacado: cellText(row.destacado).toLowerCase() === "true",
-    imagen: "",
-    imagenes: [],
+    familiaId: cellText(row.familiaId).trim() || undefined,
+    tallas: parseStringArrayCell(row.tallas),
+    tallaStock: parseNumberMapCell(row.tallaStock),
+    colorStock: parseColorStockCell(row),
+    destacado: parseBooleanCell(row.destacado),
+    activo: parseBooleanCell(row.activo, true),
+    descuento: parseDiscountCell(row.descuento),
+    campana: cellText(row.campana).trim() || undefined,
+    imagen: cellText(row.imagen).trim(),
+    imagenes: parseStringArrayCell(row.imagenes),
     esDePrueba: true,
     importadoEn: ctx.importadoEn,
     loteImportacion: ctx.loteImportacion,

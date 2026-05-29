@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 export const MAX_XLSX_IMPORT_BYTES = 5 * 1024 * 1024;
 
 export type SpreadsheetRow = Record<string, unknown>;
+const FORMULA_PREFIXES = new Set(["=", "+", "-", "@"]);
 
 function formatHeaderCell(value: ExcelJS.CellValue): string {
   if (value == null) return "";
@@ -48,6 +49,21 @@ export async function readXlsxFirstSheet(buffer: ArrayBuffer): Promise<Spreadshe
   return rows;
 }
 
+export function sanitizeSpreadsheetCellValue(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const first = value[0];
+  if (first && (FORMULA_PREFIXES.has(first) || first === "\t" || first === "\r")) {
+    return `'${value}`;
+  }
+  return value;
+}
+
+function sanitizeSpreadsheetRow(row: SpreadsheetRow): SpreadsheetRow {
+  return Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [key, sanitizeSpreadsheetCellValue(value)]),
+  );
+}
+
 export async function downloadXlsx(
   filename: string,
   sheetName: string,
@@ -59,7 +75,7 @@ export async function downloadXlsx(
     const keys = Object.keys(rows[0]);
     sheet.columns = keys.map((key) => ({ header: key, key, width: 16 }));
     for (const row of rows) {
-      sheet.addRow(row);
+      sheet.addRow(sanitizeSpreadsheetRow(row));
     }
   }
   const buffer = await workbook.xlsx.writeBuffer();
