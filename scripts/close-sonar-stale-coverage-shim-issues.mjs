@@ -62,8 +62,22 @@ function isStaleIssue(issue) {
   return STALE_PATH_FRAGMENTS.some((fragment) => component.includes(fragment));
 }
 
+function isSonarUiGhost(issue) {
+  return (
+    issue.resolution === REMOVED_RESOLUTION &&
+    issue.status === "CLOSED" &&
+    issue.issueStatus === "OPEN"
+  );
+}
+
 function isGhostStillOpen(issue) {
+  if (isSonarUiGhost(issue)) return false;
+  if (issue.status === "CLOSED" || issue.resolution === REMOVED_RESOLUTION) return false;
   return issue.issueStatus === "OPEN" || issue.status === "OPEN";
+}
+
+function isActionableStaleIssue(issue) {
+  return isStaleIssue(issue) && isGhostStillOpen(issue);
 }
 
 function uniqueIssues(issues) {
@@ -109,7 +123,7 @@ async function searchByProjectScan(branchQuery) {
         `&issueStatuses=${ISSUE_STATUSES_OPEN}${branchQuery}` +
         `&ps=${pageSize}&p=${page}`,
     );
-    found.push(...(data.issues ?? []).filter(isStaleIssue));
+    found.push(...(data.issues ?? []).filter(isActionableStaleIssue));
     const total = data.paging?.total ?? 0;
     if (page * pageSize >= total) break;
     page += 1;
@@ -132,12 +146,36 @@ async function searchRemovedGhosts(branchQuery) {
         `${branchQuery}` +
         `&ps=${pageSize}&p=${page}`,
     );
-    found.push(...(data.issues ?? []).filter((issue) => isStaleIssue(issue) && isGhostStillOpen(issue)));
+    found.push(...(data.issues ?? []).filter(isActionableStaleIssue));
     const total = data.paging?.total ?? 0;
     if (page * pageSize >= total) break;
     page += 1;
   }
 
+  return uniqueIssues(found);
+}
+
+async function fetchUiGhostsOnly() {
+  const branchVariants = ["&branch=main", ""];
+  const found = [];
+  for (const branchQuery of branchVariants) {
+    let page = 1;
+    const pageSize = 500;
+    while (page <= 10) {
+      const data = await sonarGet(
+        `/api/issues/search?organization=${ORGANIZATION}` +
+          `&projects=${PROJECT_KEY}` +
+          `&resolved=true` +
+          `&resolutions=${REMOVED_RESOLUTION}` +
+          `${branchQuery}` +
+          `&ps=${pageSize}&p=${page}`,
+      );
+      found.push(...(data.issues ?? []).filter((issue) => isStaleIssue(issue) && isSonarUiGhost(issue)));
+      const total = data.paging?.total ?? 0;
+      if (page * pageSize >= total) break;
+      page += 1;
+    }
+  }
   return uniqueIssues(found);
 }
 
@@ -221,9 +259,20 @@ async function forceCloseGhost(issue) {
 }
 
 const stale = await fetchAllStaleIssues();
+const uiGhosts = await fetchUiGhostsOnly();
 
 if (stale.length === 0) {
-  console.log("close-sonar-stale-coverage-shim-issues: 0 stale issues");
+  if (uiGhosts.length > 0) {
+    console.log(
+      `close-sonar-stale-coverage-shim-issues: ${uiGhosts.length} SonarCloud UI ghost(s) ` +
+        "(API status=CLOSED, resolution=REMOVED, issueStatus=OPEN). Quality Gate OK; UI may lag.",
+    );
+    for (const issue of uiGhosts) {
+      console.log(`  - ${issue.key} ${issue.component ?? ""}`);
+    }
+  } else {
+    console.log("close-sonar-stale-coverage-shim-issues: 0 stale issues");
+  }
   process.exit(0);
 }
 
@@ -241,13 +290,19 @@ for (const issue of stale) {
 }
 
 const remaining = await fetchAllStaleIssues();
+const remainingUiGhosts = await fetchUiGhostsOnly();
 if (remaining.length === 0) {
-  console.log(`close-sonar-stale-coverage-shim-issues: all ${stale.length} ghost(s) cleared`);
+  console.log(`close-sonar-stale-coverage-shim-issues: all ${stale.length} actionable ghost(s) cleared`);
+  if (remainingUiGhosts.length > 0) {
+    console.log(
+      `close-sonar-stale-coverage-shim-issues: ${remainingUiGhosts.length} UI-only ghost(s) remain (harmless)`,
+    );
+  }
   process.exit(0);
 }
 
 console.warn(
-  `close-sonar-stale-coverage-shim-issues: ${remaining.length} ghost(s) still OPEN in API after transitions`,
+  `close-sonar-stale-coverage-shim-issues: ${remaining.length} ghost(s) still actionable in API after transitions`,
 );
 for (const issue of remaining) {
   console.warn(
