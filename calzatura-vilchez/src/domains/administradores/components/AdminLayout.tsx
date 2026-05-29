@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { LayoutDashboard, Package, ShoppingBag, LogOut, CircleDollarSign, Users, Moon, Sun, Factory, Store, Brain, FileSpreadsheet, ChevronLeft, ChevronRight, ShieldCheck, BookOpen } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
+import { WorkerNotificationsBell } from "./WorkerNotificationsBell";
 import { ADMIN_ROUTES, PUBLIC_ROUTES } from "@/routes/paths";
 import { getLoginUrl } from "@/routes/redirects";
 import { logoutUser } from "@/domains/usuarios/services/auth";
@@ -164,6 +165,7 @@ export default function AdminLayout() {
             )}
             <h1>{activePageTitle}</h1>
           </div>
+          <WorkerNotificationsBell />
           <div className="admin-session-card" aria-label="Sesión activa">
             <span className="admin-session-icon"><ShieldCheck size={18} /></span>
             <div>
