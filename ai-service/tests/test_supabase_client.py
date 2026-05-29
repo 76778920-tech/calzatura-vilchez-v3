@@ -158,6 +158,12 @@ def test_get_headers_reutiliza_valores_cacheados():
     assert h1 is h2
 
 
+def test_cutoff_iso_delega_en_http():
+    from services.supabase import http
+
+    assert supabase_client._cutoff_iso(14) == http._cutoff_iso(14)
+
+
 def test_fetch_daily_sales_sin_days(monkeypatch):
     def fake_get(url, headers, params, timeout):
         return FakeResponse(200, [{"productId": "p1", "fecha": "2026-05-01"}])

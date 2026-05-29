@@ -69,6 +69,8 @@ describe("buildCatalogModel", () => {
       products: [],
       browse: {
         products: [browseProduct],
+        page: 1,
+        limit: 48,
         total: 1,
         totalPages: 1,
         familyGroupCounts: {},
