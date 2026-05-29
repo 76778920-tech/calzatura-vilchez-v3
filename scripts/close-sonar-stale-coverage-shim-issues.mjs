@@ -9,8 +9,16 @@
 const SONAR_HOST = (process.env.SONAR_HOST_URL ?? "https://sonarcloud.io").replace(/\/$/, "");
 const ORGANIZATION = "76778920-tech";
 const PROJECT_KEY = "76778920-tech_calzatura-vilchez-v3";
-const STALE_COMPONENT = `${PROJECT_KEY}:ai-service/scripts/fix_coverage_xml_for_sonar.py`;
-const STALE_PATH = "fix_coverage_xml_for_sonar.py";
+const STALE_PATH_FRAGMENTS = [
+  "fix_coverage_xml_for_sonar.py",
+  "split_demand_package.py",
+  "split_supabase_package.py",
+  "split_campaign_package.py",
+  "fix_split_imports.py",
+  "restore_demand_modules.py",
+  "restore_features_ml.py",
+  "restore_supabase_modules.py",
+];
 const ISSUE_STATUSES_OPEN = "OPEN,CONFIRMED";
 const REMOVED_RESOLUTION = "REMOVED";
 const token = process.env.SONAR_TOKEN;
@@ -74,12 +82,18 @@ async function fetchIssueByKey(key) {
 }
 
 async function searchByComponentKeys(branchQuery) {
-  return searchIssues(
-    `/api/issues/search?organization=${ORGANIZATION}` +
-      `&componentKeys=${encodeURIComponent(STALE_COMPONENT)}` +
-      `&issueStatuses=${ISSUE_STATUSES_OPEN}${branchQuery}` +
-      `&ps=100&p=1`,
-  );
+  const found = [];
+  for (const fragment of STALE_PATH_FRAGMENTS) {
+    const componentKey = `${PROJECT_KEY}:ai-service/scripts/${fragment}`;
+    const batch = await searchIssues(
+      `/api/issues/search?organization=${ORGANIZATION}` +
+        `&componentKeys=${encodeURIComponent(componentKey)}` +
+        `&issueStatuses=${ISSUE_STATUSES_OPEN}${branchQuery}` +
+        `&ps=100&p=1`,
+    );
+    found.push(...batch);
+  }
+  return uniqueIssues(found);
 }
 
 async function searchByProjectScan(branchQuery) {

@@ -29,6 +29,7 @@ for (const requiredExclusion of [
   "ai-service/models/campaign/**",
   "ai-service/models/demand/**",
   "ai-service/services/supabase/**",
+  "ai-service/scripts/**",
   "ai-service/models/revenue_helpers.py",
   "ai-service/models/risk_dimensions.py",
 ]) {
