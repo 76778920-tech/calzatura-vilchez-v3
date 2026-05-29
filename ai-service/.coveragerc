@@ -8,8 +8,8 @@ omit =
     */tests/*
     evaluate.py
     main.py
-    models/campaign.py
-    models/demand.py
+    models/campaign/*
+    models/demand/*
     services/firebase_verifier.py
 
 [report]
@@ -18,6 +18,6 @@ omit =
     */tests/*
     evaluate.py
     main.py
-    models/campaign.py
-    models/demand.py
+    models/campaign/*
+    models/demand/*
     services/firebase_verifier.py

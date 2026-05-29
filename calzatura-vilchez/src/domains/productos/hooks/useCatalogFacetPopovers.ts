@@ -19,6 +19,7 @@ type MenuDraftContext = {
   color: string;
   material: string;
   descuento: string;
+  marcaSlug: string;
   priceBounds: { min: number; max: number; low: number; high: number };
   availableSizes: string[];
   availableColors: Array<{ label: string; value: string; swatch: string }>;
@@ -136,6 +137,8 @@ export function useCatalogFacetPopovers(menuDraftContext: MenuDraftContext) {
       setDraftSelectedMaterials,
       setDiscountPopoverStyle,
       setDraftSelectedDiscounts,
+      setMarcaPopoverStyle,
+      setDraftSelectedMarcas,
     }),
     [],
   );

@@ -27,6 +27,8 @@ type MenuDraftSetters = {
   setDraftSelectedMaterials: (value: string[]) => void;
   setDiscountPopoverStyle: (value: null) => void;
   setDraftSelectedDiscounts: (value: string[]) => void;
+  setMarcaPopoverStyle: (value: null) => void;
+  setDraftSelectedMarcas: (value: string[]) => void;
 };
 
 export function primeCatalogMenuDraft(
@@ -37,6 +39,7 @@ export function primeCatalogMenuDraft(
     color: string;
     material: string;
     descuento: string;
+    marcaSlug: string;
     priceBounds: PriceBounds;
     availableSizes: string[];
     availableColors: ColorOption[];
@@ -75,5 +78,10 @@ export function primeCatalogMenuDraft(
   if (menuKey === "descuento") {
     setters.setDiscountPopoverStyle(null);
     setters.setDraftSelectedDiscounts(parseDiscountSelection(input.descuento));
+    return;
+  }
+  if (menuKey === "marcaSlug") {
+    setters.setMarcaPopoverStyle(null);
+    setters.setDraftSelectedMarcas(input.marcaSlug ? [input.marcaSlug] : []);
   }
 }

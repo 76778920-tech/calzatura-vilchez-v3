@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { CATALOG_SHELF } from "@/routes/catalogRouting";
 import { ProductsPageCampaignSection } from "@/domains/productos/components/ProductsPageCampaignSection";
@@ -95,7 +95,10 @@ export default function ProductsPage() {
     ],
   );
 
-  const navigation = useCatalogNavigation(effectiveParams, navigate, () => closeMenusRef.current());
+  const onNavigate = useCallback(() => {
+    closeMenusRef.current();
+  }, []);
+  const navigation = useCatalogNavigation(effectiveParams, navigate, onNavigate);
 
   const model = useProductsPageCatalogModel({
     products,
@@ -113,6 +116,7 @@ export default function ProductsPage() {
       color,
       material,
       descuento,
+      marcaSlug,
       priceBounds: model.priceBounds,
       availableSizes: model.availableSizes,
       availableColors: model.availableColors,
@@ -124,6 +128,7 @@ export default function ProductsPage() {
       color,
       material,
       descuento,
+      marcaSlug,
       model.priceBounds,
       model.availableSizes,
       model.availableColors,

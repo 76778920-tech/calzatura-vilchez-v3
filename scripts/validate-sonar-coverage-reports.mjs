@@ -73,12 +73,15 @@ for (const fn of requiredPy) {
 for (const omitted of [
   "ai-service/evaluate.py",
   "ai-service/main.py",
-  "ai-service/models/campaign.py",
-  "ai-service/models/demand.py",
   "ai-service/services/firebase_verifier.py",
 ]) {
   if (xml.includes(`filename="${omitted}"`)) {
     fail(`${omitted} no debe estar en coverage.xml (sonar.coverage.exclusions)`);
+  }
+}
+for (const prefix of ["ai-service/models/campaign/", "ai-service/models/demand/"]) {
+  if (xml.includes(`filename="${prefix}`)) {
+    fail(`${prefix}* no debe estar en coverage.xml (paquetes excluidos de cobertura)`);
   }
 }
 const sourceCount = (xml.match(/<source>/g) || []).length;

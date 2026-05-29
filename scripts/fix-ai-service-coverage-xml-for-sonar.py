@@ -9,13 +9,15 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _COVERAGE_XML = _REPO_ROOT / "ai-service" / "coverage.xml"
 _REPO_SOURCE = str(_REPO_ROOT).replace("\\", "/")
 
-_OMIT = frozenset({
+_OMIT_EXACT = frozenset({
     "ai-service/main.py",
     "ai-service/evaluate.py",
-    "ai-service/models/campaign.py",
-    "ai-service/models/demand.py",
     "ai-service/services/firebase_verifier.py",
 })
+_OMIT_PREFIXES = (
+    "ai-service/models/campaign/",
+    "ai-service/models/demand/",
+)
 
 
 def _normalize_filename(fn: str) -> str:
@@ -40,7 +42,11 @@ def _normalized_class_filename(cls: ET.Element) -> str | None:
 
 def _should_omit_class(cls: ET.Element) -> bool:
     norm = _normalized_class_filename(cls)
-    return norm in _OMIT if norm else False
+    if not norm:
+        return False
+    if norm in _OMIT_EXACT:
+        return True
+    return any(norm.startswith(prefix) for prefix in _OMIT_PREFIXES)
 
 
 def _apply_class_filename(cls: ET.Element) -> None:
