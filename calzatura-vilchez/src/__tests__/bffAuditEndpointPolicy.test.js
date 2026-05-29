@@ -30,6 +30,10 @@ const usuariosSeguroViewMigration = fs.readFileSync(
   path.resolve(process.cwd(), "supabase/migrations/20260531120000_fix_usuarios_seguro_security_invoker.sql"),
   "utf8",
 );
+const linterRemediationMigration = fs.readFileSync(
+  path.resolve(process.cwd(), "supabase/migrations/20260531200000_supabase_security_linter_remediation.sql"),
+  "utf8",
+);
 const auditPiiModule = fs.readFileSync(
   path.resolve(process.cwd(), "bff/auditPii.cjs"),
   "utf8",
@@ -134,6 +138,16 @@ describe("BFF /audit policy guards", () => {
   it("enmascara usuarioEmail al devolver GET /admin/audit", () => {
     expect(serverSource).toContain("sanitizeAuditEntryForResponse");
     expect(auditPiiModule).toContain("usuarioEmail: entry.usuarioEmail == null ? null : sanitizeAuditEmail");
+  });
+
+  it("remedia export linter Supabase (politicas legacy, RPC, search_path)", () => {
+    expect(linterRemediationMigration).toContain('DROP POLICY IF EXISTS "anon_insert_pedidos"');
+    expect(linterRemediationMigration).toContain('DROP POLICY IF EXISTS "anon full favoritos"');
+    expect(linterRemediationMigration).toContain('ALTER TABLE "productoCodigos" ENABLE ROW LEVEL SECURITY');
+    expect(linterRemediationMigration).toContain(
+      "REVOKE ALL ON FUNCTION decrement_order_stock(jsonb) FROM PUBLIC, anon, authenticated",
+    );
+    expect(linterRemediationMigration).toContain("SET search_path = public");
   });
 
   it("corrige linter security_definer_view en usuarios_seguro", () => {

@@ -20,6 +20,7 @@
     "table": "productos",
     "anonSelectPolicyMustReferenceActive": true
   },
+  "metadataBffOnlyTables": ["productoCodigos", "productoFinanzas"],
   "metadataNoAnonSelect": ["productoCodigos", "productoFinanzas"],
   "bffOnlyRpcFunctions": [
     "register_daily_sales_atomic",

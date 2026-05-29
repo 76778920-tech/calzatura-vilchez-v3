@@ -158,6 +158,13 @@ for (const table of contract.bffOnlyTables) {
 
 assertProductosCatalogPolicy(sql);
 
+for (const table of contract.metadataBffOnlyTables || []) {
+  assertRlsEnabled(sql, table);
+  assertForceRls(sql, table);
+  assertRevokedFromRoles(sql, table, ["anon", "authenticated"]);
+  assertNoAnonWritePolicies(sql, table);
+}
+
 for (const table of contract.metadataNoAnonSelect) {
   assertNoAnonSelectGrant(sql, table);
   const revokeAnonRead = new RegExp(
@@ -173,6 +180,7 @@ for (const fn of contract.bffOnlyRpcFunctions) {
   assertRpcRevokedFromClientRoles(sql, fn);
 }
 
+const metadataCount = (contract.metadataBffOnlyTables || []).length;
 console.log(
-  `validate-supabase-rls-matrix: OK — ${contract.bffOnlyTables.length} tablas BFF-only, catálogo productos, RPC sensibles`,
+  `validate-supabase-rls-matrix: OK — ${contract.bffOnlyTables.length} tablas BFF-only, ${metadataCount} metadatos, catálogo productos, RPC sensibles`,
 );
