@@ -58,18 +58,26 @@ export function CatalogFilterPopovers({
   availableMaterials,
   marcas,
 }: Props) {
-  const priceFill = computePriceSliderFill(priceBounds, price.draftMin, price.draftMax);
+  const {
+    draftMin: priceDraftMin,
+    draftMax: priceDraftMax,
+    setDraftMin: setPriceDraftMin,
+    setDraftMax: setPriceDraftMax,
+    popoverStyle: pricePopoverStyle,
+    popoverRef: pricePopoverRef,
+  } = price;
+  const priceFill = computePriceSliderFill(priceBounds, priceDraftMin, priceDraftMax);
 
   return (
     <>
-      {activeMenu === "precio" && price.popoverStyle && (
+      {activeMenu === "precio" && pricePopoverStyle && (
         <dialog
           open
           id="catalog-price-popover"
-          ref={price.popoverRef}
+          ref={pricePopoverRef}
           className="catalog-price-popover"
           aria-label="Filtro de precio"
-          style={popoverStyleProps(price.popoverStyle)}
+          style={popoverStyleProps(pricePopoverStyle)}
         >
           <div className="catalog-filter-menu catalog-filter-menu-price">
             <div className="catalog-price-fields">
@@ -80,12 +88,12 @@ export function CatalogFilterPopovers({
                     aria-label="Precio mínimo"
                     type="number"
                     min={priceBounds.min}
-                    max={price.draftMax}
-                    value={price.draftMin}
+                    max={priceDraftMax}
+                    value={priceDraftMin}
                     onChange={(event) => {
                       const next = Number(event.target.value);
                       if (!Number.isFinite(next)) return;
-                      price.setDraftMin(Math.max(priceBounds.min, Math.min(next, price.draftMax)));
+                      setPriceDraftMin(Math.max(priceBounds.min, Math.min(next, priceDraftMax)));
                     }}
                   />
                   <em>S/.</em>
@@ -97,13 +105,13 @@ export function CatalogFilterPopovers({
                   <input
                     aria-label="Precio máximo"
                     type="number"
-                    min={price.draftMin}
+                    min={priceDraftMin}
                     max={priceBounds.max}
-                    value={price.draftMax}
+                    value={priceDraftMax}
                     onChange={(event) => {
                       const next = Number(event.target.value);
                       if (!Number.isFinite(next)) return;
-                      price.setDraftMax(Math.min(priceBounds.max, Math.max(next, price.draftMin)));
+                      setPriceDraftMax(Math.min(priceBounds.max, Math.max(next, priceDraftMin)));
                     }}
                   />
                   <em>S/.</em>
@@ -119,10 +127,10 @@ export function CatalogFilterPopovers({
                 min={priceBounds.min}
                 max={priceBounds.max}
                 step={1}
-                value={price.draftMin}
+                value={priceDraftMin}
                 onChange={(event) => {
                   const next = Number(event.target.value);
-                  price.setDraftMin(Math.min(next, price.draftMax));
+                  setPriceDraftMin(Math.min(next, priceDraftMax));
                 }}
               />
               <input
@@ -131,10 +139,10 @@ export function CatalogFilterPopovers({
                 min={priceBounds.min}
                 max={priceBounds.max}
                 step={1}
-                value={price.draftMax}
+                value={priceDraftMax}
                 onChange={(event) => {
                   const next = Number(event.target.value);
-                  price.setDraftMax(Math.max(next, price.draftMin));
+                  setPriceDraftMax(Math.max(next, priceDraftMin));
                 }}
               />
             </div>
@@ -142,7 +150,7 @@ export function CatalogFilterPopovers({
               type="button"
               className="catalog-price-apply"
               onClick={() => {
-                filterMenus.find((menu) => menu.key === "precio")?.onSelect(`range:${price.draftMin}:${price.draftMax}`);
+                filterMenus.find((menu) => menu.key === "precio")?.onSelect(`range:${priceDraftMin}:${priceDraftMax}`);
               }}
             >
               Mostrar resultados

@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { CATALOG_SHELF } from "@/routes/catalogRouting";
 import { ProductsPageCampaignSection } from "@/domains/productos/components/ProductsPageCampaignSection";
@@ -132,7 +132,9 @@ export default function ProductsPage() {
   );
 
   const popovers = useCatalogFacetPopovers(menuDraftContext);
-  closeMenusRef.current = popovers.closeMenus;
+  useEffect(() => {
+    closeMenusRef.current = popovers.closeMenus;
+  }, [popovers.closeMenus]);
 
   const productsMainContent = buildProductsPageMainContent({
     loading,
