@@ -4,6 +4,6 @@
 
 El CI ejecuta en la raíz del monorepo: `scripts/fix-ai-service-coverage-xml-for-sonar.py`.
 
-## Stubs `split_*` (retirados)
+## Scripts `split_*` (eliminados)
 
-`split_demand_package.py` y `split_supabase_package.py` son marcadores mínimos del one-off de migración (ya aplicado). Se analizan en Sonar para cerrar issues históricos; el resto de scripts de esta carpeta siguen excluidos en `sonar-project.properties`.
+Los one-off `split_demand_package.py` y `split_supabase_package.py` ya no están en el repo (migración aplicada). El historial está en git (`git log -- ai-service/scripts/split_*`). Están excluidos en `sonar-project.properties` para que SonarCloud no reanalice rutas obsoletas.

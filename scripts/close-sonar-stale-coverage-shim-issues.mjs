@@ -155,6 +155,25 @@ async function searchRemovedGhosts(branchQuery) {
   return uniqueIssues(found);
 }
 
+async function searchOpenSplitScriptIssues(branchQuery) {
+  const found = [];
+  for (const fragment of ["split_demand_package.py", "split_supabase_package.py"]) {
+    const componentKey = `${PROJECT_KEY}:ai-service/scripts/${fragment}`;
+    const batches = [
+      `/api/issues/search?organization=${ORGANIZATION}` +
+        `&componentKeys=${encodeURIComponent(componentKey)}` +
+        `&issueStatuses=${ISSUE_STATUSES_OPEN}${branchQuery}&ps=100&p=1`,
+      `/api/issues/search?organization=${ORGANIZATION}` +
+        `&componentKeys=${encodeURIComponent(componentKey)}` +
+        `&resolved=false${branchQuery}&ps=100&p=1`,
+    ];
+    for (const path of batches) {
+      found.push(...(await searchIssues(path)).filter(isStaleIssue));
+    }
+  }
+  return uniqueIssues(found);
+}
+
 async function fetchUiGhostsOnly() {
   const branchVariants = ["&branch=main", ""];
   const found = [];
@@ -187,7 +206,8 @@ async function fetchAllStaleIssues() {
     const removedGhosts = await searchRemovedGhosts(branchQuery);
     const direct = await searchByComponentKeys(branchQuery);
     const scanned = await searchByProjectScan(branchQuery);
-    found.push(...removedGhosts, ...direct, ...scanned);
+    const splitOpen = await searchOpenSplitScriptIssues(branchQuery);
+    found.push(...removedGhosts, ...direct, ...scanned, ...splitOpen);
     if (removedGhosts.length > 0 || direct.length > 0 || scanned.length > 0) {
       console.log(
         `close-sonar-stale-coverage-shim-issues: branch=${branchQuery || "default"} ` +

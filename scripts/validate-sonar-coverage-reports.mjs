@@ -30,6 +30,8 @@ for (const requiredExclusion of [
   "ai-service/models/demand/**",
   "ai-service/services/supabase/**",
   "ai-service/scripts/generate_sonar_generic_coverage.py",
+  "ai-service/scripts/split_demand_package.py",
+  "ai-service/scripts/split_supabase_package.py",
   "ai-service/models/revenue_helpers.py",
   "ai-service/models/risk_dimensions.py",
 ]) {
