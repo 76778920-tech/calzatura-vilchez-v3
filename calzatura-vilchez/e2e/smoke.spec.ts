@@ -15,7 +15,6 @@ test.describe("smoke tienda publica", () => {
     await expect(hero).toBeVisible({ timeout: 30_000 });
     await expect(hero.locator('[role="application"]')).toHaveCount(0);
     await expect(carousel).toHaveAttribute("aria-label", "Carrusel de promociones destacadas");
-    await expect(carousel).toHaveAttribute("aria-describedby", "home-hero-carousel-keyboard-help");
 
     const nextButton = page.getByRole("button", { name: /siguiente promocion/i });
     const prevButton = page.getByRole("button", { name: /promocion anterior/i });

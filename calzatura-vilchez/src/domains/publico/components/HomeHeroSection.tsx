@@ -279,7 +279,6 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
       <section
         ref={heroCarouselRef}
         aria-label="Carrusel de promociones destacadas"
-        aria-describedby="home-hero-carousel-keyboard-help"
         className={`home-hero-carousel ${isHeroDragging ? "is-dragging" : ""}`}
         data-drag-direction={heroDragDirection}
         style={
@@ -291,9 +290,6 @@ export default function HomeHeroSection({ slides: heroSlides, productCountLabel 
         }
         tabIndex={heroSlides.length > 1 ? 0 : undefined}
       >
-        <div id="home-hero-carousel-keyboard-help" className="home-hero-progress-sr-only">
-          Usa las flechas izquierda y derecha para cambiar de promocion. Usa Inicio y Fin para ir a la primera o ultima promocion.
-        </div>
         {heroSlides.map((slide, index) => {
           const slideState = getHeroSlideState(index);
           const isActive = slideState === "active";
