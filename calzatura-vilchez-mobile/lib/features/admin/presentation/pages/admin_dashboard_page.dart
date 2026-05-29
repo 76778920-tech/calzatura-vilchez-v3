@@ -32,6 +32,40 @@ class _ChartData {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Modelo de notificación de trabajador
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WorkerNotif {
+  const _WorkerNotif({
+    required this.id,
+    required this.accion,
+    required this.entidad,
+    this.entidadNombre,
+    this.usuarioEmail,
+    required this.realizadoEn,
+    this.leido = false,
+  });
+
+  final String id;
+  final String accion;
+  final String entidad;
+  final String? entidadNombre;
+  final String? usuarioEmail;
+  final String realizadoEn;
+  final bool leido;
+
+  _WorkerNotif markRead() => _WorkerNotif(
+        id: id,
+        accion: accion,
+        entidad: entidad,
+        entidadNombre: entidadNombre,
+        usuarioEmail: usuarioEmail,
+        realizadoEn: realizadoEn,
+        leido: true,
+      );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -257,8 +291,14 @@ class AdminDashboardPage extends ConsumerStatefulWidget {
 class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   sb.RealtimeChannel? _realtimeChannel;
+  sb.RealtimeChannel? _notifChannel;
   Timer? _debounce;
   late final TabController _tabController;
+
+  // ── Notificaciones de trabajadores ────────────────────────────────────────
+  final Set<String> _workerUids = {};
+  final List<_WorkerNotif> _workerNotifs = [];
+  int get _unreadCount => _workerNotifs.where((n) => !n.leido).length;
 
   @override
   void initState() {
@@ -266,6 +306,7 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
     _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addObserver(this);
     _subscribeRealtime();
+    _loadWorkerUids();
   }
 
   @override
@@ -275,6 +316,9 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
     _debounce?.cancel();
     if (_realtimeChannel != null) {
       _supabase.removeChannel(_realtimeChannel!);
+    }
+    if (_notifChannel != null) {
+      _supabase.removeChannel(_notifChannel!);
     }
     super.dispose();
   }
@@ -331,6 +375,95 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
     ref.invalidate(adminAllOrdersProvider);
     ref.invalidate(adminChartProvider);
     ref.invalidate(adminAuditProvider);
+  }
+
+  // ── Notificaciones de trabajadores ────────────────────────────────────────
+
+  Future<void> _loadWorkerUids() async {
+    try {
+      final data = await _supabase
+          .from('usuarios')
+          .select('uid')
+          .eq('rol', 'trabajador');
+      if (!mounted) return;
+      final uids = List<Map<String, dynamic>>.from(data as List)
+          .map((u) => u['uid'] as String?)
+          .whereType<String>()
+          .toSet();
+      _workerUids.addAll(uids);
+      _subscribeWorkerNotifs();
+    } catch (_) {}
+  }
+
+  void _subscribeWorkerNotifs() {
+    _notifChannel = _supabase
+        .channel('worker-notifs')
+        .onPostgresChanges(
+          event: sb.PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'auditoria',
+          callback: (payload) {
+            final row = payload.newRecord;
+            final uid = row['usuarioUid'] as String?;
+            final entidad = row['entidad'] as String?;
+            if (uid != null &&
+                _workerUids.contains(uid) &&
+                (entidad == 'producto' || entidad == 'venta')) {
+              _onWorkerAction(row);
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  void _onWorkerAction(Map<String, dynamic> row) {
+    if (!mounted) return;
+    final notif = _WorkerNotif(
+      id: row['id'] as String? ?? DateTime.now().toIso8601String(),
+      accion: row['accion'] as String? ?? '',
+      entidad: row['entidad'] as String? ?? '',
+      entidadNombre: row['entidadNombre'] as String?,
+      usuarioEmail: row['usuarioEmail'] as String?,
+      realizadoEn: row['realizadoEn'] as String? ??
+          DateTime.now().toIso8601String(),
+    );
+    setState(() {
+      _workerNotifs.insert(0, notif);
+      if (_workerNotifs.length > 50) _workerNotifs.removeLast();
+    });
+    final label = notif.entidad == 'producto' ? 'Producto' : 'Venta';
+    final nombre =
+        notif.entidadNombre != null ? ': ${notif.entidadNombre}' : '';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('✏️ Trabajador ${notif.accion} un $label$nombre'),
+        backgroundColor: AppColors.black,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: AppColors.gold.withValues(alpha: 0.5)),
+        ),
+      ),
+    );
+  }
+
+  void _markAllNotifsRead() {
+    setState(() {
+      for (var i = 0; i < _workerNotifs.length; i++) {
+        _workerNotifs[i] = _workerNotifs[i].markRead();
+      }
+    });
+  }
+
+  void _showNotifSheet() {
+    _markAllNotifsRead();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _WorkerNotifsSheet(notifs: List.unmodifiable(_workerNotifs)),
+    );
   }
 
   @override
@@ -418,6 +551,44 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                 ),
                               ],
                             ),
+                          ),
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.notifications_outlined,
+                                  color: Colors.white70,
+                                ),
+                                tooltip: 'Actividad de trabajadores',
+                                onPressed: _showNotifSheet,
+                              ),
+                              if (_unreadCount > 0)
+                                Positioned(
+                                  right: 6,
+                                  top: 6,
+                                  child: Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFFB91C1C),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        _unreadCount > 9
+                                            ? '9+'
+                                            : '$_unreadCount',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                           IconButton(
                             icon: const Icon(
@@ -2277,6 +2448,215 @@ class _ChartShimmer extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.shimmerBase,
         borderRadius: BorderRadius.circular(20),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sheet de notificaciones de trabajadores
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _WorkerNotifsSheet extends StatelessWidget {
+  const _WorkerNotifsSheet({required this.notifs});
+  final List<_WorkerNotif> notifs;
+
+  static String _relTime(String iso) {
+    final diff =
+        DateTime.now().difference(DateTime.tryParse(iso) ?? DateTime.now());
+    if (diff.inMinutes < 1) return 'ahora';
+    if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
+    if (diff.inHours < 24) return 'hace ${diff.inHours}h';
+    return 'hace ${diff.inDays}d';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.55,
+      maxChildSize: 0.9,
+      minChildSize: 0.3,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: AppColors.beige,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              // Drag handle
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textSecondary.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.notifications_outlined,
+                      size: 18,
+                      color: AppColors.gold,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'ACTIVIDAD DE TRABAJADORES',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      onPressed: () => Navigator.of(context).pop(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // Lista
+              Expanded(
+                child: notifs.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.notifications_none_rounded,
+                              size: 48,
+                              color: AppColors.textSecondary.withValues(
+                                alpha: 0.4,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'Sin actividad reciente\nde trabajadores',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 13,
+                                height: 1.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ListView.separated(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+                        itemCount: notifs.length,
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: 8),
+                        itemBuilder: (_, i) =>
+                            _WorkerNotifItem(notif: notifs[i]),
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _WorkerNotifItem extends StatelessWidget {
+  const _WorkerNotifItem({required this.notif});
+  final _WorkerNotif notif;
+
+  static Color _accionColor(String a) => switch (a) {
+        'crear' => const Color(0xFF22C55E),
+        'editar' => const Color(0xFF6366F1),
+        'eliminar' => AppColors.error,
+        'cambiar_estado' => const Color(0xFFF59E0B),
+        'importar' => const Color(0xFF0EA5E9),
+        _ => AppColors.textSecondary,
+      };
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _accionColor(notif.accion);
+    final isUnread = !notif.leido;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isUnread
+            ? AppColors.gold.withValues(alpha: 0.06)
+            : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isUnread
+              ? AppColors.gold.withValues(alpha: 0.25)
+              : const Color(0xFFE5E0D8),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: color.withValues(alpha: 0.3)),
+            ),
+            child: Text(
+              notif.accion.toUpperCase(),
+              style: TextStyle(
+                color: color,
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${notif.entidad == 'producto' ? 'Producto' : 'Venta'}: ${notif.entidadNombre ?? '—'}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${notif.usuarioEmail ?? 'trabajador'} · ${_WorkerNotifsSheet._relTime(notif.realizadoEn)}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
