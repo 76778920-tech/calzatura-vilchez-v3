@@ -26,6 +26,10 @@ const auditPiiAtInsertMigration = fs.readFileSync(
   path.resolve(process.cwd(), "supabase/migrations/20260530150000_auditoria_pii_enforce_at_insert.sql"),
   "utf8",
 );
+const usuariosSeguroViewMigration = fs.readFileSync(
+  path.resolve(process.cwd(), "supabase/migrations/20260531120000_fix_usuarios_seguro_security_invoker.sql"),
+  "utf8",
+);
 const auditPiiModule = fs.readFileSync(
   path.resolve(process.cwd(), "bff/auditPii.cjs"),
   "utf8",
@@ -130,6 +134,12 @@ describe("BFF /audit policy guards", () => {
   it("enmascara usuarioEmail al devolver GET /admin/audit", () => {
     expect(serverSource).toContain("sanitizeAuditEntryForResponse");
     expect(auditPiiModule).toContain("usuarioEmail: entry.usuarioEmail == null ? null : sanitizeAuditEmail");
+  });
+
+  it("corrige linter security_definer_view en usuarios_seguro", () => {
+    expect(usuariosSeguroViewMigration).toContain("security_invoker = true");
+    expect(usuariosSeguroViewMigration).toContain("REVOKE ALL ON TABLE usuarios_seguro");
+    expect(usuariosSeguroViewMigration).toContain("GRANT SELECT ON TABLE usuarios_seguro TO service_role");
   });
 
   it("normaliza PII en INSERT/UPDATE de auditoria en base de datos", () => {
