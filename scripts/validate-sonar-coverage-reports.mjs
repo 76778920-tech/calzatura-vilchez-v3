@@ -37,7 +37,8 @@ for (const requiredExclusion of [
     fail(`sonar.exclusions sin ${requiredExclusion}`);
   }
 }
-if (sonarProps.includes("ai-service/scripts/**")) {
+const exclusionsBlock = sonarProps.split("sonar.exclusions=")[1]?.split("sonar.coverage.exclusions=")[0] ?? "";
+if (exclusionsBlock.includes("ai-service/scripts/**")) {
   fail("sonar.exclusions no debe usar ai-service/scripts/** (bloquea cierre de issues en split_* stubs)");
 }
 
