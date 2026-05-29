@@ -60,6 +60,23 @@ describe("logAudit", () => {
     });
   });
 
+  it("redacta userEmail en detalle antes de enviar al BFF", async () => {
+    mockedBffFetch.mockResolvedValue({ ok: true });
+
+    await logAudit("cambiar_estado", "pedido", "ped-1", "Pedido", {
+      userEmail: "cliente@example.com",
+      estado: "pagado",
+    });
+
+    const body = JSON.parse(mockedBffFetch.mock.calls[0][1]?.body as string) as {
+      detalle: Record<string, unknown>;
+    };
+    expect(body.detalle).toEqual({
+      userEmail: "[redacted]",
+      estado: "pagado",
+    });
+  });
+
   it("redacta PII y secretos antes de enviar detalle y normaliza labels de usuario", async () => {
     mockedBffFetch.mockResolvedValue({ ok: true });
 

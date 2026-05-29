@@ -39,9 +39,10 @@ describe("ISO audit remediation guards", () => {
     expect(serverSource).toContain("schedulePublicCatalogCacheBump");
   });
 
-  it("GET admin audit sanitiza respuestas", () => {
+  it("GET admin audit sanitiza respuestas incluyendo usuarioEmail", () => {
     expect(serverSource).toContain("sanitizeAuditEntryForResponse");
     expect(serverSource).toContain(".map(sanitizeAuditEntryForResponse)");
+    expect(serverSource).toContain('require("./auditPii.cjs")');
   });
 
   it("checkout envia lat/lng al BFF", () => {

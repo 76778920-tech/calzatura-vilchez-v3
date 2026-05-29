@@ -31,7 +31,8 @@ const REDACTED = "[redacted]";
 
 function isSensitiveAuditKey(key: string): boolean {
   const k = key.toLowerCase();
-  if (["authorization", "cookie", "jwt", "dni", "documento", "documentonumero", "email", "correo"].includes(k)) return true;
+  if (["authorization", "cookie", "jwt", "dni", "documento", "documentonumero", "email", "correo", "useremail", "usuarioemail"].includes(k)) return true;
+  if (k.endsWith("email")) return true;
   if (k.includes("telefono") || k.includes("celular") || k.includes("direccion") || k.includes("referencia")) return true;
   if (k.includes("password") || k.includes("passwd") || k.includes("contrase")) return true;
   if (/(^|_)api[_-]?key($|_)/.test(k) || k.endsWith("apikey")) return true;
@@ -72,6 +73,11 @@ function sanitizeAuditValue(value: unknown): unknown {
       out[key] = isSensitiveAuditKey(key) ? REDACTED : sanitizeAuditValue(v);
     }
     return out;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return sanitizeAuditLabel(trimmed);
+    if (/^\d{8}$/.test(trimmed)) return REDACTED;
   }
   return value;
 }

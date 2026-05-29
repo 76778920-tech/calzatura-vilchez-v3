@@ -48,3 +48,13 @@ node scripts/validate-supabase-rls-matrix.mjs
 ```
 
 Aplicar en remoto (según vuestro runbook): `supabase db push` o pipeline de migraciones acordado.
+
+## Auditoría — PII minimizada
+
+| Capa | Comportamiento |
+|------|----------------|
+| Cliente (`src/services/audit.ts`) | Redacta claves sensibles y enmascara emails en `detalle` antes de POST `/audit` |
+| BFF (`bff/auditPii.cjs`) | Mismo contrato al insertar y al responder `GET /admin/audit` (`usuarioEmail` → `xx***@dominio`) |
+| BD | Trigger `trg_auditoria_normalize_pii` + migración histórica `20260521130000_*` y `20260530150000_*` |
+
+Los registros nuevos no deben persistir correo completo en `usuarioEmail` ni emails en `detalle`.

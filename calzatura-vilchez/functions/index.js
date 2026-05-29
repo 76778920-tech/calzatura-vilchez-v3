@@ -24,6 +24,11 @@ const {
   aiAdminProxyErrorStatus, aiAdminProxyErrorMessage,
 } = require("./fnUtils");
 const { ORDER_STATUSES, assertOrderStatusTransition } = require("./orderStatusPolicy");
+const {
+  sanitizeAuditEmail,
+  sanitizeAuditEntityLabel,
+  sanitizeAuditValue,
+} = require("../bff/auditPii.cjs");
 
 /** Misma clave pública del cliente; solo la usa el servidor para REST Identity Toolkit (login vía BFF). */
 const FIREBASE_WEB_API_KEY = defineString("FIREBASE_WEB_API_KEY", { default: "" });
@@ -124,10 +129,10 @@ async function logAuditFn({
       accion,
       entidad,
       entidadId,
-      entidadNombre,
-      detalle: detalle ?? null,
+      entidadNombre: sanitizeAuditEntityLabel(entidad, entidadId, entidadNombre),
+      detalle: detalle == null ? null : sanitizeAuditValue(detalle),
       usuarioUid: usuarioUid ?? null,
-      usuarioEmail: usuarioEmail ?? null,
+      usuarioEmail: sanitizeAuditEmail(usuarioEmail),
       realizadoEn: new Date().toISOString(),
     });
   } catch {

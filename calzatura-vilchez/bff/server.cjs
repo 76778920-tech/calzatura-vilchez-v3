@@ -167,6 +167,14 @@ const { auditSecurityMonitoringConfig } = require("./securityConfig.cjs");
 const { getStoreStatus } = require("./securityStore.cjs");
 const { emailValidationError } = require("./emailValidation.cjs");
 const { redactOrderForStaff, maskEmail } = require("./privacy.cjs");
+const {
+  sanitizeAuditEmail,
+  sanitizeAuditLabel,
+  sanitizeAuditEntityLabel,
+  sanitizeAuditValue,
+  sanitizeAuditEntryForResponse,
+  safeAuditEntityRef,
+} = require("./auditPii.cjs");
 const { buildCloudinaryUploadSignature } = require("./cloudinarySign.cjs");
 
 function loadFirebaseServiceAccount() {
@@ -575,68 +583,6 @@ function validStripeImage(image) {
   } catch {
     return [];
   }
-}
-
-const AUDIT_REDACTED = "[redacted]";
-
-function isSensitiveAuditKey(key) {
-  const k = String(key || "").toLowerCase();
-  if (["authorization", "cookie", "jwt", "dni", "documento", "documentonumero", "email", "correo"].includes(k)) return true;
-  if (k.includes("password") || k.includes("passwd") || k.includes("contrase")) return true;
-  if (k.includes("token") || k.includes("secret") || k.includes("bearer")) return true;
-  if (k.includes("telefono") || k.includes("celular") || k.includes("direccion") || k.includes("referencia")) return true;
-  if (/(^|_)api[_-]?key($|_)/.test(k) || k.endsWith("apikey")) return true;
-  return false;
-}
-
-function sanitizeAuditValue(value) {
-  if (value == null) return value;
-  if (Array.isArray(value)) return value.map(sanitizeAuditValue);
-  if (typeof value === "object") {
-    const out = {};
-    for (const [key, inner] of Object.entries(value)) {
-      out[key] = isSensitiveAuditKey(key) ? AUDIT_REDACTED : sanitizeAuditValue(inner);
-    }
-    return out;
-  }
-  return value;
-}
-
-function sanitizeAuditEmail(value) {
-  const email = String(value || "").trim();
-  if (!email.includes("@")) return email || null;
-  const [local, domain] = email.split("@", 2);
-  return `${local.slice(0, 2)}***@${domain}`;
-}
-
-function sanitizeAuditLabel(value) {
-  const label = String(value || "").trim();
-  if (/^\d{8}$/.test(label)) return AUDIT_REDACTED;
-  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(label)) return sanitizeAuditEmail(label);
-  return label;
-}
-
-function safeAuditEntityRef(entidad, entidadId) {
-  const id = String(entidadId || "").trim();
-  const suffix = id.length > 8 ? id.slice(-8) : id || "sin-id";
-  return `${entidad}:${suffix}`;
-}
-
-function sanitizeAuditEntityLabel(entidad, entidadId, entidadNombre) {
-  const entity = String(entidad || "").trim();
-  if (["usuario", "fabricante"].includes(entity)) {
-    return safeAuditEntityRef(entity, entidadId);
-  }
-  return sanitizeAuditLabel(entidadNombre);
-}
-
-function sanitizeAuditEntryForResponse(entry) {
-  if (!entry || typeof entry !== "object") return entry;
-  return {
-    ...entry,
-    entidadNombre: sanitizeAuditEntityLabel(entry.entidad, entry.entidadId, entry.entidadNombre),
-    detalle: entry.detalle == null ? null : sanitizeAuditValue(entry.detalle),
-  };
 }
 
 async function resolveClientAuditEntityLabel(supabase, entidad, entidadId, entidadNombre) {

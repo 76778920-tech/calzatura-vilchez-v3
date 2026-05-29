@@ -22,6 +22,14 @@ const historicalAuditRedactionMigration = fs.readFileSync(
   path.resolve(process.cwd(), "supabase/migrations/20260521130000_redact_historical_auditoria_pii.sql"),
   "utf8",
 );
+const auditPiiAtInsertMigration = fs.readFileSync(
+  path.resolve(process.cwd(), "supabase/migrations/20260530150000_auditoria_pii_enforce_at_insert.sql"),
+  "utf8",
+);
+const auditPiiModule = fs.readFileSync(
+  path.resolve(process.cwd(), "bff/auditPii.cjs"),
+  "utf8",
+);
 
 describe("BFF /audit policy guards", () => {
   it("verifica rol y allowlist antes de persistir auditoria enviada por cliente", () => {
@@ -37,9 +45,10 @@ describe("BFF /audit policy guards", () => {
   });
 
   it("sanitiza entidadNombre con reglas por entidad antes del insert", () => {
-    expect(serverSource).toContain("function sanitizeAuditEntityLabel");
-    expect(serverSource).toContain('["usuario", "fabricante"].includes(entity)');
-    expect(serverSource).toContain("return safeAuditEntityRef(entity, entidadId)");
+    expect(serverSource).toContain('require("./auditPii.cjs")');
+    expect(serverSource).toContain("sanitizeAuditEntityLabel");
+    expect(auditPiiModule).toContain("function sanitizeAuditEntityLabel");
+    expect(auditPiiModule).toContain("ENTITY_REF_ENTITIES");
     expect(serverSource).toContain("const safeEntidadNombre = options.entityLabelResolved === true");
     expect(serverSource).toContain("entidadNombre: safeEntidadNombre");
   });
@@ -116,6 +125,19 @@ describe("BFF /audit policy guards", () => {
     expect(deployWorkflowSource).toContain("VITE_DNI_LOOKUP_URL:");
     expect(deployWorkflowSource).toContain("run: node scripts/verify-deploy-firebase-secrets.mjs");
     expect(deployWorkflowSource).toContain("run: node scripts/github-verify-workflows-for-sha.mjs");
+  });
+
+  it("enmascara usuarioEmail al devolver GET /admin/audit", () => {
+    expect(serverSource).toContain("sanitizeAuditEntryForResponse");
+    expect(auditPiiModule).toContain("usuarioEmail: entry.usuarioEmail == null ? null : sanitizeAuditEmail");
+  });
+
+  it("normaliza PII en INSERT/UPDATE de auditoria en base de datos", () => {
+    expect(auditPiiAtInsertMigration).toContain("trg_auditoria_normalize_pii");
+    expect(auditPiiAtInsertMigration).toContain("mask_audit_email");
+    expect(auditPiiAtInsertMigration).toContain("fn_audit_pedido_insert");
+    expect(auditPiiAtInsertMigration).toContain("insert_auditoria_event");
+    expect(auditPiiAtInsertMigration).toContain("useremail");
   });
 
   it("incluye migracion de saneamiento para auditoria historica con PII", () => {
