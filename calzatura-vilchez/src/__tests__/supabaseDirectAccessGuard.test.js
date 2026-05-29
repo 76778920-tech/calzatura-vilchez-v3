@@ -1,3 +1,8 @@
+/**
+ * Capa 1 (código): el bundle no debe mutar PostgREST desde src/.
+ * Capa 2 (DB): anon/authenticated bloqueados en migraciones — ver
+ * supabase/rls-matrix.contract.json y scripts/validate-supabase-rls-matrix.mjs.
+ */
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";

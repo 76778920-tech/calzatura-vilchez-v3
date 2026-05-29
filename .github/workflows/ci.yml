@@ -22,6 +22,9 @@ jobs:
       - name: Validar nombres, orden y contenido SQL
         run: node scripts/validate-supabase-migrations.mjs
 
+      - name: Validar matriz RLS (contrato anon/authenticated vs BFF)
+        run: node scripts/validate-supabase-rls-matrix.mjs
+
   ops-controls-static:
     name: Controles medibles IA/DevOps (estaticos)
     needs: [supabase-migrations]

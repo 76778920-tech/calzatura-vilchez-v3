@@ -1,0 +1,32 @@
+{
+  "$schema": "Contrato RLS web — validado en CI por scripts/validate-supabase-rls-matrix.mjs",
+  "defenseLayers": [
+    "Capa 1: el frontend web no muta Supabase desde src (Vitest supabaseDirectAccessGuard)",
+    "Capa 2: PostgREST con anon key no puede leer/escribir tablas sensibles (RLS + REVOKE en migraciones)"
+  ],
+  "bffOnlyTables": [
+    "pedidos",
+    "usuarios",
+    "favoritos",
+    "auditoria",
+    "ventasDiarias",
+    "libro_reclamaciones",
+    "movimientosStock",
+    "ireHistorial",
+    "fabricantes",
+    "modeloEstado"
+  ],
+  "catalogReadOnly": {
+    "table": "productos",
+    "anonSelectPolicyMustReferenceActive": true
+  },
+  "metadataNoAnonSelect": ["productoCodigos", "productoFinanzas"],
+  "bffOnlyRpcFunctions": [
+    "register_daily_sales_atomic",
+    "return_daily_sale_atomic",
+    "list_ventas_diarias_by_fecha",
+    "list_ventas_diarias_since",
+    "insert_auditoria_event",
+    "list_auditoria_events"
+  ]
+}

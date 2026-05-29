@@ -19,6 +19,9 @@ jobs:
       - name: Validar migraciones SQL versionadas
         run: node scripts/validate-supabase-migrations.mjs
 
+      - name: Validar matriz RLS (contrato anon/authenticated vs BFF)
+        run: node scripts/validate-supabase-rls-matrix.mjs
+
   supabase-remote-parity:
     name: Paridad migraciones Supabase (remoto)
     needs: [supabase-migrations]
