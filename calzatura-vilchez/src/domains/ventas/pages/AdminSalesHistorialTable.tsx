@@ -12,6 +12,8 @@ type AdminSalesHistorialTableProps = Readonly<{
   onClearHistorialSearch: () => void;
   onSelectSale: (sale: DailySale) => void;
   showFinancialDetails?: boolean;
+  /** Panel staff: oculta columna encargado (solo ventas propias). */
+  showEncargadoColumn?: boolean;
 }>;
 
 function saleDocumentSecondaryContent(sale: DailySale) {
@@ -35,9 +37,10 @@ export function AdminSalesHistorialTable({
   onClearHistorialSearch,
   onSelectSale,
   showFinancialDetails = true,
+  showEncargadoColumn = true,
 }: AdminSalesHistorialTableProps) {
   const filtered = filterDailySalesBySearch(sales, historialSearch);
-  const colSpan = showFinancialDetails ? 10 : 9;
+  const colSpan = (showFinancialDetails ? 1 : 0) + (showEncargadoColumn ? 1 : 0) + 8;
 
   return (
     <div className="admin-table-wrapper product-table-wrapper">
@@ -73,7 +76,7 @@ export function AdminSalesHistorialTable({
             <th>Talla</th>
             <th>Cant.</th>
             <th>Hora</th>
-            <th>Encargado</th>
+            {showEncargadoColumn && <th>Encargado</th>}
             <th>Total</th>
             {showFinancialDetails && <th>Ganancia</th>}
             <th>Documento</th>
@@ -107,12 +110,14 @@ export function AdminSalesHistorialTable({
               <td>{sale.talla || "-"}</td>
               <td>{sale.cantidad}</td>
               <td>{new Date(sale.creadoEn).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" })}</td>
-              <td>
-                <div className="admin-sale-operator-cell">
-                  <strong>{sale.encargadoNombre || "Sin encargado"}</strong>
-                  {sale.encargadoEmail && <span>{maskEmailForDisplay(sale.encargadoEmail)}</span>}
-                </div>
-              </td>
+              {showEncargadoColumn && (
+                <td>
+                  <div className="admin-sale-operator-cell">
+                    <strong>{sale.encargadoNombre || "Sin encargado"}</strong>
+                    {sale.encargadoEmail && <span>{maskEmailForDisplay(sale.encargadoEmail)}</span>}
+                  </div>
+                </td>
+              )}
               <td>S/ {sale.total.toFixed(2)}</td>
               {showFinancialDetails && (
                 <td>

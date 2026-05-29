@@ -25,6 +25,16 @@ export type SaleDocumentInput = {
   lines: SaleDocumentLine[];
 };
 
+const blobUrlByWindow = new WeakMap<Window, string>();
+
+function revokeBlobUrlForWindow(preview: Window) {
+  const previous = blobUrlByWindow.get(preview);
+  if (previous) {
+    URL.revokeObjectURL(previous);
+    blobUrlByWindow.delete(preview);
+  }
+}
+
 function money(value = 0) {
   return `S/ ${Number(value || 0).toFixed(2)}`;
 }
@@ -69,21 +79,28 @@ function loadingHtml() {
 </html>`;
 }
 
+/** Navega el popup con Blob URL (evita replaceChild de document.write en ventanas vacías). */
+export function writeHtmlToPopupWindow(preview: Window, html: string) {
+  revokeBlobUrlForWindow(preview);
+  const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+  blobUrlByWindow.set(preview, url);
+  preview.location.replace(url);
+}
+
 export function openSaleDocumentWindow() {
-  const preview = globalThis.open("", "_blank", "width=900,height=760");
-  if (!preview) return null;
-  const parsed = new DOMParser().parseFromString(loadingHtml(), "text/html");
-  preview.document.open();
-  preview.document.replaceChild(
-    preview.document.importNode(parsed.documentElement, true),
-    preview.document.documentElement,
+  const preview = globalThis.open(
+    "about:blank",
+    "_blank",
+    "noopener,noreferrer,width=900,height=760",
   );
-  preview.document.close();
+  if (!preview) return null;
+  writeHtmlToPopupWindow(preview, loadingHtml());
   return preview;
 }
 
 export function closeSaleDocumentWindow(preview: Window | null) {
   if (!preview || preview.closed) return;
+  revokeBlobUrlForWindow(preview);
   preview.close();
 }
 
@@ -105,7 +122,7 @@ export function buildSaleDocumentHtml(input: SaleDocumentInput) {
           <td>${money(line.salePrice)}</td>
           <td>${money(line.total)}</td>
         </tr>
-      `
+      `,
     )
     .join("");
 
@@ -207,13 +224,11 @@ export function buildSaleDocumentHtml(input: SaleDocumentInput) {
 
 export function renderSaleDocument(preview: Window, input: SaleDocumentInput) {
   if (preview.closed) return false;
-  const parsed = new DOMParser().parseFromString(buildSaleDocumentHtml(input), "text/html");
-  preview.document.open();
-  preview.document.replaceChild(
-    preview.document.importNode(parsed.documentElement, true),
-    preview.document.documentElement,
-  );
-  preview.document.close();
-  preview.focus();
-  return true;
+  try {
+    writeHtmlToPopupWindow(preview, buildSaleDocumentHtml(input));
+    preview.focus();
+    return true;
+  } catch {
+    return false;
+  }
 }

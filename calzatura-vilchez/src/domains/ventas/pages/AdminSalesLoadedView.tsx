@@ -2,10 +2,29 @@ import { Calculator, CircleDollarSign, FileText, IdCard, PackageSearch, Plus, Tr
 import { AccessibleConfirmDialog } from "@/components/common/AccessibleConfirmDialog";
 import { AdminSaleDetailModal } from "./AdminSaleDetailModal";
 import { AdminSalesHistorialTable } from "./AdminSalesHistorialTable";
-import type { AdminSalesPageModel } from "./useAdminSalesPage";
+import type { SalesPageModel } from "./useSalesPage";
 import { saleLineTotal } from "./adminSalesRegisterLogic";
 
-export type AdminSalesLoadedViewProps = Readonly<Omit<AdminSalesPageModel, "loading">>;
+export type AdminSalesLoadedViewProps = Readonly<Omit<SalesPageModel, "loading">>;
+
+const PAGE_COPY = {
+  admin: {
+    kicker: "Ventas diarias",
+    title: "Consulta y registro de ventas",
+    subtitle: "Agrega una o varias tallas al detalle y registra la venta completa.",
+    dateLabel: "Fecha de métricas y registro",
+    finanzasMissing: "Este producto necesita costo real y margenes en Productos.",
+    idPrefix: "admin-sale",
+  },
+  staff: {
+    kicker: "Área tienda",
+    title: "Registro de ventas físicas",
+    subtitle: "Registra tus ventas del día, emite nota o guía y consulta solo tu historial.",
+    dateLabel: "Fecha de registro",
+    finanzasMissing: "Este producto no tiene rango de precio configurado. Avisa a administración.",
+    idPrefix: "staff-sale",
+  },
+} as const;
 
 function renderSaleSizePicker(p: AdminSalesLoadedViewProps) {
   if (p.availableColors.length > 0 && !p.selectedColor) {
@@ -39,18 +58,19 @@ function renderSaleSizePicker(p: AdminSalesLoadedViewProps) {
 }
 
 export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
+  const copy = PAGE_COPY[p.panel];
+  const fieldId = (name: string) => `${copy.idPrefix}-${name}`;
+
   return (
     <div className="admin-products-page">
       <div className="admin-page-header">
         <div>
-          <span className="admin-page-kicker">Ventas diarias</span>
-          <h1 className="admin-page-title">Consulta y registro de ventas</h1>
-          <p className="admin-page-subtitle">
-            Agrega una o varias tallas al detalle y registra la venta completa.
-          </p>
+          <span className="admin-page-kicker">{copy.kicker}</span>
+          <h1 className="admin-page-title">{copy.title}</h1>
+          <p className="admin-page-subtitle">{copy.subtitle}</p>
         </div>
         <div className="admin-date-label-group">
-          <span className="admin-date-label">Fecha de métricas y registro</span>
+          <span className="admin-date-label">{copy.dateLabel}</span>
           <input type="date" value={p.date} onChange={(e) => p.setDate(e.target.value)} className="form-input admin-date-input" />
         </div>
       </div>
@@ -90,11 +110,11 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
 
             <div className="admin-sale-lookup-grid">
               <div className="form-group admin-suggest-field">
-                <label htmlFor="admin-sale-brand-search">Marca</label>
+                <label htmlFor={fieldId("brand-search")}>Marca</label>
                 <div className="admin-search-wrapper">
                   <PackageSearch size={17} />
                   <input
-                    id="admin-sale-brand-search"
+                    id={fieldId("brand-search")}
                     value={p.brandSearch}
                     onChange={(e) => p.handleBrandSearchChange(e.target.value)}
                     onFocus={() => p.setBrandFocused(true)}
@@ -215,7 +235,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
                   )}
                 </div>
               ) : (
-                <p className="admin-empty">Este producto necesita costo real y margenes en Productos.</p>
+                <p className="admin-empty">{copy.finanzasMissing}</p>
               )}
 
           <div className="form-row">
@@ -369,6 +389,7 @@ export function AdminSalesLoadedView(p: AdminSalesLoadedViewProps) {
           onHistorialSearchChange={p.setHistorialSearch}
           onClearHistorialSearch={() => p.setHistorialSearch("")}
           showFinancialDetails={p.showFinancialDetails}
+          showEncargadoColumn={p.panel === "admin"}
           onSelectSale={(sale) => {
             p.setSelectedSale(sale);
             p.setReturnMotivo("");

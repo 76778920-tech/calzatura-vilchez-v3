@@ -211,9 +211,9 @@ function renderRegisterSaleDocumentIfNeeded(
   });
   if (rendered) {
     toast.success("Documento listo para imprimir o guardar como PDF");
-  } else {
-    toast.error("No se pudo abrir el documento");
+    return;
   }
+  toast.error("Venta registrada, pero no se pudo mostrar el documento. Usa Ver documento en el historial.");
 }
 
 export type RegisterPendingSalesParams = {
@@ -262,10 +262,19 @@ export async function executeRegisterPendingSales(p: RegisterPendingSalesParams)
 
   const documentToIssue = documentType === "nota_venta" || documentType === "guia_remision" ? documentType : null;
   const docNumber = documentToIssue ? makeDocumentNumber(documentToIssue, date) : undefined;
-  const documentPreview = documentToIssue ? openSaleDocumentWindow() : null;
-  if (documentToIssue && !documentPreview) {
-    toast.error("Permite ventanas emergentes para generar el documento");
-    return;
+  let documentPreview: Window | null = null;
+  if (documentToIssue) {
+    try {
+      documentPreview = openSaleDocumentWindow();
+    } catch {
+      documentPreview = null;
+    }
+    if (!documentPreview) {
+      toast.error(
+        "No se pudo abrir la ventana del documento. La venta se registrará; reimprímela desde el historial.",
+        { duration: 6000 },
+      );
+    }
   }
 
   setSaving(true);

@@ -10,7 +10,7 @@ Cumplimiento interno ISO (27001 / 25010 / 9001): `docs/ISO-CUMPLIMIENTO-INTERNO.
 |------|----------|
 | `/staff` | Inicio |
 | `/staff/pedidos` | Pedidos (`AdminOrders` con scope staff) |
-| `/staff/ventas` | Ventas diarias (sin datos financieros en UI/API) |
+| `/staff/ventas` | **StaffSales** — ventas diarias propias (`/staff/dailySales*`), sin costos ni ganancia en UI |
 
 Login redirige a `/staff` (`redirects.ts`). Admin sigue en `/admin`.
 
@@ -20,7 +20,7 @@ Login redirige a `/staff` (`redirects.ts`). Admin sigue en `/admin`.
 - `POST /staff/dailySales/register`, `/staff/dailySales/return`
 - `POST /updateOrderStatus` (admin o trabajador)
 
-No usar rutas `/admin/*` desde el panel staff: el BFF responde 403.
+No usar rutas `/admin/*` desde el panel staff: el BFF responde 403. La pantalla **StaffSales** (`useStaffSalesPage`) llama solo a `/staff/*`; **AdminSales** en `/admin/ventas` usa solo `/admin/*` (alcance fijo por ruta, no por rol en runtime).
 
 ## Backend
 
