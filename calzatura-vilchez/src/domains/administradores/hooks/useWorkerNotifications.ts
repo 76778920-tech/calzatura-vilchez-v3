@@ -26,20 +26,20 @@ export function useWorkerNotifications(enabled: boolean) {
   // Carga los UIDs de todos los trabajadores una sola vez
   useEffect(() => {
     if (!enabled) return;
-    supabase
-      .from("usuarios")
-      .select("uid")
-      .eq("rol", "trabajador")
-      .then(({ data }) => {
+    const load = async () => {
+      try {
+        const { data } = await supabase
+          .from("usuarios")
+          .select("uid")
+          .eq("rol", "trabajador");
         if (data) {
           workerUids.current = new Set(
-            (data as { uid: string }[])
-              .map((u) => u.uid)
-              .filter(Boolean),
+            (data as { uid: string }[]).map((u) => u.uid).filter(Boolean),
           );
         }
-      })
-      .catch(() => {});
+      } catch {}
+    };
+    void load();
   }, [enabled]);
 
   const poll = useCallback(async () => {
@@ -79,8 +79,9 @@ export function useWorkerNotifications(enabled: boolean) {
       // Toasts — máximo 3 para no saturar la pantalla
       fresh.slice(0, 3).forEach((e) => {
         const tipoLabel = e.entidad === "producto" ? "Producto" : "Venta";
+        const nombre = e.entidadNombre ? ": " + e.entidadNombre : "";
         toast(
-          `✏️ Trabajador ${e.accion} un ${tipoLabel}${e.entidadNombre ? `: ${e.entidadNombre}` : ""}`,
+          `✏️ Trabajador ${e.accion} un ${tipoLabel}${nombre}`,
           {
             duration: 5000,
             style: {
