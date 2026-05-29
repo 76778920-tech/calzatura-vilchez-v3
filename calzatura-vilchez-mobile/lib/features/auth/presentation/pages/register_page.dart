@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/config/env.dart';
-import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/utils/dni.dart';
 import '../../../../shared/utils/peru_phone.dart';
@@ -248,17 +248,7 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           telefonoFormatted: formatPeruPhone(_telefonoCtrl.text),
         );
     if (ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Cuenta creada. Revisa tu correo ${_emailCtrl.text.trim()} para verificar tu cuenta.',
-          ),
-          backgroundColor: Colors.green.shade800,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 5),
-        ),
-      );
-      navigateAfterAuth(context);
+      context.go('/verify-email');
     }
   }
 

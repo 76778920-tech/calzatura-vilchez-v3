@@ -8,16 +8,56 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 
 final _supabase = sb.Supabase.instance.client;
 
-final adminUsersProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((
-  ref,
-) async {
-  final data = await _supabase
-      .from('usuarios')
-      .select(
-        'uid, email, nombre, nombres, apellidos, dni, telefono, rol, creadoEn',
-      )
-      .order('creadoEn', ascending: false);
-  return List<Map<String, dynamic>>.from(data as List);
+// ─── Privacy helpers (mirrors web maskEmail.ts) ───────────────────────────────
+
+String _maskEmailForDisplay(String? email) {
+  final trimmed = (email ?? '').trim();
+  final at = trimmed.indexOf('@');
+  if (at <= 0) return 'tu correo';
+  final local = trimmed.substring(0, at);
+  final domain = trimmed.substring(at + 1);
+  if (domain.isEmpty) return 'tu correo';
+  final visible = local.length <= 2 ? local.substring(0, 1) : local.substring(0, 2);
+  final stars = '*' * (local.length - visible.length).clamp(1, 99);
+  return '$visible$stars@$domain';
+}
+
+String _maskDniForDisplay(String? dni) {
+  final digits = (dni ?? '').replaceAll(RegExp(r'\D'), '');
+  if (digits.length >= 4) return '****${digits.substring(digits.length - 4)}';
+  final suffix = (dni ?? '').trim();
+  return suffix.length >= 4 ? '****${suffix.substring(suffix.length - 4)}' : 'Sin DNI';
+}
+
+// ─── Data model ───────────────────────────────────────────────────────────────
+
+class _UsersData {
+  const _UsersData({required this.users, required this.orderCounts});
+  final List<Map<String, dynamic>> users;
+  final Map<String, int> orderCounts;
+}
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
+
+final adminUsersProvider = FutureProvider.autoDispose<_UsersData>((ref) async {
+  final results = await Future.wait([
+    _supabase
+        .from('usuarios')
+        .select('uid, email, nombre, nombres, apellidos, dni, telefono, rol, creadoEn')
+        .order('creadoEn', ascending: false),
+    _supabase.from('pedidos').select('id, userId'),
+  ]);
+
+  final users = List<Map<String, dynamic>>.from(results[0] as List);
+  final orders = List<Map<String, dynamic>>.from(results[1] as List);
+
+  final orderCounts = <String, int>{};
+  for (final order in orders) {
+    final uid = order['userId'] as String? ?? '';
+    if (uid.isNotEmpty) orderCounts[uid] = (orderCounts[uid] ?? 0) + 1;
+  }
+
+  return _UsersData(users: users, orderCounts: orderCounts);
 });
 
 const _roles = ['cliente', 'trabajador', 'admin'];
@@ -122,13 +162,11 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
             child: CircularProgressIndicator(color: AppColors.gold),
           ),
           error: (e, _) => Center(child: Text('Error: $e')),
-          data: (users) {
-            final filtered = _filter(users);
-            final clientes = users.where((u) => u['rol'] == 'cliente').length;
-            final trabajadores = users
-                .where((u) => u['rol'] == 'trabajador')
-                .length;
-            final admins = users.where((u) => u['rol'] == 'admin').length;
+          data: (data) {
+            final filtered = _filter(data.users);
+            final clientes = data.users.where((u) => u['rol'] == 'cliente').length;
+            final trabajadores = data.users.where((u) => u['rol'] == 'trabajador').length;
+            final admins = data.users.where((u) => u['rol'] == 'admin').length;
 
             return RefreshIndicator(
               color: AppColors.gold,
@@ -142,7 +180,7 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
                       child: Row(
                         children: [
-                          _StatBadge('Total', users.length, Colors.white70),
+                          _StatBadge('Total', data.users.length, Colors.white70),
                           const SizedBox(width: 8),
                           _StatBadge('Clientes', clientes, AppColors.success),
                           const SizedBox(width: 8),
@@ -230,6 +268,7 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
                                 user: filtered[i],
                                 index: i,
                                 isSuperAdmin: isSuperAdmin,
+                                orderCount: data.orderCounts[filtered[i]['uid'] as String? ?? ''] ?? 0,
                                 onRoleChanged: (newRole) =>
                                     _changeRole(filtered[i], newRole),
                               ),
@@ -345,11 +384,13 @@ class _UserTile extends StatelessWidget {
     required this.user,
     required this.index,
     required this.isSuperAdmin,
+    required this.orderCount,
     required this.onRoleChanged,
   });
   final Map<String, dynamic> user;
   final int index;
   final bool isSuperAdmin;
+  final int orderCount;
   final ValueChanged<String> onRoleChanged;
 
   Color _roleColor(String role) {
@@ -429,7 +470,7 @@ class _UserTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      nombre.isNotEmpty ? nombre : email,
+                      nombre.isNotEmpty ? nombre : _maskEmailForDisplay(email),
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
@@ -439,7 +480,7 @@ class _UserTile extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
-                      email,
+                      _maskEmailForDisplay(email),
                       style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 11,
@@ -449,7 +490,7 @@ class _UserTile extends StatelessWidget {
                     ),
                     if (dni.isNotEmpty)
                       Text(
-                        'DNI: $dni',
+                        'DNI: ${_maskDniForDisplay(dni)}',
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 11,
@@ -463,12 +504,47 @@ class _UserTile extends StatelessWidget {
                           fontSize: 11,
                         ),
                       ),
-                    Text(
-                      'Desde $fechaCorta',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 10,
-                      ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.shopping_bag_outlined,
+                                size: 10,
+                                color: Color(0xFF6366F1),
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                '$orderCount pedido${orderCount == 1 ? '' : 's'}',
+                                style: const TextStyle(
+                                  color: Color(0xFF6366F1),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Desde $fechaCorta',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),

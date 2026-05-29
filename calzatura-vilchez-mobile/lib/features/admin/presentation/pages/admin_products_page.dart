@@ -128,6 +128,20 @@ String _normalizeAdminCategory(String category) {
   return _categorias.contains(category) ? category : 'hombre';
 }
 
+// Mirrors web adminProductStockCoherence.ts → isStockTallaIncoherent.
+// stock != sum(tallaStock) — includes legacy products with stock>0 but no per-size breakdown.
+bool _isStockIncoherent(Map<String, dynamic> p) {
+  final stock = (p['stock'] as num?)?.toInt() ?? 0;
+  final ts = p['tallaStock'];
+  int sumTallas = 0;
+  if (ts is Map) {
+    for (final v in ts.values) {
+      sumTallas += (v as num?)?.toInt() ?? 0;
+    }
+  }
+  return stock != sumTallas;
+}
+
 List<String> _sizesForCategory(String category) {
   if (category.trim().isEmpty) return [];
   return _tallasPorCategoria[_normalizeAdminCategory(category)] ??
@@ -748,6 +762,8 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
               0,
               (sum, p) => sum + ((p['stock'] as num?)?.toInt() ?? 0),
             );
+            final incoherentStock =
+                products.where(_isStockIncoherent).length;
 
             return RefreshIndicator(
               color: AppColors.gold,
@@ -781,6 +797,13 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
                               label: 'Sin stock',
                               value: '$outOfStock',
                               color: AppColors.error,
+                            ),
+                            const SizedBox(width: 8),
+                            _StatCard(
+                              icon: Icons.sync_problem_outlined,
+                              label: 'Stock≠tallas',
+                              value: '$incoherentStock',
+                              color: const Color(0xFFF97316),
                             ),
                             const SizedBox(width: 8),
                             _StatCard(

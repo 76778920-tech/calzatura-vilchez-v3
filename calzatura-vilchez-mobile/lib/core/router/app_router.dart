@@ -10,9 +10,11 @@ import '../../features/admin/presentation/pages/admin_predictions_page.dart';
 import '../../features/admin/presentation/pages/admin_products_page.dart';
 import '../../features/admin/presentation/pages/admin_sales_page.dart';
 import '../../features/admin/presentation/pages/admin_users_page.dart';
+import '../../features/profile/presentation/pages/edit_profile_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
+import '../../features/auth/presentation/pages/verify_email_page.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/cart/presentation/pages/cart_page.dart';
 import '../../features/checkout/presentation/pages/checkout_page.dart';
@@ -63,6 +65,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             '/order-success',
             '/wishlist',
             '/profile',
+            '/verify-email',
           ];
           if (!allowed.any((p) => loc.startsWith(p))) {
             return '/admin';
@@ -92,6 +95,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         pageBuilder: (ctx, s) => _sharedAxisPage(const RegisterPage()),
+      ),
+      GoRoute(
+        path: '/verify-email',
+        pageBuilder: (ctx, s) => _sharedAxisPage(const VerifyEmailPage()),
       ),
       GoRoute(
         path: '/checkout',
@@ -173,6 +180,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'orders',
                 pageBuilder: (ctx, s) => _sharedAxisPage(const OrdersPage()),
+              ),
+              GoRoute(
+                path: 'edit',
+                pageBuilder: (ctx, s) => _sharedAxisPage(const EditProfilePage()),
               ),
             ],
           ),

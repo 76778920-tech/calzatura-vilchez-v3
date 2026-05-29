@@ -219,15 +219,20 @@ class ProfilePage extends ConsumerWidget {
                 const _SectionTitle(title: 'Mi cuenta'),
                 const SizedBox(height: 8),
                 _ProfileTile(
+                  icon: Icons.edit_outlined,
+                  label: 'Editar perfil',
+                  onTap: () => context.push('/profile/edit'),
+                ).animate(delay: 100.ms).fadeIn().slideX(begin: -0.1),
+                _ProfileTile(
                   icon: Icons.receipt_long_outlined,
                   label: 'Mis pedidos',
                   onTap: () => context.push('/profile/orders'),
-                ).animate(delay: 100.ms).fadeIn().slideX(begin: -0.1),
+                ).animate(delay: 150.ms).fadeIn().slideX(begin: -0.1),
                 _ProfileTile(
                   icon: Icons.favorite_border_rounded,
                   label: 'Favoritos',
-                  onTap: () {},
-                ).animate(delay: 150.ms).fadeIn().slideX(begin: -0.1),
+                  onTap: () => context.push('/wishlist'),
+                ).animate(delay: 200.ms).fadeIn().slideX(begin: -0.1),
                 const SizedBox(height: 16),
 
                 const _SectionTitle(title: 'Configuración'),
@@ -236,18 +241,18 @@ class ProfilePage extends ConsumerWidget {
                   icon: Icons.notifications_none_rounded,
                   label: 'Notificaciones',
                   onTap: () {},
-                ).animate(delay: 200.ms).fadeIn().slideX(begin: -0.1),
+                ).animate(delay: 250.ms).fadeIn().slideX(begin: -0.1),
                 _ProfileTile(
                   icon: Icons.help_outline_rounded,
                   label: 'Ayuda y soporte',
                   onTap: () {},
-                ).animate(delay: 250.ms).fadeIn().slideX(begin: -0.1),
+                ).animate(delay: 300.ms).fadeIn().slideX(begin: -0.1),
                 _ProfileTile(
                   icon: Icons.info_outline_rounded,
                   label: 'Acerca de',
                   subtitle: 'Versión 1.0.0',
                   onTap: () {},
-                ).animate(delay: 300.ms).fadeIn().slideX(begin: -0.1),
+                ).animate(delay: 350.ms).fadeIn().slideX(begin: -0.1),
                 const SizedBox(height: 24),
 
                 Padding(
@@ -273,7 +278,7 @@ class ProfilePage extends ConsumerWidget {
                       ),
                     ),
                   ),
-                ).animate(delay: 350.ms).fadeIn(),
+                ).animate(delay: 400.ms).fadeIn(),
                 const SizedBox(height: 32),
               ]),
             ),

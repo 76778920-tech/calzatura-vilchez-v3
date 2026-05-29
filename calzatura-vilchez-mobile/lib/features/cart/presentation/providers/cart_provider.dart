@@ -31,16 +31,18 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
           item.talla == talla &&
           item.color == color,
     );
+    final stockLimit = _effectiveStock(product, talla);
     if (idx >= 0) {
       final current = state[idx];
       final newQty = current.quantity + 1;
-      if (newQty > product.stock) return;
+      if (newQty > stockLimit) return;
       state = [
         ...state.sublist(0, idx),
         current.copyWith(quantity: newQty),
         ...state.sublist(idx + 1),
       ];
     } else {
+      if (stockLimit <= 0) return;
       state = [
         ...state,
         CartItem(product: product, quantity: 1, talla: talla, color: color),
@@ -54,13 +56,21 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
     await _persist();
   }
 
+  // Per-talla stock when tallaStock has the key; falls back to product.stock.
+  int _effectiveStock(Product product, String? talla) {
+    if (talla != null && (product.tallaStock?.containsKey(talla) == true)) {
+      return product.stockDeTalla(talla);
+    }
+    return product.stock;
+  }
+
   Future<void> updateQuantity(int index, int qty) async {
     if (qty <= 0) {
       await removeItem(index);
       return;
     }
     final item = state[index];
-    if (qty > item.product.stock) return;
+    if (qty > _effectiveStock(item.product, item.talla)) return;
     state = [
       ...state.sublist(0, index),
       item.copyWith(quantity: qty),
