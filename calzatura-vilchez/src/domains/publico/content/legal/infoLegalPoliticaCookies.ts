@@ -1,9 +1,7 @@
-import { buildInfoProsePage, legalSections } from "../infoPageBuilders";
+import { buildLegalPage, legalFaqs, legalSections } from "./infoLegalBuilders";
 
-export const COOKIES_LEGAL_PAGE = buildInfoProsePage({
-      group: "legal",
-    kicker: "Legal",
-    title: "Política de cookies",
+export const COOKIES_LEGAL_PAGE = buildLegalPage({
+  title: "Política de cookies",
     intro:
       "La presente Política de Cookies forma parte integrante de la Política de Privacidad de Calzatura Vilchez. En ella se describe el uso de cookies y tecnologías de almacenamiento similares en el sitio web de la tienda en línea, las finalidades de cada categoría, la forma en que puedes otorgar o retirar tu consentimiento, y los derechos que te asisten como titular de datos personales en el Perú.",
     accent: "Consentimiento informado y control sobre tu navegación",
@@ -57,26 +55,22 @@ export const COOKIES_LEGAL_PAGE = buildInfoProsePage({
         "Cuando el cambio implique nuevas categorías de cookies o finalidades que requieran consentimiento, te solicitaremos de nuevo tu autorización mediante el banner o el panel de configuración.",
       ]
   ),
-  faq: [
-      {
-        question: "¿Debo aceptar todas las cookies para usar la tienda?",
-        answer:
-          "No. Solo las estrictamente necesarias son imprescindibles para la navegación básica. Para comprar, registrarte o pagar en línea normalmente deberás autorizar, como mínimo, las categorías funcionales y de seguridad descritas en esta política.",
-      },
-      {
-        question: "¿Utilizan cookies de Facebook, Google Ads o similares?",
-        answer:
-          "En la actualidad no empleamos cookies de publicidad en redes sociales ni píxeles de remarketing en este sitio web. Si en el futuro los incorporamos, lo indicaremos en esta política y pediremos tu consentimiento previo.",
-      },
-      {
-        question: "¿Qué ocurre si pulso «Solo necesarias»?",
-        answer:
-          "Se activarán únicamente las cookies imprescindibles. Podrás ver el catálogo, pero funciones como el carrito persistente, el inicio de sesión o el pago en línea pueden quedar limitadas hasta que autorices otras categorías desde el panel de configuración.",
-      },
-      {
-        question: "¿Cada cuánto se me vuelve a preguntar?",
-        answer:
-          "Tu elección se guarda durante un máximo de doce (12) meses o hasta que cambiemos de versión de política de forma sustancial, en cuyo caso te mostraremos de nuevo el aviso de cookies.",
-      },
+  faq: legalFaqs(
+    [
+      "¿Debo aceptar todas las cookies para usar la tienda?",
+      "No. Solo las estrictamente necesarias son imprescindibles para la navegación básica. Para comprar, registrarte o pagar en línea normalmente deberás autorizar, como mínimo, las categorías funcionales y de seguridad descritas en esta política.",
     ],
+    [
+      "¿Utilizan cookies de Facebook, Google Ads o similares?",
+      "En la actualidad no empleamos cookies de publicidad en redes sociales ni píxeles de remarketing en este sitio web. Si en el futuro los incorporamos, lo indicaremos en esta política y pediremos tu consentimiento previo.",
+    ],
+    [
+      "¿Qué ocurre si pulso «Solo necesarias»?",
+      "Se activarán únicamente las cookies imprescindibles. Podrás ver el catálogo, pero funciones como el carrito persistente, el inicio de sesión o el pago en línea pueden quedar limitadas hasta que autorices otras categorías desde el panel de configuración.",
+    ],
+    [
+      "¿Cada cuánto se me vuelve a preguntar?",
+      "Tu elección se guarda durante un máximo de doce (12) meses o hasta que cambiemos de versión de política de forma sustancial, en cuyo caso te mostraremos de nuevo el aviso de cookies.",
+    ],
+  ),
 });

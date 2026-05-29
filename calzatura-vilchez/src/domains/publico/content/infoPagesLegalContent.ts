@@ -1,8 +1,10 @@
 import type { InfoContent, InfoPageKey } from "./infoPageTypes";
 import { COOKIES_LEGAL_PAGE } from "./legal/infoLegalPoliticaCookies";
 import { LIBRO_LEGAL_PAGE } from "./legal/infoLegalLibroReclamaciones";
-import { PRIVACIDAD_LEGAL_PAGE } from "./legal/infoLegalPrivacidad";
-import { TERMINOS_LEGAL_PAGE } from "./legal/infoLegalTerminos";
+import {
+  PRIVACIDAD_LEGAL_PAGE,
+  TERMINOS_LEGAL_PAGE,
+} from "./legal/infoLegalTerminosPrivacidadPages";
 
 export const LEGAL_INFO_PAGES: Pick<
   Record<InfoPageKey, InfoContent>,
