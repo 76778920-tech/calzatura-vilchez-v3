@@ -2235,62 +2235,71 @@ class _AuditLogSheet extends StatelessWidget {
                                 ),
                               ],
                             ),
-                            child: Row(
+                            child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Pill de acción
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: color.withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: color.withValues(alpha: 0.3),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    accion.toUpperCase(),
-                                    style: TextStyle(
-                                      color: color,
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.6,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                // Contenido
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '$entidad · $nombre',
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: AppColors.textPrimary,
+                                // Fila superior: pill + fecha
+                                Row(
+                                  children: [
+                                    Container(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 160,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: color.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: color.withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        accion.toUpperCase(),
+                                        style: TextStyle(
+                                          color: color,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.5,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        email != null
-                                            ? '$email · $fecha'
-                                            : fecha,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: AppColors.textSecondary,
-                                        ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      fecha,
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        color: AppColors.textSecondary,
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
+                                const SizedBox(height: 8),
+                                // Entidad · nombre (ancho completo)
+                                Text(
+                                  '$entidad · $nombre',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (email != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    email,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           );
