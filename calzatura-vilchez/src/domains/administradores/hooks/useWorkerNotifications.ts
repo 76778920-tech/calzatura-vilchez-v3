@@ -37,7 +37,9 @@ export function useWorkerNotifications(enabled: boolean) {
             (data as { uid: string }[]).map((u) => u.uid).filter(Boolean),
           );
         }
-      } catch {}
+      } catch {
+        // silently ignore — worker UIDs load failure is non-critical
+      }
     };
     void load();
   }, [enabled]);
