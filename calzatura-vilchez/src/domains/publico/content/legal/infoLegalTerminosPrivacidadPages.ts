@@ -5,7 +5,7 @@ import {
   legalSections,
   legalUpdatedNote,
   providerLegalSection,
-} from "./infoLegalBuilders";
+} from "../infoPageBuilders";
 
 export const TERMINOS_LEGAL_PAGE = buildLegalPage({
   title: "Términos y condiciones",

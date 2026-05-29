@@ -1,4 +1,4 @@
-import { buildLegalPage, legalFaqs, legalSections } from "./infoLegalBuilders";
+import { buildLegalPage, legalFaqs, legalSections } from "../infoPageBuilders";
 
 export const COOKIES_LEGAL_PAGE = buildLegalPage({
   title: "Política de cookies",

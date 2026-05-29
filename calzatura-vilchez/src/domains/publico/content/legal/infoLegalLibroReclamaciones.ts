@@ -7,7 +7,7 @@ import {
   legalSections,
   legalUpdatedNote,
   providerLegalSection,
-} from "./infoLegalBuilders";
+} from "../infoPageBuilders";
 
 export const LIBRO_LEGAL_PAGE = buildLegalPage({
   title: "Libro de reclamaciones",
