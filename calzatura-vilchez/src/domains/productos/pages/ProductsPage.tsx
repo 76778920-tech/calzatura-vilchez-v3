@@ -1,243 +1,27 @@
-import { startTransition, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef } from "react";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
-import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  buildCanonicalCatalogLocation,
-  CATALOG_ROUTE_PARAM_KEYS,
-  CATALOG_SHELF,
-  getCatalogCanonicalRedirect,
-  mergeCatalogSearchParams,
-} from "@/routes/catalogRouting";
-import { ChevronRight, X } from "lucide-react";
-import {
-  fetchPublicCatalogBrowse,
-  fetchProductFamilyGroupCounts,
-  fetchPublicProducts,
-} from "@/domains/productos/services/products";
-import { hasPublicBff, type PublicCatalogBrowseResult } from "@/utils/publicBffClient";
-import type { Product } from "@/types";
-import {
-  cyberWowJuvenilEditorial,
-  cyberWowZapatillasEditorial,
-} from "@/constants/cloudinaryHomeImages";
-import { useProductsRealtime } from "@/hooks/useProductsRealtime";
-import { slugifyCatalogValue, toPublicCategorySlug } from "@/utils/catalog";
-import { categoryLabel } from "@/utils/labels";
-import { CatalogFilterRail } from "@/domains/productos/components/CatalogFilterRail";
-import {
-  buildActiveCatalogFacetChips,
-  buildCatalogBreadcrumbs,
-  buildContextualCatalogFilters,
-  buildFacetFilteredCatalogProducts,
-  buildRouteFilteredCatalogProducts,
-  DISCOUNT_OPTIONS,
-  getPriceLabel,
-  getProductSizes,
-  humanizeSlug,
-  MATERIAL_FILTER_ORDER,
-  MATERIAL_RULES,
-  parseColorSelection,
-  parseDiscountSelection,
-  parseMaterialSelection,
-  parseSizeSelection,
-  resolveProductsPageTitle,
-  toggleCatalogStringListMember,
-  type CatalogFilterGroup,
-} from "@/domains/productos/utils/productsPageCatalogDerivations";
-import { useCatalogCampaignCarousel } from "@/domains/productos/hooks/useCatalogCampaignCarousel";
-import { useCatalogMenuDismiss } from "@/domains/productos/hooks/useCatalogMenuDismiss";
+import { CATALOG_SHELF } from "@/routes/catalogRouting";
+import { ProductsPageCampaignSection } from "@/domains/productos/components/ProductsPageCampaignSection";
+import { ProductsPageControlShell } from "@/domains/productos/components/ProductsPageControlShell";
+import { useCatalogFacetPopovers } from "@/domains/productos/hooks/useCatalogFacetPopovers";
+import { useCatalogNavigation } from "@/domains/productos/hooks/useCatalogNavigation";
+import { useCatalogRouteParams } from "@/domains/productos/hooks/useCatalogRouteParams";
+import { useProductsPageCatalogData } from "@/domains/productos/hooks/useProductsPageCatalogData";
+import { useProductsPageCatalogModel } from "@/domains/productos/hooks/useProductsPageCatalogModel";
 import { buildProductsPageMainContent } from "@/domains/productos/pages/productsPageMainContent";
-import { primeCatalogMenuDraft } from "@/domains/productos/utils/catalogMenuDraft";
-import {
-  measureColorCatalogPopover,
-  measureDiscountCatalogPopover,
-  measureMarcaCatalogPopover,
-  measureMaterialCatalogPopover,
-  measurePriceCatalogPopover,
-  measureSizeCatalogPopover,
-} from "@/domains/productos/utils/productsPagePopoverLayouts";
-import { usePopoverDockEffect } from "@/hooks/usePopoverDockEffect";
-
-const CATALOG_CAMPAIGN_ROTATION_MS = 9000;
-const CATALOG_PAGE_SIZE = 24;
-const USE_BFF_CATALOG_BROWSE = hasPublicBff();
-
-function productCountLabel(count: number): string {
-  const suffix = count === 1 ? "" : "s";
-  return `${count} producto${suffix}`;
-}
-
-type FilterOption = {
-  label: string;
-  value: string;
-};
-
-type FilterMenuConfig = {
-  key: string;
-  label: string;
-  value: string;
-  options: FilterOption[];
-  onSelect: (value: string) => void;
-};
-
-const CYBER_DISCOUNT_PILL_OPTIONS: Array<{ label: string; value: string }> = [
-  { label: "Todo Cyber Wow", value: "all" },
-  { label: "10 %", value: "10" },
-  { label: "20 %", value: "20" },
-  { label: "30 %", value: "30" },
-];
-
-const COLOR_SWATCH_MAP: Record<string, string> = {
-  negro: "#000000",
-  blanco: "#f5f4f0",
-  nude: "#d9d7b2",
-  camel: "#bd7013",
-  multicolor: "linear-gradient(90deg, #ff0000, #ff8c00, #ffee00, #00c853, #00b0ff, #3d00ff)",
-  gris: "#8e8e8e",
-  dorado: "#d4b11a",
-  plata: "#bfbfbf",
-  morado: "#a046bd",
-  "azul-claro": "#9bc5d3",
-  azul: "#322fb0",
-  verde: "#0f8d0f",
-  chocolate: "#8b5a07",
-  marron: "#7b4b2a",
-  rojo: "#ff2b1a",
-  rosa: "#e9aaa7",
-  "cafe-claro": "#c9aa58",
-  guinda: "#6f1f2b",
-  "petroleo-oscuro": "#27464c",
-  "rose-gold": "#bf9f8c",
-  amarillo: "#e5df2a",
-  "verde-agua": "#13a394",
-};
-
-const COLOR_SWATCH_ORDER = [
-  "negro",
-  "blanco",
-  "nude",
-  "camel",
-  "multicolor",
-  "gris",
-  "dorado",
-  "plata",
-  "morado",
-  "azul-claro",
-  "azul",
-  "verde",
-  "chocolate",
-  "marron",
-  "rojo",
-  "rosa",
-  "cafe-claro",
-  "guinda",
-  "petroleo-oscuro",
-  "rose-gold",
-  "amarillo",
-  "verde-agua",
-] as const;
+import { CATALOG_PAGE_SIZE } from "@/domains/productos/pages/productsPageConstants";
 
 export default function ProductsPage() {
   useDocumentTitle("Productos");
   const catalogDescriptionId = useId();
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const routeParams = useParams();
-  const effectiveParams = useMemo(
-    () => mergeCatalogSearchParams(location.pathname, routeParams, searchParams),
-    [location.pathname, routeParams, searchParams]
-  );
+  const closeMenusRef = useRef<() => void>(() => {});
 
-  useEffect(() => {
-    const target = getCatalogCanonicalRedirect(location.pathname, location.search, routeParams);
-    if (!target) return;
-    navigate(`${target.pathname}${target.search}`, { replace: true });
-  }, [location.pathname, location.search, routeParams, navigate]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [browse, setBrowse] = useState<PublicCatalogBrowseResult | null>(null);
-  const [familyGroupCounts, setFamilyGroupCounts] = useState<Record<string, number>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadToken, setReloadToken] = useState(0);
-  const [catalogPage, setCatalogPage] = useState(1);
-  useProductsRealtime(() => setReloadToken((t) => t + 1));
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [draftPriceMin, setDraftPriceMin] = useState(0);
-  const [draftPriceMax, setDraftPriceMax] = useState(0);
-  const [pricePopoverStyle, setPricePopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
-  const filterRailRef = useRef<HTMLDivElement | null>(null);
-  const priceTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const pricePopoverRef = useRef<HTMLDialogElement | null>(null);
-  const pricePopoverFrameRef = useRef<number | null>(null);
-  const [draftSelectedSizes, setDraftSelectedSizes] = useState<string[]>([]);
-  const [sizePopoverStyle, setSizePopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
-  const sizeTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const sizePopoverRef = useRef<HTMLDialogElement | null>(null);
-  const sizePopoverFrameRef = useRef<number | null>(null);
-  const [draftSelectedColors, setDraftSelectedColors] = useState<string[]>([]);
-  const [colorPopoverStyle, setColorPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
-  const colorTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const colorPopoverRef = useRef<HTMLDialogElement | null>(null);
-  const colorPopoverFrameRef = useRef<number | null>(null);
-  const [draftSelectedMaterials, setDraftSelectedMaterials] = useState<string[]>([]);
-  const [materialPopoverStyle, setMaterialPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
-  const materialTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const materialPopoverRef = useRef<HTMLDialogElement | null>(null);
-  const materialPopoverFrameRef = useRef<number | null>(null);
-  const [draftSelectedDiscounts, setDraftSelectedDiscounts] = useState<string[]>([]);
-  const [discountPopoverStyle, setDiscountPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
-  const discountTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const discountPopoverRef = useRef<HTMLDialogElement | null>(null);
-  const discountPopoverFrameRef = useRef<number | null>(null);
-  const [draftSelectedMarcas, setDraftSelectedMarcas] = useState<string[]>([]);
-  const [marcaPopoverStyle, setMarcaPopoverStyle] = useState<{ top: number; left: number; width: number } | null>(null);
-  const marcaTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const marcaPopoverRef = useRef<HTMLDialogElement | null>(null);
-  const marcaPopoverFrameRef = useRef<number | null>(null);
-
-  const categoria = toPublicCategorySlug(effectiveParams.get("categoria") ?? "todos");
-  const vista = effectiveParams.get("vista");
-  const marca = effectiveParams.get("marca") ?? "todas";
-  const marcaSlug = effectiveParams.get("marcaSlug") ?? "";
-  const query = effectiveParams.get("buscar") ?? "";
-  const campana = effectiveParams.get("campana") ?? "";
-  const coleccion = effectiveParams.get("coleccion") ?? "";
-  const estilo = effectiveParams.get("estilo") ?? "";
-  const tipo = effectiveParams.get("tipo") ?? "";
-  const linea = effectiveParams.get("linea") ?? "";
-  const segmento = effectiveParams.get("segmento") ?? "";
-  const color = effectiveParams.get("color") ?? "";
-  const promocion = effectiveParams.get("promocion") ?? "";
-  const rangoEdad = effectiveParams.get("rangoEdad") ?? "";
-  const precio = effectiveParams.get("precio") ?? "";
-  const talla = effectiveParams.get("talla") ?? "";
-  const material = effectiveParams.get("material") ?? "";
-  const descuento = effectiveParams.get("descuento") ?? "";
-  const trimmedQuery = query.trim();
-
-  const cyberShelfParams = useMemo((): Record<string, string | undefined> | null => {
-    if (campana !== "cyber") return null;
-    const p: Record<string, string | undefined> = { campana: "cyber" };
-    if (categoria !== "todos") p.categoria = categoria;
-    if (vista) p.vista = vista;
-    if (marca && marca !== "todas") p.marca = marca;
-    if (marcaSlug) p.marcaSlug = marcaSlug;
-    if (coleccion) p.coleccion = coleccion;
-    if (estilo) p.estilo = estilo;
-    if (tipo) p.tipo = tipo;
-    if (linea) p.linea = linea;
-    if (segmento) p.segmento = segmento;
-    if (color) p.color = color;
-    if (promocion) p.promocion = promocion;
-    if (rangoEdad) p.rangoEdad = rangoEdad;
-    return p;
-  }, [
-    campana,
+  const {
+    effectiveParams,
+    navigate,
     categoria,
     vista,
-    marca,
-    marcaSlug,
+    campana,
     coleccion,
     estilo,
     tipo,
@@ -246,138 +30,30 @@ export default function ProductsPage() {
     color,
     promocion,
     rangoEdad,
-  ]);
+    precio,
+    talla,
+    material,
+    descuento,
+    trimmedQuery,
+    marca,
+    marcaSlug,
+    cyberShelfParams,
+    catalogPage,
+    setCatalogPage,
+  } = useCatalogRouteParams();
 
-  const filterParamsKey = effectiveParams.toString();
-  const [prevFilterParamsKey, setPrevFilterParamsKey] = useState(filterParamsKey);
+  const {
+    products,
+    browse,
+    familyGroupCounts,
+    loading,
+    error,
+    handleRetry,
+    useBffBrowse,
+  } = useProductsPageCatalogData(effectiveParams, catalogPage);
 
-  if (prevFilterParamsKey !== filterParamsKey) {
-    setPrevFilterParamsKey(filterParamsKey);
-    setCatalogPage(1);
-  }
-
-  useEffect(() => {
-    let isMounted = true;
-    startTransition(() => {
-      setLoading(true);
-      setError(null);
-    });
-
-    if (USE_BFF_CATALOG_BROWSE) {
-      fetchPublicCatalogBrowse(effectiveParams, catalogPage, CATALOG_PAGE_SIZE)
-        .then((data) => {
-          if (!isMounted) return;
-          setBrowse(data);
-          setFamilyGroupCounts(data.familyGroupCounts);
-        })
-        .catch(() => {
-          if (!isMounted) return;
-          setBrowse(null);
-          setError("No pudimos cargar el catálogo en este momento.");
-        })
-        .finally(() => {
-          if (isMounted) setLoading(false);
-        });
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    Promise.all([
-      fetchPublicProducts(),
-      fetchProductFamilyGroupCounts().catch((): Record<string, number> => ({})),
-    ])
-      .then(([nextProducts, counts]) => {
-        if (!isMounted) return;
-        setProducts(nextProducts);
-        setFamilyGroupCounts(counts);
-        setBrowse(null);
-      })
-      .catch(() => {
-        if (!isMounted) return;
-        setError("No pudimos cargar el catálogo en este momento.");
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [reloadToken, effectiveParams, catalogPage]);
-
-  useCatalogMenuDismiss(
-    {
-      filterRailRef,
-      pricePopoverRef,
-      priceTriggerRef,
-      sizePopoverRef,
-      sizeTriggerRef,
-      colorPopoverRef,
-      colorTriggerRef,
-      materialPopoverRef,
-      materialTriggerRef,
-      discountPopoverRef,
-      discountTriggerRef,
-      marcaPopoverRef,
-      marcaTriggerRef,
-    },
-    setActiveMenu,
-  );
-
-  const layoutPricePopover = useCallback(
-    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measurePriceCatalogPopover(rect, viewport),
-    [],
-  );
-  const layoutSizePopover = useCallback(
-    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureSizeCatalogPopover(rect, viewport),
-    [],
-  );
-  const layoutColorPopover = useCallback(
-    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureColorCatalogPopover(rect, viewport),
-    [],
-  );
-  const layoutMaterialPopover = useCallback(
-    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureMaterialCatalogPopover(rect, viewport),
-    [],
-  );
-  const layoutDiscountPopover = useCallback(
-    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureDiscountCatalogPopover(rect, viewport),
-    [],
-  );
-  const layoutMarcaPopover = useCallback(
-    (rect: DOMRect, viewport: { innerWidth: number; innerHeight: number }) => measureMarcaCatalogPopover(rect, viewport),
-    [],
-  );
-
-  usePopoverDockEffect(activeMenu === "precio", priceTriggerRef, pricePopoverFrameRef, setPricePopoverStyle, layoutPricePopover);
-  usePopoverDockEffect(activeMenu === "talla", sizeTriggerRef, sizePopoverFrameRef, setSizePopoverStyle, layoutSizePopover);
-  usePopoverDockEffect(activeMenu === "color", colorTriggerRef, colorPopoverFrameRef, setColorPopoverStyle, layoutColorPopover);
-  usePopoverDockEffect(activeMenu === "material", materialTriggerRef, materialPopoverFrameRef, setMaterialPopoverStyle, layoutMaterialPopover);
-  usePopoverDockEffect(activeMenu === "descuento", discountTriggerRef, discountPopoverFrameRef, setDiscountPopoverStyle, layoutDiscountPopover);
-  usePopoverDockEffect(activeMenu === "marcaSlug", marcaTriggerRef, marcaPopoverFrameRef, setMarcaPopoverStyle, layoutMarcaPopover);
-
-  const routeFiltered = useMemo((): Product[] => {
-    if (USE_BFF_CATALOG_BROWSE) return [];
-    return buildRouteFilteredCatalogProducts({
-        products,
-        categoria,
-        vista,
-        marca,
-        marcaSlug,
-        campana,
-        promocion,
-        coleccion,
-        tipo,
-        linea,
-        estilo,
-        segmento,
-        rangoEdad,
-        color,
-        trimmedQuery,
-      });
-  }, [
-      products,
+  const route = useMemo(
+    () => ({
       categoria,
       vista,
       marca,
@@ -385,964 +61,123 @@ export default function ProductsPage() {
       campana,
       promocion,
       coleccion,
+      estilo,
       tipo,
       linea,
-      estilo,
       segmento,
+      color,
       rangoEdad,
-      color,
+      precio,
+      talla,
+      material,
+      descuento,
       trimmedQuery,
-    ]
-  );
-
-  const marcasClient = useMemo(() => {
-    const names = routeFiltered
-      .map((product) => product.marca?.trim())
-      .filter((value): value is string => Boolean(value));
-    return Array.from(new Set(names))
-      .sort((left, right) => left.localeCompare(right))
-      .map((value) => ({ label: value, value: slugifyCatalogValue(value) }));
-  }, [routeFiltered]);
-  const marcas = useMemo(
-    () => (USE_BFF_CATALOG_BROWSE ? (browse?.meta.marcas ?? []) : marcasClient),
-    [browse, marcasClient],
-  );
-
-  const availableColors = useMemo(() => {
-    return COLOR_SWATCH_ORDER.map((value) => ({
-      label: humanizeSlug(value),
-      value,
-      swatch: COLOR_SWATCH_MAP[value],
-    }));
-  }, []);
-
-  const availableSizesClient = useMemo(() => {
-    const numericSizes = routeFiltered
-      .flatMap((product) => getProductSizes(product))
-      .map(Number)
-      .filter(Number.isFinite);
-    return Array.from(new Set(numericSizes))
-      .sort((left, right) => left - right)
-      .map(String);
-  }, [routeFiltered]);
-  const availableSizes = useMemo(
-    () => (USE_BFF_CATALOG_BROWSE ? (browse?.meta.availableSizes ?? []) : availableSizesClient),
-    [browse, availableSizesClient],
-  );
-
-  const availableMaterials = useMemo(() => {
-    return MATERIAL_FILTER_ORDER
-      .map((slug) => ({
-        value: slug,
-        label: MATERIAL_RULES.find((rule) => rule.slug === slug)?.label ?? humanizeSlug(slug),
-      }));
-  }, []);
-
-  const priceBoundsClient = useMemo(() => {
-    if (routeFiltered.length === 0) {
-      return { min: 0, max: 0, low: 0, high: 0 };
-    }
-
-    const prices = routeFiltered.map((product) => product.precio).filter(Number.isFinite);
-    if (prices.length === 0) {
-      return { min: 0, max: 0, low: 0, high: 0 };
-    }
-
-    const min = Math.floor(Math.min(...prices));
-    const max = Math.ceil(Math.max(...prices));
-    const low = Math.max(min, Math.round((min + (max - min) * 0.35) / 10) * 10);
-    const high = Math.max(low + 10, Math.round((min + (max - min) * 0.68) / 10) * 10);
-
-    return { min, max, low, high: Math.min(high, max) };
-  }, [routeFiltered]);
-  const priceBounds = useMemo(
-    () =>
-      USE_BFF_CATALOG_BROWSE
-        ? (browse?.meta.priceBounds ?? { min: 0, max: 0, low: 0, high: 0 })
-        : priceBoundsClient,
-    [browse, priceBoundsClient],
-  );
-
-  const filtered = useMemo(() => {
-    if (USE_BFF_CATALOG_BROWSE) return [];
-    return buildFacetFilteredCatalogProducts(routeFiltered, {
-      precio,
-      talla,
-      color,
-      material,
-      descuento,
-    });
-  }, [color, descuento, material, precio, routeFiltered, talla]);
-
-  const catalogTotal = USE_BFF_CATALOG_BROWSE ? (browse?.total ?? 0) : filtered.length;
-  const totalCatalogPages = USE_BFF_CATALOG_BROWSE
-    ? (browse?.totalPages ?? 0)
-    : Math.ceil(filtered.length / CATALOG_PAGE_SIZE);
-  const pagedProductsClient = useMemo(
-    () => filtered.slice((catalogPage - 1) * CATALOG_PAGE_SIZE, catalogPage * CATALOG_PAGE_SIZE),
-    [filtered, catalogPage],
-  );
-  const pagedProducts = useMemo(
-    (): Product[] => (USE_BFF_CATALOG_BROWSE ? (browse?.products ?? []) : pagedProductsClient),
-    [browse, pagedProductsClient],
-  );
-
-  const pageTitle = useMemo(
-    () =>
-      resolveProductsPageTitle({
-        vista,
-        campana,
-        promocion,
-        coleccion,
-        linea,
-        tipo,
-        estilo,
-        segmento,
-        marcaSlug,
-        categoria,
-        trimmedQuery,
-      }),
-    [campana, categoria, coleccion, estilo, linea, marcaSlug, promocion, segmento, tipo, trimmedQuery, vista]
-  );
-
-  const pageSubtitle = useMemo(() => {
-    const visibleCount = productCountLabel(catalogTotal);
-
-    if (campana || promocion || coleccion) {
-      return `${visibleCount} visibles dentro de la selección activa. Explora por filtros rápidos sin perder la línea visual de la colección.`;
-    }
-
-    if (categoria === "todos") {
-      return `${visibleCount} listos para comparar con una navegación más limpia, directa y coherente con la marca.`;
-    }
-
-    return `${visibleCount} listos para explorar dentro de ${categoryLabel(categoria).toLowerCase()}. Usa los menús horizontales para afinar color, talla, material o promociones.`;
-  }, [campana, categoria, coleccion, catalogTotal, promocion]);
-
-  const catalogCampaignSlides = useMemo(
-    () => [
-      {
-        id: "juvenil",
-        image: cyberWowJuvenilEditorial,
-        alt: "Campaña CYBER WOW juvenil con composición de calzado al lado derecho y espacio libre al lado izquierdo.",
-      },
-      {
-        id: "zapatillas",
-        image: cyberWowZapatillasEditorial,
-        alt: "Campaña CYBER WOW de zapatillas con composición de calzado al lado izquierdo y espacio libre al lado derecho.",
-      },
-    ],
-    []
-  );
-
-  const {
-    activeCampaignSlide,
-    isCampaignDragging,
-    campaignTrackRef,
-    handleCampaignPointerDown,
-    handleCampaignPointerMove,
-    handleCampaignPointerUp,
-    handleCampaignPointerCancel,
-    handleCampaignAnimationEnd,
-    getCampaignSlideClassName,
-    getCampaignSlideStyle,
-  } = useCatalogCampaignCarousel(catalogCampaignSlides, CATALOG_CAMPAIGN_ROTATION_MS);
-
-  const primaryFilters = useMemo<CatalogFilterGroup>(
-    () => ({
-      title: "Sección",
-      items: [
-        { label: "Todos", params: {} },
-        { label: "Mujer", params: { categoria: "mujer" } },
-        { label: "Hombre", params: { categoria: "hombre" } },
-        { label: "Infantil", params: { categoria: "nino" } },
-        { label: "Marcas", params: { vista: "marcas" } },
-      ],
     }),
-    []
-  );
-
-  const contextualFilters = useMemo(
-    () =>
-      buildContextualCatalogFilters({
-        vista,
-        campana,
-        categoria,
-        coleccion,
-        tipo,
-        linea,
-        segmento,
-        color,
-        descuento,
-        rangoEdad,
-        marcas,
-      }),
-    [campana, categoria, coleccion, color, descuento, linea, marcas, rangoEdad, segmento, tipo, vista]
-  );
-
-  const showContextualFilterGroup = useMemo(() => {
-    if (contextualFilters.title === "Categoría") return false;
-    if (contextualFilters.items.length !== primaryFilters.items.length) return true;
-
-    return contextualFilters.items.some((item, index) => {
-      const primaryItem = primaryFilters.items[index];
-      if (!primaryItem) return true;
-      if (item.label !== primaryItem.label) return true;
-
-      return CATALOG_ROUTE_PARAM_KEYS.some(
-        (key) => (item.params[key] ?? "") !== (primaryItem.params[key] ?? "")
-      );
-    });
-  }, [contextualFilters, primaryFilters]);
-
-  const isQuickFilterActive = (params: Record<string, string | undefined>) => {
-    const routeOk = CATALOG_ROUTE_PARAM_KEYS.every(
-      (key) => (effectiveParams.get(key) ?? "") === (params[key] ?? "")
-    );
-    if (Object.hasOwn(params, "descuento")) {
-      return routeOk && (effectiveParams.get("descuento") ?? "") === (params.descuento ?? "");
-    }
-    return routeOk;
-  };
-
-  const applySectionFilter = useCallback(
-    (next: Record<string, string | undefined>) => {
-      const params = new URLSearchParams();
-
-      Object.entries(next).forEach(([key, value]) => {
-        if (!value) return;
-        params.set(key, value);
-      });
-
-      setActiveMenu(null);
-      const { pathname, search } = buildCanonicalCatalogLocation(params);
-      navigate(`${pathname}${search}`);
-    },
-    [navigate]
-  );
-
-  const applyFacetFilter = useCallback(
-    (next: Record<string, string | undefined>) => {
-      const params = new URLSearchParams(effectiveParams);
-
-      Object.entries(next).forEach(([key, value]) => {
-        if (value) {
-          params.set(key, value);
-        } else {
-          params.delete(key);
-        }
-      });
-
-      setActiveMenu(null);
-      const { pathname, search } = buildCanonicalCatalogLocation(params);
-      navigate(`${pathname}${search}`);
-    },
-    [effectiveParams, navigate]
-  );
-
-  const menuDraftSetters = useMemo(
-    () => ({
-      setPricePopoverStyle,
-      setDraftPriceMin,
-      setDraftPriceMax,
-      setSizePopoverStyle,
-      setDraftSelectedSizes,
-      setColorPopoverStyle,
-      setDraftSelectedColors,
-      setMaterialPopoverStyle,
-      setDraftSelectedMaterials,
-      setDiscountPopoverStyle,
-      setDraftSelectedDiscounts,
-    }),
-    [],
-  );
-
-  const toggleMenu = useCallback(
-    (menuKey: string) => {
-      setActiveMenu((current) => {
-        if (current === menuKey) return null;
-        primeCatalogMenuDraft(
-          menuKey,
-          { precio, talla, color, material, descuento, priceBounds, availableSizes, availableColors, availableMaterials },
-          menuDraftSetters,
-        );
-        return menuKey;
-      });
-    },
     [
-      availableColors,
-      availableMaterials,
-      availableSizes,
+      categoria,
+      vista,
+      marca,
+      marcaSlug,
+      campana,
+      promocion,
+      coleccion,
+      estilo,
+      tipo,
+      linea,
+      segmento,
       color,
-      descuento,
-      material,
-      menuDraftSetters,
+      rangoEdad,
       precio,
-      priceBounds,
       talla,
+      material,
+      descuento,
+      trimmedQuery,
     ],
   );
 
-  const breadcrumbs = useMemo(
-    () =>
-      buildCatalogBreadcrumbs({
-        vista,
-        categoria,
-        campana,
-        coleccion,
-        linea,
-        tipo,
-        estilo,
-        segmento,
-        rangoEdad,
-        color,
-        marca,
-        marcaSlug,
-        descuento,
-        precio,
-        talla,
-        material,
-      }),
-    [campana, categoria, coleccion, color, descuento, estilo, linea, marca, marcaSlug, material, precio, rangoEdad, segmento, talla, tipo, vista]
+  const navigation = useCatalogNavigation(effectiveParams, navigate, () => closeMenusRef.current());
+
+  const model = useProductsPageCatalogModel({
+    products,
+    browse,
+    useBffBrowse,
+    catalogPage,
+    route,
+    applyFacetFilter: navigation.applyFacetFilter,
+  });
+
+  const menuDraftContext = useMemo(
+    () => ({
+      precio,
+      talla,
+      color,
+      material,
+      descuento,
+      priceBounds: model.priceBounds,
+      availableSizes: model.availableSizes,
+      availableColors: model.availableColors,
+      availableMaterials: model.availableMaterials,
+    }),
+    [
+      precio,
+      talla,
+      color,
+      material,
+      descuento,
+      model.priceBounds,
+      model.availableSizes,
+      model.availableColors,
+      model.availableMaterials,
+    ],
   );
 
-  const sectionLabel = useMemo(() => {
-    if (vista === "marcas") return "Marcas";
-    if (categoria !== "todos") return categoryLabel(categoria);
-    return "Todo el catálogo";
-  }, [categoria, vista]);
-
-  const visibleBrandCount = useMemo(() => {
-    return new Set(pagedProducts.map((product) => product.marca).filter(Boolean)).size;
-  }, [pagedProducts]);
-
-  const filterMenus = useMemo<FilterMenuConfig[]>(() => {
-    return [
-      {
-        key: "precio",
-        label: "Precio",
-        value: precio ? getPriceLabel(precio, priceBounds.min, priceBounds.max) : "",
-        options: [],
-        onSelect: (value) => applyFacetFilter({ precio: value || undefined }),
-      },
-      {
-        key: "talla",
-        label: "Talla",
-        value: talla ? parseSizeSelection(talla).join(", ") : "",
-        options: [],
-        onSelect: (value) => applyFacetFilter({ talla: value || undefined }),
-      },
-      {
-        key: "marcaSlug",
-        label: "Marca",
-        value: marcaSlug ? humanizeSlug(marcaSlug) : "",
-        options: marcas,
-        onSelect: (value) => applyFacetFilter({ vista: value ? "marcas" : vista || undefined, marcaSlug: value || undefined }),
-      },
-      {
-        key: "color",
-        label: "Color",
-        value: color ? parseColorSelection(color).map(humanizeSlug).join(", ") : "",
-        options: [],
-        onSelect: (value) => applyFacetFilter({ color: value || undefined }),
-      },
-      {
-        key: "material",
-        label: "Material",
-        value: material ? parseMaterialSelection(material).map(humanizeSlug).join(", ") : "",
-        options: [],
-        onSelect: (value) => applyFacetFilter({ material: value || undefined }),
-      },
-      {
-        key: "descuento",
-        label: "Descuento %",
-        value: descuento ? parseDiscountSelection(descuento).map((value) => DISCOUNT_OPTIONS.find((option) => option.value === value)?.label ?? value).join(", ") : "",
-        options: [],
-        onSelect: (value) => applyFacetFilter({ descuento: value || undefined }),
-      },
-    ];
-  }, [
-    applyFacetFilter,
-    color,
-    descuento,
-    marcas,
-    marcaSlug,
-    material,
-    precio,
-    priceBounds.max,
-    priceBounds.min,
-    talla,
-    vista,
-  ]);
-
-  const activeFacets = useMemo(
-    () =>
-      buildActiveCatalogFacetChips(
-        {
-          precio,
-          talla,
-          marcaSlug,
-          color,
-          material,
-          descuento,
-          categoria,
-          vista,
-          priceBoundsMin: priceBounds.min,
-          priceBoundsMax: priceBounds.max,
-        },
-        applyFacetFilter
-      ),
-    [applyFacetFilter, categoria, color, descuento, marcaSlug, material, precio, priceBounds.max, priceBounds.min, talla, vista]
-  );
-
-  const hasAnyProducts = catalogTotal > 0;
-
-  const fillRangeLeft = (() => {
-    if (priceBounds.max <= priceBounds.min) return "10px";
-    const l = (draftPriceMin - priceBounds.min) / (priceBounds.max - priceBounds.min);
-    return `calc(${(l * 100).toFixed(2)}% + ${(10 - l * 20).toFixed(2)}px)`;
-  })();
-  const fillRangeRight = (() => {
-    if (priceBounds.max <= priceBounds.min) return "10px";
-    const r = (draftPriceMax - priceBounds.min) / (priceBounds.max - priceBounds.min);
-    return `calc(${((1 - r) * 100).toFixed(2)}% + ${(r * 20 - 10).toFixed(2)}px)`;
-  })();
-
-  const handleCatalogRetry = useCallback(() => {
-    setLoading(true);
-    setError(null);
-    setReloadToken((current) => current + 1);
-  }, []);
+  const popovers = useCatalogFacetPopovers(menuDraftContext);
+  closeMenusRef.current = popovers.closeMenus;
 
   const productsMainContent = buildProductsPageMainContent({
     loading,
     error,
-    hasAnyProducts,
+    hasAnyProducts: model.hasAnyProducts,
     trimmedQuery,
-    pagedProducts,
+    pagedProducts: model.pagedProducts,
     familyGroupCounts,
-    catalogTotal,
+    catalogTotal: model.catalogTotal,
     catalogPage,
-    totalCatalogPages,
+    totalCatalogPages: model.totalCatalogPages,
     pageSize: CATALOG_PAGE_SIZE,
-    onRetry: handleCatalogRetry,
+    onRetry: handleRetry,
     onGoToFullCatalog: () => navigate(CATALOG_SHELF.products),
     onPageChange: setCatalogPage,
   });
 
   return (
     <main className="products-page products-page-modern">
-      <section
-        className="catalog-campaign-shell"
-        aria-label={pageTitle}
-        aria-describedby={catalogDescriptionId}
-      >
-        <p id={catalogDescriptionId} className="sr-only">
-          {`${pageSubtitle} ${sectionLabel}. ${visibleBrandCount || 0} marcas visibles.`}
-        </p>
-        <div
-          ref={campaignTrackRef}
-          className={`catalog-campaign-track ${isCampaignDragging ? "is-dragging" : ""}`}
-          onPointerDown={handleCampaignPointerDown}
-          onPointerMove={handleCampaignPointerMove}
-          onPointerUp={handleCampaignPointerUp}
-          onPointerCancel={handleCampaignPointerCancel}
-        >
-          {catalogCampaignSlides.map((slide, index) => (
-            <article
-              key={slide.id}
-              className={getCampaignSlideClassName(index)}
-              style={getCampaignSlideStyle(index)}
-              onAnimationEnd={() => handleCampaignAnimationEnd(index)}
-            >
-              <img
-                className="catalog-campaign-image"
-                src={slide.image}
-                alt={slide.alt}
-                loading={index === 0 ? "eager" : "lazy"}
-                draggable={false}
-              />
-            </article>
-          ))}
-        </div>
+      <ProductsPageCampaignSection
+        pageTitle={model.pageTitle}
+        pageSubtitle={model.pageSubtitle}
+        sectionLabel={model.sectionLabel}
+        visibleBrandCount={model.visibleBrandCount}
+        catalogDescriptionId={catalogDescriptionId}
+      />
 
-        <progress
-          className="catalog-campaign-progress"
-          aria-label="Progreso de campañas"
-          aria-valuenow={activeCampaignSlide + 1}
-          value={activeCampaignSlide + 1}
-          max={catalogCampaignSlides.length}
-        />
-      </section>
-
-      {breadcrumbs.length > 1 && (
-        <nav className="catalog-breadcrumbs" aria-label="Navegación del catálogo">
-          {breadcrumbs.map((crumb, index) => {
-            const isLast = index === breadcrumbs.length - 1;
-            return (
-              <div key={`${crumb.label}-${index}`} className="catalog-breadcrumb-item">
-                <button
-                  type="button"
-                  className={`catalog-breadcrumb-btn ${isLast ? "is-current" : ""}`}
-                  onClick={() => applySectionFilter(crumb.params)}
-                  disabled={isLast}
-                >
-                  {crumb.label}
-                </button>
-                {!isLast && <ChevronRight size={14} className="catalog-breadcrumb-separator" />}
-              </div>
-            );
-          })}
-        </nav>
-      )}
-
-      <section className="catalog-control-shell">
-        <div className="catalog-section-tabs" aria-label={primaryFilters.title}>
-          {primaryFilters.items.map((item) => (
-            <button
-              key={`section-${item.label}`}
-              type="button"
-              className={`catalog-section-tab ${isQuickFilterActive(item.params) ? "is-active" : ""}`}
-              onClick={() => applySectionFilter(item.params)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        {showContextualFilterGroup && (
-          <div className="catalog-context-strip">
-            <span className="catalog-context-label">{contextualFilters.title}</span>
-            <div className="catalog-context-pills">
-              {contextualFilters.items.map((item) => (
-                <button
-                  key={`context-${contextualFilters.title}-${item.label}`}
-                  type="button"
-                  className={`catalog-context-pill ${isQuickFilterActive(item.params) ? "is-active" : ""}`}
-                  onClick={() => applySectionFilter(item.params)}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {campana === "cyber" && cyberShelfParams && (
-          <div
-            className="catalog-context-strip catalog-context-strip--cyber-descuentos"
-            aria-label="Descuentos Cyber Wow"
-          >
-            <span className="catalog-context-label">Descuento Cyber Wow</span>
-            <div className="catalog-context-pills">
-              {CYBER_DISCOUNT_PILL_OPTIONS.map((opt) => {
-                const params = { ...cyberShelfParams, descuento: opt.value };
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    className={`catalog-context-pill ${isQuickFilterActive(params) ? "is-active" : ""}`}
-                    onClick={() => applySectionFilter(params)}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        <CatalogFilterRail
-          filterRailRef={filterRailRef}
-          menus={filterMenus.map((menu) => ({ key: menu.key, label: menu.label, value: menu.value }))}
-          activeMenu={activeMenu}
-          toggleMenu={toggleMenu}
-          triggerRefs={{
-            priceTriggerRef,
-            sizeTriggerRef,
-            marcaTriggerRef,
-            colorTriggerRef,
-            materialTriggerRef,
-            discountTriggerRef,
-          }}
-        />
-
-        {activeMenu === "precio" && pricePopoverStyle && (
-          <dialog
-            open
-            id="catalog-price-popover"
-            ref={pricePopoverRef}
-            className="catalog-price-popover"
-            aria-label="Filtro de precio"
-            style={{
-              top: `${pricePopoverStyle.top}px`,
-              left: `${pricePopoverStyle.left}px`,
-              width: `${pricePopoverStyle.width}px`,
-            }}
-          >
-            <div className="catalog-filter-menu catalog-filter-menu-price">
-              <div className="catalog-price-fields">
-                <label className="catalog-price-field" aria-label="Precio mínimo">
-                  <div className="catalog-price-input-shell">
-                    <span className="catalog-price-input-label">Mínimo</span>
-                    <input
-                      aria-label="Precio mínimo"
-                      type="number"
-                      min={priceBounds.min}
-                      max={draftPriceMax}
-                      value={draftPriceMin}
-                      onChange={(event) => {
-                        const next = Number(event.target.value);
-                        if (!Number.isFinite(next)) return;
-                        setDraftPriceMin(Math.max(priceBounds.min, Math.min(next, draftPriceMax)));
-                      }}
-                    />
-                    <em>S/.</em>
-                  </div>
-                </label>
-
-                <label className="catalog-price-field" aria-label="Precio máximo">
-                  <div className="catalog-price-input-shell">
-                    <span className="catalog-price-input-label">Máximo</span>
-                    <input
-                      aria-label="Precio máximo"
-                      type="number"
-                      min={draftPriceMin}
-                      max={priceBounds.max}
-                      value={draftPriceMax}
-                      onChange={(event) => {
-                        const next = Number(event.target.value);
-                        if (!Number.isFinite(next)) return;
-                        setDraftPriceMax(Math.min(priceBounds.max, Math.max(next, draftPriceMin)));
-                      }}
-                    />
-                    <em>S/.</em>
-                  </div>
-                </label>
-              </div>
-
-              <div className="catalog-price-slider-shell">
-                <div className="catalog-price-slider-track" />
-                <div
-                  className="catalog-price-slider-range"
-                  style={{ left: fillRangeLeft, right: fillRangeRight }}
-                />
-                <input
-                  className="catalog-price-slider catalog-price-slider-min"
-                  type="range"
-                  min={priceBounds.min}
-                  max={priceBounds.max}
-                  step={1}
-                  value={draftPriceMin}
-                  onChange={(event) => {
-                    const next = Number(event.target.value);
-                    setDraftPriceMin(Math.min(next, draftPriceMax));
-                  }}
-                />
-                <input
-                  className="catalog-price-slider catalog-price-slider-max"
-                  type="range"
-                  min={priceBounds.min}
-                  max={priceBounds.max}
-                  step={1}
-                  value={draftPriceMax}
-                  onChange={(event) => {
-                    const next = Number(event.target.value);
-                    setDraftPriceMax(Math.max(next, draftPriceMin));
-                  }}
-                />
-              </div>
-
-              <button
-                type="button"
-                className="catalog-price-apply"
-                onClick={() => {
-                  const priceMenu = filterMenus.find((menu) => menu.key === "precio");
-                  priceMenu?.onSelect(`range:${draftPriceMin}:${draftPriceMax}`);
-                }}
-              >
-                Mostrar resultados
-              </button>
-            </div>
-          </dialog>
-        )}
-
-        {activeMenu === "talla" && sizePopoverStyle && (
-          <dialog
-            open
-            id="catalog-size-popover"
-            ref={sizePopoverRef}
-            className="catalog-price-popover"
-            aria-label="Filtro de talla"
-            style={{
-              top: `${sizePopoverStyle.top}px`,
-              left: `${sizePopoverStyle.left}px`,
-              width: `${sizePopoverStyle.width}px`,
-            }}
-          >
-            <div className="catalog-filter-menu catalog-filter-menu-price">
-              <fieldset className="catalog-size-grid">
-                <legend className="sr-only">Tallas disponibles</legend>
-                {availableSizes.length === 0 ? (
-                  <p className="catalog-size-empty">No hay tallas disponibles para los filtros actuales.</p>
-                ) : (
-                  availableSizes.map((size) => {
-                    const checked = draftSelectedSizes.includes(size);
-                    return (
-                      <label key={size} className="catalog-size-item">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => {
-                            setDraftSelectedSizes((current) =>
-                              toggleCatalogStringListMember(current, size, checked)
-                            );
-                          }}
-                        />
-                        <span>{size}</span>
-                      </label>
-                    );
-                  })
-                )}
-              </fieldset>
-
-              <button
-                type="button"
-                className="catalog-price-apply"
-                onClick={() => {
-                  const tallaMenu = filterMenus.find((m) => m.key === "talla");
-                  tallaMenu?.onSelect(draftSelectedSizes.join(","));
-                }}
-              >
-                Mostrar resultados
-              </button>
-            </div>
-          </dialog>
-        )}
-
-        {activeMenu === "color" && colorPopoverStyle && (
-          <dialog
-            open
-            id="catalog-color-popover"
-            ref={colorPopoverRef}
-            className="catalog-price-popover"
-            aria-label="Filtro de color"
-            style={{
-              top: `${colorPopoverStyle.top}px`,
-              left: `${colorPopoverStyle.left}px`,
-              width: `${colorPopoverStyle.width}px`,
-            }}
-          >
-            <div className="catalog-filter-menu catalog-filter-menu-price">
-              <fieldset className="catalog-color-grid">
-                <legend className="sr-only">Colores disponibles</legend>
-                {availableColors.length === 0 ? (
-                  <p className="catalog-size-empty">No hay colores disponibles para los filtros actuales.</p>
-                ) : (
-                  availableColors.map((colorOption) => {
-                    const checked = draftSelectedColors.includes(colorOption.value);
-                    return (
-                      <button
-                        key={colorOption.value}
-                        type="button"
-                        className={`catalog-color-item ${checked ? "is-active" : ""}`}
-                        onClick={() =>
-                          setDraftSelectedColors((current) =>
-                            toggleCatalogStringListMember(current, colorOption.value, checked)
-                          )
-                        }
-                      >
-                        <span
-                          className="catalog-color-swatch"
-                          style={{ background: colorOption.swatch }}
-                          aria-hidden="true"
-                        />
-                        <span>{colorOption.label}</span>
-                      </button>
-                    );
-                  })
-                )}
-              </fieldset>
-
-              <button
-                type="button"
-                className="catalog-price-apply"
-                onClick={() => {
-                  const colorMenu = filterMenus.find((m) => m.key === "color");
-                  colorMenu?.onSelect(draftSelectedColors.join(","));
-                }}
-              >
-                Mostrar resultados
-              </button>
-            </div>
-          </dialog>
-        )}
-
-        {activeMenu === "material" && materialPopoverStyle && (
-          <dialog
-            open
-            id="catalog-material-popover"
-            ref={materialPopoverRef}
-            className="catalog-price-popover"
-            aria-label="Filtro de material"
-            style={{
-              top: `${materialPopoverStyle.top}px`,
-              left: `${materialPopoverStyle.left}px`,
-              width: `${materialPopoverStyle.width}px`,
-            }}
-          >
-            <div className="catalog-filter-menu catalog-filter-menu-price catalog-filter-menu-material">
-              <fieldset className="catalog-material-grid">
-                <legend className="sr-only">Materiales disponibles</legend>
-                {availableMaterials.length === 0 ? (
-                  <p className="catalog-size-empty">No hay materiales disponibles para los filtros actuales.</p>
-                ) : (
-                  availableMaterials.map((materialOption) => {
-                    const checked = draftSelectedMaterials.includes(materialOption.value);
-                    return (
-                      <label key={materialOption.value} className="catalog-material-item">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => {
-                            setDraftSelectedMaterials((current) =>
-                              toggleCatalogStringListMember(current, materialOption.value, checked)
-                            );
-                          }}
-                        />
-                        <span>{materialOption.label}</span>
-                      </label>
-                    );
-                  })
-                )}
-              </fieldset>
-
-              <button
-                type="button"
-                className="catalog-price-apply"
-                onClick={() => {
-                  const materialMenu = filterMenus.find((m) => m.key === "material");
-                  materialMenu?.onSelect(draftSelectedMaterials.join(","));
-                }}
-              >
-                Mostrar resultados
-              </button>
-            </div>
-          </dialog>
-        )}
-
-        {activeMenu === "descuento" && discountPopoverStyle && (
-          <dialog
-            open
-            id="catalog-discount-popover"
-            ref={discountPopoverRef}
-            className="catalog-price-popover"
-            aria-label="Filtro de descuento"
-            style={{
-              top: `${discountPopoverStyle.top}px`,
-              left: `${discountPopoverStyle.left}px`,
-              width: `${discountPopoverStyle.width}px`,
-            }}
-          >
-            <div className="catalog-filter-menu catalog-filter-menu-price">
-              <fieldset className="catalog-checklist-vertical">
-                <legend className="sr-only">Descuentos disponibles</legend>
-                {DISCOUNT_OPTIONS.map((discountOption) => {
-                  const checked = draftSelectedDiscounts.includes(discountOption.value);
-                  return (
-                    <label key={discountOption.value} className="catalog-size-item">
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => {
-                          setDraftSelectedDiscounts((current) =>
-                            toggleCatalogStringListMember(current, discountOption.value, checked)
-                          );
-                        }}
-                      />
-                      <span>{discountOption.label}</span>
-                    </label>
-                  );
-                })}
-              </fieldset>
-
-              <button
-                type="button"
-                className="catalog-price-apply"
-                onClick={() => {
-                  const discountMenu = filterMenus.find((m) => m.key === "descuento");
-                  discountMenu?.onSelect(draftSelectedDiscounts.join(","));
-                }}
-              >
-                Mostrar resultados
-              </button>
-            </div>
-          </dialog>
-        )}
-
-        {activeMenu === "marcaSlug" && marcaPopoverStyle && (
-          <dialog
-            open
-            id="catalog-marca-popover"
-            ref={marcaPopoverRef}
-            className="catalog-price-popover"
-            aria-label="Filtro de marca"
-            style={{
-              top: `${marcaPopoverStyle.top}px`,
-              left: `${marcaPopoverStyle.left}px`,
-              width: `${marcaPopoverStyle.width}px`,
-            }}
-          >
-            <div className="catalog-filter-menu catalog-filter-menu-price">
-              <fieldset className="catalog-checklist-vertical">
-                <legend className="sr-only">Marcas disponibles</legend>
-                {marcas.length === 0 ? (
-                  <p className="catalog-size-empty">No hay marcas disponibles.</p>
-                ) : (
-                  marcas.map((brandOption) => {
-                    const selected = draftSelectedMarcas[0] === brandOption.value;
-                    return (
-                      <label key={brandOption.value} className="catalog-size-item">
-                        <input
-                          type="radio"
-                          name="catalog-marca-radio"
-                          checked={selected}
-                          onChange={() => {
-                            setDraftSelectedMarcas(selected ? [] : [brandOption.value]);
-                          }}
-                        />
-                        <span>{brandOption.label}</span>
-                      </label>
-                    );
-                  })
-                )}
-              </fieldset>
-
-              <button
-                type="button"
-                className="catalog-price-apply"
-                onClick={() => {
-                  const marcaMenu = filterMenus.find((m) => m.key === "marcaSlug");
-                  marcaMenu?.onSelect(draftSelectedMarcas[0] ?? "");
-                }}
-              >
-                Mostrar resultados
-              </button>
-            </div>
-          </dialog>
-        )}
-
-        {activeFacets.length > 0 && (
-          <div className="catalog-active-facets" aria-label="Filtros activos">
-            {activeFacets.map((facet) => (
-              <button key={facet.label} type="button" className="catalog-active-facet" onClick={facet.onClear}>
-                <span>{facet.label}</span>
-                <X size={12} />
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+      <ProductsPageControlShell
+        breadcrumbs={model.breadcrumbs}
+        primaryFilters={model.primaryFilters}
+        contextualFilters={model.contextualFilters}
+        showContextualFilterGroup={model.showContextualFilterGroup}
+        campana={campana}
+        cyberShelfParams={cyberShelfParams}
+        filterMenus={model.filterMenus}
+        activeFacets={model.activeFacets}
+        marcas={model.marcas}
+        availableSizes={model.availableSizes}
+        availableColors={model.availableColors}
+        availableMaterials={model.availableMaterials}
+        priceBounds={model.priceBounds}
+        isQuickFilterActive={navigation.isQuickFilterActive}
+        applySectionFilter={navigation.applySectionFilter}
+        popovers={popovers}
+      />
 
       <div className="products-main">{productsMainContent}</div>
     </main>

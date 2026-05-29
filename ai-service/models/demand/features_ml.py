@@ -1,24 +1,10 @@
-"""
-Demand prediction model.
-Uses a RandomForestRegressor (scikit-learn) trained on all products' aggregated
-historical daily sales. Features: weekday, month, day-of-month, 7-day lag
-average, 30-day lag average, category, campaign (label-encoded), and
-seasonal flags for footwear sales peaks.
+"""Feature engineering, ML training, and per-product prediction rows."""
 
-Falls back to weighted moving average (70 % last-7d + 30 % last-30d) only when
-there are fewer than MIN_TRAIN_ROWS training samples across all products.
-"""
+import math
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
-import hashlib
-import math
 from typing import Any
-
-def _stockout_date(days_until: int) -> str | None:
-    if days_until >= 999:
-        return None
-    return (date.today() + timedelta(days=days_until)).isoformat()
 
 import numpy as np
 import pandas as pd
@@ -26,177 +12,22 @@ import sklearn
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import LabelEncoder
 
+from models.demand.constants import FEATURE_COLS, MIN_TRAIN_ROWS, SEASONAL_FEATURES
 from models.safe_limits import (
     MAX_HISTORY_DAYS_FOR_LOOPS,
     MAX_HORIZON_DAYS_FOR_LOOPS,
-    MAX_WEEKS_FOR_CHART,
     sanitize_int_for_range,
 )
-
-# Minimum training rows (product × day pairs) to use the ML model.
-MIN_TRAIN_ROWS = 30
-
-# Mínimo de productos con ventas para considerar el panel de predicciones representativo.
-MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS = 5
-SEASONAL_FEATURES = [
-    "temporada_verano",
-    "temporada_escolar",
-    "temporada_fiestas_patrias",
-    "temporada_navidad",
-]
-FEATURE_COLS = [
-    "weekday",
-    "month",
-    "day_of_month",
-    "lag_7",
-    "lag_30",
-    "categoria",
-    "campana",
-    *SEASONAL_FEATURES,
-]
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _safe_float(value) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _iso_date(value) -> str | None:
-    if isinstance(value, str) and len(value) >= 10:
-        return value[:10]
-    if hasattr(value, "date"):
-        return value.date().isoformat()
-    return None
-
-
-def _percentile(values: list[float], quantile: float) -> float:
-    if not values:
-        return 0.0
-    ordered = sorted(values)
-    if len(ordered) == 1:
-        return ordered[0]
-    pos = max(0.0, min(1.0, quantile)) * (len(ordered) - 1)
-    lower = math.floor(pos)
-    upper = math.ceil(pos)
-    if lower == upper:
-        return ordered[lower]
-    weight = pos - lower
-    return ordered[lower] * (1 - weight) + ordered[upper] * weight
-
-
-def _normalize_campaign(value) -> str:
-    """Normalize campaign names so model encoding is stable across sources."""
-    if not isinstance(value, str):
-        return ""
-    return value.strip().lower()
-
-
-def _season_flags(current_date: date) -> dict[str, int]:
-    """
-    Footwear-specific seasonality flags used by the demand model.
-    They represent expected commercial peaks: summer, back-to-school,
-    Peru's Fiestas Patrias, and Christmas / year-end.
-    """
-    month = current_date.month
-    return {
-        "temporada_verano": 1 if month in {12, 1, 2, 3} else 0,
-        "temporada_escolar": 1 if month in {2, 3} else 0,
-        "temporada_fiestas_patrias": 1 if month == 7 else 0,
-        "temporada_navidad": 1 if month in {11, 12} else 0,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Reproducibility helpers
-# ---------------------------------------------------------------------------
-
-def _data_hash(sales_map: dict, sale_meta: dict | None = None) -> str:
-    """Stable fingerprint of the training dataset and commercial context."""
-    sale_meta = sale_meta or {}
-    key = "|".join(
-        f"{pid}:"
-        f"{sum(day_sales.values()):.1f}:"
-        f"{sale_meta.get(pid, {}).get('categoria') or ''}:"
-        f"{_normalize_campaign(sale_meta.get(pid, {}).get('campana'))}"
-        for pid, day_sales in sorted(sales_map.items())
-    )
-    return hashlib.sha256(key.encode()).hexdigest()[:16]
-
-
-def _drift_score(lag_7: float, lag_30: float, feature_stats: dict) -> float:
-    """
-    Z-score-based drift: how far current lag features are from the training
-    distribution. Returns 0.0 (no drift) … 1.0 (high drift, z ≥ 3).
-    """
-    if not feature_stats:
-        return 0.0
-    scores = []
-    for feat, val in [("lag_7", lag_7), ("lag_30", lag_30)]:
-        stats = feature_stats.get(feat, {})
-        std = stats.get("std", 1.0) or 1.0
-        z = abs(val - stats.get("mean", 0.0)) / std
-        scores.append(min(z / 3.0, 1.0))
-    return round(sum(scores) / len(scores), 2) if scores else 0.0
-
-
-# ---------------------------------------------------------------------------
-# Sales aggregation
-# ---------------------------------------------------------------------------
-
-def _accumulate_daily_sale_row(
-    result: dict[str, dict[str, float]],
-    sale: dict,
-) -> None:
-    # canal='web' ya está en pedidos → excluir para evitar doble conteo de unidades
-    if sale.get("canal") == "web":
-        return
-    pid = sale.get("productId", "")
-    fecha = sale.get("fecha", "")
-    qty = _safe_float(sale.get("cantidad", 0))
-    if pid and fecha and qty > 0 and not sale.get("devuelto", False):
-        result[pid][fecha] += qty
-
-
-def _accumulate_completed_order_row(
-    result: dict[str, dict[str, float]],
-    order: dict,
-) -> None:
-    fecha = _iso_date(order.get("pagadoEn") or order.get("creadoEn"))
-    if not fecha:
-        return
-    for item in order.get("items", []):
-        product = item.get("product", {})
-        pid = product.get("id", "")
-        qty = _safe_float(item.get("quantity", 0))
-        if pid and qty > 0:
-            result[pid][fecha] += qty
-
-
-def build_daily_sales_by_product(
-    daily_sales: list[dict],
-    completed_orders: list[dict],
-) -> dict[str, dict[str, float]]:
-    """Returns {productId: {"YYYY-MM-DD": units_sold}} from all sales sources."""
-    result: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
-
-    for sale in daily_sales:
-        _accumulate_daily_sale_row(result, sale)
-
-    for order in completed_orders:
-        _accumulate_completed_order_row(result, order)
-
-    return {k: dict(v) for k, v in result.items()}
-
-
-# ---------------------------------------------------------------------------
-# Feature engineering
-# ---------------------------------------------------------------------------
+from models.demand.helpers import (
+    _data_hash,
+    _drift_score,
+    _iso_date,
+    _normalize_campaign,
+    _percentile,
+    _safe_float,
+    _season_flags,
+    _stockout_date,
+)
 
 def _lag_features(current_date: date, day_sales: dict, cat_enc: int, campaign_enc: int = 0) -> dict:
     """Compute temporal and lag features for a single date."""
@@ -209,7 +40,7 @@ def _lag_features(current_date: date, day_sales: dict, cat_enc: int, campaign_en
         for d in range(1, 31)
     ) / 30.0
     return {
-        "weekday": current_date.weekday(),       # 0=Mon … 6=Sun
+        "weekday": current_date.weekday(),       # 0=Mon â€¦ 6=Sun
         "month": current_date.month,
         "day_of_month": current_date.day,
         "lag_7": lag_7,                          # mean daily units last 7 days
@@ -600,8 +431,8 @@ def _prediction_row_no_sales_history(
     }
 
 
-# Tallas de mayor rotación por categoría para detectar stock residual.
-# Si solo quedan tallas fuera de este rango, el producto está estancado por surtido,
+# Tallas de mayor rotaciÃ³n por categorÃ­a para detectar stock residual.
+# Si solo quedan tallas fuera de este rango, el producto estÃ¡ estancado por surtido,
 # no por falta de demanda.
 _POPULAR_SIZES: dict[str, set[str]] = {
     "hombre":  {"39", "40", "41", "42"},
@@ -656,7 +487,7 @@ def _inventory_enrichment(
     movements_by_product: dict[str, list[dict]],
     total_sold: float,
 ) -> dict:
-    """Calcula métricas de inventario: sell-through, talla residual y stock por talla."""
+    """Calcula mÃ©tricas de inventario: sell-through, talla residual y stock por talla."""
     talla_stock = {k: v for k, v in (product.get("tallaStock") or {}).items() if (v or 0) > 0}
     sell_through = _sell_through_metrics(pid, total_sold, movements_by_product)
     categoria = product.get("categoria", "")
@@ -671,7 +502,7 @@ def _inventory_enrichment(
 
 
 def _detect_talla_residual(categoria: str, talla_stock: dict) -> bool:
-    """True si solo quedan tallas de baja rotación (extremos del rango para esa categoría)."""
+    """True si solo quedan tallas de baja rotaciÃ³n (extremos del rango para esa categorÃ­a)."""
     if not talla_stock:
         return False
     sizes_with_stock = {k for k, v in talla_stock.items() if (v or 0) > 0}
@@ -809,197 +640,3 @@ def _prediction_row_with_sales_history(inp: _SalesHistoryPredictionInput) -> dic
     }
 
 
-def predict_demand(
-    daily_sales: list[dict],
-    completed_orders: list[dict],
-    products: list[dict],
-    product_codes: dict[str, str] | None = None,
-    horizon_days: int = 30,
-    history_days: int = 90,
-    stock_movements: list[dict] | None = None,
-) -> tuple[list[dict], dict]:
-    """
-    Predict demand for each product over the next horizon_days.
-
-    Primary model: RandomForestRegressor trained on all products' combined
-    historical daily sales (cross-product model). Each product contributes
-    (history_days) training rows with temporal and lag features.
-
-    Fallback: weighted moving average when total training data < MIN_TRAIN_ROWS.
-
-    Returns (predictions, training_meta) where training_meta contains
-    reproducibility fields (data_hash, random_state, sklearn_version),
-    explainability fields (feature_importances), and drift baseline
-    (feature_stats) for production monitoring.
-    """
-    history_days = sanitize_int_for_range(
-        history_days, default=90, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS
-    )
-    horizon_days = sanitize_int_for_range(
-        horizon_days, default=30, min_v=1, max_v=MAX_HORIZON_DAYS_FOR_LOOPS
-    )
-    today = date.today()
-    history_start = today - timedelta(days=history_days)
-    date_range = [
-        (history_start + timedelta(days=i)).isoformat()
-        for i in range(history_days)
-    ]
-
-    sales_map = build_daily_sales_by_product(daily_sales, completed_orders)
-    product_map = {p["id"]: p for p in products}
-    codes_map: dict[str, str] = product_codes or {}
-    movements_by_product = _build_movements_by_product(stock_movements or [])
-
-    sale_meta = _init_sale_meta_from_sources(daily_sales, completed_orders, product_map)
-
-    # Train global ML model once for all products
-    ml_model, label_enc, campaign_enc, used_ml, training_meta = _train_global_model(
-        sales_map, sale_meta, history_days
-    )
-    feature_stats = training_meta.get("feature_stats", {})
-
-    window_7 = min(7, history_days)
-    window_15 = min(15, history_days)
-    window_30 = min(30, history_days)
-
-    recent_predictions = []
-    predicted_pids: set[str] = set()
-
-    for pid, day_sales in sales_map.items():
-        product = product_map.get(pid, {})
-        meta = sale_meta.get(pid, {})
-        row = _prediction_row_with_sales_history(
-            _SalesHistoryPredictionInput(
-                pid=pid,
-                day_sales=day_sales,
-                date_range=date_range,
-                history_days=history_days,
-                horizon_days=horizon_days,
-                window_7=window_7,
-                window_15=window_15,
-                window_30=window_30,
-                used_ml=used_ml,
-                ml_model=ml_model,
-                label_enc=label_enc,
-                campaign_enc=campaign_enc,
-                product=product,
-                meta=meta,
-                codes_map=codes_map,
-                feature_stats=feature_stats,
-                movements_by_product=movements_by_product,
-            )
-        )
-        if row is None:
-            continue
-        predicted_pids.add(pid)
-        recent_predictions.append(row)
-
-    # ---------------------------------------------------------------------------
-    # Risk classification (unchanged)
-    # ---------------------------------------------------------------------------
-    predictions = _apply_demand_risk_flags(recent_predictions, horizon_days)
-
-    # Products with no sales history
-    for pid, product in product_map.items():
-        if pid in predicted_pids:
-            continue
-        predictions.append(_prediction_row_no_sales_history(pid, product, codes_map, movements_by_product))
-
-    risk_order = {"critico": 0, "atencion": 1, "vigilancia": 2, "estable": 3, "sin_historial": 4}
-    predictions.sort(
-        key=lambda item: (
-            item["sin_historial"],
-            0 if item["riesgo_agotamiento"] else 1,
-            risk_order.get(item["nivel_riesgo"], 4),
-            -item["consumo_estimado_diario"],
-            -item["prediccion_unidades"],
-        )
-    )
-    training_meta = {
-        **training_meta,
-        **training_data_quality_meta(training_meta),
-    }
-    return predictions, training_meta
-
-
-def training_data_quality_meta(training_meta: dict) -> dict:
-    """
-    Metadatos para API/UI: indica si hay historial suficiente para confiar
-    en predicciones ML (misma lógica que _train_global_model).
-    """
-    n_samples = int(training_meta.get("n_samples") or 0)
-    n_products = int(training_meta.get("n_products") or 0)
-    model_type = str(training_meta.get("model_type") or "")
-    ml_active = model_type == "random_forest"
-
-    reasons: list[str] = []
-    if n_samples < MIN_TRAIN_ROWS:
-        reasons.append(
-            f"Muestras de entrenamiento ({n_samples}) por debajo del mínimo ({MIN_TRAIN_ROWS})."
-        )
-    if not ml_active:
-        reasons.append(
-            "No se entrenó Random Forest; las predicciones usan promedio móvil (menos fiables)."
-        )
-    if n_products < MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS:
-        reasons.append(
-            f"Pocos productos con ventas en el historial ({n_products} "
-            f"< {MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS})."
-        )
-
-    data_sufficient = (
-        ml_active
-        and n_samples >= MIN_TRAIN_ROWS
-        and n_products >= MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS
-    )
-    return {
-        "data_sufficient": data_sufficient,
-        "ml_active": ml_active,
-        "min_train_rows": MIN_TRAIN_ROWS,
-        "min_products_reliable": MIN_PRODUCTS_FOR_RELIABLE_PREDICTIONS,
-        "insufficient_reason": " ".join(reasons),
-    }
-
-
-# ---------------------------------------------------------------------------
-# Auxiliary endpoints
-# ---------------------------------------------------------------------------
-
-def get_stock_alerts(predictions: list[dict], days_threshold: int = 14) -> list[dict]:
-    """Returns products in real stockout risk: high demand + low coverage."""
-    alerts = [
-        item
-        for item in predictions
-        if item["riesgo_agotamiento"]
-        and (item["stock_actual"] == 0 or item["dias_hasta_agotarse"] <= days_threshold)
-    ]
-    alerts.sort(key=lambda item: (item["dias_hasta_agotarse"], -item["consumo_estimado_diario"]))
-    return alerts
-
-
-def get_weekly_chart(
-    daily_sales: list[dict],
-    completed_orders: list[dict],
-    weeks: int = 8,
-) -> list[dict]:
-    """Returns total units sold per week for the last `weeks` weeks."""
-    weeks = sanitize_int_for_range(weeks, default=8, min_v=1, max_v=MAX_WEEKS_FOR_CHART)
-    today = date.today()
-    sales_map = build_daily_sales_by_product(daily_sales, completed_orders)
-
-    date_totals: dict[str, float] = defaultdict(float)
-    for day_sales in sales_map.values():
-        for current_date, qty in day_sales.items():
-            date_totals[current_date] += qty
-
-    chart = []
-    for w in range(weeks - 1, -1, -1):
-        week_start = today - timedelta(days=(w + 1) * 7 - 1)
-        week_dates = [
-            (week_start + timedelta(days=i)).isoformat()
-            for i in range(7)
-        ]
-        total = sum(date_totals.get(d, 0.0) for d in week_dates)
-        chart.append({"semana": f"Sem {week_start.strftime('%d/%m')}", "unidades": round(total, 1)})
-
-    return chart

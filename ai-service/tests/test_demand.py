@@ -351,7 +351,8 @@ class TestTrainingDataQualityMeta:
         })
         assert meta["data_sufficient"] is False
         assert meta["ml_active"] is False
-        assert "promedio móvil" in meta["insufficient_reason"].lower() or "promedio movil" in meta["insufficient_reason"].lower()
+        assert not meta["ml_active"]
+        assert "Random Forest" in meta["insufficient_reason"]
 
     def test_suficiente_con_random_forest(self):
         meta = training_data_quality_meta({
