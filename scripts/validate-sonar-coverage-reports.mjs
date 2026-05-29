@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const lcovPath = path.join(repoRoot, "calzatura-vilchez", "coverage", "lcov.info");
 const xmlPath = path.join(repoRoot, "ai-service", "coverage.xml");
+const sonarPropsPath = path.join(repoRoot, "sonar-project.properties");
 function fail(msg) {
   console.error(`validate-sonar-coverage-reports: ${msg}`);
   process.exit(1);
@@ -16,6 +17,25 @@ function fail(msg) {
 
 if (!fs.existsSync(lcovPath)) fail(`no existe ${lcovPath}`);
 if (!fs.existsSync(xmlPath)) fail(`no existe ${xmlPath}`);
+if (!fs.existsSync(sonarPropsPath)) fail(`no existe ${sonarPropsPath}`);
+
+const sonarProps = fs.readFileSync(sonarPropsPath, "utf8");
+if (/\\,\s*\r?\n# [^#\r\n]/.test(sonarProps)) {
+  fail(
+    "sonar-project.properties: comentario '#' dentro de sonar.exclusions/sonar.coverage.exclusions rompe los patrones (mover el comentario fuera del bloque)",
+  );
+}
+for (const requiredExclusion of [
+  "ai-service/models/campaign/**",
+  "ai-service/models/demand/**",
+  "ai-service/services/supabase/**",
+  "ai-service/models/revenue_helpers.py",
+  "ai-service/models/risk_dimensions.py",
+]) {
+  if (!sonarProps.includes(requiredExclusion)) {
+    fail(`sonar.exclusions sin ${requiredExclusion}`);
+  }
+}
 
 const lcov = fs.readFileSync(lcovPath, "utf8");
 const badSf = lcov
