@@ -58,7 +58,8 @@ async function sonarPost(path, body) {
 }
 
 function isStaleIssue(issue) {
-  return (issue.component ?? "").includes(STALE_PATH);
+  const component = issue.component ?? "";
+  return STALE_PATH_FRAGMENTS.some((fragment) => component.includes(fragment));
 }
 
 function isGhostStillOpen(issue) {
@@ -142,34 +143,54 @@ async function searchRemovedGhosts(branchQuery) {
 
 async function fetchAllStaleIssues() {
   const branchVariants = ["&branch=main", ""];
+  const found = [];
 
   for (const branchQuery of branchVariants) {
     const removedGhosts = await searchRemovedGhosts(branchQuery);
-    if (removedGhosts.length > 0) {
-      console.log(
-        `close-sonar-stale-coverage-shim-issues: ${removedGhosts.length} REMOVED ghosts (${branchQuery || "no branch"})`,
-      );
-      return removedGhosts;
-    }
-
     const direct = await searchByComponentKeys(branchQuery);
-    if (direct.length > 0) {
-      console.log(
-        `close-sonar-stale-coverage-shim-issues: ${direct.length} by componentKeys (${branchQuery || "no branch"})`,
-      );
-      return direct;
-    }
-
     const scanned = await searchByProjectScan(branchQuery);
-    if (scanned.length > 0) {
+    found.push(...removedGhosts, ...direct, ...scanned);
+    if (removedGhosts.length > 0 || direct.length > 0 || scanned.length > 0) {
       console.log(
-        `close-sonar-stale-coverage-shim-issues: ${scanned.length} by projects+issueStatuses (${branchQuery || "no branch"})`,
+        `close-sonar-stale-coverage-shim-issues: branch=${branchQuery || "default"} ` +
+          `removed=${removedGhosts.length} componentKeys=${direct.length} scan=${scanned.length}`,
       );
-      return scanned;
     }
   }
 
-  return [];
+  return uniqueIssues(found);
+}
+
+async function tryBulkTransition(issueKeys, transition) {
+  const chunkSize = 50;
+  for (let index = 0; index < issueKeys.length; index += chunkSize) {
+    const chunk = issueKeys.slice(index, index + chunkSize);
+    await sonarPost("/api/issues/bulk_change", {
+      issues: chunk.join(","),
+      do_transition: transition,
+    });
+  }
+}
+
+async function bulkCloseGhosts(issues) {
+  const keys = issues.map((issue) => issue.key);
+  const transitions = ["wontfix", "falsepositive", "resolve", "close"];
+  for (const transition of transitions) {
+    try {
+      await tryBulkTransition(keys, transition);
+      const remaining = (await fetchAllStaleIssues()).filter((issue) => keys.includes(issue.key));
+      if (remaining.length === 0) {
+        console.log(`close-sonar-stale-coverage-shim-issues: bulk ${transition} cleared all ghosts`);
+        return true;
+      }
+      console.log(
+        `close-sonar-stale-coverage-shim-issues: bulk ${transition} left ${remaining.length} open`,
+      );
+    } catch (error) {
+      console.warn(`close-sonar-stale-coverage-shim-issues: bulk ${transition} failed: ${error.message}`);
+    }
+  }
+  return false;
 }
 
 async function tryTransition(issueKey, transition) {
@@ -209,6 +230,8 @@ if (stale.length === 0) {
 console.log(
   `close-sonar-stale-coverage-shim-issues: attempting to close ${stale.length} issue(s): ${stale.map((i) => i.key).join(", ")}`,
 );
+
+await bulkCloseGhosts(stale);
 
 let closed = 0;
 for (const issue of stale) {

@@ -221,6 +221,12 @@ export function shouldShowContextualFilterGroup(
   });
 }
 
+export function resolveCatalogSectionLabel(vista: string | null, categoria: string): string {
+  if (vista === "marcas") return "Marcas";
+  if (categoria === "todos") return "Todo el catálogo";
+  return categoryLabel(categoria);
+}
+
 export function resolvePageSubtitle(route: RouteFacetParams, catalogTotal: number) {
   const visibleCount = productCountLabel(catalogTotal);
   if (route.campana || route.promocion || route.coleccion) {
@@ -333,8 +339,7 @@ export function buildCatalogModel(input: CatalogModelInput) {
     material: route.material,
   });
 
-  const sectionLabel =
-    route.vista === "marcas" ? "Marcas" : route.categoria !== "todos" ? categoryLabel(route.categoria) : "Todo el catálogo";
+  const sectionLabel = resolveCatalogSectionLabel(route.vista, route.categoria);
 
   const visibleBrandCount = new Set(pagedProducts.map((product) => product.marca).filter(Boolean)).size;
 

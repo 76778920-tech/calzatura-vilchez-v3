@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Product } from "@/types";
-import { buildCatalogModel } from "@/domains/productos/utils/productsPageCatalogModel";
+import {
+  buildCatalogModel,
+  resolveCatalogSectionLabel,
+} from "@/domains/productos/utils/productsPageCatalogModel";
 
 function product(partial: Partial<Product> & Pick<Product, "id">): Product {
   return {
@@ -34,6 +37,20 @@ const baseRoute = {
   descuento: "",
   trimmedQuery: "",
 };
+
+describe("resolveCatalogSectionLabel", () => {
+  it("devuelve Marcas en vista marcas", () => {
+    expect(resolveCatalogSectionLabel("marcas", "todos")).toBe("Marcas");
+  });
+
+  it("devuelve Todo el catálogo sin categoría concreta", () => {
+    expect(resolveCatalogSectionLabel(null, "todos")).toBe("Todo el catálogo");
+  });
+
+  it("etiqueta la categoría activa", () => {
+    expect(resolveCatalogSectionLabel(null, "mujer")).toBe("Mujer");
+  });
+});
 
 describe("buildCatalogModel", () => {
   it("pagina y filtra productos en modo cliente", () => {
