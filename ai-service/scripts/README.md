@@ -1,11 +1,9 @@
 # Scripts de `ai-service`
 
-## Cobertura SonarCloud (único script)
+## Cobertura SonarCloud
 
-El CI ejecuta **solo** este archivo en la raíz del monorepo:
+El CI ejecuta en la raíz del monorepo: `scripts/fix-ai-service-coverage-xml-for-sonar.py`.
 
-`scripts/fix-ai-service-coverage-xml-for-sonar.py`
+## Stubs `split_*` (retirados)
 
-No existe `fix_coverage_xml_for_sonar.py` en esta carpeta. Si SonarCloud muestra issues en esa ruta, son **avisos antiguos** de un archivo ya eliminado; el workflow de CI los cierra automáticamente tras cada análisis.
-
-Los scripts Python de migración (`split_*`, `restore_*`, `fix_split_imports.py`) fueron eliminados tras el refactor a paquetes; `sonar.exclusions` ignora `ai-service/scripts/**`.
+`split_demand_package.py` y `split_supabase_package.py` son marcadores mínimos del one-off de migración (ya aplicado). Se analizan en Sonar para cerrar issues históricos; el resto de scripts de esta carpeta siguen excluidos en `sonar-project.properties`.

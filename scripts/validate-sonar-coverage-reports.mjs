@@ -29,13 +29,16 @@ for (const requiredExclusion of [
   "ai-service/models/campaign/**",
   "ai-service/models/demand/**",
   "ai-service/services/supabase/**",
-  "ai-service/scripts/**",
+  "ai-service/scripts/generate_sonar_generic_coverage.py",
   "ai-service/models/revenue_helpers.py",
   "ai-service/models/risk_dimensions.py",
 ]) {
   if (!sonarProps.includes(requiredExclusion)) {
     fail(`sonar.exclusions sin ${requiredExclusion}`);
   }
+}
+if (sonarProps.includes("ai-service/scripts/**")) {
+  fail("sonar.exclusions no debe usar ai-service/scripts/** (bloquea cierre de issues en split_* stubs)");
 }
 
 const lcov = fs.readFileSync(lcovPath, "utf8");

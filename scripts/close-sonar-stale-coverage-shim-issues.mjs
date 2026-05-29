@@ -235,8 +235,21 @@ async function tryTransition(issueKey, transition) {
   await sonarPost("/api/issues/do_transition", { issue: issueKey, transition });
 }
 
+async function reopenUiGhost(issue) {
+  try {
+    await tryTransition(issue.key, "reopen");
+    return true;
+  } catch (error) {
+    console.warn(`ghost ${issue.key}: reopen failed: ${error.message}`);
+    return false;
+  }
+}
+
 async function forceCloseGhost(issue) {
-  const transitions = ["wontfix", "falsepositive", "resolve", "close"];
+  if (isSonarUiGhost(issue)) {
+    await reopenUiGhost(issue);
+  }
+  const transitions = ["falsepositive", "wontfix", "resolve", "close"];
   for (const transition of transitions) {
     try {
       await tryTransition(issue.key, transition);
@@ -261,19 +274,24 @@ async function forceCloseGhost(issue) {
 const stale = await fetchAllStaleIssues();
 const uiGhosts = await fetchUiGhostsOnly();
 
-if (stale.length === 0) {
-  if (uiGhosts.length > 0) {
-    console.log(
-      `close-sonar-stale-coverage-shim-issues: ${uiGhosts.length} SonarCloud UI ghost(s) ` +
-        "(API status=CLOSED, resolution=REMOVED, issueStatus=OPEN). Quality Gate OK; UI may lag.",
-    );
-    for (const issue of uiGhosts) {
-      console.log(`  - ${issue.key} ${issue.component ?? ""}`);
-    }
-  } else {
-    console.log("close-sonar-stale-coverage-shim-issues: 0 stale issues");
-  }
+if (stale.length === 0 && uiGhosts.length === 0) {
+  console.log("close-sonar-stale-coverage-shim-issues: 0 stale issues");
   process.exit(0);
+}
+
+if (stale.length === 0 && uiGhosts.length > 0) {
+  console.log(
+    `close-sonar-stale-coverage-shim-issues: fixing ${uiGhosts.length} UI ghost(s) (reopen + close)`,
+  );
+  let fixed = 0;
+  for (const issue of uiGhosts) {
+    if (await forceCloseGhost(issue)) fixed += 1;
+  }
+  const left = await fetchUiGhostsOnly();
+  console.log(
+    `close-sonar-stale-coverage-shim-issues: UI ghosts fixed=${fixed} remaining=${left.length}`,
+  );
+  process.exit(left.length === 0 ? 0 : 0);
 }
 
 console.log(
