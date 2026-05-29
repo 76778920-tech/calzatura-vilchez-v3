@@ -34,6 +34,10 @@ const linterRemediationMigration = fs.readFileSync(
   path.resolve(process.cwd(), "supabase/migrations/20260531200000_supabase_security_linter_remediation.sql"),
   "utf8",
 );
+const rlsServiceRolePoliciesMigration = fs.readFileSync(
+  path.resolve(process.cwd(), "supabase/migrations/20260531210000_rls_service_role_policies_no_client.sql"),
+  "utf8",
+);
 const auditPiiModule = fs.readFileSync(
   path.resolve(process.cwd(), "bff/auditPii.cjs"),
   "utf8",
@@ -138,6 +142,12 @@ describe("BFF /audit policy guards", () => {
   it("enmascara usuarioEmail al devolver GET /admin/audit", () => {
     expect(serverSource).toContain("sanitizeAuditEntryForResponse");
     expect(auditPiiModule).toContain("usuarioEmail: entry.usuarioEmail == null ? null : sanitizeAuditEmail");
+  });
+
+  it("cierra lint rls_enabled_no_policy en tablas BFF-only", () => {
+    expect(rlsServiceRolePoliciesMigration).toContain("service_role_all_movimientosStock");
+    expect(rlsServiceRolePoliciesMigration).toContain("service_role_all_productoFinanzas");
+    expect(rlsServiceRolePoliciesMigration).toContain("TO service_role");
   });
 
   it("remedia export linter Supabase (politicas legacy, RPC, search_path)", () => {
