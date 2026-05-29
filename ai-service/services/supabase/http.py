@@ -13,7 +13,7 @@ _HEADERS: dict | None = None
 
 _AUDIT_FALLBACK_STATUS_CODES = {400, 404, 406, 409, 422}
 
-# Prefer headers (PostgREST) â€” constantes para evitar literales duplicados (Sonar).
+# Prefer headers (PostgREST) — constants to avoid duplicated literals (Sonar).
 _PREFER_RESOLUTION_MERGE_DUPLICATES_MINIMAL = "resolution=merge-duplicates,return=minimal"
 _PREFER_RETURN_MINIMAL = "return=minimal"
 _ORDER_FECHA_DETECCION_DESC = "fecha_deteccion.desc"

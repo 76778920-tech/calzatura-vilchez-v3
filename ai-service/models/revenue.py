@@ -3,9 +3,21 @@ Revenue forecasting model.
 Builds a daily income series and projects future revenue using
 recent trend plus weekday seasonality.
 """
-from collections import defaultdict
-from datetime import date, timedelta
-
+from models.revenue_forecast import (
+    build_revenue_forecast_rows,
+    revenue_growth_rate,
+    weekday_value_buckets,
+)
+from models.revenue_helpers import (
+    accumulate_tienda_revenue,
+    accumulate_web_revenue,
+    build_daily_revenue_series,
+    build_date_range,
+    clamp,
+    iso_date,
+    safe_float,
+)
+from models.revenue_summary import assemble_revenue_response, build_revenue_summary
 from models.safe_limits import (
     MAX_CHART_FORECAST_DAYS,
     MAX_CHART_HISTORY_DAYS,
@@ -14,142 +26,15 @@ from models.safe_limits import (
     sanitize_int_for_range,
 )
 
-
-def _safe_float(value) -> float:
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _iso_date(value) -> str | None:
-    if isinstance(value, str) and len(value) >= 10:
-        return value[:10]
-    if hasattr(value, "date"):
-        return value.date().isoformat()
-    return None
-
-
-def _clamp(value: float, minimum: float, maximum: float) -> float:
-    return max(minimum, min(maximum, value))
-
-
-def _revenue_growth_rate(
-    recent_values: list[float],
-    prior_values: list[float],
-    recent_window: int,
-    prior_window: int,
-    overall_avg: float,
-) -> float:
-    recent_avg = sum(recent_values) / recent_window if recent_window else overall_avg
-    prior_avg = sum(prior_values) / prior_window if prior_window else recent_avg
-    if prior_avg > 0:
-        growth_rate = (recent_avg - prior_avg) / prior_avg
-    elif recent_avg > 0:
-        growth_rate = 0.12
-    else:
-        growth_rate = 0.0
-    return _clamp(growth_rate, -0.35, 0.35)
-
-
-def _build_revenue_forecast_rows(
-    horizon_days: int,
-    weekday_values_recent: dict[int, list[float]],
-    weekday_values_all: dict[int, list[float]],
-    overall_avg: float,
-    recent_avg: float,
-    growth_rate: float,
-) -> list[dict]:
-    forecast: list[dict] = []
-    today = date.today()
-    for step in range(1, horizon_days + 1):
-        current_date = today + timedelta(days=step)
-        weekday = current_date.weekday()
-        weekday_recent = weekday_values_recent.get(weekday, [])
-        weekday_all = weekday_values_all.get(weekday, [])
-        weekday_recent_avg = sum(weekday_recent) / len(weekday_recent) if weekday_recent else 0.0
-        weekday_all_avg = sum(weekday_all) / len(weekday_all) if weekday_all else 0.0
-        seasonal_base = (
-            weekday_recent_avg * 0.65 + weekday_all_avg * 0.2 + overall_avg * 0.15
-        )
-        if seasonal_base <= 0:
-            seasonal_base = recent_avg if recent_avg > 0 else overall_avg
-        trend_multiplier = 1 + (growth_rate * min(step, 30) / 30)
-        projected = round(max(0.0, seasonal_base * trend_multiplier), 2)
-        forecast.append({"fecha": current_date.isoformat(), "ingresos": projected})
-    return forecast
-
-
-def _build_date_range(history_days: int) -> list[str]:
-    history_days = sanitize_int_for_range(
-        history_days, default=120, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS
-    )
-    today = date.today()
-    start = today - timedelta(days=history_days - 1)
-    return [(start + timedelta(days=i)).isoformat() for i in range(history_days)]
-
-
-def _accumulate_tienda_revenue(
-    daily_sales: list[dict],
-    revenue_by_date: dict[str, float],
-    date_range_set: set[str],
-) -> float:
-    tienda_total = 0.0
-    for sale in daily_sales:
-        if sale.get("canal") == "web":
-            continue
-        fecha = sale.get("fecha", "")
-        total = _safe_float(sale.get("total", 0))
-        if fecha and total > 0 and not sale.get("devuelto", False):
-            revenue_by_date[fecha] += total
-            if fecha in date_range_set:
-                tienda_total += total
-    return tienda_total
-
-
-def _accumulate_web_revenue(
-    completed_orders: list[dict],
-    revenue_by_date: dict[str, float],
-    date_range_set: set[str],
-) -> float:
-    web_total = 0.0
-    for order in completed_orders:
-        fecha = _iso_date(order.get("pagadoEn") or order.get("creadoEn"))
-        total = _safe_float(order.get("total", 0))
-        if fecha and total > 0:
-            revenue_by_date[fecha] += total
-            if fecha in date_range_set:
-                web_total += total
-    return web_total
-
-
-def build_daily_revenue_series(
-    daily_sales: list[dict],
-    completed_orders: list[dict],
-    history_days: int = 120,
-) -> tuple[list[dict], float, float]:
-    """Returns (daily revenue series, tienda_total, web_total) for the requested history.
-
-    tienda_total / web_total solo acumulan días dentro del window para ser
-    consistentes con total_historical = sum(series[*].ingresos).
-    """
-    history_days = sanitize_int_for_range(
-        history_days, default=120, min_v=1, max_v=MAX_HISTORY_DAYS_FOR_LOOPS
-    )
-    revenue_by_date: dict[str, float] = defaultdict(float)
-    tienda_total = 0.0
-    web_total = 0.0
-    date_range = _build_date_range(history_days)
-    date_range_set = set(date_range)
-
-    tienda_total = _accumulate_tienda_revenue(daily_sales, revenue_by_date, date_range_set)
-    web_total = _accumulate_web_revenue(completed_orders, revenue_by_date, date_range_set)
-
-    series = [
-        {"fecha": d, "ingresos": round(revenue_by_date.get(d, 0.0), 2)}
-        for d in date_range
-    ]
-    return series, round(tienda_total, 2), round(web_total, 2)
+# Backward-compatible aliases for tests and internal callers
+_safe_float = safe_float
+_iso_date = iso_date
+_clamp = clamp
+_build_date_range = build_date_range
+_accumulate_tienda_revenue = accumulate_tienda_revenue
+_accumulate_web_revenue = accumulate_web_revenue
+_revenue_growth_rate = revenue_growth_rate
+_build_revenue_forecast_rows = build_revenue_forecast_rows
 
 
 def forecast_revenue(
@@ -172,116 +57,50 @@ def forecast_revenue(
     chart_forecast_days = sanitize_int_for_range(
         chart_forecast_days, default=14, min_v=1, max_v=MAX_CHART_FORECAST_DAYS
     )
+
     series, tienda_total, web_total = build_daily_revenue_series(
         daily_sales=daily_sales,
         completed_orders=completed_orders,
         history_days=history_days,
     )
     values = [point["ingresos"] for point in series]
-    total_historical = round(sum(values), 2)
-    active_days = sum(1 for value in values if value > 0)
-    overall_avg = total_historical / history_days if history_days > 0 else 0.0
+    overall_avg = sum(values) / history_days if history_days > 0 else 0.0
 
     recent_window = min(28, len(values))
     prior_window = min(28, max(0, len(values) - recent_window))
     recent_values = values[-recent_window:] if recent_window else []
     prior_values = values[-(recent_window + prior_window):-recent_window] if prior_window else []
-
     recent_avg = sum(recent_values) / recent_window if recent_window else overall_avg
-    growth_rate = _revenue_growth_rate(
+
+    growth_rate = revenue_growth_rate(
         recent_values, prior_values, recent_window, prior_window, overall_avg
     )
-
-    weekday_values_recent: dict[int, list[float]] = defaultdict(list)
-    weekday_values_all: dict[int, list[float]] = defaultdict(list)
-    for point in series:
-        weekday = date.fromisoformat(point["fecha"]).weekday()
-        weekday_values_all[weekday].append(point["ingresos"])
-    for point in series[-56:]:
-        weekday = date.fromisoformat(point["fecha"]).weekday()
-        weekday_values_recent[weekday].append(point["ingresos"])
-
-    forecast = _build_revenue_forecast_rows(
+    weekday_recent, weekday_all = weekday_value_buckets(series)
+    forecast = build_revenue_forecast_rows(
         horizon_days,
-        weekday_values_recent,
-        weekday_values_all,
+        weekday_recent,
+        weekday_all,
         overall_avg,
         recent_avg,
         growth_rate,
     )
-
     forecast_values = [point["ingresos"] for point in forecast]
-    next_7_days = round(sum(forecast_values[:7]), 2)
-    next_30_days = round(sum(forecast_values[:30]), 2)
-    next_horizon_days = round(sum(forecast_values[:horizon_days]), 2)
-    forecast_avg = sum(forecast_values) / len(forecast_values) if forecast_values else 0.0
-
-    if growth_rate > 0.05:
-        trend = "subiendo"
-    elif growth_rate < -0.05:
-        trend = "bajando"
-    else:
-        trend = "estable"
-
-    confidence = round(_clamp(
-        35
-        + (min(history_days, 120) / 120) * 20
-        + (min(active_days, 60) / 60) * 25
-        + (1 - min(abs(growth_rate), 0.35) / 0.35) * 20,
-        30,
-        95,
-    ))
-
-    last_30_actual = round(sum(values[-30:]), 2) if values else 0.0
-    last_horizon_actual = round(sum(values[-horizon_days:]), 2) if values else 0.0
-    growth_vs_last_30 = (
-        round(((next_30_days - last_30_actual) / last_30_actual) * 100, 1)
-        if last_30_actual > 0
-        else 0.0
+    summary = build_revenue_summary(
+        horizon_days=horizon_days,
+        history_days=history_days,
+        forecast_values=forecast_values,
+        values=values,
+        overall_avg=overall_avg,
+        growth_rate=growth_rate,
+        tienda_total=tienda_total,
+        web_total=web_total,
     )
-    growth_vs_last_horizon = (
-        round(((next_horizon_days - last_horizon_actual) / last_horizon_actual) * 100, 1)
-        if last_horizon_actual > 0
-        else 0.0
+    return assemble_revenue_response(
+        horizon_days=horizon_days,
+        history_days=history_days,
+        series=series,
+        forecast=forecast,
+        summary=summary,
+        chart_history_days=chart_history_days,
+        chart_forecast_days=chart_forecast_days,
     )
-
-    history_chart = [
-        {
-            "fecha": point["fecha"],
-            "label": date.fromisoformat(point["fecha"]).strftime("%d/%m"),
-            "ingresos": point["ingresos"],
-            "tipo": "historico",
-        }
-        for point in series[-chart_history_days:]
-    ]
-    forecast_chart = [
-        {
-            "fecha": point["fecha"],
-            "label": date.fromisoformat(point["fecha"]).strftime("%d/%m"),
-            "ingresos": point["ingresos"],
-            "tipo": "proyectado",
-        }
-        for point in forecast[:chart_forecast_days]
-    ]
-
-    return {
-        "horizon_days": horizon_days,
-        "history_days": history_days,
-        "summary": {
-            "proximo_7_dias": next_7_days,
-            "proximo_30_dias": next_30_days,
-            "proximo_horizonte": next_horizon_days,
-            "promedio_diario_historico": round(overall_avg, 2),
-            "promedio_diario_proyectado": round(forecast_avg, 2),
-            "ultimo_30_dias": last_30_actual,
-            "ultimo_horizonte": last_horizon_actual,
-            "crecimiento_estimado_pct": growth_vs_last_30,
-            "crecimiento_estimado_horizonte_pct": growth_vs_last_horizon,
-            "tendencia": trend,
-            "confianza": confidence,
-            "total_historico_tienda": tienda_total,
-            "total_historico_web": web_total,
-        },
-        "history": history_chart,
-        "forecast": forecast_chart,
-    }
