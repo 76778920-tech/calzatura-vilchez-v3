@@ -76,6 +76,7 @@ if (sourceText.endsWith("/ai-service")) {
 const requiredPy = [
   "ai-service/models/revenue.py",
   "ai-service/models/risk.py",
+  "ai-service/models/safe_limits.py",
   "ai-service/services/supabase_client.py",
 ];
 for (const fn of requiredPy) {

@@ -87,6 +87,7 @@ jobs:
           test -f ai-service/bandit-report.json
           grep -q 'SF:calzatura-vilchez/src/' calzatura-vilchez/coverage/lcov.info
           grep -q 'filename="ai-service/models/revenue.py"' ai-service/coverage.xml
+          grep -q 'filename="ai-service/models/safe_limits.py"' ai-service/coverage.xml
           grep -q 'filename="ai-service/services/supabase_client.py"' ai-service/coverage.xml
           node scripts/validate-sonar-coverage-reports.mjs
 
