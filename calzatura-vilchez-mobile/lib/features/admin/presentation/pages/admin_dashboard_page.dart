@@ -587,6 +587,13 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                       context.push('/admin/predicciones'),
                                   delay: 300,
                                 ),
+                                _ModuleCard(
+                                  icon: Icons.table_chart_outlined,
+                                  label: 'Datos',
+                                  color: const Color(0xFF06B6D4),
+                                  onTap: () => context.push('/admin/datos'),
+                                  delay: 360,
+                                ),
                               ],
                             ),
                           ],
@@ -612,7 +619,7 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                           kpis: kpis,
                           onPredictions: () =>
                               context.push('/admin/predicciones'),
-                          onData: () => context.push('/admin/ventas'),
+                          onData: () => context.push('/admin/datos'),
                           onSales: () => context.push('/admin/ventas'),
                         ),
                       ),

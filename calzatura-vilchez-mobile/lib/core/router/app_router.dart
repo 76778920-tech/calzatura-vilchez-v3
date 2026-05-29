@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/admin/presentation/pages/admin_dashboard_page.dart';
+import '../../features/admin/presentation/pages/admin_data_page.dart';
 import '../../features/admin/presentation/pages/admin_manufacturers_page.dart';
 import '../../features/admin/presentation/pages/admin_orders_page.dart';
 import '../../features/admin/presentation/pages/admin_predictions_page.dart';
@@ -139,6 +140,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'predicciones',
             pageBuilder: (ctx, s) =>
                 _sharedAxisPage(const AdminPredictionsPage()),
+          ),
+          GoRoute(
+            path: 'datos',
+            pageBuilder: (ctx, s) => _sharedAxisPage(const AdminDataPage()),
           ),
         ],
       ),
