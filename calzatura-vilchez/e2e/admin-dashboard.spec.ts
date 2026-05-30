@@ -215,7 +215,7 @@ test.describe("admin dashboard → KPIs, auditoría y errores", () => {
     await expect(page.locator(".dash-kpi-orange .dash-kpi-value")).toHaveText("2");
 
     await expect(page.getByRole("columnheader", { name: /Acción/i })).toBeVisible();
-    await expect(page.getByRole("cell", { name: /^crear$/ })).toBeVisible();
+    await expect(page.getByRole("cell", { name: /^creó$/ })).toBeVisible();
     await expect(page.getByRole("cell", { name: /Zapatilla E2E/i })).toBeVisible();
   });
 

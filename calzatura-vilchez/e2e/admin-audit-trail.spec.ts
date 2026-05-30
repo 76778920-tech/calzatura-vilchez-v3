@@ -194,9 +194,9 @@ test.describe("admin → rastro de auditoría", () => {
 
     await goToAdmin(page);
 
-    // La tabla de auditoría debe mostrar las entradas
-    await expect(page.getByRole("cell", { name: /^editar$/ })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole("cell", { name: /^crear$/ })).toBeVisible({ timeout: 5_000 });
+    // La tabla muestra etiquetas legibles (actionLabelForWorkerNotif), no el código crudo
+    await expect(page.getByRole("cell", { name: /^editó$/ })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("cell", { name: /^creó$/ })).toBeVisible({ timeout: 5_000 });
     await expect(page.getByRole("cell", { name: new RegExp(MOCK_PRODUCT.nombre, "i") }).first()).toBeVisible();
   });
 
@@ -210,7 +210,7 @@ test.describe("admin → rastro de auditoría", () => {
 
     await goToAdmin(page);
 
-    await expect(page.getByRole("cell", { name: /^eliminar$/ })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("cell", { name: /^eliminó$/ })).toBeVisible({ timeout: 10_000 });
   });
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -226,12 +226,11 @@ test.describe("admin → rastro de auditoría", () => {
 
     await expectAdminDashboardLoaded(page);
 
-    // La primera celda de acción en la tabla debe ser "eliminar" (más reciente)
-    const firstActionCell = page.locator("td[class*='accion'], tbody tr:first-child td").first();
-    if (await firstActionCell.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      const text = await firstActionCell.textContent();
-      expect(text?.toLowerCase()).toContain("eliminar");
-    }
+    // La primera fila debe ser la más reciente (eliminar → "eliminó" en UI)
+    const firstActionCell = page.locator(".admin-table tbody tr:first-child td").first();
+    await expect(firstActionCell).toBeVisible({ timeout: 5_000 });
+    const text = await firstActionCell.textContent();
+    expect(text?.toLowerCase()).toContain("elimin");
   });
 
   // ──────────────────────────────────────────────────────────────────────────
