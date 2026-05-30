@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+import '../../../../core/services/panel_bff_api.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 
-final _supabase = sb.Supabase.instance.client;
-
+/// Lista vía BFF (`GET /admin/manufacturers`), igual que la web — sin Supabase directo.
 final adminManufacturersProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-      final data = await _supabase
-          .from('fabricantes')
-          .select()
-          .order('nombres');
-      return List<Map<String, dynamic>>.from(data as List);
+      final list = await PanelBffApi().fetchManufacturers();
+      list.sort((a, b) {
+        final na =
+            '${a['nombres'] ?? ''} ${a['apellidos'] ?? ''}'.trim().toLowerCase();
+        final nb =
+            '${b['nombres'] ?? ''} ${b['apellidos'] ?? ''}'.trim().toLowerCase();
+        return na.compareTo(nb);
+      });
+      return list;
     });
 
 class AdminManufacturersPage extends ConsumerStatefulWidget {
@@ -239,8 +242,19 @@ class _AdminManufacturersPageState
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              await _supabase.from('fabricantes').delete().eq('id', man['id']);
-              ref.invalidate(adminManufacturersProvider);
+              try {
+                await PanelBffApi().deleteManufacturer(man['id'].toString());
+                ref.invalidate(adminManufacturersProvider);
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text(
               'Eliminar',
@@ -520,13 +534,14 @@ class _ManufacturerFormState extends State<_ManufacturerForm> {
         'ultimoIngresoMonto': double.tryParse(_montoCtrl.text) ?? 0,
     };
     try {
+      final api = PanelBffApi();
       if (widget.man != null) {
-        await _supabase
-            .from('fabricantes')
-            .update(data)
-            .eq('id', widget.man!['id']);
+        await api.updateManufacturer(
+          widget.man!['id'].toString(),
+          data,
+        );
       } else {
-        await _supabase.from('fabricantes').insert(data);
+        await api.createManufacturer(data);
       }
       widget.onSaved();
       if (mounted) Navigator.pop(context);

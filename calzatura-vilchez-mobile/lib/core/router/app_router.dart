@@ -9,7 +9,9 @@ import '../../features/admin/presentation/pages/admin_manufacturers_page.dart';
 import '../../features/admin/presentation/pages/admin_orders_page.dart';
 import '../../features/admin/presentation/pages/admin_predictions_page.dart';
 import '../../features/admin/presentation/pages/admin_products_page.dart';
+import '../../features/admin/data/panel_scope_provider.dart';
 import '../../features/admin/presentation/pages/admin_sales_page.dart';
+import '../../features/admin/presentation/pages/staff_sales_page.dart';
 import '../../features/admin/presentation/pages/admin_users_page.dart';
 import '../../features/profile/presentation/pages/edit_profile_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -148,7 +150,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: 'ventas',
-            pageBuilder: (ctx, s) => _sharedAxisPage(const AdminSalesPage()),
+            pageBuilder: (ctx, s) => _sharedAxisPage(
+              Consumer(
+                builder: (context, ref, _) {
+                  final profile = ref.watch(userProfileBffProvider).valueOrNull;
+                  final isStaff = profile?['rol'] == 'trabajador';
+                  return isStaff
+                      ? const StaffSalesPage()
+                      : const AdminSalesPage();
+                },
+              ),
+            ),
           ),
           GoRoute(
             path: 'usuarios',

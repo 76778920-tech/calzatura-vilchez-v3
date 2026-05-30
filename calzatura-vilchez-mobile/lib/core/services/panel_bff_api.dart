@@ -233,6 +233,79 @@ class PanelBffApi {
 
   // ── Productos ─────────────────────────────────────────────────────────────
 
+  Future<Map<String, String>> fetchProductCodes(PanelScope scope) async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+
+    final path = scope == PanelScope.staff
+        ? '/staff/productCodes'
+        : '/admin/productCodes';
+    final response = await _client.get(
+      _uri(path),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudieron cargar códigos');
+
+    final codes = payload['codes'];
+    if (codes is Map) {
+      return codes.map(
+        (k, v) => MapEntry(k.toString(), v?.toString() ?? ''),
+      );
+    }
+    return {};
+  }
+
+  /// Rangos de precio para trabajador (`/staff/productPriceRanges`).
+  Future<Map<String, Map<String, dynamic>>> fetchProductPriceRanges() async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+
+    final response = await _client.get(
+      _uri('/staff/productPriceRanges'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudo cargar rangos de precio');
+
+    final rows = payload['rows'];
+    final out = <String, Map<String, dynamic>>{};
+    if (rows is List) {
+      for (final row in rows) {
+        if (row is! Map) continue;
+        final map = Map<String, dynamic>.from(row);
+        final id = map['productId']?.toString();
+        if (id != null && id.isNotEmpty) out[id] = map;
+      }
+    }
+    return out;
+  }
+
+  /// Finanzas completas para admin (`/admin/productFinanzas`).
+  Future<Map<String, Map<String, dynamic>>> fetchAdminProductFinanzas() async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+
+    final response = await _client.get(
+      _uri('/admin/productFinanzas'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudieron cargar finanzas');
+
+    final rows = payload['rows'];
+    final out = <String, Map<String, dynamic>>{};
+    if (rows is List) {
+      for (final row in rows) {
+        if (row is! Map) continue;
+        final map = Map<String, dynamic>.from(row);
+        final id = map['productId']?.toString();
+        if (id != null && id.isNotEmpty) out[id] = map;
+      }
+    }
+    return out;
+  }
+
   Future<List<Map<String, dynamic>>> fetchProducts(PanelScope scope) async {
     final token = await _token();
     if (token == null) throw Exception('Debes iniciar sesión');
@@ -252,6 +325,75 @@ class PanelBffApi {
         .whereType<Map>()
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
+  }
+
+  // ── Admin: fabricantes ──────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> fetchManufacturers() async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+
+    final response = await _client.get(
+      _uri('/admin/manufacturers'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudieron cargar fabricantes');
+
+    final manufacturers = payload['manufacturers'];
+    if (manufacturers is! List) return [];
+    return manufacturers
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  Future<String> createManufacturer(Map<String, dynamic> manufacturer) async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+
+    final response = await _client.post(
+      _uri('/admin/manufacturers'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'manufacturer': manufacturer}),
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudo crear el fabricante');
+    return payload['id']?.toString() ?? '';
+  }
+
+  Future<void> updateManufacturer(
+    String manufacturerId,
+    Map<String, dynamic> manufacturer,
+  ) async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+
+    final response = await _client.patch(
+      _uri('/admin/manufacturers/${Uri.encodeComponent(manufacturerId)}'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'manufacturer': manufacturer}),
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudo actualizar el fabricante');
+  }
+
+  Future<void> deleteManufacturer(String manufacturerId) async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+
+    final response = await _client.delete(
+      _uri('/admin/manufacturers/${Uri.encodeComponent(manufacturerId)}'),
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudo eliminar el fabricante');
   }
 
   // ── Admin: usuarios y auditoría ───────────────────────────────────────────
