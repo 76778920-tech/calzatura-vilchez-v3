@@ -7,7 +7,6 @@ import '../../features/admin/presentation/pages/admin_dashboard_page.dart';
 import '../../features/admin/presentation/pages/admin_data_page.dart';
 import '../../features/admin/presentation/pages/admin_manufacturers_page.dart';
 import '../../features/admin/presentation/pages/admin_orders_page.dart';
-import '../../features/admin/presentation/pages/admin_predictions_page.dart';
 import '../../features/admin/presentation/pages/admin_products_page.dart';
 import '../../features/admin/data/panel_scope_provider.dart';
 import '../../features/admin/presentation/pages/admin_sales_page.dart';
@@ -63,6 +62,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       }
 
       if (isAuth && !isOnAuth) {
+        if (loc.startsWith('/admin/predicciones')) return '/admin';
+
         final role = roleAsync.valueOrNull;
         if (role == 'admin' || role == 'trabajador') {
           const allowed = [
@@ -170,11 +171,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'fabricantes',
             pageBuilder: (ctx, s) =>
                 _sharedAxisPage(const AdminManufacturersPage()),
-          ),
-          GoRoute(
-            path: 'predicciones',
-            pageBuilder: (ctx, s) =>
-                _sharedAxisPage(const AdminPredictionsPage()),
           ),
           GoRoute(
             path: 'datos',

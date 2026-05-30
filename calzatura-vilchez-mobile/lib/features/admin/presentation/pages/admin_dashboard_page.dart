@@ -825,20 +825,12 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                         delay: 240,
                                       ),
                                       _ModuleCard(
-                                        icon: Icons.insights_rounded,
-                                        label: 'Predicciones',
-                                        color: const Color(0xFFEC4899),
-                                        onTap: () =>
-                                            context.push('/admin/predicciones'),
-                                        delay: 300,
-                                      ),
-                                      _ModuleCard(
                                         icon: Icons.table_chart_outlined,
                                         label: 'Datos',
                                         color: const Color(0xFF06B6D4),
                                         onTap: () =>
                                             context.push('/admin/datos'),
-                                        delay: 360,
+                                        delay: 300,
                                       ),
                                     ],
                             ),
@@ -914,8 +906,6 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                         error: (_, _) => const SizedBox.shrink(),
                         data: (kpis) => _ExecutiveBand(
                           kpis: kpis,
-                          onPredictions: () =>
-                              context.push('/admin/predicciones'),
                           onData: () => context.push('/admin/datos'),
                           onSales: () => context.push('/admin/ventas'),
                         ),
@@ -1096,13 +1086,11 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
 class _ExecutiveBand extends StatelessWidget {
   const _ExecutiveBand({
     required this.kpis,
-    required this.onPredictions,
     required this.onData,
     required this.onSales,
   });
 
   final Map<String, dynamic> kpis;
-  final VoidCallback onPredictions;
   final VoidCallback onData;
   final VoidCallback onSales;
 
@@ -1137,7 +1125,7 @@ class _ExecutiveBand extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Ventas, inventario, pedidos y predicción en una sola vista',
+                'Ventas, inventario y pedidos en una sola vista',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 13,
@@ -1172,20 +1160,11 @@ class _ExecutiveBand extends StatelessWidget {
                 children: [
                   Expanded(
                     child: _ExecutiveAction(
-                      icon: Icons.insights_outlined,
-                      label: 'Predicciones IA',
-                      color: const Color(0xFFEC4899),
-                      onTap: onPredictions,
-                      isPrimary: true,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: _ExecutiveAction(
                       icon: Icons.table_chart_outlined,
                       label: 'Datos Excel',
                       color: Colors.white70,
                       onTap: onData,
+                      isPrimary: true,
                     ),
                   ),
                   const SizedBox(width: 8),
