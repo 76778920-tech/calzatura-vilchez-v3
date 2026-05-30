@@ -1,15 +1,17 @@
 import "@/styles/admin.css";
 import { NavLink, Outlet, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, CircleDollarSign, LogOut, Store, BookOpen } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, CircleDollarSign, LogOut, Store, BookOpen, Moon, Sun } from "lucide-react";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
 import { ADMIN_ROUTES, PUBLIC_ROUTES, STAFF_ROUTES } from "@/routes/paths";
 import { logoutUser } from "@/domains/usuarios/services/auth";
+import { useThemeMode } from "@/hooks/useThemeMode";
 import toast from "react-hot-toast";
 
 export default function StaffLayout() {
   const { user, userProfile, loading, isAdmin, isTrabajador } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { theme, toggleTheme } = useThemeMode();
 
   if (loading) {
     return (
@@ -49,11 +51,22 @@ export default function StaffLayout() {
         <div className="admin-sidebar-header">
           <div className="admin-sidebar-brand">
             <Store size={20} />
-            <span className="admin-brand-name">Área tienda</span>
+            <span className="admin-brand-name">
+              <strong>Área tienda</strong>
+              <small>{userProfile?.nombre?.trim() || "Trabajador"}</small>
+            </span>
           </div>
-          <p className="text-sm opacity-80 px-3">{userProfile?.nombre}</p>
+          <button
+            type="button"
+            className="admin-theme-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Activar modo claro" : "Activar modo oscuro"}
+            title={theme === "dark" ? "Modo claro" : "Modo oscuro"}
+          >
+            {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
         </div>
-        <nav className="admin-nav">
+        <nav className="admin-nav" aria-label="Módulos del panel de tienda">
           <NavLink to={STAFF_ROUTES.home} end className={({ isActive }) => `admin-nav-item ${isActive ? "active" : ""}`}>
             <LayoutDashboard size={18} />
             <span className="admin-nav-label">Inicio</span>
@@ -71,10 +84,26 @@ export default function StaffLayout() {
             <span className="admin-nav-label">Reclamaciones</span>
           </NavLink>
         </nav>
-        <button type="button" className="admin-nav-item w-full" onClick={handleLogout}>
-          <LogOut size={18} />
-          <span className="admin-nav-label">Salir</span>
-        </button>
+        <div className="admin-sidebar-footer">
+          <button
+            type="button"
+            className="admin-nav-item admin-back-link"
+            onClick={() => navigate(PUBLIC_ROUTES.home)}
+            title="Ver tienda"
+          >
+            <Store size={18} />
+            <span className="admin-nav-label">Ver tienda</span>
+          </button>
+          <button
+            type="button"
+            className="admin-nav-item admin-back-link"
+            onClick={handleLogout}
+            title="Cerrar sesión"
+          >
+            <LogOut size={18} />
+            <span className="admin-nav-label">Cerrar sesión</span>
+          </button>
+        </div>
       </aside>
       <main className="admin-main" id="staff-main-content" tabIndex={-1}>
         <Outlet />
