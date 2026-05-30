@@ -256,7 +256,7 @@ test.describe("admin ventas → registro de venta y devolución", () => {
     await expect(returnDialog).toBeVisible({ timeout: 5_000 });
     await returnDialog.getByRole("button", { name: /registrar devolución/i }).click();
 
-    await expect(page.getByText("Devolución registrada y stock restaurado").first()).toBeVisible({
+    await expect(page.getByText(/Devolución registrada.*stock restaurado/i).first()).toBeVisible({
       timeout: 8_000,
     });
 
