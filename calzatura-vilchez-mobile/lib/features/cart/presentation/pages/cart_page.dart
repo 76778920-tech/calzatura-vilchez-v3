@@ -520,6 +520,16 @@ class _OrderSummary extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           _Row(
+            label: 'Base imponible',
+            value: 'S/ ${fmt.format(total - total * (18 / 118))}',
+          ),
+          const SizedBox(height: 6),
+          _Row(
+            label: 'IGV (18%)',
+            value: 'S/ ${fmt.format(total * (18 / 118))}',
+          ),
+          const SizedBox(height: 6),
+          _Row(
             label: 'Envío a Huancayo',
             value: shipping == 0 ? 'Gratis' : 'S/ ${fmt.format(shipping)}',
             valueColor: AppColors.success,

@@ -153,7 +153,8 @@ export function buildReceiptHtml(order: Order, userProfile?: UserProfile | null)
         <tbody>${rows}</tbody>
       </table>
       <div class="totals">
-        <div class="total-row"><span>Subtotal</span><strong>${money(order.subtotal)}</strong></div>
+        <div class="total-row"><span>Base imponible</span><strong>${money(order.subtotal / 1.18)}</strong></div>
+        <div class="total-row"><span>IGV (18%)</span><strong>${money(order.subtotal * (18 / 118))}</strong></div>
         <div class="total-row"><span>Envío</span><strong>${order.envio === 0 ? "Gratis" : money(order.envio)}</strong></div>
         <div class="total-row final"><span>Total</span><strong>${money(order.total)}</strong></div>
       </div>

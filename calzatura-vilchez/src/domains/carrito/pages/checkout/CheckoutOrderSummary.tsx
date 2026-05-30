@@ -41,8 +41,12 @@ export function CheckoutOrderSummary({
       </div>
       <div className="checkout-totals">
         <div className="summary-row">
-          <span>Subtotal</span>
-          <span>S/ {subtotal.toFixed(2)}</span>
+          <span>Base imponible</span>
+          <span>S/ {(subtotal - subtotal * (18 / 118)).toFixed(2)}</span>
+        </div>
+        <div className="summary-row">
+          <span>IGV (18%)</span>
+          <span>S/ {(subtotal * (18 / 118)).toFixed(2)}</span>
         </div>
         <div className="summary-row">
           <span>Envío</span>

@@ -204,7 +204,8 @@ export function buildSaleDocumentHtml(input: SaleDocumentInput) {
         <tbody>${rows}</tbody>
       </table>
       <div class="totals">
-        <div class="total-row"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
+        <div class="total-row"><span>Base imponible</span><strong>${money(subtotal / 1.18)}</strong></div>
+        <div class="total-row"><span>IGV (18%)</span><strong>${money(subtotal * (18 / 118))}</strong></div>
         <div class="total-row final"><span>Total</span><strong>${money(subtotal)}</strong></div>
       </div>
     </section>

@@ -60,11 +60,18 @@ export function CartSummaryRows({ subtotal, total, rowClass, totalClass }: Reado
   rowClass: string;
   totalClass: string;
 }>) {
+  const igv = subtotal * (18 / 118);
+  const baseImponible = subtotal - igv;
+
   return (
     <>
       <div className={rowClass}>
-        <span>Subtotal</span>
-        <span>S/ {subtotal.toFixed(2)}</span>
+        <span>Base imponible</span>
+        <span>S/ {baseImponible.toFixed(2)}</span>
+      </div>
+      <div className={rowClass}>
+        <span>IGV (18%)</span>
+        <span>S/ {igv.toFixed(2)}</span>
       </div>
       <div className={rowClass}>
         <span>Envío</span>
