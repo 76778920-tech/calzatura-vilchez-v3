@@ -27,31 +27,43 @@ const MAX_NOTIFS = 50;
 
 export function useWorkerNotifications(enabled: boolean) {
   const [notifs, setNotifs] = useState<WorkerNotif[]>([]);
-  const [workersReady, setWorkersReady] = useState(false);
+  const [workersLoaded, setWorkersLoaded] = useState(false);
   const workerUids = useRef<Set<string>>(new Set());
   const pollState = useRef<WorkerNotificationsPollState>(createWorkerNotificationsPollState());
+  const workersReady = enabled && workersLoaded;
+  const visibleNotifs = enabled ? notifs : [];
 
   useEffect(() => {
     if (!enabled) {
-      setWorkersReady(false);
-      setNotifs([]);
       workerUids.current = new Set();
       pollState.current = createWorkerNotificationsPollState();
       return;
     }
+
+    let cancelled = false;
+
     const load = async () => {
+      setNotifs([]);
+      setWorkersLoaded(false);
       try {
         const users = await fetchAllUsers();
+        if (cancelled) return;
         workerUids.current = new Set(
           users.filter((u) => u.rol === "trabajador").map((u) => u.uid).filter(Boolean),
         );
-        setWorkersReady(workerUids.current.size > 0);
+        setWorkersLoaded(workerUids.current.size > 0);
       } catch (err) {
+        if (cancelled) return;
         console.error("[worker-notifs] no se pudieron cargar UIDs de trabajadores:", err);
-        setWorkersReady(false);
+        setWorkersLoaded(false);
       }
     };
+
     void load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [enabled]);
 
   const poll = useCallback(async () => {
@@ -115,7 +127,7 @@ export function useWorkerNotifications(enabled: boolean) {
     };
   }, [enabled, workersReady, poll]);
 
-  const unread = notifs.filter((n) => !n.leido).length;
+  const unread = visibleNotifs.filter((n) => !n.leido).length;
 
   const markAllRead = () =>
     setNotifs((prev) => prev.map((n) => ({ ...n, leido: true })));
@@ -123,5 +135,5 @@ export function useWorkerNotifications(enabled: boolean) {
   const dismiss = (id: string) =>
     setNotifs((prev) => prev.filter((n) => n.id !== id));
 
-  return { notifs, unread, markAllRead, dismiss };
+  return { notifs: visibleNotifs, unread, markAllRead, dismiss };
 }
