@@ -1,3 +1,4 @@
+import type { AuditEntry } from "@/services/audit";
 import { describe, expect, it } from "vitest";
 import {
   createWorkerNotificationsPollState,
@@ -9,7 +10,7 @@ describe("workerNotificationsPoll", () => {
 
   it("en bootstrap incluye devolución reciente de trabajador", () => {
     const state = createWorkerNotificationsPollState();
-    const entries = [
+    const entries: AuditEntry[] = [
       {
         id: "a1",
         accion: "devolver_venta",
@@ -31,10 +32,10 @@ describe("workerNotificationsPoll", () => {
 
   it("no repite la misma entrada en el siguiente poll", () => {
     const state = createWorkerNotificationsPollState();
-    const entry = {
+    const entry: AuditEntry = {
       id: "a1",
-      accion: "devolver_venta" as const,
-      entidad: "venta_diaria" as const,
+      accion: "devolver_venta",
+      entidad: "venta_diaria",
       entidadId: "sale-1",
       entidadNombre: "#ABC12345",
       detalle: null,
@@ -50,7 +51,7 @@ describe("workerNotificationsPoll", () => {
 
   it("ignora devolución hecha por admin", () => {
     const state = createWorkerNotificationsPollState();
-    const entries = [
+    const entries: AuditEntry[] = [
       {
         id: "a2",
         accion: "devolver_venta",
