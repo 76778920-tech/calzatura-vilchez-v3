@@ -28,6 +28,8 @@ const ACCION_COLORS: Record<string, string> = {
   eliminar: "#ef4444",
   cambiar_estado: "#f59e0b",
   importar: "#0ea5e9",
+  registrar_venta: "#22c55e",
+  devolver_venta: "#f59e0b",
 };
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────

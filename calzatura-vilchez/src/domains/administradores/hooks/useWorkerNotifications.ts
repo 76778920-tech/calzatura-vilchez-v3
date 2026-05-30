@@ -4,8 +4,13 @@ import { fetchAllUsers } from "@/domains/usuarios/services/users";
 import { fetchRecentAudit } from "@/services/audit";
 import {
   formatWorkerNotifToast,
-  isWorkerAuditEntry,
 } from "../utils/workerNotificationPolicy";
+import {
+  createWorkerNotificationsPollState,
+  pollWorkerAuditEntries,
+  WORKER_NOTIFS_REFRESH_EVENT,
+  type WorkerNotificationsPollState,
+} from "../utils/workerNotificationsPoll";
 
 export type WorkerNotif = {
   id: string;
@@ -22,46 +27,45 @@ const MAX_NOTIFS = 50;
 
 export function useWorkerNotifications(enabled: boolean) {
   const [notifs, setNotifs] = useState<WorkerNotif[]>([]);
+  const [workersReady, setWorkersReady] = useState(false);
   const workerUids = useRef<Set<string>>(new Set());
-  const baseline = useRef<string | null>(null);
-  const initialized = useRef(false);
-  const workersLoaded = useRef(false);
+  const pollState = useRef<WorkerNotificationsPollState>(createWorkerNotificationsPollState());
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setWorkersReady(false);
+      setNotifs([]);
+      workerUids.current = new Set();
+      pollState.current = createWorkerNotificationsPollState();
+      return;
+    }
     const load = async () => {
       try {
         const users = await fetchAllUsers();
         workerUids.current = new Set(
           users.filter((u) => u.rol === "trabajador").map((u) => u.uid).filter(Boolean),
         );
-        workersLoaded.current = true;
+        setWorkersReady(workerUids.current.size > 0);
       } catch (err) {
         console.error("[worker-notifs] no se pudieron cargar UIDs de trabajadores:", err);
-        workersLoaded.current = false;
+        setWorkersReady(false);
       }
     };
     void load();
   }, [enabled]);
 
   const poll = useCallback(async () => {
-    if (!enabled || !workersLoaded.current || workerUids.current.size === 0) return;
+    if (!enabled || !workersReady || workerUids.current.size === 0) return;
     try {
       const entries = await fetchRecentAudit(30);
       if (!entries.length) return;
 
-      if (!initialized.current) {
-        baseline.current = entries[0].realizadoEn;
-        initialized.current = true;
-        return;
-      }
-
-      const cutoff = baseline.current ?? "";
-      const fresh = entries.filter(
-        (e) => e.realizadoEn > cutoff && isWorkerAuditEntry(e, workerUids.current),
+      const { fresh, isBootstrap, nextState } = pollWorkerAuditEntries(
+        entries,
+        workerUids.current,
+        pollState.current,
       );
-
-      baseline.current = entries[0].realizadoEn;
+      pollState.current = nextState;
 
       if (fresh.length === 0) return;
 
@@ -72,28 +76,44 @@ export function useWorkerNotifications(enabled: boolean) {
         ].slice(0, MAX_NOTIFS),
       );
 
-      fresh.slice(0, 3).forEach((e) => {
-        toast(formatWorkerNotifToast(e), {
-          duration: 5000,
-          style: {
-            background: "#1c1c1c",
-            color: "#fff",
-            fontSize: "13px",
-            border: "1px solid rgba(201,162,39,0.5)",
-          },
+      if (!isBootstrap) {
+        fresh.slice(0, 3).forEach((e) => {
+          toast(formatWorkerNotifToast(e), {
+            duration: 5000,
+            style: {
+              background: "#1c1c1c",
+              color: "#fff",
+              fontSize: "13px",
+              border: "1px solid rgba(201,162,39,0.5)",
+            },
+          });
         });
-      });
+      }
     } catch (err) {
       console.error("[worker-notifs] poll falló:", err);
     }
-  }, [enabled]);
+  }, [enabled, workersReady]);
 
   useEffect(() => {
-    if (!enabled) return;
-    poll();
+    if (!enabled || !workersReady) return;
+    void poll();
     const id = setInterval(poll, POLL_MS);
     return () => clearInterval(id);
-  }, [enabled, poll]);
+  }, [enabled, workersReady, poll]);
+
+  useEffect(() => {
+    if (!enabled || !workersReady) return;
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void poll();
+    };
+    const onRefresh = () => void poll();
+    document.addEventListener("visibilitychange", onVisible);
+    globalThis.addEventListener(WORKER_NOTIFS_REFRESH_EVENT, onRefresh);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      globalThis.removeEventListener(WORKER_NOTIFS_REFRESH_EVENT, onRefresh);
+    };
+  }, [enabled, workersReady, poll]);
 
   const unread = notifs.filter((n) => !n.leido).length;
 

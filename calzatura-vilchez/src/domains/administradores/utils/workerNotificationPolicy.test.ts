@@ -40,4 +40,14 @@ describe("workerNotificationPolicy", () => {
       }),
     ).toBe("Trabajador registró Venta: #ABC12345");
   });
+
+  it("formatea toast de devolver venta", () => {
+    expect(
+      formatWorkerNotifToast({
+        accion: "devolver_venta",
+        entidad: "venta_diaria",
+        entidadNombre: "#XYZ98765",
+      }),
+    ).toBe("Trabajador devolvió Venta: #XYZ98765");
+  });
 });

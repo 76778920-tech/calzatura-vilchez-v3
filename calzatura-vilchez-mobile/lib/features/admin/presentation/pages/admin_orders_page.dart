@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+import '../../../../core/services/panel_bff_api.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
-
-final _supabase = sb.Supabase.instance.client;
+import '../../data/panel_scope_provider.dart';
 
 // Transiciones válidas por estado
 const _validTransitions = <String, List<String>>{
@@ -16,36 +15,17 @@ const _validTransitions = <String, List<String>>{
   'cancelado': [],
 };
 
-Future<Map<String, Map<String, dynamic>>> _fetchUsersByUid() async {
-  final data = await _supabase
-      .from('usuarios')
-      .select('uid, nombre, nombres, apellidos, email, telefono');
-
-  return List<Map<String, dynamic>>.from(data as List)
-      .fold<Map<String, Map<String, dynamic>>>({}, (acc, row) {
-        final uid = row['uid']?.toString();
-        if (uid != null && uid.isNotEmpty) acc[uid] = row;
-        return acc;
-      });
-}
-
 final adminOrdersProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-      final ordersData = await _supabase
-          .from('pedidos')
-          .select(
-            'id, total, subtotal, envio, estado, metodoPago, stripeSessionId, notas, creadoEn, userId, userEmail, direccion, items',
-          )
-          .order('creadoEn', ascending: false);
-      final usersByUid = await _fetchUsersByUid();
-      final orders = List<Map<String, dynamic>>.from(ordersData as List);
-
-      return orders.map((order) {
-        final merged = Map<String, dynamic>.from(order);
-        merged['usuario'] =
-            usersByUid[order['userId']] ?? const <String, dynamic>{};
-        return merged;
-      }).toList();
+      final scope = ref.watch(panelScopeProvider);
+      final orders = await PanelBffApi().fetchOrders(scope);
+      return orders
+          .map((order) {
+            final merged = Map<String, dynamic>.from(order);
+            merged['usuario'] ??= const <String, dynamic>{};
+            return merged;
+          })
+          .toList();
     });
 
 const _estados = ['pendiente', 'pagado', 'enviado', 'entregado', 'cancelado'];
@@ -253,8 +233,12 @@ class _AdminOrdersPageState extends ConsumerState<AdminOrdersPage> {
                               (ctx, i) => _OrderCard(
                                 order: filtered[i],
                                 index: i,
-                                onStatusChanged: (newStatus) =>
-                                    _updateStatus(filtered[i]['id'], newStatus),
+                                onStatusChanged: (newStatus) => _updateStatus(
+                                  filtered[i]['id'] as String,
+                                  newStatus,
+                                  currentEstado:
+                                      filtered[i]['estado'] as String?,
+                                ),
                               ),
                               childCount: filtered.length,
                             ),
@@ -269,10 +253,18 @@ class _AdminOrdersPageState extends ConsumerState<AdminOrdersPage> {
     );
   }
 
-  Future<void> _updateStatus(String orderId, String newStatus) async {
-    await _supabase
-        .from('pedidos')
-        .update({'estado': newStatus}).eq('id', orderId);
+  Future<void> _updateStatus(
+    String orderId,
+    String newStatus, {
+    String? currentEstado,
+  }) async {
+    if (currentEstado != null) {
+      final allowed = _validTransitions[currentEstado] ?? [];
+      if (!allowed.contains(newStatus)) {
+        throw Exception('Transición de estado no permitida');
+      }
+    }
+    await PanelBffApi().updateOrderStatus(orderId: orderId, estado: newStatus);
     ref.invalidate(adminOrdersProvider);
   }
 }

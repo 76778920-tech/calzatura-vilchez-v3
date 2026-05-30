@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../../../../core/config/env.dart';
+import '../../../admin/data/panel_scope_provider.dart';
 import '../../data/auth_repository.dart';
 
 final authStateProvider = StreamProvider<User?>((ref) {
@@ -12,29 +12,19 @@ final currentUserProvider = Provider<User?>((ref) {
   return ref.watch(authStateProvider).valueOrNull;
 });
 
-/// Rol del usuario actual: 'cliente' | 'trabajador' | 'admin'
-/// Superadmin email recibe 'admin' directamente.
+/// Rol del usuario actual: 'cliente' | 'trabajador' | 'admin' (vía BFF `/users/me`).
 final userRoleProvider = FutureProvider<String>((ref) async {
   final user = ref.watch(currentUserProvider);
   if (user == null) return 'cliente';
-  // Superadmin hardcoded igual que la web
   if (user.email == Env.superadminEmail) return 'admin';
-  try {
-    final data = await sb.Supabase.instance.client
-        .from('usuarios')
-        .select('rol')
-        .eq('uid', user.uid)
-        .maybeSingle();
-    return (data?['rol'] as String?) ?? 'cliente';
-  } catch (_) {
-    return 'cliente';
-  }
+  final profile = await ref.watch(userProfileBffProvider.future);
+  return (profile?['rol'] as String?) ?? 'cliente';
 });
 
+/// Acceso al shell `/admin` (admin o trabajador de tienda).
 final isAdminProvider = Provider<bool>((ref) {
-  final roleAsync = ref.watch(userRoleProvider);
-  return roleAsync.valueOrNull == 'admin' ||
-      roleAsync.valueOrNull == 'trabajador';
+  final role = ref.watch(userRoleProvider).valueOrNull;
+  return role == 'admin' || role == 'trabajador';
 });
 
 /// Nombre para mostrar del usuario actual, leído desde Supabase.
@@ -43,31 +33,23 @@ final userDisplayNameProvider = FutureProvider<String>((ref) async {
   final user = ref.watch(currentUserProvider);
   if (user == null) return '';
 
-  try {
-    final data = await sb.Supabase.instance.client
-        .from('usuarios')
-        .select('nombre, nombres, apellidos')
-        .eq('uid', user.uid)
-        .maybeSingle();
-
-    if (data != null) {
-      final nombres = (data['nombres'] as String?)?.trim() ?? '';
-      final apellidos = (data['apellidos'] as String?)?.trim() ?? '';
-      if (nombres.isNotEmpty) {
-        final first = _capFirst(nombres);
-        final last = _capFirst(apellidos);
-        return [first, last].where((p) => p.isNotEmpty).join(' ');
-      }
-
-      final nombre = (data['nombre'] as String?)?.trim() ?? '';
-      if (nombre.isNotEmpty) {
-        final parts = nombre.split(RegExp(r'\s+'));
-        return parts.take(2).map(_capWord).join(' ');
-      }
+  final data = await ref.watch(userProfileBffProvider.future);
+  if (data != null) {
+    final nombres = (data['nombres'] as String?)?.trim() ?? '';
+    final apellidos = (data['apellidos'] as String?)?.trim() ?? '';
+    if (nombres.isNotEmpty) {
+      final first = _capFirst(nombres);
+      final last = _capFirst(apellidos);
+      return [first, last].where((p) => p.isNotEmpty).join(' ');
     }
-  } catch (_) {}
 
-  // Fallback: displayName de Firebase
+    final nombre = (data['nombre'] as String?)?.trim() ?? '';
+    if (nombre.isNotEmpty) {
+      final parts = nombre.split(RegExp(r'\s+'));
+      return parts.take(2).map(_capWord).join(' ');
+    }
+  }
+
   final display = user.displayName?.trim() ?? '';
   if (display.isNotEmpty) {
     final parts = display.split(RegExp(r'\s+'));

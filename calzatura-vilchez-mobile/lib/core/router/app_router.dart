@@ -29,13 +29,19 @@ import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/wishlist/presentation/pages/wishlist_page.dart';
 import 'auth_navigation.dart';
 
+const _forceAdminDashboard = bool.fromEnvironment('CV_FORCE_ADMIN_DASHBOARD');
+
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
   final roleAsync = ref.watch(userRoleProvider);
 
   return GoRouter(
-    initialLocation: '/splash',
+    initialLocation: _forceAdminDashboard ? '/admin' : '/splash',
     redirect: (context, state) {
+      if (_forceAdminDashboard) {
+        return state.matchedLocation.startsWith('/admin') ? null : '/admin';
+      }
+
       final isLoading = authState.isLoading;
       final isAuth = authState.valueOrNull != null;
       final loc = state.matchedLocation;
@@ -70,6 +76,23 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ];
           if (!allowed.any((p) => loc.startsWith(p))) {
             return '/admin';
+          }
+          if (role == 'trabajador') {
+            const staffOnly = ['/admin', '/admin/ventas', '/admin/pedidos'];
+            const blocked = [
+              '/admin/usuarios',
+              '/admin/datos',
+              '/admin/predicciones',
+              '/admin/fabricantes',
+              '/admin/productos',
+            ];
+            if (blocked.any((p) => loc.startsWith(p))) {
+              return '/admin';
+            }
+            if (loc.startsWith('/admin') &&
+                !staffOnly.any((p) => loc == p || loc.startsWith('$p/'))) {
+              return '/admin';
+            }
           }
         }
       }
@@ -188,7 +211,8 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               ),
               GoRoute(
                 path: 'edit',
-                pageBuilder: (ctx, s) => _sharedAxisPage(const EditProfilePage()),
+                pageBuilder: (ctx, s) =>
+                    _sharedAxisPage(const EditProfilePage()),
               ),
             ],
           ),

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { fetchProductCodes, fetchProducts } from "@/domains/productos/services/products";
 import { useAuth } from "@/domains/usuarios/context/AuthContext";
+import { requestWorkerNotificationsRefresh } from "@/domains/administradores/utils/workerNotificationsPoll";
 import {
   fetchDailySales,
   fetchProductFinancials,
@@ -460,6 +461,9 @@ export function useSalesPage(config: SalesPageConfig): SalesPageModel {
     setReturning(true);
     try {
       await returnDailySaleAtomic(selectedSale.id, motivo, financeScope);
+      if (financeScope === "staff") {
+        requestWorkerNotificationsRefresh();
+      }
       await load(date);
       setSelectedSale(null);
       setReturnConfirmOpen(false);

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+import '../../../../core/services/panel_bff_api.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
-
-final _supabase = sb.Supabase.instance.client;
+import '../../data/panel_scope_provider.dart';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -45,31 +44,25 @@ final _selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
 final adminDaySalesProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
       final date = ref.watch(_selectedDateProvider);
+      final scope = ref.watch(panelScopeProvider);
       final dateStr =
           '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
-      final data = await _supabase
-          .from('ventasDiarias')
-          .select(
-            'id, productId, codigo, nombre, color, talla, fecha, cantidad, '
-            'precioVenta, total, ganancia, documentoTipo, documentoNumero, '
-            'encargadoNombre, cliente, devuelto, motivoDevolucion, devueltoEn, creadoEn, canal',
-          )
-          .eq('fecha', dateStr)
-          .order('creadoEn', ascending: false);
-      return List<Map<String, dynamic>>.from(data as List);
+      final sales = await PanelBffApi().fetchDailySales(scope, fecha: dateStr);
+      sales.sort(
+        (a, b) => (b['creadoEn'] as String? ?? '').compareTo(
+          a['creadoEn'] as String? ?? '',
+        ),
+      );
+      return sales;
     });
 
 final adminProductsCatalogProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
-      final data = await _supabase
-          .from('productos')
-          .select(
-            'id, codigo, nombre, marca, precio, stock, color, tallaStock, tallas, categoria',
-          )
-          .eq('activo', true)
-          .gt('stock', 0)
-          .order('marca');
-      return List<Map<String, dynamic>>.from(data as List);
+      final scope = ref.watch(panelScopeProvider);
+      final products = await PanelBffApi().fetchProducts(scope);
+      return products
+          .where((p) => p['activo'] != false && ((p['stock'] as num?) ?? 0) > 0)
+          .toList();
     });
 
 // ─── Cart item model ──────────────────────────────────────────────────────────
@@ -186,46 +179,52 @@ class _AdminSalesPageState extends ConsumerState<AdminSalesPage> {
     if (_cart.isEmpty) return;
     setState(() => _saving = true);
     final date = ref.read(_selectedDateProvider);
+    final scope = ref.read(panelScopeProvider);
+    final profile = await ref.read(userProfileBffProvider.future);
     final dateStr =
         '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
-    try {
-      for (final item in _cart) {
-        await _supabase.from('ventasDiarias').insert({
-          'productId': item.productId,
-          'codigo': item.codigo,
-          'nombre': item.nombre,
-          'color': item.color,
-          'talla': item.talla,
-          'fecha': dateStr,
-          'cantidad': item.cantidad,
-          'precioVenta': item.precio,
-          'total': item.total,
-          'devuelto': false,
-          'creadoEn': DateTime.now().toIso8601String(),
-        });
-        final Map<String, dynamic> ts = await _supabase
-            .from('productos')
-            .select('stock, tallaStock')
-            .eq('id', item.productId)
-            .single();
-        final currentStock = ts['stock'] as int? ?? 0;
-        final tallaStock = ts['tallaStock'] as Map<String, dynamic>?;
-        final updateData = <String, dynamic>{
-          'stock': (currentStock - item.cantidad).clamp(0, 99999),
-        };
-        if (tallaStock != null && item.talla.isNotEmpty) {
-          final curr = (tallaStock[item.talla] as int? ?? 0);
-          tallaStock[item.talla] = (curr - item.cantidad).clamp(0, 99999);
-          updateData['tallaStock'] = tallaStock;
-        }
-        await _supabase
-            .from('productos')
-            .update(updateData)
-            .eq('id', item.productId);
+    final uid = profile?['uid']?.toString() ?? '';
+    final nombre = _operatorName(profile);
+    final email = profile?['email']?.toString() ?? '';
+    if (uid.isEmpty || nombre.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo identificar al encargado de la venta'),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
+      setState(() => _saving = false);
+      return;
+    }
+
+    try {
+      final payload = _cart
+          .map(
+            (item) => {
+              'productId': item.productId,
+              'codigo': item.codigo,
+              'nombre': item.nombre,
+              'color': item.color,
+              if (item.talla.isNotEmpty) 'talla': item.talla,
+              'fecha': dateStr,
+              'cantidad': item.cantidad,
+              'precioVenta': item.precio,
+              'total': item.total,
+              'documentoTipo': 'ninguno',
+              'encargadoUid': uid,
+              'encargadoNombre': nombre,
+              'encargadoEmail': email,
+            },
+          )
+          .toList();
+
+      await PanelBffApi().registerDailySales(scope: scope, sales: payload);
       setState(() => _cart.clear());
       ref.invalidate(adminDaySalesProvider);
+      ref.invalidate(adminProductsCatalogProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -247,35 +246,27 @@ class _AdminSalesPageState extends ConsumerState<AdminSalesPage> {
     setState(() => _saving = false);
   }
 
-  Future<void> _returnSale(Map<String, dynamic> sale, String motivo) async {
-    await _supabase.from('ventasDiarias').update({
-      'devuelto': true,
-      'motivoDevolucion': motivo,
-      'devueltoEn': DateTime.now().toIso8601String(),
-    }).eq('id', sale['id']);
-
-    // Restore stock
-    final productId = sale['productId'] as String? ?? '';
-    final cantidad = sale['cantidad'] as int? ?? 0;
-    final talla = sale['talla'] as String? ?? '';
-    if (productId.isNotEmpty && cantidad > 0) {
-      final ts = await _supabase
-          .from('productos')
-          .select('stock, tallaStock')
-          .eq('id', productId)
-          .single();
-      final currentStock = ts['stock'] as int? ?? 0;
-      final tallaStock = ts['tallaStock'] as Map<String, dynamic>?;
-      final updateData = <String, dynamic>{
-        'stock': currentStock + cantidad,
-      };
-      if (tallaStock != null && talla.isNotEmpty) {
-        final curr = (tallaStock[talla] as int? ?? 0);
-        tallaStock[talla] = curr + cantidad;
-        updateData['tallaStock'] = tallaStock;
-      }
-      await _supabase.from('productos').update(updateData).eq('id', productId);
+  String _operatorName(Map<String, dynamic>? profile) {
+    if (profile == null) return '';
+    final nombres = (profile['nombres'] as String?)?.trim() ?? '';
+    final apellidos = (profile['apellidos'] as String?)?.trim() ?? '';
+    if (nombres.isNotEmpty) {
+      return [nombres, apellidos].where((p) => p.isNotEmpty).join(' ');
     }
+    return (profile['nombre'] as String?)?.trim() ?? '';
+  }
+
+  Future<void> _returnSale(Map<String, dynamic> sale, String motivo) async {
+    final saleId = sale['id'] as String? ?? '';
+    if (saleId.isEmpty) {
+      throw Exception('Venta sin identificador');
+    }
+    final scope = ref.read(panelScopeProvider);
+    await PanelBffApi().returnDailySale(
+      saleId: saleId,
+      motivo: motivo,
+      scope: scope,
+    );
 
     ref.invalidate(adminDaySalesProvider);
     if (mounted) {

@@ -18,6 +18,7 @@ import { fetchProducts } from "@/domains/productos/services/products";
 import { fetchAllOrders } from "@/domains/pedidos/services/orders";
 import { fetchDailySales, fetchProductFinancials } from "@/domains/ventas/services/finance";
 import { fetchAllUsers } from "@/domains/usuarios/services/users";
+import { actionLabelForWorkerNotif } from "@/domains/administradores/utils/workerNotificationPolicy";
 import { fetchRecentAudit } from "@/services/audit";
 import type { Order, CartItem } from "@/types";
 import type { AuditEntry } from "@/services/audit";
@@ -465,7 +466,7 @@ export default function AdminDashboard() {
               <tr key={entry.id}>
                 <td>
                   <span className={`order-status-badge audit-badge-${entry.accion}`}>
-                    {entry.accion}
+                    {actionLabelForWorkerNotif(entry.accion)}
                   </span>
                 </td>
                 <td>{entry.entidad}</td>

@@ -6,10 +6,16 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+import '../../../../core/services/panel_bff_api.dart';
+import '../../../../core/services/worker_notification_policy.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/cv_logo.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../data/panel_scope_provider.dart';
+import '../../data/staff_dashboard_providers.dart';
+import '../../data/worker_notification.dart';
+import '../../data/worker_notifications_controller.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Modelo interno para datos del gráfico
@@ -29,40 +35,6 @@ class _ChartData {
   double get totalTienda => tienda.fold(0.0, (a, b) => a + b);
   double get todayWeb => web.isNotEmpty ? web.last : 0.0;
   double get todayTienda => tienda.isNotEmpty ? tienda.last : 0.0;
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Modelo de notificación de trabajador
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _WorkerNotif {
-  const _WorkerNotif({
-    required this.id,
-    required this.accion,
-    required this.entidad,
-    this.entidadNombre,
-    this.usuarioEmail,
-    required this.realizadoEn,
-    this.leido = false,
-  });
-
-  final String id;
-  final String accion;
-  final String entidad;
-  final String? entidadNombre;
-  final String? usuarioEmail;
-  final String realizadoEn;
-  final bool leido;
-
-  _WorkerNotif markRead() => _WorkerNotif(
-    id: id,
-    accion: accion,
-    entidad: entidad,
-    entidadNombre: entidadNombre,
-    usuarioEmail: usuarioEmail,
-    realizadoEn: realizadoEn,
-    leido: true,
-  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -273,12 +245,8 @@ final adminChartProvider = FutureProvider<_ChartData>((ref) async {
 final adminAuditProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
-  final data = await _supabase
-      .from('auditoria')
-      .select('id, accion, entidad, entidadNombre, usuarioEmail, realizadoEn')
-      .order('realizadoEn', ascending: false)
-      .limit(10);
-  return List<Map<String, dynamic>>.from(data as List);
+  final entries = await PanelBffApi().fetchRecentAudit(limit: 10);
+  return entries.map((e) => e.toDashboardMap()).toList();
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -295,22 +263,57 @@ class AdminDashboardPage extends ConsumerStatefulWidget {
 class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   sb.RealtimeChannel? _realtimeChannel;
-  sb.RealtimeChannel? _notifChannel;
   Timer? _debounce;
-  late final TabController _tabController;
+  late TabController _tabController;
+  int _tabControllerLen = 2;
+  late final WorkerNotificationsController _workerNotifsCtrl;
+  bool _workerNotifsStarted = false;
 
-  // ── Notificaciones de trabajadores ────────────────────────────────────────
-  final Set<String> _workerUids = {};
-  final List<_WorkerNotif> _workerNotifs = [];
-  int get _unreadCount => _workerNotifs.where((n) => !n.leido).length;
+  void _syncTabController(int length) {
+    if (_tabControllerLen == length) return;
+    final prev = _tabController.index.clamp(0, length - 1);
+    _tabController.dispose();
+    _tabControllerLen = length;
+    _tabController = TabController(
+      length: length,
+      vsync: this,
+      initialIndex: prev,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: _tabControllerLen, vsync: this);
     WidgetsBinding.instance.addObserver(this);
     _subscribeRealtime();
-    _loadWorkerUids();
+    _workerNotifsCtrl = WorkerNotificationsController(
+      onToast: _showWorkerNotifToast,
+      onPollComplete: () {
+        if (mounted) ref.invalidate(adminAuditProvider);
+      },
+    );
+    _workerNotifsCtrl.addListener(_onWorkerNotifsChanged);
+  }
+
+  void _onWorkerNotifsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  void _showWorkerNotifToast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.black,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 5),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+          side: BorderSide(color: AppColors.gold.withValues(alpha: 0.5)),
+        ),
+      ),
+    );
   }
 
   @override
@@ -321,9 +324,8 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
     if (_realtimeChannel != null) {
       _supabase.removeChannel(_realtimeChannel!);
     }
-    if (_notifChannel != null) {
-      _supabase.removeChannel(_notifChannel!);
-    }
+    _workerNotifsCtrl.removeListener(_onWorkerNotifsChanged);
+    _workerNotifsCtrl.dispose();
     super.dispose();
   }
 
@@ -331,6 +333,9 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _invalidateAll();
+      if (ref.read(isAdminPanelProvider)) {
+        unawaited(_workerNotifsCtrl.poll());
+      }
     }
   }
 
@@ -347,12 +352,6 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
           event: sb.PostgresChangeEvent.all,
           schema: 'public',
           table: 'ventasDiarias',
-          callback: (_) => _debouncedInvalidate(),
-        )
-        .onPostgresChanges(
-          event: sb.PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'auditoria',
           callback: (_) => _debouncedInvalidate(),
         )
         .subscribe();
@@ -374,6 +373,11 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
 
   void _invalidateAll() {
     if (!mounted) return;
+    if (ref.read(isTrabajadorPanelProvider)) {
+      ref.invalidate(staffKpisProvider);
+      ref.invalidate(staffRecentOrdersProvider);
+      return;
+    }
     ref.invalidate(adminKpisProvider);
     ref.invalidate(adminRecentOrdersProvider);
     ref.invalidate(adminAllOrdersProvider);
@@ -381,100 +385,15 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
     ref.invalidate(adminAuditProvider);
   }
 
-  // ── Notificaciones de trabajadores ────────────────────────────────────────
-
-  Future<void> _loadWorkerUids() async {
-    try {
-      final data = await _supabase
-          .from('usuarios')
-          .select('uid')
-          .eq('rol', 'trabajador');
-      if (!mounted) return;
-      final uids = List<Map<String, dynamic>>.from(
-        data as List,
-      ).map((u) => u['uid'] as String?).whereType<String>().toSet();
-      _workerUids.addAll(uids);
-      _subscribeWorkerNotifs();
-    } catch (_) {}
-  }
-
-  void _subscribeWorkerNotifs() {
-    _notifChannel = _supabase
-        .channel('worker-notifs')
-        .onPostgresChanges(
-          event: sb.PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'auditoria',
-          callback: (payload) {
-            final row = payload.newRecord;
-            final uid = row['usuarioUid'] as String?;
-            final entidad = row['entidad'] as String?;
-            if (uid != null &&
-                _workerUids.contains(uid) &&
-                (entidad == 'producto' ||
-                    entidad == 'venta' ||
-                    entidad == 'venta_diaria' ||
-                    entidad == 'pedido')) {
-              _onWorkerAction(row);
-            }
-          },
-        )
-        .subscribe();
-  }
-
-  void _onWorkerAction(Map<String, dynamic> row) {
-    if (!mounted) return;
-    final notif = _WorkerNotif(
-      id: row['id'] as String? ?? DateTime.now().toIso8601String(),
-      accion: row['accion'] as String? ?? '',
-      entidad: row['entidad'] as String? ?? '',
-      entidadNombre: row['entidadNombre'] as String?,
-      usuarioEmail: row['usuarioEmail'] as String?,
-      realizadoEn:
-          row['realizadoEn'] as String? ?? DateTime.now().toIso8601String(),
-    );
-    setState(() {
-      _workerNotifs.insert(0, notif);
-      if (_workerNotifs.length > 50) _workerNotifs.removeLast();
-    });
-    final label = notif.entidad == 'producto'
-        ? 'Producto'
-        : notif.entidad == 'pedido'
-            ? 'Pedido'
-            : 'Venta';
-    final nombre = notif.entidadNombre != null
-        ? ': ${notif.entidadNombre}'
-        : '';
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('✏️ Trabajador ${notif.accion} un $label$nombre'),
-        backgroundColor: AppColors.black,
-        behavior: SnackBarBehavior.floating,
-        duration: const Duration(seconds: 5),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: BorderSide(color: AppColors.gold.withValues(alpha: 0.5)),
-        ),
-      ),
-    );
-  }
-
-  void _markAllNotifsRead() {
-    setState(() {
-      for (var i = 0; i < _workerNotifs.length; i++) {
-        _workerNotifs[i] = _workerNotifs[i].markRead();
-      }
-    });
-  }
-
   void _showNotifSheet() {
-    _markAllNotifsRead();
+    _workerNotifsCtrl.markAllRead();
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) =>
-          _WorkerNotifsSheet(notifs: List.unmodifiable(_workerNotifs)),
+      builder: (_) => _WorkerNotifsSheet(
+        notifs: List.unmodifiable(_workerNotifsCtrl.notifs),
+      ),
     );
   }
 
@@ -492,11 +411,40 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
     final displayName = ref.watch(userDisplayNameProvider).valueOrNull ?? '';
     final roleAsync = ref.watch(userRoleProvider);
     final role = roleAsync.valueOrNull ?? 'admin';
-    final kpisAsync = ref.watch(adminKpisProvider);
-    final ordersAsync = ref.watch(adminRecentOrdersProvider);
-    final allOrdersAsync = ref.watch(adminAllOrdersProvider);
-    final chartAsync = ref.watch(adminChartProvider);
-    final auditAsync = ref.watch(adminAuditProvider);
+    final isStaff = ref.watch(isTrabajadorPanelProvider);
+    final isAdmin = ref.watch(isAdminPanelProvider);
+    final tabLen = isStaff ? 1 : 2;
+    if (_tabControllerLen != tabLen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() => _syncTabController(tabLen));
+      });
+    }
+
+    if (isAdmin && !_workerNotifsStarted) {
+      _workerNotifsStarted = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_workerNotifsCtrl.start());
+      });
+    }
+
+    final kpisAsync = isStaff
+        ? ref.watch(staffKpisProvider)
+        : ref.watch(adminKpisProvider);
+    final ordersAsync = isStaff
+        ? ref.watch(staffRecentOrdersProvider)
+        : ref.watch(adminRecentOrdersProvider);
+    final allOrdersAsync = isStaff
+        ? const AsyncValue<List<Map<String, dynamic>>>.data([])
+        : ref.watch(adminAllOrdersProvider);
+    final chartAsync = isStaff
+        ? const AsyncValue<_ChartData>.data(
+            _ChartData(web: [], tienda: [], labels: []),
+          )
+        : ref.watch(adminChartProvider);
+    final auditAsync = isAdmin
+        ? ref.watch(adminAuditProvider)
+        : const AsyncValue<List<Map<String, dynamic>>>.data([]);
 
     return BackNavigationScope(
       fallbackRoute: '/home',
@@ -581,51 +529,56 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                       ),
                                     ),
                                     const Spacer(),
-                                    // Campana con badge
-                                    Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(
-                                            Icons.notifications_outlined,
-                                            color: Colors.white70,
-                                            size: 20,
+                                    if (isAdmin)
+                                      Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.notifications_outlined,
+                                              color: Colors.white70,
+                                              size: 20,
+                                            ),
+                                            tooltip:
+                                                'Actividad de trabajadores',
+                                            padding: const EdgeInsets.all(4),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 28,
+                                              minHeight: 28,
+                                            ),
+                                            onPressed: _showNotifSheet,
                                           ),
-                                          tooltip: 'Actividad de trabajadores',
-                                          padding: const EdgeInsets.all(4),
-                                          constraints: const BoxConstraints(
-                                            minWidth: 28,
-                                            minHeight: 28,
-                                          ),
-                                          onPressed: _showNotifSheet,
-                                        ),
-                                        if (_unreadCount > 0)
-                                          Positioned(
-                                            right: 2,
-                                            top: 2,
-                                            child: Container(
-                                              width: 14,
-                                              height: 14,
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFFB91C1C),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: Center(
-                                                child: Text(
-                                                  _unreadCount > 9
-                                                      ? '9+'
-                                                      : '$_unreadCount',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 8,
-                                                    fontWeight: FontWeight.w800,
+                                          if (_workerNotifsCtrl.unreadCount > 0)
+                                            Positioned(
+                                              right: 2,
+                                              top: 2,
+                                              child: Container(
+                                                width: 14,
+                                                height: 14,
+                                                decoration:
+                                                    const BoxDecoration(
+                                                  color: Color(0xFFB91C1C),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: Center(
+                                                  child: Text(
+                                                    _workerNotifsCtrl
+                                                                .unreadCount >
+                                                            9
+                                                        ? '9+'
+                                                        : '${_workerNotifsCtrl.unreadCount}',
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 8,
+                                                      fontWeight:
+                                                          FontWeight.w800,
+                                                    ),
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                      ],
-                                    ),
+                                        ],
+                                      ),
                                     // Tienda
                                     IconButton(
                                       icon: const Icon(
@@ -685,9 +638,9 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                   fontWeight: FontWeight.w600,
                 ),
                 unselectedLabelStyle: const TextStyle(fontSize: 13),
-                tabs: const [
-                  Tab(text: 'Inicio'),
-                  Tab(text: 'Dashboard'),
+                tabs: [
+                  const Tab(text: 'Inicio'),
+                  if (!isStaff) const Tab(text: 'Dashboard'),
                 ],
               ),
             ),
@@ -710,7 +663,11 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                           data: (kpis) => Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const _SectionTitle('Resumen del negocio'),
+                              _SectionTitle(
+                                isStaff
+                                    ? 'Resumen de tienda'
+                                    : 'Resumen del negocio',
+                              ),
                               const SizedBox(height: 4),
                               GridView.count(
                                 crossAxisCount: 2,
@@ -720,36 +677,71 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                 crossAxisSpacing: 8,
                                 mainAxisSpacing: 8,
                                 childAspectRatio: 1.75,
-                                children: [
-                                  _KpiCard(
-                                    label: 'Productos',
-                                    value: kpis['productos'].toString(),
-                                    icon: Icons.inventory_2_outlined,
-                                    color: AppColors.gold,
-                                    delay: 0,
-                                  ),
-                                  _KpiCard(
-                                    label: 'Pedidos web',
-                                    value: kpis['pedidos'].toString(),
-                                    icon: Icons.receipt_long_outlined,
-                                    color: const Color(0xFF10B981),
-                                    delay: 100,
-                                  ),
-                                  _KpiCard(
-                                    label: 'Usuarios',
-                                    value: kpis['usuarios'].toString(),
-                                    icon: Icons.people_outline_rounded,
-                                    color: const Color(0xFF6366F1),
-                                    delay: 200,
-                                  ),
-                                  _KpiCard(
-                                    label: 'Pendientes',
-                                    value: kpis['pendientes'].toString(),
-                                    icon: Icons.pending_actions_outlined,
-                                    color: const Color(0xFFF59E0B),
-                                    delay: 300,
-                                  ),
-                                ],
+                                children: isStaff
+                                    ? [
+                                        _KpiCard(
+                                          label: 'Pedidos',
+                                          value: kpis['pedidos'].toString(),
+                                          icon: Icons.receipt_long_outlined,
+                                          color: const Color(0xFF10B981),
+                                          delay: 0,
+                                        ),
+                                        _KpiCard(
+                                          label: 'Pendientes',
+                                          value: kpis['pendientes'].toString(),
+                                          icon: Icons.pending_actions_outlined,
+                                          color: const Color(0xFFF59E0B),
+                                          delay: 100,
+                                        ),
+                                        _KpiCard(
+                                          label: 'Ventas hoy',
+                                          value: kpis['ventasHoy'].toString(),
+                                          icon: Icons.point_of_sale_outlined,
+                                          color: const Color(0xFF0EA5E9),
+                                          delay: 200,
+                                        ),
+                                        _KpiCard(
+                                          label: 'Total hoy',
+                                          value: _formatCurrency(
+                                            (kpis['totalHoy'] as num?)
+                                                    ?.toDouble() ??
+                                                0,
+                                          ),
+                                          icon: Icons.payments_outlined,
+                                          color: AppColors.gold,
+                                          delay: 300,
+                                        ),
+                                      ]
+                                    : [
+                                        _KpiCard(
+                                          label: 'Productos',
+                                          value: kpis['productos'].toString(),
+                                          icon: Icons.inventory_2_outlined,
+                                          color: AppColors.gold,
+                                          delay: 0,
+                                        ),
+                                        _KpiCard(
+                                          label: 'Pedidos web',
+                                          value: kpis['pedidos'].toString(),
+                                          icon: Icons.receipt_long_outlined,
+                                          color: const Color(0xFF10B981),
+                                          delay: 100,
+                                        ),
+                                        _KpiCard(
+                                          label: 'Usuarios',
+                                          value: kpis['usuarios'].toString(),
+                                          icon: Icons.people_outline_rounded,
+                                          color: const Color(0xFF6366F1),
+                                          delay: 200,
+                                        ),
+                                        _KpiCard(
+                                          label: 'Pendientes',
+                                          value: kpis['pendientes'].toString(),
+                                          icon: Icons.pending_actions_outlined,
+                                          color: const Color(0xFFF59E0B),
+                                          delay: 300,
+                                        ),
+                                      ],
                               ),
                             ],
                           ),
@@ -765,77 +757,152 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                             const _SectionTitle('Módulos'),
                             const SizedBox(height: 8),
                             GridView.count(
-                              crossAxisCount: 3,
+                              crossAxisCount: isStaff ? 2 : 3,
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               padding: EdgeInsets.zero,
                               crossAxisSpacing: 8,
                               mainAxisSpacing: 8,
                               childAspectRatio: 1.12,
-                              children: [
-                                _ModuleCard(
-                                  icon: Icons.inventory_2_outlined,
-                                  label: 'Productos',
-                                  color: AppColors.gold,
-                                  onTap: () => context.push('/admin/productos'),
-                                  delay: 0,
-                                ),
-                                _ModuleCard(
-                                  icon: Icons.receipt_long_outlined,
-                                  label: 'Pedidos',
-                                  color: const Color(0xFF10B981),
-                                  onTap: () => context.push('/admin/pedidos'),
-                                  delay: 60,
-                                ),
-                                _ModuleCard(
-                                  icon: Icons.point_of_sale_outlined,
-                                  label: 'Ventas',
-                                  color: const Color(0xFF0EA5E9),
-                                  onTap: () => context.push('/admin/ventas'),
-                                  delay: 120,
-                                ),
-                                _ModuleCard(
-                                  icon: Icons.people_alt_outlined,
-                                  label: 'Usuarios',
-                                  color: const Color(0xFF6366F1),
-                                  onTap: () => context.push('/admin/usuarios'),
-                                  delay: 180,
-                                ),
-                                _ModuleCard(
-                                  icon: Icons.factory_outlined,
-                                  label: 'Fabricantes',
-                                  color: const Color(0xFFF59E0B),
-                                  onTap: () =>
-                                      context.push('/admin/fabricantes'),
-                                  delay: 240,
-                                ),
-                                _ModuleCard(
-                                  icon: Icons.insights_rounded,
-                                  label: 'Predicciones',
-                                  color: const Color(0xFFEC4899),
-                                  onTap: () =>
-                                      context.push('/admin/predicciones'),
-                                  delay: 300,
-                                ),
-                                _ModuleCard(
-                                  icon: Icons.table_chart_outlined,
-                                  label: 'Datos',
-                                  color: const Color(0xFF06B6D4),
-                                  onTap: () => context.push('/admin/datos'),
-                                  delay: 360,
-                                ),
-                              ],
+                              children: isStaff
+                                  ? [
+                                      _ModuleCard(
+                                        icon: Icons.receipt_long_outlined,
+                                        label: 'Pedidos',
+                                        color: const Color(0xFF10B981),
+                                        onTap: () =>
+                                            context.push('/admin/pedidos'),
+                                        delay: 0,
+                                      ),
+                                      _ModuleCard(
+                                        icon: Icons.point_of_sale_outlined,
+                                        label: 'Ventas',
+                                        color: const Color(0xFF0EA5E9),
+                                        onTap: () =>
+                                            context.push('/admin/ventas'),
+                                        delay: 60,
+                                      ),
+                                    ]
+                                  : [
+                                      _ModuleCard(
+                                        icon: Icons.inventory_2_outlined,
+                                        label: 'Productos',
+                                        color: AppColors.gold,
+                                        onTap: () =>
+                                            context.push('/admin/productos'),
+                                        delay: 0,
+                                      ),
+                                      _ModuleCard(
+                                        icon: Icons.receipt_long_outlined,
+                                        label: 'Pedidos',
+                                        color: const Color(0xFF10B981),
+                                        onTap: () =>
+                                            context.push('/admin/pedidos'),
+                                        delay: 60,
+                                      ),
+                                      _ModuleCard(
+                                        icon: Icons.point_of_sale_outlined,
+                                        label: 'Ventas',
+                                        color: const Color(0xFF0EA5E9),
+                                        onTap: () =>
+                                            context.push('/admin/ventas'),
+                                        delay: 120,
+                                      ),
+                                      _ModuleCard(
+                                        icon: Icons.people_alt_outlined,
+                                        label: 'Usuarios',
+                                        color: const Color(0xFF6366F1),
+                                        onTap: () =>
+                                            context.push('/admin/usuarios'),
+                                        delay: 180,
+                                      ),
+                                      _ModuleCard(
+                                        icon: Icons.factory_outlined,
+                                        label: 'Fabricantes',
+                                        color: const Color(0xFFF59E0B),
+                                        onTap: () =>
+                                            context.push('/admin/fabricantes'),
+                                        delay: 240,
+                                      ),
+                                      _ModuleCard(
+                                        icon: Icons.insights_rounded,
+                                        label: 'Predicciones',
+                                        color: const Color(0xFFEC4899),
+                                        onTap: () =>
+                                            context.push('/admin/predicciones'),
+                                        delay: 300,
+                                      ),
+                                      _ModuleCard(
+                                        icon: Icons.table_chart_outlined,
+                                        label: 'Datos',
+                                        color: const Color(0xFF06B6D4),
+                                        onTap: () =>
+                                            context.push('/admin/datos'),
+                                        delay: 360,
+                                      ),
+                                    ],
                             ),
                           ],
                         ),
                       ),
                     ),
+                    if (isStaff) ...[
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const _SectionTitle('Pedidos recientes'),
+                              GestureDetector(
+                                onTap: () => context.push('/admin/pedidos'),
+                                child: const Text(
+                                  'Ver todos',
+                                  style: TextStyle(
+                                    color: AppColors.gold,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      ordersAsync.when(
+                        loading: () => const SliverToBoxAdapter(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.gold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        error: (_, _) =>
+                            const SliverToBoxAdapter(child: SizedBox.shrink()),
+                        data: (orders) => SliverPadding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 48),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (ctx, i) => _OrderRow(
+                                order: orders[i],
+                                index: i,
+                                onTap: () => _showOrderDetail(orders[i]),
+                              ),
+                              childCount: orders.length,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
 
-              // ── Tab Dashboard ─────────────────────────────────────────────
-              RefreshIndicator(
+              if (!isStaff)
+                RefreshIndicator(
                 color: AppColors.gold,
                 onRefresh: () async => _invalidateAll(),
                 child: CustomScrollView(
@@ -2705,7 +2772,7 @@ class _ChartShimmer extends StatelessWidget {
 
 class _WorkerNotifsSheet extends StatelessWidget {
   const _WorkerNotifsSheet({required this.notifs});
-  final List<_WorkerNotif> notifs;
+  final List<WorkerNotif> notifs;
 
   static String _relTime(String iso) {
     final diff = DateTime.now().difference(
@@ -2820,21 +2887,15 @@ class _WorkerNotifsSheet extends StatelessWidget {
 
 class _WorkerNotifItem extends StatelessWidget {
   const _WorkerNotifItem({required this.notif});
-  final _WorkerNotif notif;
-
-  static Color _accionColor(String a) => switch (a) {
-    'crear' => const Color(0xFF22C55E),
-    'editar' => const Color(0xFF6366F1),
-    'eliminar' => AppColors.error,
-    'cambiar_estado' => const Color(0xFFF59E0B),
-    'importar' => const Color(0xFF0EA5E9),
-    _ => AppColors.textSecondary,
-  };
+  final WorkerNotif notif;
 
   @override
   Widget build(BuildContext context) {
-    final color = _accionColor(notif.accion);
+    final color = accionColorForWorkerNotif(notif.accion);
     final isUnread = !notif.leido;
+    final actionLabel = actionLabelForWorkerNotif(notif.accion);
+    final displayName =
+        notif.entidadNombre ?? entityLabelForWorkerNotif(notif.entidad);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -2865,7 +2926,7 @@ class _WorkerNotifItem extends StatelessWidget {
               border: Border.all(color: color.withValues(alpha: 0.3)),
             ),
             child: Text(
-              notif.accion.toUpperCase(),
+              actionLabel.toUpperCase(),
               style: TextStyle(
                 color: color,
                 fontSize: 9,
@@ -2880,7 +2941,7 @@ class _WorkerNotifItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${notif.entidad == 'producto' ? 'Producto' : 'Venta'}: ${notif.entidadNombre ?? '—'}',
+                  displayName,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
