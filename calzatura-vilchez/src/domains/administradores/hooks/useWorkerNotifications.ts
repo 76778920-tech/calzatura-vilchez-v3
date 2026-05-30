@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { supabase } from "@/supabase/client";
+import { fetchAllUsers } from "@/domains/usuarios/services/users";
 import { fetchRecentAudit } from "@/services/audit";
+import {
+  formatWorkerNotifToast,
+  isWorkerAuditEntry,
+} from "../utils/workerNotificationPolicy";
 
 export type WorkerNotif = {
   id: string;
@@ -15,43 +19,38 @@ export type WorkerNotif = {
 
 const POLL_MS = 30_000;
 const MAX_NOTIFS = 50;
-const TRACKED_ENTITIES = new Set(["producto", "venta"]);
 
 export function useWorkerNotifications(enabled: boolean) {
   const [notifs, setNotifs] = useState<WorkerNotif[]>([]);
   const workerUids = useRef<Set<string>>(new Set());
   const baseline = useRef<string | null>(null);
   const initialized = useRef(false);
+  const workersLoaded = useRef(false);
 
-  // Carga los UIDs de todos los trabajadores una sola vez
   useEffect(() => {
     if (!enabled) return;
     const load = async () => {
       try {
-        const { data } = await supabase
-          .from("usuarios")
-          .select("uid")
-          .eq("rol", "trabajador");
-        if (data) {
-          workerUids.current = new Set(
-            (data as { uid: string }[]).map((u) => u.uid).filter(Boolean),
-          );
-        }
-      } catch {
-        // silently ignore — worker UIDs load failure is non-critical
+        const users = await fetchAllUsers();
+        workerUids.current = new Set(
+          users.filter((u) => u.rol === "trabajador").map((u) => u.uid).filter(Boolean),
+        );
+        workersLoaded.current = true;
+      } catch (err) {
+        console.error("[worker-notifs] no se pudieron cargar UIDs de trabajadores:", err);
+        workersLoaded.current = false;
       }
     };
     void load();
   }, [enabled]);
 
   const poll = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled || !workersLoaded.current || workerUids.current.size === 0) return;
     try {
-      const entries = await fetchRecentAudit(20);
+      const entries = await fetchRecentAudit(30);
       if (!entries.length) return;
 
       if (!initialized.current) {
-        // Primera llamada: establece el punto de corte sin generar notificaciones
         baseline.current = entries[0].realizadoEn;
         initialized.current = true;
         return;
@@ -59,14 +58,9 @@ export function useWorkerNotifications(enabled: boolean) {
 
       const cutoff = baseline.current ?? "";
       const fresh = entries.filter(
-        (e) =>
-          e.realizadoEn > cutoff &&
-          TRACKED_ENTITIES.has(e.entidad) &&
-          e.usuarioUid != null &&
-          workerUids.current.has(e.usuarioUid),
+        (e) => e.realizadoEn > cutoff && isWorkerAuditEntry(e, workerUids.current),
       );
 
-      // Actualiza el baseline siempre (con o sin actividad de trabajadores)
       baseline.current = entries[0].realizadoEn;
 
       if (fresh.length === 0) return;
@@ -78,25 +72,19 @@ export function useWorkerNotifications(enabled: boolean) {
         ].slice(0, MAX_NOTIFS),
       );
 
-      // Toasts — máximo 3 para no saturar la pantalla
       fresh.slice(0, 3).forEach((e) => {
-        const tipoLabel = e.entidad === "producto" ? "Producto" : "Venta";
-        const nombre = e.entidadNombre ? ": " + e.entidadNombre : "";
-        toast(
-          `✏️ Trabajador ${e.accion} un ${tipoLabel}${nombre}`,
-          {
-            duration: 5000,
-            style: {
-              background: "#1c1c1c",
-              color: "#fff",
-              fontSize: "13px",
-              border: "1px solid rgba(201,162,39,0.5)",
-            },
+        toast(formatWorkerNotifToast(e), {
+          duration: 5000,
+          style: {
+            background: "#1c1c1c",
+            color: "#fff",
+            fontSize: "13px",
+            border: "1px solid rgba(201,162,39,0.5)",
           },
-        );
+        });
       });
-    } catch {
-      // Falla silenciosa — las notificaciones no son críticas
+    } catch (err) {
+      console.error("[worker-notifs] poll falló:", err);
     }
   }, [enabled]);
 

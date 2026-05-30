@@ -5,7 +5,9 @@ export type AuditAction =
   | "editar"
   | "eliminar"
   | "cambiar_estado"
-  | "importar";
+  | "importar"
+  | "registrar_venta"
+  | "devolver_venta";
 
 export type AuditEntity =
   | "producto"
@@ -13,6 +15,7 @@ export type AuditEntity =
   | "fabricante"
   | "usuario"
   | "venta"
+  | "venta_diaria"
   | "importar";
 
 export interface AuditEntry {

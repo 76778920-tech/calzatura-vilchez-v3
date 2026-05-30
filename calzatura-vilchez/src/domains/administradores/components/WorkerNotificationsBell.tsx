@@ -5,6 +5,10 @@ import {
   useWorkerNotifications,
   type WorkerNotif,
 } from "../hooks/useWorkerNotifications";
+import {
+  actionLabelForWorkerNotif,
+  entityLabelForWorkerNotif,
+} from "../utils/workerNotificationPolicy";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,7 +32,7 @@ const ACCION_COLORS: Record<string, string> = {
 
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
-function AccionPill({ accion }: { accion: string }) {
+function AccionPill({ accion, label }: { accion: string; label?: string }) {
   const color = ACCION_COLORS[accion] ?? "#888";
   return (
     <span
@@ -46,7 +50,7 @@ function AccionPill({ accion }: { accion: string }) {
         flexShrink: 0,
       }}
     >
-      {accion}
+      {label ?? accion}
     </span>
   );
 }
@@ -58,7 +62,7 @@ function NotifItem({
   n: WorkerNotif;
   onDismiss: () => void;
 }) {
-  const Icon = n.entidad === "producto" ? Package : CircleDollarSign;
+  const Icon = n.entidad === "producto" ? Package : n.entidad === "pedido" ? Package : CircleDollarSign;
   return (
     <div
       className={`wnotif-item${n.leido ? " wnotif-item--read" : ""}`}
@@ -69,9 +73,9 @@ function NotifItem({
       </span>
       <div className="wnotif-item-body">
         <div className="wnotif-item-top">
-          <AccionPill accion={n.accion} />
+          <AccionPill accion={n.accion} label={actionLabelForWorkerNotif(n.accion)} />
           <span className="wnotif-item-name">
-            {n.entidadNombre ?? n.entidad}
+            {n.entidadNombre ?? entityLabelForWorkerNotif(n.entidad)}
           </span>
         </div>
         <span className="wnotif-item-meta">

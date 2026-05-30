@@ -55,14 +55,14 @@ class _WorkerNotif {
   final bool leido;
 
   _WorkerNotif markRead() => _WorkerNotif(
-        id: id,
-        accion: accion,
-        entidad: entidad,
-        entidadNombre: entidadNombre,
-        usuarioEmail: usuarioEmail,
-        realizadoEn: realizadoEn,
-        leido: true,
-      );
+    id: id,
+    accion: accion,
+    entidad: entidad,
+    entidadNombre: entidadNombre,
+    usuarioEmail: usuarioEmail,
+    realizadoEn: realizadoEn,
+    leido: true,
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -80,7 +80,9 @@ String _greeting() {
 
 String _greetingWithName(String? name) {
   final first = name?.trim().split(RegExp(r'\s+')).firstOrNull;
-  return first != null && first.isNotEmpty ? '${_greeting()}, $first' : _greeting();
+  return first != null && first.isNotEmpty
+      ? '${_greeting()}, $first'
+      : _greeting();
 }
 
 String _formatCurrency(double n) => 'S/ ${n.toStringAsFixed(2)}';
@@ -203,7 +205,9 @@ final adminRecentOrdersProvider = FutureProvider<List<Map<String, dynamic>>>((
 ) async {
   final data = await _supabase
       .from('pedidos')
-      .select('id, estado, total, subtotal, envio, creadoEn, userEmail, direccion, items')
+      .select(
+        'id, estado, total, subtotal, envio, creadoEn, userEmail, direccion, items',
+      )
       .order('creadoEn', ascending: false)
       .limit(8);
   return List<Map<String, dynamic>>.from(data as List);
@@ -386,10 +390,9 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
           .select('uid')
           .eq('rol', 'trabajador');
       if (!mounted) return;
-      final uids = List<Map<String, dynamic>>.from(data as List)
-          .map((u) => u['uid'] as String?)
-          .whereType<String>()
-          .toSet();
+      final uids = List<Map<String, dynamic>>.from(
+        data as List,
+      ).map((u) => u['uid'] as String?).whereType<String>().toSet();
       _workerUids.addAll(uids);
       _subscribeWorkerNotifs();
     } catch (_) {}
@@ -408,7 +411,10 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
             final entidad = row['entidad'] as String?;
             if (uid != null &&
                 _workerUids.contains(uid) &&
-                (entidad == 'producto' || entidad == 'venta')) {
+                (entidad == 'producto' ||
+                    entidad == 'venta' ||
+                    entidad == 'venta_diaria' ||
+                    entidad == 'pedido')) {
               _onWorkerAction(row);
             }
           },
@@ -424,16 +430,21 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
       entidad: row['entidad'] as String? ?? '',
       entidadNombre: row['entidadNombre'] as String?,
       usuarioEmail: row['usuarioEmail'] as String?,
-      realizadoEn: row['realizadoEn'] as String? ??
-          DateTime.now().toIso8601String(),
+      realizadoEn:
+          row['realizadoEn'] as String? ?? DateTime.now().toIso8601String(),
     );
     setState(() {
       _workerNotifs.insert(0, notif);
       if (_workerNotifs.length > 50) _workerNotifs.removeLast();
     });
-    final label = notif.entidad == 'producto' ? 'Producto' : 'Venta';
-    final nombre =
-        notif.entidadNombre != null ? ': ${notif.entidadNombre}' : '';
+    final label = notif.entidad == 'producto'
+        ? 'Producto'
+        : notif.entidad == 'pedido'
+            ? 'Pedido'
+            : 'Venta';
+    final nombre = notif.entidadNombre != null
+        ? ': ${notif.entidadNombre}'
+        : '';
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('✏️ Trabajador ${notif.accion} un $label$nombre'),
@@ -462,7 +473,8 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _WorkerNotifsSheet(notifs: List.unmodifiable(_workerNotifs)),
+      builder: (_) =>
+          _WorkerNotifsSheet(notifs: List.unmodifiable(_workerNotifs)),
     );
   }
 
@@ -493,7 +505,7 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
         body: NestedScrollView(
           headerSliverBuilder: (ctx, _) => [
             SliverAppBar(
-              expandedHeight: 140,
+              expandedHeight: 136,
               pinned: true,
               backgroundColor: AppColors.black,
               automaticallyImplyLeading: false,
@@ -502,12 +514,12 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                   color: AppColors.black,
                   child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const CVLogo(size: 38),
-                          const SizedBox(width: 12),
+                          const CVLogo(size: 34),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,23 +532,23 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                   ),
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 15,
+                                    fontSize: 14,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: 0.2,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 1),
                                 // Fecha
                                 Text(
                                   _todayLabel(),
                                   style: const TextStyle(
                                     color: Colors.white54,
-                                    fontSize: 11,
+                                    fontSize: 10.5,
                                   ),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(height: 4),
                                 // Badge + iconos en la misma fila
                                 Row(
                                   children: [
@@ -582,8 +594,8 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                           tooltip: 'Actividad de trabajadores',
                                           padding: const EdgeInsets.all(4),
                                           constraints: const BoxConstraints(
-                                            minWidth: 30,
-                                            minHeight: 30,
+                                            minWidth: 28,
+                                            minHeight: 28,
                                           ),
                                           onPressed: _showNotifSheet,
                                         ),
@@ -624,8 +636,8 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                       tooltip: 'Ver tienda',
                                       padding: const EdgeInsets.all(4),
                                       constraints: const BoxConstraints(
-                                        minWidth: 30,
-                                        minHeight: 30,
+                                        minWidth: 28,
+                                        minHeight: 28,
                                       ),
                                       onPressed: () => context.go('/home'),
                                     ),
@@ -639,14 +651,12 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                       tooltip: 'Cerrar sesión',
                                       padding: const EdgeInsets.all(4),
                                       constraints: const BoxConstraints(
-                                        minWidth: 30,
-                                        minHeight: 30,
+                                        minWidth: 28,
+                                        minHeight: 28,
                                       ),
                                       onPressed: () async {
                                         await ref
-                                            .read(
-                                              authNotifierProvider.notifier,
-                                            )
+                                            .read(authNotifierProvider.notifier)
                                             .signOut();
                                         if (context.mounted) {
                                           context.go('/login');
@@ -693,7 +703,7 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                   slivers: [
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                         child: kpisAsync.when(
                           loading: () => _KpiShimmer(),
                           error: (_, _) => const SizedBox.shrink(),
@@ -701,14 +711,15 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               const _SectionTitle('Resumen del negocio'),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: 4),
                               GridView.count(
                                 crossAxisCount: 2,
                                 shrinkWrap: true,
                                 physics: const NeverScrollableScrollPhysics(),
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                                childAspectRatio: 1.5,
+                                padding: EdgeInsets.zero,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                                childAspectRatio: 1.75,
                                 children: [
                                   _KpiCard(
                                     label: 'Productos',
@@ -747,19 +758,20 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                     ),
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 80),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 48),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const _SectionTitle('Módulos'),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 8),
                             GridView.count(
                               crossAxisCount: 3,
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
-                              crossAxisSpacing: 10,
-                              mainAxisSpacing: 10,
-                              childAspectRatio: 1.0,
+                              padding: EdgeInsets.zero,
+                              crossAxisSpacing: 8,
+                              mainAxisSpacing: 8,
+                              childAspectRatio: 1.12,
                               children: [
                                 _ModuleCard(
                                   icon: Icons.inventory_2_outlined,
@@ -854,9 +866,8 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                           todaySales: chart.todayWeb,
                           values: chart.web,
                           labels: chart.labels,
-                          pendientes: kpisAsync.valueOrNull?['pendientes']
-                                  as int? ??
-                              0,
+                          pendientes:
+                              kpisAsync.valueOrNull?['pendientes'] as int? ?? 0,
                           onPendingsTap: () => context.push('/admin/pedidos'),
                         ),
                       ),
@@ -957,10 +968,7 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
                         child: auditAsync.when(
-                          loading: () => _AuditButton(
-                            count: null,
-                            onTap: null,
-                          ),
+                          loading: () => _AuditButton(count: null, onTap: null),
                           error: (_, _) => _AuditButton(
                             count: null,
                             onTap: null,
@@ -1550,7 +1558,13 @@ class _OrderStatusSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const statuses = ['pendiente', 'pagado', 'enviado', 'entregado', 'cancelado'];
+    const statuses = [
+      'pendiente',
+      'pagado',
+      'enviado',
+      'entregado',
+      'cancelado',
+    ];
     final total = orders.isEmpty ? 1 : orders.length;
 
     return Container(
@@ -1600,10 +1614,12 @@ class _OrderStatusSummary extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                       child: LinearProgressIndicator(
                         value: pct,
-                        backgroundColor: _statusColor(status).withValues(
-                          alpha: 0.1,
+                        backgroundColor: _statusColor(
+                          status,
+                        ).withValues(alpha: 0.1),
+                        valueColor: AlwaysStoppedAnimation(
+                          _statusColor(status),
                         ),
-                        valueColor: AlwaysStoppedAnimation(_statusColor(status)),
                         minHeight: 8,
                       ),
                     ),
@@ -1665,7 +1681,9 @@ class _OrderDetailSheet extends StatelessWidget {
     final envio = (order['envio'] as num?)?.toDouble() ?? 0.0;
     final email = order['userEmail'] as String? ?? '';
     final creadoEn = order['creadoEn'] as String? ?? '';
-    final fechaCorta = creadoEn.length >= 10 ? creadoEn.substring(0, 10) : creadoEn;
+    final fechaCorta = creadoEn.length >= 10
+        ? creadoEn.substring(0, 10)
+        : creadoEn;
     final rawId = order['id'] as String? ?? '';
     final orderId = rawId.length > 8
         ? rawId.substring(rawId.length - 8).toUpperCase()
@@ -1679,9 +1697,7 @@ class _OrderDetailSheet extends StatelessWidget {
 
     final itemsRaw = order['items'];
     final List<Map<String, dynamic>> items = itemsRaw is List
-        ? itemsRaw
-              .map((e) => Map<String, dynamic>.from(e as Map))
-              .toList()
+        ? itemsRaw.map((e) => Map<String, dynamic>.from(e as Map)).toList()
         : [];
 
     return DraggableScrollableSheet(
@@ -1782,7 +1798,8 @@ class _OrderDetailSheet extends StatelessWidget {
                           _InfoRow(
                             Icons.location_on_outlined,
                             [
-                              '${direccion['nombre'] ?? ''} ${direccion['apellido'] ?? ''}'.trim(),
+                              '${direccion['nombre'] ?? ''} ${direccion['apellido'] ?? ''}'
+                                  .trim(),
                               direccion['direccion']?.toString() ?? '',
                               '${direccion['distrito'] ?? ''}, ${direccion['ciudad'] ?? ''}',
                             ].where((s) => s.isNotEmpty).join(' — '),
@@ -1870,11 +1887,7 @@ class _OrderDetailSheet extends StatelessWidget {
                       child: Column(
                         children: [
                           _TotalRow('Subtotal', subtotal),
-                          _TotalRow(
-                            'Envío',
-                            envio,
-                            freeLabel: envio <= 0,
-                          ),
+                          _TotalRow('Envío', envio, freeLabel: envio <= 0),
                           const Divider(height: 16),
                           _TotalRow('Total', total, isBold: true),
                         ],
@@ -2021,9 +2034,7 @@ class _AuditButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppColors.gold.withValues(alpha: 0.25),
-          ),
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.25)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.04),
@@ -2131,13 +2142,13 @@ class _AuditLogSheet extends StatelessWidget {
   final List<Map<String, dynamic>> entries;
 
   static Color _accionColor(String a) => switch (a) {
-        'crear' => const Color(0xFF10B981),
-        'editar' => const Color(0xFF6366F1),
-        'eliminar' => AppColors.error,
-        'cambiar_estado' => const Color(0xFFF59E0B),
-        'importar' => const Color(0xFF0EA5E9),
-        _ => AppColors.textSecondary,
-      };
+    'crear' => const Color(0xFF10B981),
+    'editar' => const Color(0xFF6366F1),
+    'eliminar' => AppColors.error,
+    'cambiar_estado' => const Color(0xFFF59E0B),
+    'importar' => const Color(0xFF0EA5E9),
+    _ => AppColors.textSecondary,
+  };
 
   static String _fmtDate(String? iso) {
     if (iso == null) return '—';
@@ -2246,18 +2257,14 @@ class _AuditLogSheet extends StatelessWidget {
                         controller: scrollCtrl,
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                         itemCount: entries.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: 8),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (_, i) {
                           final e = entries[i];
                           final accion = e['accion'] as String? ?? '—';
                           final entidad = e['entidad'] as String? ?? '—';
-                          final nombre =
-                              e['entidadNombre'] as String? ?? '—';
+                          final nombre = e['entidadNombre'] as String? ?? '—';
                           final email = e['usuarioEmail'] as String?;
-                          final fecha = _fmtDate(
-                            e['realizadoEn'] as String?,
-                          );
+                          final fecha = _fmtDate(e['realizadoEn'] as String?);
                           final color = _accionColor(accion);
 
                           return Container(
@@ -2392,7 +2399,7 @@ class _KpiCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(13),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
@@ -2409,13 +2416,13 @@ class _KpiCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(9),
                 ),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: color, size: 18),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2423,7 +2430,7 @@ class _KpiCard extends StatelessWidget {
                   Text(
                     value,
                     style: const TextStyle(
-                      fontSize: 24,
+                      fontSize: 22,
                       fontWeight: FontWeight.w800,
                       color: AppColors.textPrimary,
                       height: 1,
@@ -2468,7 +2475,7 @@ class _ModuleCard extends StatelessWidget {
     return GestureDetector(
           onTap: onTap,
           child: Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -2485,20 +2492,20 @@ class _ModuleCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 34,
+                  height: 34,
                   decoration: BoxDecoration(
                     color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: color, size: 22),
+                  child: Icon(icon, color: color, size: 20),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   label,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                     height: 1.2,
@@ -2659,9 +2666,10 @@ class _KpiShimmer extends StatelessWidget {
       crossAxisCount: 2,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.5,
+      padding: EdgeInsets.zero,
+      crossAxisSpacing: 8,
+      mainAxisSpacing: 8,
+      childAspectRatio: 1.75,
       children: List.generate(
         4,
         (_) => Container(
@@ -2700,8 +2708,9 @@ class _WorkerNotifsSheet extends StatelessWidget {
   final List<_WorkerNotif> notifs;
 
   static String _relTime(String iso) {
-    final diff =
-        DateTime.now().difference(DateTime.tryParse(iso) ?? DateTime.now());
+    final diff = DateTime.now().difference(
+      DateTime.tryParse(iso) ?? DateTime.now(),
+    );
     if (diff.inMinutes < 1) return 'ahora';
     if (diff.inMinutes < 60) return 'hace ${diff.inMinutes} min';
     if (diff.inHours < 24) return 'hace ${diff.inHours}h';
@@ -2796,8 +2805,7 @@ class _WorkerNotifsSheet extends StatelessWidget {
                         controller: scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                         itemCount: notifs.length,
-                        separatorBuilder: (_, _) =>
-                            const SizedBox(height: 8),
+                        separatorBuilder: (_, _) => const SizedBox(height: 8),
                         itemBuilder: (_, i) =>
                             _WorkerNotifItem(notif: notifs[i]),
                       ),
@@ -2815,13 +2823,13 @@ class _WorkerNotifItem extends StatelessWidget {
   final _WorkerNotif notif;
 
   static Color _accionColor(String a) => switch (a) {
-        'crear' => const Color(0xFF22C55E),
-        'editar' => const Color(0xFF6366F1),
-        'eliminar' => AppColors.error,
-        'cambiar_estado' => const Color(0xFFF59E0B),
-        'importar' => const Color(0xFF0EA5E9),
-        _ => AppColors.textSecondary,
-      };
+    'crear' => const Color(0xFF22C55E),
+    'editar' => const Color(0xFF6366F1),
+    'eliminar' => AppColors.error,
+    'cambiar_estado' => const Color(0xFFF59E0B),
+    'importar' => const Color(0xFF0EA5E9),
+    _ => AppColors.textSecondary,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -2831,9 +2839,7 @@ class _WorkerNotifItem extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: isUnread
-            ? AppColors.gold.withValues(alpha: 0.06)
-            : Colors.white,
+        color: isUnread ? AppColors.gold.withValues(alpha: 0.06) : Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: isUnread
