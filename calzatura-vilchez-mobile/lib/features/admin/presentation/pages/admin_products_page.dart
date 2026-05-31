@@ -532,13 +532,26 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
     return _typesForCategory(_categoryFilter);
   }
 
-  Future<void> _toggleActive(Map<String, dynamic> product) async {
+  Future<void> _toggleActive(
+    BuildContext context,
+    Map<String, dynamic> product,
+  ) async {
     final current = product['activo'] == true;
-    await _supabase
-        .from('productos')
-        .update({'activo': !current})
-        .eq('id', product['id']);
-    ref.invalidate(adminProductsProvider);
+    try {
+      await _supabase
+          .from('productos')
+          .update({'activo': !current})
+          .eq('id', product['id']);
+      ref.invalidate(adminProductsProvider);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cambiar visibilidad: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Future<void> _confirmDelete(
@@ -939,7 +952,7 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
                             index: index,
                             onEdit: () => _openProductForm(context, product),
                             onDelete: () => _confirmDelete(context, product),
-                            onToggleActive: () => _toggleActive(product),
+                            onToggleActive: () => _toggleActive(context, product),
                           );
                         }, childCount: filtered.length),
                       ),
