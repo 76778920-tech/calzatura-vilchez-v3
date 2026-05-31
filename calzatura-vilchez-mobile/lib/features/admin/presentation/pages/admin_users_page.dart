@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
+import '../../../../core/config/env.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -114,7 +115,7 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
   Widget build(BuildContext context) {
     final usersAsync = ref.watch(adminUsersProvider);
     final currentUser = ref.watch(currentUserProvider);
-    final isSuperAdmin = currentUser?.email == '76778920@continental.edu.pe';
+    final isSuperAdmin = currentUser?.email == Env.superadminEmail;
 
     return BackNavigationScope(
       fallbackRoute: '/admin',
@@ -287,7 +288,7 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
 
   Future<void> _changeRole(Map<String, dynamic> user, String newRole) async {
     final currentUser = ref.read(currentUserProvider);
-    final isSuperAdmin = currentUser?.email == '76778920@continental.edu.pe';
+    final isSuperAdmin = currentUser?.email == Env.superadminEmail;
     final userRole = user['rol'] as String? ?? 'cliente';
 
     // Solo superadmin puede asignar/quitar admin

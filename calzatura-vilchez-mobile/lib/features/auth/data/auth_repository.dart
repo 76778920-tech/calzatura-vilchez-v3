@@ -16,38 +16,78 @@ class AuthRepository {
       email: email,
       password: password,
     );
-    // Firmar también en Supabase para activar el rol `authenticated` en queries.
-    // Si el usuario no tiene cuenta Supabase aún, se crea en este momento.
-    await _signInSupabase(email: email, password: password);
+    await _syncSupabaseSession(email: email, password: password);
     return cred;
   }
 
-  /// Intenta signIn en Supabase; si la cuenta no existe la crea (usuarios migrados).
-  Future<void> _signInSupabase({
+  /// Sincroniza la sesión de Supabase para activar el rol `authenticated`.
+  ///
+  /// Flujo:
+  ///  1. signInWithPassword → ok → sesión establecida.
+  ///  2. Falla 400 (credenciales inválidas) → la cuenta puede no existir:
+  ///     a. signUp → ok → sesión establecida (si autoconfirm está activo).
+  ///     b. signUp falla "User already registered" → la cuenta existe pero con
+  ///        contraseña diferente (el usuario hizo reset en Firebase). Se continúa
+  ///        como anon; las tablas públicas funcionan normalmente.
+  ///  3. Cualquier otro error → log + continúa como anon.
+  Future<void> _syncSupabaseSession({
     required String email,
     required String password,
   }) async {
+    final normalizedEmail = email.trim().toLowerCase();
     try {
       await _supabase.auth.signInWithPassword(
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         password: password,
       );
+      return; // sesión establecida correctamente
     } on sb.AuthException catch (e) {
-      if (e.statusCode == '400' || e.message.contains('Invalid login')) {
-        // La cuenta Supabase no existe todavía — la creamos automáticamente.
-        try {
-          await _supabase.auth.signUp(
-            email: email.trim().toLowerCase(),
-            password: password,
-          );
-        } catch (_) {
-          debugPrint('[AuthRepository] Supabase signUp fallback failed');
+      final isInvalidCredentials =
+          e.statusCode == '400' ||
+          e.message.toLowerCase().contains('invalid login') ||
+          e.message.toLowerCase().contains('invalid credentials');
+
+      if (!isInvalidCredentials) {
+        debugPrint('[Auth] Supabase signIn error inesperado: ${e.message}');
+        return;
+      }
+
+      // Credenciales inválidas: intentar crear la cuenta Supabase.
+      try {
+        final res = await _supabase.auth.signUp(
+          email: normalizedEmail,
+          password: password,
+        );
+        // signUp exitoso pero sin sesión activa (email confirm requerido):
+        // intentar signIn una vez más para obtener la sesión.
+        if (res.session == null) {
+          try {
+            await _supabase.auth.signInWithPassword(
+              email: normalizedEmail,
+              password: password,
+            );
+          } catch (_) {}
         }
-      } else {
-        debugPrint('[AuthRepository] Supabase signIn error: $e');
+      } on sb.AuthException catch (signUpErr) {
+        final alreadyExists =
+            signUpErr.message.toLowerCase().contains('already registered') ||
+            signUpErr.message.toLowerCase().contains('already been registered') ||
+            signUpErr.statusCode == '422';
+        if (alreadyExists) {
+          // Cuenta Supabase existente con contraseña diferente (post-reset Firebase).
+          // Continúa como anon — las tablas con grant anon funcionan normalmente.
+          debugPrint(
+            '[Auth] Supabase: cuenta existe con contraseña diferente. '
+            'El usuario debe cerrar sesión y volver a entrar para sincronizar.',
+          );
+        } else {
+          debugPrint('[Auth] Supabase signUp error: ${signUpErr.message}');
+        }
+      } catch (e) {
+        debugPrint('[Auth] Supabase signUp inesperado: $e');
       }
     } catch (e) {
-      debugPrint('[AuthRepository] Supabase signIn unexpected: $e');
+      debugPrint('[Auth] Supabase sync inesperado: $e');
     }
   }
 
@@ -60,15 +100,13 @@ class AuthRepository {
     required String nombre,
     required String telefonoFormatted,
   }) async {
-    // Verificar email duplicado en Supabase antes de crear cuenta Firebase
+    // Verificar email duplicado en Supabase antes de crear cuenta Firebase.
     final existing = await _supabase
         .from('usuarios')
         .select('uid')
         .eq('email', email.trim().toLowerCase())
         .maybeSingle();
-    if (existing != null) {
-      throw const EmailAlreadyInUseException();
-    }
+    if (existing != null) throw const EmailAlreadyInUseException();
 
     final cred = await _auth.createUserWithEmailAndPassword(
       email: email,
@@ -89,11 +127,10 @@ class AuthRepository {
         'creadoEn': DateTime.now().toIso8601String(),
       });
       await cred.user?.sendEmailVerification();
-      // Crear cuenta Supabase Auth para que las queries usen rol `authenticated`.
-      await _signInSupabase(email: email, password: password);
+      // Crear cuenta Supabase Auth para activar rol `authenticated`.
+      await _syncSupabaseSession(email: email, password: password);
     } catch (e) {
-      // Si Supabase falla, eliminar cuenta Firebase para evitar cuentas huérfanas
-      debugPrint('[AuthRepository] post-register failed: $e');
+      debugPrint('[Auth] post-register failed: $e');
       await cred.user?.delete().catchError((_) {});
       rethrow;
     }
