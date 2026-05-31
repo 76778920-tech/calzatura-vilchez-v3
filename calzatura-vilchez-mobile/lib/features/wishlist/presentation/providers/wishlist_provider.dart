@@ -64,9 +64,9 @@ final isWishedProvider = Provider.family<bool, String>((ref, productId) {
   return ref.watch(wishlistProvider).valueOrNull?.contains(productId) ?? false;
 });
 
-// autoDispose: se recrea al entrar a la pantalla → siempre dato fresco.
 // Espera con .future para no emitir [] mientras wishlistProvider carga.
-final wishlistProductsProvider = FutureProvider.autoDispose<List<Product>>((ref) async {
+// Usa pull-to-refresh (invalidate wishlistProvider) para datos frescos.
+final wishlistProductsProvider = FutureProvider<List<Product>>((ref) async {
   final ids = await ref.watch(wishlistProvider.future);
   if (ids.isEmpty) return [];
 
