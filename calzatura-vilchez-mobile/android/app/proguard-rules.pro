@@ -10,3 +10,8 @@
 -keepattributes Signature
 -keepattributes *Annotation*
 -dontwarn com.google.errorprone.annotations.**
+
+# Play Core (referenciado por Flutter deferred components; no usado en este APK)
+-dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.tasks.**
