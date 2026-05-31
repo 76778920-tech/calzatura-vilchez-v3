@@ -11,8 +11,45 @@ class AuthRepository {
   final _auth = FirebaseAuth.instance;
   final _supabase = sb.Supabase.instance.client;
 
-  Future<UserCredential> signIn(String email, String password) =>
-      _auth.signInWithEmailAndPassword(email: email, password: password);
+  Future<UserCredential> signIn(String email, String password) async {
+    final cred = await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    // Firmar también en Supabase para activar el rol `authenticated` en queries.
+    // Si el usuario no tiene cuenta Supabase aún, se crea en este momento.
+    await _signInSupabase(email: email, password: password);
+    return cred;
+  }
+
+  /// Intenta signIn en Supabase; si la cuenta no existe la crea (usuarios migrados).
+  Future<void> _signInSupabase({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      await _supabase.auth.signInWithPassword(
+        email: email.trim().toLowerCase(),
+        password: password,
+      );
+    } on sb.AuthException catch (e) {
+      if (e.statusCode == '400' || e.message.contains('Invalid login')) {
+        // La cuenta Supabase no existe todavía — la creamos automáticamente.
+        try {
+          await _supabase.auth.signUp(
+            email: email.trim().toLowerCase(),
+            password: password,
+          );
+        } catch (_) {
+          debugPrint('[AuthRepository] Supabase signUp fallback failed');
+        }
+      } else {
+        debugPrint('[AuthRepository] Supabase signIn error: $e');
+      }
+    } catch (e) {
+      debugPrint('[AuthRepository] Supabase signIn unexpected: $e');
+    }
+  }
 
   Future<UserCredential> register({
     required String email,
@@ -52,6 +89,8 @@ class AuthRepository {
         'creadoEn': DateTime.now().toIso8601String(),
       });
       await cred.user?.sendEmailVerification();
+      // Crear cuenta Supabase Auth para que las queries usen rol `authenticated`.
+      await _signInSupabase(email: email, password: password);
     } catch (e) {
       // Si Supabase falla, eliminar cuenta Firebase para evitar cuentas huérfanas
       debugPrint('[AuthRepository] post-register failed: $e');
@@ -62,7 +101,10 @@ class AuthRepository {
     return cred;
   }
 
-  Future<void> signOut() => _auth.signOut();
+  Future<void> signOut() async {
+    await _supabase.auth.signOut().catchError((_) {});
+    await _auth.signOut();
+  }
 
   Future<void> resetPassword(String email) =>
       _auth.sendPasswordResetEmail(email: email);
