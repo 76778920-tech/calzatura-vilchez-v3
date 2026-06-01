@@ -1,0 +1,18 @@
+sequenceDiagram
+  actor Admin as Administrador
+  participant UI as UI Predicción
+  participant BFF
+  participant IA as Servicio IA
+  participant DB as Supabase
+  participant Modelo as Modelo/IRE
+  participant Dash as Dashboard
+  Admin->>UI: Solicita horizonte de análisis
+  UI->>BFF: Token Firebase + parámetros
+  BFF->>DB: Consulta ventas, productos y métricas
+  BFF->>IA: GET /api/predict/combined
+  IA->>Modelo: Prepara dataset y calcula features
+  Modelo->>Modelo: Backtesting MAE/MAPE y data_sufficient
+  Modelo->>Modelo: Calcula IRE y nivel de riesgo
+  IA->>DB: Persiste ireHistorial/modeloEstado
+  IA-->>BFF: Predicción + métricas
+  BFF-->>Dash: Renderiza tabla, IRE y evidencia

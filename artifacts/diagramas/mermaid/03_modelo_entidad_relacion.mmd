@@ -1,0 +1,11 @@
+erDiagram
+  usuarios ||--o{ pedidos : realiza
+  usuarios ||--o{ favoritos : guarda
+  productos ||--o{ favoritos : aparece
+  productos ||--o{ ventasDiarias : registra
+  productos ||--|| productoFinanzas : tiene
+  productos ||--o{ productoCodigos : identifica
+  fabricantes ||--o{ productos : provee
+  pedidos ||--o{ auditoria : genera
+  ventasDiarias ||--o{ ireHistorial : alimenta
+  modeloEstado ||--o{ ireHistorial : versiona

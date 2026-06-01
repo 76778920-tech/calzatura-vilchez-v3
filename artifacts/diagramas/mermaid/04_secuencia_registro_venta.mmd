@@ -1,0 +1,18 @@
+sequenceDiagram
+  actor Trabajador
+  participant UI as UI Ventas
+  participant BFF
+  participant RPC as RPC Supabase
+  participant Productos
+  participant Ventas
+  participant Auditoria
+  Trabajador->>UI: Selecciona producto, talla y cantidad
+  UI->>UI: Valida campos y stock visible
+  UI->>BFF: POST /staff/dailySales/register
+  BFF->>BFF: Verifica Firebase y rol
+  BFF->>RPC: register_daily_sales_atomic
+  RPC->>Productos: Descuenta stock por talla
+  RPC->>Ventas: Inserta ventaDiaria
+  RPC->>Auditoria: Registra evento sin PII
+  RPC-->>BFF: Resultado atómico
+  BFF-->>UI: Respuesta y toast de éxito

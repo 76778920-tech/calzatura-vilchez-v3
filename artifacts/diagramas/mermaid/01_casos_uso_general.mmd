@@ -1,0 +1,29 @@
+flowchart LR
+  Visitante[Visitante / Cliente]
+  Admin[Administrador]
+  Trabajador[Trabajador]
+  Stripe[Stripe]
+  IA[Servicio IA]
+  subgraph Sistema["Sistema web Calzatura Vilchez"]
+    Catalogo((Navegar catálogo))
+    Auth((Registrarse e iniciar sesión))
+    Checkout((Gestionar carrito y checkout))
+    Pedidos((Consultar pedidos))
+    Productos((Gestionar productos y stock))
+    Ventas((Registrar ventas físicas))
+    Excel((Importar y exportar Excel))
+    Prediccion((Ejecutar predicción IRE))
+    Auditoria((Auditar operaciones))
+  end
+  Visitante --> Catalogo
+  Visitante --> Auth
+  Visitante --> Checkout
+  Visitante --> Pedidos
+  Admin --> Productos
+  Admin --> Ventas
+  Admin --> Excel
+  Admin --> Prediccion
+  Admin --> Auditoria
+  Trabajador --> Ventas
+  Stripe -.webhook.-> Checkout
+  IA -.modelo.-> Prediccion

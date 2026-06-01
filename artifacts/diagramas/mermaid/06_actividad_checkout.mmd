@@ -1,0 +1,12 @@
+flowchart TD
+  A([Inicio]) --> B[Explorar catálogo y ficha de producto]
+  B --> C[Seleccionar talla y agregar al carrito]
+  C --> D[Confirmar datos de entrega y ubicación]
+  D --> E{Método de pago}
+  E -->|Tarjeta| F[Crear sesión Stripe y esperar webhook firmado]
+  E -->|Contraentrega| G[Crear pedido pendiente]
+  F --> H[BFF valida precio, stock, envío e idempotencia]
+  G --> H
+  H --> I[Pedido visible en confirmación e historial]
+  H -->|error| J[Mensaje controlado y reintento]
+  J --> D

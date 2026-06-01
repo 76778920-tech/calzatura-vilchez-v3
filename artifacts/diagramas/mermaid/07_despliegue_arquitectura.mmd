@@ -1,0 +1,20 @@
+flowchart LR
+  Browser[Navegador: React SPA / Firebase Hosting]
+  BFF[BFF Render: Node + Express + service_role]
+  DB[Supabase: PostgreSQL + RLS + RPC]
+  Auth[Firebase Auth + App Check]
+  Stripe[Stripe Checkout + webhook]
+  Cloudinary[Cloudinary firma BFF]
+  DNI[Proveedor DNI protegido]
+  AI[Servicio IA]
+  CI[GitHub Actions: CI + Docker + ZAP + stress]
+  Browser -->|HTTPS| BFF
+  BFF -->|SQL/RPC| DB
+  BFF -->|verifica token| Auth
+  BFF --> Stripe
+  BFF --> Cloudinary
+  BFF --> DNI
+  BFF --> AI
+  CI --> Browser
+  CI --> BFF
+  CI --> AI

@@ -1,0 +1,57 @@
+classDiagram
+  class Usuario {
+    +string uid
+    +string email
+    +string rol
+    +actualizarPerfil()
+  }
+  class Producto {
+    +uuid id
+    +string nombre
+    +decimal precio
+    +json tallaStock
+    +validarStock()
+  }
+  class Pedido {
+    +uuid id
+    +string estado
+    +string metodoPago
+    +cambiarEstado()
+  }
+  class PedidoItem {
+    +uuid productoId
+    +string talla
+    +int cantidad
+    +subtotal()
+  }
+  class VentaDiaria {
+    +uuid productoId
+    +int cantidad
+    +registrar()
+    +devolver()
+  }
+  class Auditoria {
+    +string accion
+    +string entidad
+    +json detalle
+    +registrarEvento()
+  }
+  class PrediccionIRE {
+    +number score
+    +string nivel
+    +calcularIRE()
+  }
+  class BFFService {
+    +verificarFirebase()
+    +validarRol()
+    +invocarRPC()
+    +redactarPII()
+  }
+  Usuario "1" --> "*" Pedido
+  Pedido "1" --> "*" PedidoItem
+  PedidoItem "*" --> "1" Producto
+  Producto "1" --> "*" VentaDiaria
+  BFFService --> Pedido
+  BFFService --> VentaDiaria
+  BFFService --> Auditoria
+  BFFService --> PrediccionIRE
