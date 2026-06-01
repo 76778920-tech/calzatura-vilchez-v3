@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,7 +41,12 @@ class _SplashPageState extends ConsumerState<SplashPage>
     final auth = ref.read(authStateProvider);
     if (auth.isLoading) return; // el listener en build llamará de nuevo
     _navigated = true;
-    context.go('/home');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null && !user.emailVerified) {
+      context.go('/verify-email');
+    } else {
+      context.go('/home');
+    }
   }
 
   @override

@@ -1,4 +1,5 @@
 import 'package:animations/animations.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -59,6 +60,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         if (loc.startsWith('/order-success')) return '/home';
         if (!isGuestBrowsableLocation(loc)) return '/home';
         return null;
+      }
+
+      // Forzar verificación de email antes de continuar
+      final firebaseUser = FirebaseAuth.instance.currentUser;
+      final emailVerified = firebaseUser?.emailVerified ?? false;
+      if (isAuth && !emailVerified && loc != '/verify-email') {
+        return '/verify-email';
       }
 
       if (isAuth && !isOnAuth) {

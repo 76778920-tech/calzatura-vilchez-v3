@@ -251,12 +251,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                                 icon: Icons.email_outlined,
                                 keyboardType: TextInputType.emailAddress,
                                 validator: (v) {
-                                  if (v == null || v.isEmpty) {
+                                  if (v == null || v.trim().isEmpty) {
                                     return 'Ingresa tu correo';
                                   }
-                                  if (!v.contains('@')) {
-                                    return 'Correo inválido';
-                                  }
+                                  final valid = RegExp(
+                                    r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
+                                  ).hasMatch(v.trim());
+                                  if (!valid) return 'Correo inválido';
                                   return null;
                                 },
                               ),
