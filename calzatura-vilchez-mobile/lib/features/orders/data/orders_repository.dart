@@ -203,7 +203,7 @@ class OrdersRepository {
     if (user == null) return;
     final idToken = await user.getIdToken();
     final base = Env.backendApiUrl.replaceAll(RegExp(r'/$'), '');
-    await _client.post(
+    final response = await _client.post(
       Uri.parse('$base/updateOrderStatus'),
       headers: {
         'Content-Type': 'application/json',
@@ -211,6 +211,13 @@ class OrdersRepository {
       },
       body: jsonEncode({'orderId': orderId, 'estado': 'cancelado'}),
     );
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final payload =
+          jsonDecode(response.body) as Map<String, dynamic>? ?? {};
+      throw Exception(
+        payload['error']?.toString() ?? 'No se pudo cancelar el pedido',
+      );
+    }
   }
 }
 

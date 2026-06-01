@@ -160,7 +160,7 @@ class _OrderCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Pedido #${order.id.substring(0, 8).toUpperCase()}',
+                      'Pedido #${order.id.substring(0, order.id.length.clamp(0, 8)).toUpperCase()}',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
