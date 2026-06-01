@@ -131,7 +131,7 @@ class OrderSuccessPage extends ConsumerWidget {
                         const SizedBox(height: 20),
                         _SuccessRow(
                           label: 'N.° de pedido',
-                          value: '#${order.id.split('-').first.toUpperCase()}',
+                          value: '#${(order.id.contains('-') ? order.id.split('-').first : order.id.substring(0, order.id.length.clamp(0, 8))).toUpperCase()}',
                         ),
                         const SizedBox(height: 8),
                         _SuccessRow(

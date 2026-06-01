@@ -389,7 +389,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   const Divider(height: 20, color: Color(0xFFE5E0D8)),
                   _InfoRow(
                     label: 'UID',
-                    value: '${profile.uid.substring(0, 12)}…',
+                    value: '${profile.uid.substring(0, profile.uid.length.clamp(0, 12))}…',
                     valueStyle: const TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 12,

@@ -63,6 +63,7 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
               error: (err, s) => SliverToBoxAdapter(
                 child: _ErrorState(
                   onRetry: () => ref.invalidate(productsProvider),
+                  message: err.toString(),
                 ),
               ),
               data: (products) => products.isEmpty
@@ -256,8 +257,9 @@ class _CategoryDelegate extends SliverPersistentHeaderDelegate {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onRetry});
+  const _ErrorState({required this.onRetry, this.message});
   final VoidCallback onRetry;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
@@ -276,6 +278,17 @@ class _ErrorState extends StatelessWidget {
               'Error al cargar productos',
               style: TextStyle(color: AppColors.textSecondary),
             ),
+            if (message != null) ...[
+              const SizedBox(height: 6),
+              Text(
+                message!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             ElevatedButton(onPressed: onRetry, child: const Text('Reintentar')),
           ],
