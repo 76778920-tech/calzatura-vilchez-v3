@@ -283,24 +283,24 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       if (_metodoPago == 'stripe') {
         try {
           await StripeService().payWithSheet(orderId);
-        } on StripeException catch (e) {
-          // Pago cancelado o fallido → cancelar el pedido creado
+        } catch (e) {
+          // Cualquier error o cancelación → cancelar el pedido creado
           await ref
               .read(ordersRepositoryProvider)
               .cancelOrder(orderId)
               .catchError((_) {});
           if (!mounted) return;
-          final msg = e.error.localizedMessage ?? e.error.message ?? 'Pago cancelado';
+          final bool userCancelled =
+              e is StripeException && e.error.code == FailureCode.Canceled;
+          final String msg = e is StripeException
+              ? (userCancelled
+                  ? 'Pago cancelado. Tu pedido no fue procesado.'
+                  : 'Error de pago: ${e.error.localizedMessage ?? e.error.message ?? 'Inténtalo de nuevo'}')
+              : 'Error al procesar el pago. Tu pedido no fue cobrado.';
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                e.error.code == FailureCode.Canceled
-                    ? 'Pago cancelado. Tu pedido no fue procesado.'
-                    : 'Error de pago: $msg',
-              ),
-              backgroundColor: e.error.code == FailureCode.Canceled
-                  ? AppColors.warning
-                  : AppColors.error,
+              content: Text(msg),
+              backgroundColor: userCancelled ? AppColors.warning : AppColors.error,
             ),
           );
           return;
