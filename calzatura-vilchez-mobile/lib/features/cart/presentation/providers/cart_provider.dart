@@ -52,6 +52,7 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
   }
 
   Future<void> removeItem(int index) async {
+    if (index < 0 || index >= state.length) return;
     state = [...state.sublist(0, index), ...state.sublist(index + 1)];
     await _persist();
   }
@@ -69,6 +70,7 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
       await removeItem(index);
       return;
     }
+    if (index < 0 || index >= state.length) return;
     final item = state[index];
     if (qty > _effectiveStock(item.product, item.talla)) return;
     state = [

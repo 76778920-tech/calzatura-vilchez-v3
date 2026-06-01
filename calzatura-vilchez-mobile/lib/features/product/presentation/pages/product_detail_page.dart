@@ -32,7 +32,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
     super.dispose();
   }
 
-  void _addToCart(Product product) {
+  Future<void> _addToCart(Product product) async {
     if (product.tallas != null &&
         product.tallas!.isNotEmpty &&
         _selectedTalla == null) {
@@ -46,8 +46,9 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
       return;
     }
     for (int i = 0; i < _qty; i++) {
-      ref.read(cartProvider.notifier).addItem(product, talla: _selectedTalla);
+      await ref.read(cartProvider.notifier).addItem(product, talla: _selectedTalla);
     }
+    if (!mounted) return;
     showAddedToCartSheet(context, product, talla: _selectedTalla);
   }
 
