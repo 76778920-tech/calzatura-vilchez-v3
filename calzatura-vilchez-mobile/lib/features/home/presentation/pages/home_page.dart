@@ -18,7 +18,7 @@ const _heroSlides = [
     kicker: 'COLECCION MUJER',
     title: 'Botines para caminar con estilo.',
     subtitle:
-        'Disenos comodos, versatiles y listos para acompanarte en cada salida.',
+        'Diseños cómodos, versátiles y listos para acompañarte en cada salida.',
     ctaLabel: 'Ver dama',
     category: 'dama',
     badges: ['Elegancia diaria', 'Paso ligero', 'Looks urbanos'],
@@ -29,7 +29,7 @@ const _heroSlides = [
     kicker: 'BOTIN HOMBRE',
     title: 'Botines con caracter urbano.',
     subtitle:
-        'Disenos resistentes para caminar seguro y mantener presencia todos los dias.',
+        'Diseños resistentes para caminar seguro y mantener presencia todos los días.',
     ctaLabel: 'Ver hombre',
     category: 'hombre',
     badges: ['Textura premium', 'Base firme', 'Perfil sobrio'],
@@ -40,10 +40,10 @@ const _heroSlides = [
     kicker: 'INFANTIL',
     title: 'Resistencia para jugar, caminar y volver.',
     subtitle:
-        'Modelos practicos con tallas claras y comodidad real para la semana.',
-    ctaLabel: 'Ver ninos',
+        'Modelos prácticos con tallas claras y comodidad real para la semana.',
+    ctaLabel: 'Ver niños',
     category: 'nino',
-    badges: ['Mas juego', 'Ajuste practico', 'Uso diario'],
+    badges: ['Más juego', 'Ajuste práctico', 'Uso diario'],
     tagColor: Color(0xFFFFD166),
   ),
   _Slide(
@@ -51,7 +51,7 @@ const _heroSlides = [
     kicker: 'ZAPATILLAS',
     title: 'Movimiento con comodidad desde el primer paso.',
     subtitle:
-        'Zapatillas urbanas, deportivas y casuales para renovar tu rotacion.',
+        'Zapatillas urbanas, deportivas y casuales para renovar tu rotación.',
     ctaLabel: 'Ver juvenil',
     category: 'juvenil',
     badges: ['Ciudad activa', 'Comodidad real', 'Cambio de ritmo'],
@@ -62,7 +62,7 @@ const _heroSlides = [
     kicker: 'CALZADO FORMAL',
     title: 'Presencia para oficina y eventos.',
     subtitle:
-        'Pares pensados para verse bien sin perder comodidad durante el dia.',
+        'Pares pensados para verse bien sin perder comodidad durante el día.',
     ctaLabel: 'Ver formales',
     category: 'hombre',
     badges: ['Linea limpia', 'Impacto sobrio', 'Comodidad extendida'],
@@ -70,7 +70,7 @@ const _heroSlides = [
   ),
   _Slide(
     asset: 'assets/images/hero-ofertas-ai.png',
-    kicker: 'SELECCION DESTACADA',
+    kicker: 'SELECCIÓN DESTACADA',
     title: 'Descuentos activos en calzado seleccionado.',
     subtitle:
         'Precios claros, stock visible y pares listos para decidir sin dudas.',
@@ -82,11 +82,11 @@ const _heroSlides = [
 ];
 
 const _promoTicker = [
-  'Envio gratis a Huancayo en 24-48 hrs',
-  'Nueva coleccion lista para explorar',
+  'Envío gratis a Huancayo en 24-48 hrs',
+  'Nueva colección lista para explorar',
   'Cyber Wow con descuentos activos',
   'Compra segura y stock en tiempo real',
-  'Cambios disponibles durante 7 dias',
+  'Cambios disponibles durante 7 días',
 ];
 
 const _categoryCards = [
@@ -99,13 +99,13 @@ const _categoryCards = [
   _CatCard(
     asset: 'assets/images/category-women-editorial.png',
     label: 'Dama',
-    copy: 'Modelos comodos con presencia',
+    copy: 'Modelos cómodos con presencia',
     category: 'dama',
   ),
   _CatCard(
     asset: 'assets/images/category-children-editorial.png',
-    label: 'Ninos',
-    copy: 'Resistentes para el dia a dia',
+    label: 'Niños',
+    copy: 'Resistentes para el día a día',
     category: 'nino',
   ),
   _CatCard(
