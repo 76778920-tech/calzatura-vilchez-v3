@@ -151,7 +151,15 @@ class AuthRepository {
   }
 
   Future<void> resetPassword(String email) =>
-      _auth.sendPasswordResetEmail(email: email);
+      _auth.sendPasswordResetEmail(
+        email: email,
+        actionCodeSettings: ActionCodeSettings(
+          url: 'https://calzaturavilchez-ab17f.firebaseapp.com',
+          handleCodeInApp: false,
+          androidPackageName: 'com.calzaturavilchez.calzatura_vilchez_mobile',
+          androidInstallApp: false,
+        ),
+      );
 
   User? get currentUser => _auth.currentUser;
 }
