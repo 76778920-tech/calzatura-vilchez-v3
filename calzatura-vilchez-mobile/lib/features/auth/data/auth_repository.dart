@@ -126,7 +126,14 @@ class AuthRepository {
         'rol': 'cliente',
         'creadoEn': DateTime.now().toIso8601String(),
       });
-      await cred.user?.sendEmailVerification();
+      await cred.user?.sendEmailVerification(
+        ActionCodeSettings(
+          url: 'https://calzaturavilchez-ab17f.firebaseapp.com',
+          handleCodeInApp: false,
+          androidPackageName: 'com.calzaturavilchez.calzatura_vilchez_mobile',
+          androidInstallApp: false,
+        ),
+      );
       // Crear cuenta Supabase Auth para activar rol `authenticated`.
       await _syncSupabaseSession(email: email, password: password);
     } catch (e) {

@@ -75,7 +75,10 @@ export async function checkDisposableEmail(email: string): Promise<void> {
 export async function resendVerificationEmail(): Promise<void> {
   const user = auth.currentUser;
   if (!user) throw new Error("NO_USER");
-  await sendEmailVerification(user);
+  await sendEmailVerification(user, {
+    url: import.meta.env.VITE_APP_URL ?? 'https://calzaturavilchez-ab17f.firebaseapp.com',
+    handleCodeInApp: false,
+  });
 }
 
 export function getCurrentAuthUser(): User | null {
@@ -135,7 +138,10 @@ export async function registerUser(
       ...(data.celular ? { telefono: data.celular } : {}),
     };
     await saveUserProfile(profile);
-    await sendEmailVerification(user);
+    await sendEmailVerification(user, {
+    url: import.meta.env.VITE_APP_URL ?? 'https://calzaturavilchez-ab17f.firebaseapp.com',
+    handleCodeInApp: false,
+  });
   } catch (error) {
     await deleteUser(user).catch(() => undefined);
     throw error;
