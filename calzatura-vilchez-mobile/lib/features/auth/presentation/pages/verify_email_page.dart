@@ -57,16 +57,26 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
       _message = null;
     });
     try {
-      await FirebaseAuth.instance.currentUser?.sendEmailVerification();
+      await FirebaseAuth.instance.currentUser?.sendEmailVerification(
+        ActionCodeSettings(
+          url: 'https://calzaturavilchez-ab17f.firebaseapp.com',
+          handleCodeInApp: false,
+          androidPackageName: 'com.calzaturavilchez.calzatura_vilchez_mobile',
+          androidInstallApp: false,
+        ),
+      );
       if (!mounted) return;
       setState(() {
         _message = 'Correo de verificación reenviado.';
         _messageIsError = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
+      final msg = e.toString().toLowerCase();
       setState(() {
-        _message = 'No se pudo reenviar. Intenta más tarde.';
+        _message = msg.contains('too-many-requests') || msg.contains('too many')
+            ? 'Espera unos minutos antes de reenviar.'
+            : 'No se pudo reenviar. Intenta más tarde.';
         _messageIsError = true;
       });
     } finally {
