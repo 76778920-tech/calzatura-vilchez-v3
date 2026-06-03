@@ -48,6 +48,21 @@ const ORDER_PAGADO = {
 async function setupOrderMocks(page: Page, orders: unknown[] = [ORDER_PENDIENTE, ORDER_PAGADO]) {
   await mirrorAdminOrders(page, orders);
 
+  await page.route(/\/delivery\/route\?/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        positions: [
+          [-12.071054, -75.205806],
+          [-12.0719, -75.2066],
+          [-12.072948, -75.207624],
+        ],
+        distanceKm: 0.35,
+      }),
+    });
+  });
+
   await page.route("**/rest/v1/auditoria*", async (route) => {
     await route.fulfill({ status: 201, body: "" });
   });
@@ -110,7 +125,7 @@ test.describe("admin pedidos → filtro, expansión y cambio de estado", () => {
     await expect(firstCard.locator(".order-delivery-map-container")).toBeVisible();
     await expect(firstCard.getByRole("link", { name: /Ver en Google Maps/ })).toHaveAttribute(
       "href",
-      "https://www.google.com/maps?q=-12.072948,-75.207624",
+      "https://www.google.com/maps/dir/?api=1&origin=-12.071054,-75.205806&destination=-12.072948,-75.207624&travelmode=driving",
     );
     await expect(firstCard.locator(".order-card-body")).not.toContainText("A** G***");
 

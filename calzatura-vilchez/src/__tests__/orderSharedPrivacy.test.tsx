@@ -66,7 +66,7 @@ describe("OrderAddressBlock", () => {
     expect(screen.queryByText(/-12\.072948/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Ver en Google Maps/ })).toHaveAttribute(
       "href",
-      "https://www.google.com/maps?q=-12.072948,-75.207624",
+      "https://www.google.com/maps/dir/?api=1&origin=-12.071054,-75.205806&destination=-12.072948,-75.207624&travelmode=driving",
     );
   });
 

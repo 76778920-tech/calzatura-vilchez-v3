@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { ExternalLink } from "@/components/common/ExternalLink";
 import type { CartItem, Order } from "@/types";
 import { maskPersonName, maskPhone } from "@/security/orderPrivacy";
+import { DELIVERY_CONFIG } from "@/config/delivery";
 
 const OrderDeliveryMapReadOnly = lazy(
   () => import("@/domains/pedidos/components/OrderDeliveryMapReadOnly"),
@@ -22,6 +23,16 @@ function buildFullAddressLine(dir: Order["direccion"] | undefined): string {
 
   const extraParts = [dir?.distrito, dir?.ciudad].filter((part) => !includesText(base, part));
   return [base, ...extraParts].filter(Boolean).join(", ");
+}
+
+function buildGoogleMapsDirectionsUrl(destLat: number, destLng: number): string {
+  const { storeLat, storeLng } = DELIVERY_CONFIG;
+  return [
+    "https://www.google.com/maps/dir/?api=1",
+    `origin=${storeLat},${storeLng}`,
+    `destination=${destLat},${destLng}`,
+    "travelmode=driving",
+  ].join("&");
 }
 
 export function OrderAddressBlock({
@@ -50,7 +61,7 @@ export function OrderAddressBlock({
     Number.isFinite(dir.lat) &&
     Number.isFinite(dir.lng);
   const mapsUrl = hasCoords
-    ? `https://www.google.com/maps?q=${dir?.lat},${dir?.lng}`
+    ? buildGoogleMapsDirectionsUrl(dir?.lat as number, dir?.lng as number)
     : "";
 
   return (
