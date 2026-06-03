@@ -30,6 +30,9 @@ export function OrderAddressBlock({
     typeof dir?.lng === "number" &&
     Number.isFinite(dir.lat) &&
     Number.isFinite(dir.lng);
+  const mapsUrl = hasCoords
+    ? `https://www.google.com/maps?q=${dir?.lat},${dir?.lng}`
+    : "";
 
   return (
     <div className="order-address-block">
@@ -84,12 +87,20 @@ export function OrderAddressBlock({
           </div>
         )}
 
-        {/* Coordenadas (solo admin) */}
+        {/* Ubicación marcada (solo admin) */}
         {!redactPii && hasCoords && (
-          <div className="order-address-block__field">
-            <span className="order-address-block__label">Coordenadas</span>
-            <span className="order-address-block__value order-address-block__coords">
-              {(dir?.lat as number).toFixed(6)}, {(dir?.lng as number).toFixed(6)}
+          <div className="order-address-block__field order-address-block__field--full">
+            <span className="order-address-block__label">Ubicación marcada por el cliente</span>
+            <span className="order-address-block__value order-address-block__location">
+              <span>Pin de entrega confirmado en el mapa</span>
+              <a
+                className="order-address-block__map-link"
+                href={mapsUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ver en Google Maps
+              </a>
             </span>
           </div>
         )}

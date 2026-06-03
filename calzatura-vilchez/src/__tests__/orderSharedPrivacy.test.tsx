@@ -48,4 +48,19 @@ describe("OrderAddressBlock", () => {
     expect(screen.getByText("999888777")).toBeInTheDocument();
     expect(screen.queryByText("Av. Real 123, El Tambo, Huancayo")).not.toBeInTheDocument();
   });
+
+  it("muestra la ubicación marcada como enlace para administracion", () => {
+    render(<OrderAddressBlock order={{
+      ...ORDER,
+      direccion: { ...ORDER.direccion, lat: -12.072948, lng: -75.207624 },
+    }} />);
+
+    expect(screen.getByText("Ubicación marcada por el cliente")).toBeInTheDocument();
+    expect(screen.getByText("Pin de entrega confirmado en el mapa")).toBeInTheDocument();
+    expect(screen.queryByText(/-12\.072948/)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Ver en Google Maps" })).toHaveAttribute(
+      "href",
+      "https://www.google.com/maps?q=-12.072948,-75.207624",
+    );
+  });
 });
