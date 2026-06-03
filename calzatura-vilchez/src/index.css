@@ -5978,6 +5978,19 @@ output.complaint-book-success {
 }
 .checkout-delivery-suggest-btn:hover { background: var(--bg-alt); }
 .checkout-delivery-map-inner { height: 100%; width: 100%; z-index: 0; }
+.checkout-delivery-map-missing {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #475569;
+  background: #e2e8f0;
+}
 .checkout-delivery-map .gm-bundled-control { display: none; }
 .checkout-delivery-map-legend {
   position: absolute;

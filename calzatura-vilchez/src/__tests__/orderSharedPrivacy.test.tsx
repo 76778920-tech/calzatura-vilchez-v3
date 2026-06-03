@@ -52,15 +52,42 @@ describe("OrderAddressBlock", () => {
   it("muestra la ubicación marcada como enlace para administracion", () => {
     render(<OrderAddressBlock order={{
       ...ORDER,
-      direccion: { ...ORDER.direccion, lat: -12.072948, lng: -75.207624 },
+      direccion: {
+        ...ORDER.direccion,
+        ubicacionLabel: "Av. Real 123, El Tambo, Huancayo",
+        lat: -12.072948,
+        lng: -75.207624,
+      },
     }} />);
 
     expect(screen.getByText("Ubicación marcada por el cliente")).toBeInTheDocument();
-    expect(screen.getByText("Pin de entrega confirmado en el mapa")).toBeInTheDocument();
+    expect(screen.getByText("Av. Real 123, El Tambo, Huancayo")).toBeInTheDocument();
+    expect(screen.queryByText("Pin de entrega confirmado en el mapa")).not.toBeInTheDocument();
     expect(screen.queryByText(/-12\.072948/)).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Ver en Google Maps/ })).toHaveAttribute(
       "href",
       "https://www.google.com/maps?q=-12.072948,-75.207624",
     );
+  });
+
+  it("evita duplicar ciudad al mostrar ubicaciones historicas sin etiqueta guardada", () => {
+    render(<OrderAddressBlock order={{
+      ...ORDER,
+      direccion: {
+        ...ORDER.direccion,
+        direccion: "Jiron Piura, San Carlos, Huancayo, Junin, 12001, Peru",
+        distrito: "Cajas Chico",
+        ciudad: "Huancayo",
+        lat: -12.072948,
+        lng: -75.207624,
+      },
+    }} />);
+
+    expect(
+      screen.getByText("Jiron Piura, San Carlos, Huancayo, Junin, 12001, Peru, Cajas Chico"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Jiron Piura, San Carlos, Huancayo, Junin, 12001, Peru, Cajas Chico, Huancayo/),
+    ).not.toBeInTheDocument();
   });
 });

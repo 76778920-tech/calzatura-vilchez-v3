@@ -28,6 +28,7 @@ const ORDER_PENDIENTE = {
     ciudad: "Lima",
     distrito: "Miraflores",
     telefono: "999111222",
+    ubicacionLabel: "Av. Test 123, Miraflores, Lima",
     lat: -12.072948,
     lng: -75.207624,
   },
@@ -105,7 +106,7 @@ test.describe("admin pedidos → filtro, expansión y cambio de estado", () => {
     await expect(firstCard.locator(".order-card-body")).toContainText("Lima");
     await expect(firstCard.locator(".order-card-body")).toContainText("999111222");
     await expect(firstCard.locator(".order-card-body")).toContainText("Ubicación marcada por el cliente");
-    await expect(firstCard.locator(".order-card-body")).toContainText("Pin de entrega confirmado en el mapa");
+    await expect(firstCard.locator(".order-card-body")).toContainText("Av. Test 123, Miraflores, Lima");
     await expect(firstCard.locator(".order-delivery-map-container")).toBeVisible();
     await expect(firstCard.getByRole("link", { name: /Ver en Google Maps/ })).toHaveAttribute(
       "href",

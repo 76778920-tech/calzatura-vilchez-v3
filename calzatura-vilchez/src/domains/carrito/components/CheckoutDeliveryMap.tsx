@@ -247,8 +247,10 @@ export default function CheckoutDeliveryMap({
 
   if (!GMAPS_KEY) {
     return (
-      <div className={containerClass}>
-        <div className="checkout-delivery-map-inner" />
+      <div className={containerClass} role="status" aria-live="polite">
+        <div className="checkout-delivery-map-missing">
+          Mapa no disponible. Falta configurar Google Maps para este entorno.
+        </div>
       </div>
     );
   }

@@ -147,7 +147,9 @@ export default function CheckoutPage() {
       const deliveryPoint = geo.selectedDelivery;
       const orderDireccion = {
         ...direccion,
-        ...(deliveryPoint ? { lat: deliveryPoint.lat, lng: deliveryPoint.lng } : {}),
+        ...(deliveryPoint
+          ? { lat: deliveryPoint.lat, lng: deliveryPoint.lng, ubicacionLabel: deliveryPoint.label }
+          : {}),
       };
       const orderId = await createOrder({
         items: checkoutItems,

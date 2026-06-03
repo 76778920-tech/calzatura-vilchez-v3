@@ -7,6 +7,23 @@ const OrderDeliveryMapReadOnly = lazy(
   () => import("@/domains/pedidos/components/OrderDeliveryMapReadOnly"),
 );
 
+function includesText(value: string | undefined, needle: string | undefined): boolean {
+  if (!value || !needle) return false;
+  return value.toLocaleLowerCase("es-PE").includes(needle.toLocaleLowerCase("es-PE"));
+}
+
+function buildPublicAddressLine(dir: Order["direccion"] | undefined): string {
+  return [dir?.distrito, dir?.ciudad].filter(Boolean).join(", ");
+}
+
+function buildFullAddressLine(dir: Order["direccion"] | undefined): string {
+  const base = dir?.direccion?.trim() ?? "";
+  if (!base) return [dir?.distrito, dir?.ciudad].filter(Boolean).join(", ");
+
+  const extraParts = [dir?.distrito, dir?.ciudad].filter((part) => !includesText(base, part));
+  return [base, ...extraParts].filter(Boolean).join(", ");
+}
+
 export function OrderAddressBlock({
   order,
   redactPii = false,
@@ -18,9 +35,10 @@ export function OrderAddressBlock({
     ? `${maskPersonName(dir?.nombre ?? "") || "Cliente"} ${maskPersonName(dir?.apellido ?? "")}`.trim()
     : `${dir?.nombre ?? ""} ${dir?.apellido ?? ""}`.trim();
 
-  const addressLine = redactPii
-    ? [dir?.distrito, dir?.ciudad].filter(Boolean).join(", ")
-    : [dir?.direccion, dir?.distrito, dir?.ciudad].filter(Boolean).join(", ");
+  const addressLine = redactPii ? buildPublicAddressLine(dir) : buildFullAddressLine(dir);
+  const deliveryLocationLabel = !redactPii
+    ? dir?.ubicacionLabel?.trim() || addressLine
+    : addressLine;
 
   const phone = redactPii
     ? maskPhone(dir?.telefono ?? "")
@@ -93,7 +111,7 @@ export function OrderAddressBlock({
           <div className="order-address-block__field order-address-block__field--full">
             <span className="order-address-block__label">Ubicación marcada por el cliente</span>
             <span className="order-address-block__value order-address-block__location">
-              <span>Pin de entrega confirmado en el mapa</span>
+              <span>{deliveryLocationLabel || "Pin de entrega confirmado en el mapa"}</span>
               <ExternalLink
                 className="order-address-block__map-link"
                 href={mapsUrl}
@@ -112,7 +130,7 @@ export function OrderAddressBlock({
           <OrderDeliveryMapReadOnly
             customerLat={dir?.lat as number}
             customerLng={dir?.lng as number}
-            direccion={addressLine || undefined}
+            direccion={deliveryLocationLabel || undefined}
           />
         </Suspense>
       )}

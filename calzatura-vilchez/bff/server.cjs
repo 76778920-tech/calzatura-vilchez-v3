@@ -821,6 +821,7 @@ function normalizeAddress(address) {
     distrito: normalizeTextField(address.distrito, "Distrito", 80),
     telefono: normalizeTextField(address.telefono, "Telefono", 15),
     referencia: normalizeOptionalText(address.referencia, 180),
+    ubicacionLabel: normalizeOptionalText(address.ubicacionLabel, 220),
   };
 
   if (!isValidPeruPhone(normalized.telefono)) {
