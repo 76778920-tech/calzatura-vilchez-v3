@@ -151,6 +151,24 @@ h1, h2, h3, h4, h5 { font-weight: 600; color: var(--text); line-height: 1.3; }
 }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
 
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: var(--surface); color: var(--text-primary);
+  padding: 0.5rem 1rem; border-radius: var(--radius-sm);
+  font-weight: 600; font-size: 13px; border: 1px solid var(--border);
+  cursor: pointer; transition: all var(--transition);
+}
+.btn-secondary:hover { background: var(--border); }
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btn-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; transition: all var(--transition); color: var(--text-muted);
+}
+.btn-icon:hover { background: var(--border); color: var(--text-primary); }
+
 .btn-outline {
   display: inline-flex; align-items: center; gap: 0.5rem;
   background: transparent; color: var(--gold);
@@ -6105,6 +6123,61 @@ button.order-card-header {
 .order-delivery-map-label { font-size: 12px; color: var(--text-muted); margin: 0; }
 .order-delivery-map-container { width: 100%; height: 260px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
 .order-delivery-map-loading { height: 260px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--text-muted); background: var(--surface); border-radius: var(--radius); }
+
+/* ── Filtros y búsqueda de pedidos ─────────────────────────────────────── */
+.admin-orders-count { font-size: 13px; font-weight: 400; color: var(--text-muted); margin-left: 0.6rem; }
+.order-date { font-size: 11px; color: var(--text-muted); }
+
+.orders-filters {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;
+  margin-bottom: 1rem; padding: 0.75rem 1rem;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Buscador */
+.orders-search-wrapper {
+  position: relative; display: flex; align-items: center;
+  flex: 1; min-width: 220px;
+}
+.orders-search-icon {
+  position: absolute; left: 0.65rem; color: var(--text-muted); pointer-events: none; flex-shrink: 0;
+}
+.orders-search-input {
+  width: 100%; padding: 0.45rem 2.2rem 0.45rem 2rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 13px; background: var(--white); color: var(--text-primary);
+  outline: none; transition: border var(--transition);
+}
+.orders-search-input:focus { border-color: var(--gold); }
+.orders-search-input::placeholder { color: var(--text-muted); }
+.orders-search-clear {
+  position: absolute; right: 0.5rem; display: flex; align-items: center;
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  padding: 0.2rem;
+}
+.orders-search-clear:hover { color: var(--text-primary); }
+
+/* Select de estado */
+.orders-filter-select { font-size: 13px; padding: 0.45rem 0.6rem; height: auto; }
+
+/* Rango de fechas */
+.orders-date-range { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+.orders-date-label { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.orders-date-input { font-size: 13px; padding: 0.42rem 0.5rem; height: auto; width: auto; }
+.orders-clear-all { font-size: 12px; padding: 0.4rem 0.7rem; }
+
+/* Paginación */
+.orders-pagination {
+  display: flex; align-items: center; justify-content: center; gap: 1rem;
+  margin-top: 1.5rem; padding: 1rem;
+  border-top: 1px solid var(--border);
+}
+.orders-pagination-info {
+  font-size: 13px; color: var(--text-muted);
+  display: flex; flex-direction: column; align-items: center; gap: 0.1rem;
+}
+.orders-pagination-range { font-size: 11px; color: var(--text-muted); }
 
 /* ============================================================
    AUTH
