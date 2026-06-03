@@ -107,7 +107,7 @@ test.describe("admin pedidos → filtro, expansión y cambio de estado", () => {
     await expect(firstCard.locator(".order-card-body")).toContainText("Ubicación marcada por el cliente");
     await expect(firstCard.locator(".order-card-body")).toContainText("Pin de entrega confirmado en el mapa");
     await expect(firstCard.locator(".order-delivery-map-container")).toBeVisible();
-    await expect(firstCard.getByRole("link", { name: "Ver en Google Maps" })).toHaveAttribute(
+    await expect(firstCard.getByRole("link", { name: /Ver en Google Maps/ })).toHaveAttribute(
       "href",
       "https://www.google.com/maps?q=-12.072948,-75.207624",
     );

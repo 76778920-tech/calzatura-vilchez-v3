@@ -58,7 +58,7 @@ describe("OrderAddressBlock", () => {
     expect(screen.getByText("Ubicación marcada por el cliente")).toBeInTheDocument();
     expect(screen.getByText("Pin de entrega confirmado en el mapa")).toBeInTheDocument();
     expect(screen.queryByText(/-12\.072948/)).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Ver en Google Maps" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /Ver en Google Maps/ })).toHaveAttribute(
       "href",
       "https://www.google.com/maps?q=-12.072948,-75.207624",
     );

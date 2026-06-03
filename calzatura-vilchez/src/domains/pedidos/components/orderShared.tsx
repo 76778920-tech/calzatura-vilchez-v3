@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { ExternalLink } from "@/components/common/ExternalLink";
 import type { CartItem, Order } from "@/types";
 import { maskPersonName, maskPhone } from "@/security/orderPrivacy";
 
@@ -93,14 +94,13 @@ export function OrderAddressBlock({
             <span className="order-address-block__label">Ubicación marcada por el cliente</span>
             <span className="order-address-block__value order-address-block__location">
               <span>Pin de entrega confirmado en el mapa</span>
-              <a
+              <ExternalLink
                 className="order-address-block__map-link"
                 href={mapsUrl}
-                target="_blank"
-                rel="noreferrer"
+                hideIcon
               >
                 Ver en Google Maps
-              </a>
+              </ExternalLink>
             </span>
           </div>
         )}
