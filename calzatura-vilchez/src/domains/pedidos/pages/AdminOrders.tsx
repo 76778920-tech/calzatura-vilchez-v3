@@ -45,9 +45,10 @@ function maskOperationalToken(value: string): string {
 
 function orderMatchesSearch(order: Order, q: string): boolean {
   if (!q) return true;
-  const term = q.toLowerCase().trim();
+  const term = q.toLowerCase().trim().replaceAll("-", "");
   const haystack = [
-    order.id.slice(-8).toUpperCase(),
+    order.id.replaceAll("-", ""),         // UUID completo sin guiones
+    order.id.slice(-8),                   // sufijo visible en pantalla
     order.userEmail,
     order.direccion?.nombre,
     order.direccion?.apellido,
@@ -329,7 +330,7 @@ export default function AdminOrders() {
           Pedidos
           {!loading && (
             <span className="admin-orders-count">
-              {filtered.length} resultado{filtered.length !== 1 ? "s" : ""}
+              {filtered.length} resultado{filtered.length === 1 ? "" : "s"}
               {orders.length !== filtered.length && ` de ${orders.length}`}
             </span>
           )}
@@ -418,7 +419,6 @@ export default function AdminOrders() {
           )}
         </div>
 
-        {/* Limpiar todo */}
         {hasFilters && (
           <button type="button" onClick={clearFilters} className="btn-secondary orders-clear-all">
             Limpiar filtros
