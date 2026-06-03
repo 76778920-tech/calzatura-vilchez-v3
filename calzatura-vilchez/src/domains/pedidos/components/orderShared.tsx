@@ -1,25 +1,110 @@
+import { lazy, Suspense } from "react";
 import type { CartItem, Order } from "@/types";
 import { maskPersonName, maskPhone } from "@/security/orderPrivacy";
+
+const OrderDeliveryMapReadOnly = lazy(
+  () => import("@/domains/pedidos/components/OrderDeliveryMapReadOnly"),
+);
 
 export function OrderAddressBlock({
   order,
   redactPii = false,
-}: Readonly<{ order: Order; redactPii?: boolean }>) {
-  const direccion = order.direccion;
+  showMap = false,
+}: Readonly<{ order: Order; redactPii?: boolean; showMap?: boolean }>) {
+  const dir = order.direccion;
+
   const customerName = redactPii
-    ? `${maskPersonName(direccion?.nombre ?? "") || "Cliente"} ${maskPersonName(direccion?.apellido ?? "")}`.trim()
-    : `${direccion?.nombre ?? ""} ${direccion?.apellido ?? ""}`.trim();
+    ? `${maskPersonName(dir?.nombre ?? "") || "Cliente"} ${maskPersonName(dir?.apellido ?? "")}`.trim()
+    : `${dir?.nombre ?? ""} ${dir?.apellido ?? ""}`.trim();
+
   const addressLine = redactPii
-    ? [direccion?.distrito, direccion?.ciudad].filter(Boolean).join(", ")
-    : [direccion?.direccion, direccion?.distrito, direccion?.ciudad].filter(Boolean).join(", ");
-  const phone = redactPii ? maskPhone(direccion?.telefono ?? "") : direccion?.telefono;
+    ? [dir?.distrito, dir?.ciudad].filter(Boolean).join(", ")
+    : [dir?.direccion, dir?.distrito, dir?.ciudad].filter(Boolean).join(", ");
+
+  const phone = redactPii
+    ? maskPhone(dir?.telefono ?? "")
+    : dir?.telefono;
+
+  const hasCoords =
+    typeof dir?.lat === "number" &&
+    typeof dir?.lng === "number" &&
+    Number.isFinite(dir.lat) &&
+    Number.isFinite(dir.lng);
 
   return (
-    <div className="order-address">
-      <strong>Direccion de entrega:</strong>
-      <p>{customerName || "Cliente"}</p>
-      <p>{addressLine || "Ubicacion reservada"}</p>
-      <p>Tel: {phone || "***"}</p>
+    <div className="order-address-block">
+      <p className="order-address-block__title">Dirección de entrega</p>
+
+      <div className="order-address-block__grid">
+        {/* Cliente */}
+        <div className="order-address-block__field">
+          <span className="order-address-block__label">Cliente</span>
+          <span className="order-address-block__value">{customerName || "—"}</span>
+        </div>
+
+        {/* Email (solo admin) */}
+        {!redactPii && order.userEmail && (
+          <div className="order-address-block__field">
+            <span className="order-address-block__label">Correo</span>
+            <span className="order-address-block__value">{order.userEmail}</span>
+          </div>
+        )}
+
+        {/* Dirección completa */}
+        {!redactPii && dir?.direccion && (
+          <div className="order-address-block__field">
+            <span className="order-address-block__label">Dirección</span>
+            <span className="order-address-block__value">{dir.direccion}</span>
+          </div>
+        )}
+
+        {/* Distrito */}
+        <div className="order-address-block__field">
+          <span className="order-address-block__label">Distrito</span>
+          <span className="order-address-block__value">{dir?.distrito || "—"}</span>
+        </div>
+
+        {/* Ciudad */}
+        <div className="order-address-block__field">
+          <span className="order-address-block__label">Ciudad</span>
+          <span className="order-address-block__value">{dir?.ciudad || "—"}</span>
+        </div>
+
+        {/* Teléfono */}
+        <div className="order-address-block__field">
+          <span className="order-address-block__label">Teléfono</span>
+          <span className="order-address-block__value">{phone || "—"}</span>
+        </div>
+
+        {/* Referencia (solo admin) */}
+        {!redactPii && dir?.referencia && (
+          <div className="order-address-block__field order-address-block__field--full">
+            <span className="order-address-block__label">Referencia</span>
+            <span className="order-address-block__value">{dir.referencia}</span>
+          </div>
+        )}
+
+        {/* Coordenadas (solo admin) */}
+        {!redactPii && hasCoords && (
+          <div className="order-address-block__field">
+            <span className="order-address-block__label">Coordenadas</span>
+            <span className="order-address-block__value order-address-block__coords">
+              {(dir?.lat as number).toFixed(6)}, {(dir?.lng as number).toFixed(6)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Mapa (solo admin con coords) */}
+      {showMap && hasCoords && (
+        <Suspense fallback={<div className="order-delivery-map-loading">Cargando mapa…</div>}>
+          <OrderDeliveryMapReadOnly
+            customerLat={dir?.lat as number}
+            customerLng={dir?.lng as number}
+            direccion={addressLine || undefined}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

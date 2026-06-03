@@ -231,7 +231,11 @@ export default function AdminOrders() {
                       </div>
                     ))}
                   </div>
-                  <OrderAddressBlock order={order} redactPii />
+                  <OrderAddressBlock
+                    order={order}
+                    redactPii={panelScope !== "admin"}
+                    showMap={panelScope === "admin"}
+                  />
                   <div className="order-payment-info">
                     <p><strong>Método de pago:</strong> {order.metodoPago}</p>
                     {order.stripeSessionId && (
