@@ -223,14 +223,14 @@ jobs:
           BFF_BASE_URL: ${{ secrets.VITE_BACKEND_API_URL }}
           AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
           READINESS_BFF_MAX_MS: 5000
-          # Render cold start del AI Service puede superar 5s; 15s mantiene detección de caídas reales.
-          READINESS_AI_MAX_MS: 15000
+          # Render cold start del AI Service puede superar 25s; el gate real falla si no responde tras reintentos.
+          READINESS_AI_MAX_MS: 60000
         run: |
           node scripts/readiness-check.mjs \
             --require-env BFF_BASE_URL \
             --require-env AI_SERVICE_URL \
-            --timeout-ms 25000 \
-            --retries 2 \
+            --timeout-ms 60000 \
+            --retries 3 \
             --output artifacts/readiness/integration-live.json
 
       - name: Backtesting IA real con umbrales
