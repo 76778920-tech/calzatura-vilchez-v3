@@ -43,6 +43,10 @@ on:
         required: true
       VITE_BACKEND_API_URL:
         required: true
+      VITE_GOOGLE_MAPS_API_KEY:
+        required: true
+      VITE_GOOGLE_MAPS_MAP_ID:
+        required: false
       VITE_ORS_API_KEY:
         required: false
       RENDER_BFF_DEPLOY_HOOK_URL:
@@ -104,6 +108,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_APPCHECK_SITE_KEY: ${{ secrets.VITE_FIREBASE_APPCHECK_SITE_KEY }}
           VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
           VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
           VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
@@ -228,6 +233,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_APPCHECK_SITE_KEY: ${{ secrets.VITE_FIREBASE_APPCHECK_SITE_KEY }}
           VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
           VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
           VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
@@ -267,6 +273,8 @@ jobs:
           VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
           VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
           VITE_BACKEND_API_URL: ${{ secrets.VITE_BACKEND_API_URL }}
+          VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
+          VITE_GOOGLE_MAPS_MAP_ID: ${{ secrets.VITE_GOOGLE_MAPS_MAP_ID }}
           VITE_ORS_API_KEY: ${{ secrets.VITE_ORS_API_KEY }}
           VITE_ADMIN_PATH: ${{ secrets.VITE_ADMIN_PATH || 'cv-panel' }}-${{ needs.gate.outputs.head_sha }}
           VITE_STAFF_PATH: ${{ secrets.VITE_STAFF_PATH || 'cv-ops' }}-${{ needs.gate.outputs.head_sha }}
