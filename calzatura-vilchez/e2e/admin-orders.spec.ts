@@ -89,10 +89,13 @@ test.describe("admin pedidos → filtro, expansión y cambio de estado", () => {
     await header.click();
     await expect(firstCard.locator(".order-card-body")).toBeVisible();
     await expect(firstCard.locator(".order-card-body")).toContainText("Zapatilla E2E");
-    await expect(firstCard.locator(".order-card-body")).toContainText("A** G***");
-    await expect(firstCard.locator(".order-card-body")).toContainText("Tel: ***1222");
-    await expect(firstCard.locator(".order-card-body")).not.toContainText("Av. Test 123");
-    await expect(firstCard.locator(".order-card-body")).not.toContainText("999111222");
+    await expect(firstCard.locator(".order-card-body")).toContainText("Ana");
+    await expect(firstCard.locator(".order-card-body")).toContainText("Garc");
+    await expect(firstCard.locator(".order-card-body")).toContainText("Av. Test 123");
+    await expect(firstCard.locator(".order-card-body")).toContainText("Miraflores");
+    await expect(firstCard.locator(".order-card-body")).toContainText("Lima");
+    await expect(firstCard.locator(".order-card-body")).toContainText("999111222");
+    await expect(firstCard.locator(".order-card-body")).not.toContainText("A** G***");
 
     // Segundo click colapsa
     await header.click();

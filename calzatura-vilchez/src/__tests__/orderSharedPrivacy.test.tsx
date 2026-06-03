@@ -30,8 +30,10 @@ describe("OrderAddressBlock", () => {
     render(<OrderAddressBlock order={ORDER} redactPii />);
 
     expect(screen.getByText("M*** L***")).toBeInTheDocument();
-    expect(screen.getByText("El Tambo, Huancayo")).toBeInTheDocument();
-    expect(screen.getByText("Tel: ***8777")).toBeInTheDocument();
+    expect(screen.getByText("El Tambo")).toBeInTheDocument();
+    expect(screen.getByText("Huancayo")).toBeInTheDocument();
+    expect(screen.getByText("***8777")).toBeInTheDocument();
+    expect(screen.queryByText("El Tambo, Huancayo")).not.toBeInTheDocument();
     expect(screen.queryByText(/Av\. Real 123/)).not.toBeInTheDocument();
     expect(screen.queryByText(/999888777/)).not.toBeInTheDocument();
   });
@@ -40,7 +42,10 @@ describe("OrderAddressBlock", () => {
     render(<OrderAddressBlock order={ORDER} />);
 
     expect(screen.getByText("Maria Lopez")).toBeInTheDocument();
-    expect(screen.getByText("Av. Real 123, El Tambo, Huancayo")).toBeInTheDocument();
-    expect(screen.getByText("Tel: 999888777")).toBeInTheDocument();
+    expect(screen.getByText("Av. Real 123")).toBeInTheDocument();
+    expect(screen.getByText("El Tambo")).toBeInTheDocument();
+    expect(screen.getByText("Huancayo")).toBeInTheDocument();
+    expect(screen.getByText("999888777")).toBeInTheDocument();
+    expect(screen.queryByText("Av. Real 123, El Tambo, Huancayo")).not.toBeInTheDocument();
   });
 });

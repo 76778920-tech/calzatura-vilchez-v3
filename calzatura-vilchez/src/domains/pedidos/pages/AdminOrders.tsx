@@ -132,9 +132,6 @@ export default function AdminOrders() {
     });
   }, [orders, filterEstado, search, dateFrom, dateTo]);
 
-  // Reset página al cambiar filtros
-  useEffect(() => { setPage(1); }, [filterEstado, search, dateFrom, dateTo]);
-
   // ── Paginación ─────────────────────────────────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -146,6 +143,7 @@ export default function AdminOrders() {
     setSearch("");
     setDateFrom("");
     setDateTo("");
+    setPage(1);
   };
 
   // ── Cambio de estado ───────────────────────────────────────────────────────
@@ -354,7 +352,7 @@ export default function AdminOrders() {
           <input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Buscar por ID, correo, cliente, producto…"
             className="orders-search-input"
             aria-label="Buscar pedidos"
@@ -362,7 +360,7 @@ export default function AdminOrders() {
           {search && (
             <button
               type="button"
-              onClick={() => setSearch("")}
+              onClick={() => { setSearch(""); setPage(1); }}
               className="orders-search-clear"
               aria-label="Limpiar búsqueda"
             >
@@ -374,7 +372,7 @@ export default function AdminOrders() {
         {/* Estado */}
         <select
           value={filterEstado}
-          onChange={(e) => setFilterEstado(e.target.value)}
+          onChange={(e) => { setFilterEstado(e.target.value); setPage(1); }}
           className="form-input orders-filter-select"
           aria-label="Filtrar por estado"
         >
@@ -391,7 +389,7 @@ export default function AdminOrders() {
             id="orders-date-from"
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
             max={dateTo || undefined}
             className="form-input orders-date-input"
             aria-label="Fecha desde"
@@ -401,7 +399,7 @@ export default function AdminOrders() {
             id="orders-date-to"
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
             min={dateFrom || undefined}
             className="form-input orders-date-input"
             aria-label="Fecha hasta"
@@ -409,7 +407,7 @@ export default function AdminOrders() {
           {(dateFrom || dateTo) && (
             <button
               type="button"
-              onClick={() => { setDateFrom(""); setDateTo(""); }}
+              onClick={() => { setDateFrom(""); setDateTo(""); setPage(1); }}
               className="orders-search-clear"
               aria-label="Limpiar fechas"
               title="Limpiar fechas"
