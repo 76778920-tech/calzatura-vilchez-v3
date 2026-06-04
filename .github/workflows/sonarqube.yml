@@ -120,12 +120,12 @@ jobs:
         shell: bash
         run: |
           echo "=== LCOV: primeras rutas SF: (deben empezar por calzatura-vilchez/) ==="
-          grep '^SF:' calzatura-vilchez/coverage/lcov.info | head -8
+          grep -m8 '^SF:' calzatura-vilchez/coverage/lcov.info
           echo "=== Cobertura XML: fuente y revenue ==="
           grep -m1 '<source>' ai-service/coverage.xml
-          grep 'filename="ai-service/services/supabase_client.py"' ai-service/coverage.xml | head -1 || true
+          grep -m1 'filename="ai-service/services/supabase_client.py"' ai-service/coverage.xml || true
           echo "=== stock.ts en lcov (fragmento) ==="
-          grep -A2 'SF:calzatura-vilchez/src/utils/stock.ts' calzatura-vilchez/coverage/lcov.info | head -6 || true
+          grep -m1 -A2 'SF:calzatura-vilchez/src/utils/stock.ts' calzatura-vilchez/coverage/lcov.info || true
 
       # Ayuda a diagnosticar "Project not found": debe coincidir con SonarCloud → Project information → Project key
       - name: Mostrar claves Sonar (sin SONAR_TOKEN)
