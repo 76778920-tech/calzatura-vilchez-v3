@@ -14,6 +14,10 @@ const firebaseConfigSource = fs.readFileSync(
   path.resolve(process.cwd(), "src/firebase/config.ts"),
   "utf8",
 );
+const firebaseHostingConfigSource = fs.readFileSync(
+  path.resolve(process.cwd(), "firebase.json"),
+  "utf8",
+);
 const deployWorkflowSource = fs.readFileSync(
   path.resolve(process.cwd(), "../.github/workflows/deploy-production.yml"),
   "utf8",
@@ -137,6 +141,12 @@ describe("BFF /audit policy guards", () => {
     expect(deployWorkflowSource).toContain("VITE_DNI_LOOKUP_URL:");
     expect(deployWorkflowSource).toContain("run: node scripts/verify-deploy-firebase-secrets.mjs");
     expect(deployWorkflowSource).toContain("run: node scripts/github-verify-workflows-for-sha.mjs");
+  });
+
+  it("permite cargar Google Maps JS desde la CSP de Firebase Hosting", () => {
+    expect(firebaseHostingConfigSource).toContain("Content-Security-Policy");
+    expect(firebaseHostingConfigSource).toContain("script-src 'self'");
+    expect(firebaseHostingConfigSource).toContain("https://maps.googleapis.com");
   });
 
   it("enmascara usuarioEmail al devolver GET /admin/audit", () => {
