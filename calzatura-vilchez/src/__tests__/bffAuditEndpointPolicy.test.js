@@ -147,6 +147,8 @@ describe("BFF /audit policy guards", () => {
     expect(firebaseHostingConfigSource).toContain("Content-Security-Policy");
     expect(firebaseHostingConfigSource).toContain("script-src 'self'");
     expect(firebaseHostingConfigSource).toContain("https://maps.googleapis.com");
+    expect(firebaseHostingConfigSource).toContain("https://fonts.googleapis.com");
+    expect(firebaseHostingConfigSource).toContain("https://fonts.gstatic.com");
   });
 
   it("enmascara usuarioEmail al devolver GET /admin/audit", () => {
