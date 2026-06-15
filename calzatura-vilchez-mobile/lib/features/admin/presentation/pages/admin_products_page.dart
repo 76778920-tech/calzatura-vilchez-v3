@@ -15,6 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../../../../core/config/env.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 
 final _supabase = sb.Supabase.instance.client;
@@ -683,13 +684,12 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
       fallbackRoute: '/admin',
       child: Scaffold(
         backgroundColor: AppColors.beige,
-        appBar: AppBar(
-          backgroundColor: AppColors.black,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+        appBar: CVAppBar(
+          leading: CVBackButton(
             onPressed: () =>
                 handleBackNavigation(context, fallbackRoute: '/admin'),
           ),
+          centerTitle: false,
           title: _searching
               ? TextField(
                   controller: _searchCtrl,
@@ -703,10 +703,7 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
                   ),
                   onChanged: (_) => setState(() {}),
                 )
-              : const Text(
-                  'Productos',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
+              : null,
           actions: [
             IconButton(
               icon: Icon(

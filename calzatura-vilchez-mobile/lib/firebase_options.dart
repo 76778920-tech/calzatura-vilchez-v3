@@ -35,10 +35,11 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyBAnVUP4M6wujGs-x8EytdGabkIP7EJkwo',
-    appId: '1:337744526151:ios:a7b2c4d8e9f0a1b3',
+    apiKey: 'AIzaSyAf75XdPUqT29NVhSgq7Blxs6U03b9sMuA',
+    appId: '1:337744526151:ios:adde262e67f91bc36baa62',
     messagingSenderId: '337744526151',
     projectId: 'calzaturavilchez-ab17f',
+    authDomain: 'calzaturavilchez-ab17f.firebaseapp.com',
     storageBucket: 'calzaturavilchez-ab17f.firebasestorage.app',
     iosBundleId: 'com.calzaturavilchez.calzaturaVilchezMobile',
   );

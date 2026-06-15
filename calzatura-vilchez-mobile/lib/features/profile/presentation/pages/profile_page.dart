@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/cv_logo.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
 class ProfilePage extends ConsumerWidget {
@@ -18,12 +18,7 @@ class ProfilePage extends ConsumerWidget {
     if (authState.isLoading) {
       return Scaffold(
         backgroundColor: AppColors.beige,
-        appBar: AppBar(
-          backgroundColor: AppColors.black,
-          foregroundColor: Colors.white,
-          title: const Text('Mi cuenta'),
-          centerTitle: true,
-        ),
+        appBar: const CVAppBar(),
         body: const Center(
           child: CircularProgressIndicator(color: AppColors.gold),
         ),
@@ -48,11 +43,13 @@ class ProfilePage extends ConsumerWidget {
       body: CustomScrollView(
         slivers: [
           // ── Header negro con avatar dorado ──────────────────────────────
-          SliverAppBar(
+          CVSliverAppBar(
             expandedHeight: 210,
             pinned: true,
-            automaticallyImplyLeading: false,
-            backgroundColor: AppColors.black,
+            floating: false,
+            snap: false,
+            centerTitle: true,
+            logoSize: 34,
             flexibleSpace: FlexibleSpaceBar(
               background: Container(
                 color: AppColors.black,
@@ -179,7 +176,7 @@ class ProfilePage extends ConsumerWidget {
                       ),
                       child: Row(
                         children: [
-                          const CVLogo(size: 44, dark: true),
+                          cvAppBarLogo(size: 44),
                           const SizedBox(width: 14),
                           const Expanded(
                             child: Column(
@@ -248,6 +245,12 @@ class ProfilePage extends ConsumerWidget {
                   onTap: () {},
                 ).animate(delay: 300.ms).fadeIn().slideX(begin: -0.1),
                 _ProfileTile(
+                  icon: Icons.sensors_rounded,
+                  label: 'Sensores del dispositivo',
+                  subtitle: 'Acelerómetro, giroscopio y más',
+                  onTap: () => context.push('/profile/sensors'),
+                ).animate(delay: 275.ms).fadeIn().slideX(begin: -0.1),
+                _ProfileTile(
                   icon: Icons.info_outline_rounded,
                   label: 'Acerca de',
                   subtitle: 'Versión 1.0.0',
@@ -296,12 +299,7 @@ class _ProfileGuestPrompt extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.beige,
-      appBar: AppBar(
-        backgroundColor: AppColors.black,
-        foregroundColor: Colors.white,
-        title: const Text('Mi cuenta'),
-        centerTitle: true,
-      ),
+      appBar: const CVAppBar(),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 32),

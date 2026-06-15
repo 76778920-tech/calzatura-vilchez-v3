@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../data/orders_repository.dart';
 import '../providers/orders_provider.dart';
@@ -73,10 +74,8 @@ class OrdersPage extends ConsumerWidget {
       fallbackRoute: '/profile',
       child: Scaffold(
         backgroundColor: AppColors.background,
-        appBar: AppBar(
-          title: const Text('Mis pedidos'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+        appBar: CVAppBar(
+          leading: CVBackButton(
             onPressed: () =>
                 handleBackNavigation(context, fallbackRoute: '/profile'),
           ),

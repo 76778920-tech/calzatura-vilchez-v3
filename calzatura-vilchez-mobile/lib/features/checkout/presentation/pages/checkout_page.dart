@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/cv_logo.dart';
 import '../../../../shared/utils/peru_phone.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -334,15 +335,10 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       fallbackRoute: '/cart',
       child: Scaffold(
         backgroundColor: AppColors.beige,
-        appBar: AppBar(
-          backgroundColor: AppColors.black,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-            onPressed: () => handleBackNavigation(context, fallbackRoute: '/cart'),
-          ),
-          title: const Text(
-            'Finalizar compra',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+        appBar: CVAppBar(
+          leading: CVBackButton(
+            onPressed: () =>
+                handleBackNavigation(context, fallbackRoute: '/cart'),
           ),
         ),
         body: user == null

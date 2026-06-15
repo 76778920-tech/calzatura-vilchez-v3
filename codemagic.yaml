@@ -1,0 +1,45 @@
+# Monorepo: app Flutter en calzatura-vilchez-mobile/
+# Guía Práctica N° 13 — compilación iOS (Codemagic).
+workflows:
+  ios-build:
+    name: Calzatura Vilchez iOS
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    working_directory: calzatura-vilchez-mobile
+    environment:
+      flutter: stable
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.calzaturavilchez.calzaturaVilchezMobile
+      vars:
+        BUNDLE_ID: com.calzaturavilchez.calzaturaVilchezMobile
+    scripts:
+      - name: Verificar Firebase iOS
+        script: |
+          test -f ios/Runner/GoogleService-Info.plist
+          grep -q "adde262e67f91bc36baa62" ios/Runner/GoogleService-Info.plist
+      - name: Dependencias
+        script: flutter pub get
+      - name: Crear .env para release
+        script: |
+          cat > .env << EOF
+          SUPABASE_URL=$SUPABASE_URL
+          SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY
+          BACKEND_API_URL=$BACKEND_API_URL
+          DNI_LOOKUP_URL=$DNI_LOOKUP_URL
+          STRIPE_PUBLISHABLE_KEY=$STRIPE_PUBLISHABLE_KEY
+          AI_SERVICE_URL=$AI_SERVICE_URL
+          AI_SERVICE_BEARER_TOKEN=$AI_SERVICE_BEARER_TOKEN
+          SUPERADMIN_EMAIL=$SUPERADMIN_EMAIL
+          EOF
+      - name: Análisis y pruebas
+        script: |
+          flutter analyze
+          flutter test
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=ios/ExportOptions.plist
+    artifacts:
+      - build/ios/ipa/*.ipa

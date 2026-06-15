@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
+import '../../../core/config/firebase_auth_actions.dart';
+
 class EmailAlreadyInUseException implements Exception {
   const EmailAlreadyInUseException();
 }
@@ -126,14 +128,7 @@ class AuthRepository {
         'rol': 'cliente',
         'creadoEn': DateTime.now().toIso8601String(),
       });
-      await cred.user?.sendEmailVerification(
-        ActionCodeSettings(
-          url: 'https://calzaturavilchez-ab17f.firebaseapp.com',
-          handleCodeInApp: false,
-          androidPackageName: 'com.calzaturavilchez.calzatura_vilchez_mobile',
-          androidInstallApp: false,
-        ),
-      );
+      await cred.user?.sendEmailVerification(firebaseActionCodeSettings());
       // Crear cuenta Supabase Auth para activar rol `authenticated`.
       await _syncSupabaseSession(email: email, password: password);
     } catch (e) {
@@ -153,12 +148,7 @@ class AuthRepository {
   Future<void> resetPassword(String email) =>
       _auth.sendPasswordResetEmail(
         email: email,
-        actionCodeSettings: ActionCodeSettings(
-          url: 'https://calzaturavilchez-ab17f.firebaseapp.com',
-          handleCodeInApp: false,
-          androidPackageName: 'com.calzaturavilchez.calzatura_vilchez_mobile',
-          androidInstallApp: false,
-        ),
+        actionCodeSettings: firebaseActionCodeSettings(),
       );
 
   User? get currentUser => _auth.currentUser;

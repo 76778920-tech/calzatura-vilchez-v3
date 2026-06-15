@@ -7,8 +7,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/product.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/cv_refresh_wrapper.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../catalog/presentation/providers/catalog_provider.dart';
 import '../../../catalog/presentation/widgets/product_card.dart';
 
@@ -249,11 +249,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     context.go('/catalog');
   }
 
-  String _greeting(String name) {
-    if (name.isEmpty) return 'Hola';
-    return 'Hola, $name';
-  }
-
   @override
   Widget build(BuildContext context) {
     final featuredAsync = ref.watch(featuredProductsProvider);
@@ -324,25 +319,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Widget _buildAppBar() {
-    final name = ref.watch(userDisplayNameProvider).valueOrNull ?? '';
-    return SliverAppBar(
-      floating: true,
-      snap: true,
-      pinned: false,
-      toolbarHeight: 60,
-      backgroundColor: AppColors.black,
-      automaticallyImplyLeading: false,
-      centerTitle: false,
-      titleSpacing: 16,
-      title: Text(
-        _greeting(name),
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 17,
-          fontWeight: FontWeight.w800,
-          letterSpacing: 0.2,
-        ),
-      ),
+    return CVSliverAppBar(
+      centerTitle: true,
       actions: [
         IconButton(
           icon: const Icon(

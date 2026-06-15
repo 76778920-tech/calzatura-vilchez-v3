@@ -9,7 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../../../../core/services/panel_bff_api.dart';
 import '../../../../core/services/worker_notification_policy.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/cv_logo.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/panel_scope_provider.dart';
@@ -457,6 +457,8 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
               pinned: true,
               backgroundColor: AppColors.black,
               automaticallyImplyLeading: false,
+              title: cvAppBarLogo(size: 34),
+              centerTitle: false,
               flexibleSpace: FlexibleSpaceBar(
                 background: Container(
                   color: AppColors.black,
@@ -466,7 +468,7 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const CVLogo(size: 34),
+                          cvAppBarLogo(size: 34),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(

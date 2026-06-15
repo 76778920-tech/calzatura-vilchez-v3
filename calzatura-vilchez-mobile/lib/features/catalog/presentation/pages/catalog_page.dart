@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/cv_refresh_wrapper.dart';
-import '../../../../shared/widgets/cv_logo.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/shimmer_grid.dart';
 import '../providers/catalog_provider.dart';
 import '../widgets/product_card.dart';
@@ -93,13 +93,7 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
   }
 
   Widget _buildAppBar() {
-    return SliverAppBar(
-      floating: true,
-      snap: true,
-      pinned: false,
-      toolbarHeight: 60,
-      backgroundColor: AppColors.black,
-      automaticallyImplyLeading: false,
+    return CVSliverAppBar(
       title: _searchActive
           ? TextField(
               controller: _searchCtrl,
@@ -128,34 +122,9 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
               onChanged: (v) =>
                   ref.read(searchQueryProvider.notifier).state = v.trim(),
             )
-          : Row(
-              children: [
-                const CVLogo(size: 38, dark: true),
-                const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: const [
-                    Text(
-                      'Tienda',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    Text(
-                      'Todos los productos',
-                      style: TextStyle(
-                        color: AppColors.gold,
-                        fontSize: 10,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          : const CVAppBarTitle(
+              heading: 'Tienda',
+              subheading: 'Todos los productos',
             ),
       actions: [
         IconButton(

@@ -27,6 +27,7 @@ import '../../features/orders/presentation/pages/orders_page.dart';
 import '../../features/orders/presentation/pages/order_success_page.dart';
 import '../../features/product/presentation/pages/product_detail_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/sensors/presentation/pages/device_sensors_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/wishlist/presentation/pages/wishlist_page.dart';
 import 'auth_navigation.dart';
@@ -229,6 +230,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 path: 'edit',
                 pageBuilder: (ctx, s) =>
                     _sharedAxisPage(const EditProfilePage()),
+              ),
+              GoRoute(
+                path: 'sensors',
+                pageBuilder: (ctx, s) =>
+                    _sharedAxisPage(const DeviceSensorsPage()),
               ),
             ],
           ),

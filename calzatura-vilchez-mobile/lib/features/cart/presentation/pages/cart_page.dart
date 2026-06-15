@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../shared/widgets/cv_logo.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../domain/cart_item.dart';
 import '../providers/cart_provider.dart';
 
@@ -17,19 +17,41 @@ class CartPage extends ConsumerWidget {
     final items = ref.watch(cartProvider);
     final total = ref.watch(cartTotalProvider);
     final fmt = NumberFormat('#,##0.00', 'es_PE');
+    final itemCount = items.length;
 
     return Scaffold(
       backgroundColor: AppColors.beige,
+      appBar: CVAppBar(
+        centerTitle: false,
+        automaticallyImplyLeading: false,
+        title: CVAppBarTitle(
+          heading: 'Mi carrito',
+          subheading: itemCount == 0
+              ? null
+              : '$itemCount ${itemCount == 1 ? 'producto' : 'productos'}',
+        ),
+        actions: itemCount == 0
+            ? null
+            : [
+                TextButton.icon(
+                  onPressed: () => ref.read(cartProvider.notifier).clear(),
+                  icon: const Icon(
+                    Icons.delete_sweep_outlined,
+                    color: Colors.white54,
+                    size: 16,
+                  ),
+                  label: const Text(
+                    'Vaciar',
+                    style: TextStyle(color: Colors.white54, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(width: 4),
+              ],
+      ),
       body: items.isEmpty
-          ? _EmptyCart()
+          ? const _EmptyCartBody()
           : Column(
               children: [
-                // ── Header ──────────────────────────────────────────────
-                _CartHeader(
-                  itemCount: items.length,
-                  onClear: () => ref.read(cartProvider.notifier).clear(),
-                ),
-                // ── Lista ────────────────────────────────────────────────
                 Expanded(
                   child: ListView.separated(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -43,7 +65,6 @@ class CartPage extends ConsumerWidget {
                     ).animate(delay: (i * 60).ms).fadeIn().slideX(begin: -0.08),
                   ),
                 ),
-                // ── Resumen + checkout ──────────────────────────────────
                 _OrderSummary(total: total, fmt: fmt, items: items),
               ],
             ),
@@ -52,179 +73,73 @@ class CartPage extends ConsumerWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Header del carrito
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _CartHeader extends StatelessWidget {
-  const _CartHeader({required this.itemCount, required this.onClear});
-  final int itemCount;
-  final VoidCallback onClear;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.black,
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 16, 14),
-          child: Row(
-            children: [
-              const CVLogo(size: 38, dark: true),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Mi carrito',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  Text(
-                    '$itemCount ${itemCount == 1 ? 'producto' : 'productos'}',
-                    style: const TextStyle(color: AppColors.gold, fontSize: 11),
-                  ),
-                ],
-              ),
-              const Spacer(),
-              if (itemCount > 0)
-                GestureDetector(
-                  onTap: onClear,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.15),
-                      ),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(
-                          Icons.delete_sweep_outlined,
-                          color: Colors.white54,
-                          size: 15,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'Vaciar',
-                          style: TextStyle(color: Colors.white54, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Carrito vacío
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _EmptyCart extends StatelessWidget {
+class _EmptyCartBody extends StatelessWidget {
+  const _EmptyCartBody();
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          color: AppColors.black,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 16, 14),
-              child: Row(
-                children: const [
-                  CVLogo(size: 38, dark: true),
-                  SizedBox(width: 12),
-                  Text(
-                    'Mi carrito',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 110,
+            height: 110,
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.shopping_bag_outlined,
+              size: 52,
+              color: AppColors.gold,
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Tu carrito está vacío',
+            style: TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Agrega productos para continuar\ncon tu compra',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () => context.go('/catalog'),
+            icon: const Icon(Icons.storefront_rounded),
+            label: const Text('Explorar catálogo'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.gold,
+              foregroundColor: AppColors.black,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 28,
+                vertical: 14,
+              ),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
-        ),
-        Expanded(
-          child: Center(
-            child:
-                Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 110,
-                          height: 110,
-                          decoration: BoxDecoration(
-                            color: AppColors.gold.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.shopping_bag_outlined,
-                            size: 52,
-                            color: AppColors.gold,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Tu carrito está vacío',
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Agrega productos para continuar\ncon tu compra',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 14,
-                            height: 1.5,
-                          ),
-                        ),
-                        const SizedBox(height: 32),
-                        ElevatedButton.icon(
-                          onPressed: () => context.go('/catalog'),
-                          icon: const Icon(Icons.storefront_rounded),
-                          label: const Text('Explorar catálogo'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.gold,
-                            foregroundColor: AppColors.black,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 28,
-                              vertical: 14,
-                            ),
-                            textStyle: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                    .animate()
-                    .fadeIn(duration: 400.ms)
-                    .scale(begin: const Offset(0.9, 0.9)),
-          ),
-        ),
-      ],
+        ],
+      )
+          .animate()
+          .fadeIn(duration: 400.ms)
+          .scale(begin: const Offset(0.9, 0.9)),
     );
   }
 }

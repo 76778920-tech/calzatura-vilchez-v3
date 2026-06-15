@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/utils/peru_phone.dart';
 import '../providers/profile_provider.dart';
 import '../../data/profile_repository.dart';
@@ -124,15 +125,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
 
     return Scaffold(
       backgroundColor: AppColors.beige,
-      appBar: AppBar(
-        backgroundColor: AppColors.black,
-        foregroundColor: Colors.white,
-        title: const Text('Editar perfil'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.pop(),
-        ),
+      appBar: CVAppBar(
+        leading: CVBackButton(onPressed: () => context.pop()),
       ),
       body: profileAsync.when(
         loading: () => const Center(

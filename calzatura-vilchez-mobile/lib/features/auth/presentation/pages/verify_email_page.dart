@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/config/firebase_auth_actions.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/auth_background.dart';
 
@@ -58,12 +59,7 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     });
     try {
       await FirebaseAuth.instance.currentUser?.sendEmailVerification(
-        ActionCodeSettings(
-          url: 'https://calzaturavilchez-ab17f.firebaseapp.com',
-          handleCodeInApp: false,
-          androidPackageName: 'com.calzaturavilchez.calzatura_vilchez_mobile',
-          androidInstallApp: false,
-        ),
+        firebaseActionCodeSettings(),
       );
       if (!mounted) return;
       setState(() {

@@ -6,6 +6,7 @@ import '../../../../core/config/env.dart';
 import '../../../../core/services/panel_bff_api.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/utils/dni.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../../auth/data/dni_lookup_service.dart';
 import '../../data/panel_scope_provider.dart';
@@ -420,16 +421,10 @@ class _PanelSalesPageState extends ConsumerState<PanelSalesPage> {
       fallbackRoute: '/admin',
       child: Scaffold(
         backgroundColor: theme.scaffold,
-        appBar: AppBar(
-          backgroundColor: AppColors.black,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+        appBar: CVAppBar(
+          leading: CVBackButton(
             onPressed: () =>
                 handleBackNavigation(context, fallbackRoute: '/admin'),
-          ),
-          title: Text(
-            _cfg.title,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
           ),
           actions: [
             TextButton.icon(

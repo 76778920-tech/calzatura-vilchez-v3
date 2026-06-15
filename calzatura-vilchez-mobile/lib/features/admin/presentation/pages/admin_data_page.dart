@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../data/admin_data_service.dart';
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -290,15 +291,8 @@ class _AdminDataPageState extends ConsumerState<AdminDataPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.beige,
-      appBar: AppBar(
-        backgroundColor: AppColors.black,
-        foregroundColor: Colors.white,
-        title: const Text('Gestión de Datos'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () => context.pop(),
-        ),
+      appBar: CVAppBar(
+        leading: CVBackButton(onPressed: () => context.pop()),
       ),
       body: RefreshIndicator(
         color: AppColors.gold,

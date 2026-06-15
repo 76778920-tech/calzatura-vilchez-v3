@@ -66,5 +66,16 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>La app necesita usar la cámara para subir fotos de productos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>La app necesita acceder a tus imágenes para subir fotos de productos.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>La app necesita guardar imágenes en tu galería cuando lo solicites.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

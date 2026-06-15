@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/panel_bff_api.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 
 /// Lista vía BFF (`GET /admin/manufacturers`), igual que la web — sin Supabase directo.
@@ -67,13 +68,12 @@ class _AdminManufacturersPageState
       fallbackRoute: '/admin',
       child: Scaffold(
         backgroundColor: AppColors.beige,
-        appBar: AppBar(
-          backgroundColor: AppColors.black,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, size: 18),
+        appBar: CVAppBar(
+          leading: CVBackButton(
             onPressed: () =>
                 handleBackNavigation(context, fallbackRoute: '/admin'),
           ),
+          centerTitle: false,
           title: _searching
               ? TextField(
                   controller: _searchCtrl,
@@ -87,10 +87,7 @@ class _AdminManufacturersPageState
                   ),
                   onChanged: (_) => setState(() {}),
                 )
-              : const Text(
-                  'Fabricantes',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
+              : null,
           actions: [
             IconButton(
               icon: Icon(

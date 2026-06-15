@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/config/env.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 
 const _panelCard = Color(0xFF2A1F10);
@@ -181,16 +182,10 @@ class _AdminPredictionsPageState extends ConsumerState<AdminPredictionsPage>
       fallbackRoute: '/admin',
       child: Scaffold(
         backgroundColor: AppColors.black,
-        appBar: AppBar(
-          backgroundColor: AppColors.black,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+        appBar: CVAppBar(
+          leading: CVBackButton(
             onPressed: () =>
                 handleBackNavigation(context, fallbackRoute: '/admin'),
-          ),
-          title: const Text(
-            'Inteligencia Artificial',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
         ),
         body: Column(

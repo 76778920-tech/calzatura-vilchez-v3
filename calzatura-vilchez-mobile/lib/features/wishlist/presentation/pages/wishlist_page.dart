@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/cv_refresh_wrapper.dart';
-import '../../../../shared/widgets/cv_logo.dart';
+import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../catalog/presentation/widgets/product_card.dart';
 import '../providers/wishlist_provider.dart';
@@ -30,42 +30,10 @@ class WishlistPage extends ConsumerWidget {
             parent: AlwaysScrollableScrollPhysics(),
           ),
           slivers: [
-            // ── AppBar ──────────────────────────────────────────────
-            SliverAppBar(
-              floating: true,
-              snap: true,
-              pinned: false,
-              toolbarHeight: 60,
-              backgroundColor: AppColors.black,
-              automaticallyImplyLeading: false,
-              title: Row(
-                children: [
-                  const CVLogo(size: 38, dark: true),
-                  const SizedBox(width: 10),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Text(
-                        'Mis Favoritos',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      Text(
-                        'Productos guardados',
-                        style: TextStyle(
-                          color: AppColors.gold,
-                          fontSize: 10,
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+            CVSliverAppBar(
+              title: const CVAppBarTitle(
+                heading: 'Mis Favoritos',
+                subheading: 'Productos guardados',
               ),
             ),
 
