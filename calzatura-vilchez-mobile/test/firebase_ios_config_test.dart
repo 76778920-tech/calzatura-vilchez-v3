@@ -7,7 +7,8 @@ void main() {
     const ios = DefaultFirebaseOptions.ios;
 
     expect(ios.appId, '1:337744526151:ios:adde262e67f91bc36baa62');
-    expect(ios.apiKey, 'AIzaSyAf75XdPUqT29NVhSgq7Blxs6U03b9sMuA');
+    expect(ios.apiKey, startsWith('AIza'));
+    expect(ios.apiKey.length, greaterThan(20));
     expect(ios.projectId, 'calzaturavilchez-ab17f');
     expect(ios.messagingSenderId, '337744526151');
     expect(ios.iosBundleId, MobileAppIds.iosBundleId);

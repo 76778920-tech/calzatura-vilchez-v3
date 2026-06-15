@@ -1,0 +1,9 @@
+title = "Calzatura Vilchez — Gitleaks allowlist"
+
+[allowlist]
+description = "Firebase client config uses public API keys by design (not server secrets)."
+paths = [
+  '''(?i)firebase_options\.dart$''',
+  '''(?i)google-services\.json$''',
+  '''(?i)GoogleService-Info\.plist$''',
+]
