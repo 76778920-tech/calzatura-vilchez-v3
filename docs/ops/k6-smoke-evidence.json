@@ -1,0 +1,26 @@
+{
+  "runId": "k6-smoke-live-2026-06-17",
+  "scenario": "smoke",
+  "date": "2026-06-17",
+  "owner": "Calidad / Calzatura Vilchez",
+  "environment": "production",
+  "evidenceType": "live-run",
+  "script": "load-tests/scenarios/smoke-read.js",
+  "peakVus": 20,
+  "duration": "see k6 summary",
+  "result": "pass",
+  "metrics": {
+    "httpReqFailedRate": 0,
+    "p95CatalogMs": 248,
+    "p95DetailMs": 243,
+    "p95BffHealthMs": 243
+  },
+  "thresholds": {
+    "maxHttpFailedRate": 0.02,
+    "maxP95CatalogMs": 3000,
+    "maxP95DetailMs": 2500,
+    "maxP95BffHealthMs": 1500
+  },
+  "k6SummaryPath": "artifacts/load-tests/k6-smoke-20260617-125425.json",
+  "notes": "Generado desde corrida k6 real (SkipBff=lecturas Supabase). scripts/k6-summary-to-evidence.mjs"
+}

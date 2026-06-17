@@ -32,7 +32,16 @@
 
 ## 2. Matriz requisito ↔ prueba
 
-**Fuente editable:** `cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv`
+**Fuente editable:** `cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv`  
+**Cierre Idoneidad (RF Must 100 %):** `idoneidad-trazabilidad-iso25000.md` — recorrido integrador `e2e/idoneidad-journey.spec.ts` (TC-IDON-001). Verificación: `npm run ops:verify-idoneidad` (raíz) o `npm run test:e2e:idoneidad` (calzatura-vilchez).
+
+**Cierre Precisión (100 %):** `precision-trazabilidad-iso25000.md` — gate `npm run ops:verify-precision -- --run-tests` (raíz).
+
+**Cierre Interoperabilidad (100 %):** `interoperabilidad-trazabilidad-iso25000.md` — gate `npm run ops:verify-interoperabilidad -- --run-tests` (raíz).
+
+**Cierre Seguridad (100 %):** `seguridad-trazabilidad-iso25000.md` — gate `npm run ops:verify-seguridad -- --run-tests` (raíz). Marco **ISO/IEC 25010 producto**, no SGSI 27001.
+
+**Cierre Cumplimiento de la funcionalidad (100 %):** `cumplimiento-trazabilidad-iso25000.md` — gate `npm run ops:verify-cumplimiento -- --run-tests` (raíz). Adherencia a normas legales (Ley 29571, 29733) y trazabilidad SRS CU-T05/CU-T07. TC-CMP-001…005.
 
 ### 2.1 Ejemplos (completar IDs reales de specs)
 

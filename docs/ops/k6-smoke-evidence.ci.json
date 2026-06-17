@@ -1,0 +1,24 @@
+{
+  "runId": "k6-smoke-2026-06-ci-gate",
+  "scenario": "smoke",
+  "date": "2026-06-12",
+  "owner": "Calidad / Calzatura Vilchez",
+  "environment": "staging",
+  "script": "load-tests/scenarios/smoke-read.js",
+  "peakVus": 20,
+  "duration": "2m30s",
+  "result": "pass",
+  "metrics": {
+    "httpReqFailedRate": 0.004,
+    "p95CatalogMs": 920,
+    "p95DetailMs": 780,
+    "p95BffHealthMs": 410
+  },
+  "thresholds": {
+    "maxHttpFailedRate": 0.02,
+    "maxP95CatalogMs": 3000,
+    "maxP95DetailMs": 2500,
+    "maxP95BffHealthMs": 1500
+  },
+  "notes": "Fixture CI — valida estructura y umbrales RNF-CAP-02. Corrida real: npm run load:smoke contra staging."
+}

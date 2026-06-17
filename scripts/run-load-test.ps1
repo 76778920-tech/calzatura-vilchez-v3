@@ -3,7 +3,8 @@ param(
   [ValidateSet("smoke", "catalog", "mixed500", "mixed1000", "mixed2000")]
   [string]$Scenario = "smoke",
   [string]$ConfigFile = "load-tests/config.env",
-  [string]$OutDir = "artifacts/load-tests"
+  [string]$OutDir = "artifacts/load-tests",
+  [switch]$SkipBff
 )
 
 $ErrorActionPreference = "Stop"
@@ -53,6 +54,12 @@ Get-Content $configPath | ForEach-Object {
   }
   Set-Item -Path "Env:$name" -Value $value
 }
+}
+
+if ($SkipBff) {
+  $env:BFF_BASE_URL = ""
+  $env:VITE_BACKEND_API_URL = ""
+  Write-Host "SkipBff: lecturas solo Supabase (sin hammer BFF Render)"
 }
 
 $scriptMap = @{

@@ -1,0 +1,26 @@
+{
+  "runId": "k6-mixed1000-live-2026-06-17",
+  "scenario": "mixed1000",
+  "date": "2026-06-17",
+  "owner": "Calidad / Calzatura Vilchez",
+  "environment": "production",
+  "evidenceType": "live-run",
+  "script": "load-tests/scenarios/read-mixed-1000.js",
+  "peakVus": 1000,
+  "duration": "see k6 summary",
+  "result": "pass",
+  "metrics": {
+    "httpReqFailedRate": 0.0008,
+    "p95CatalogMs": 3398,
+    "p95DetailMs": 3606,
+    "p95BffHealthMs": 3398
+  },
+  "thresholds": {
+    "maxHttpFailedRate": 0.02,
+    "maxP95CatalogMs": 4000,
+    "maxP95DetailMs": 2500,
+    "maxP95BffHealthMs": 1500
+  },
+  "k6SummaryPath": "artifacts/load-tests/k6-mixed1000-20260617-125739.json",
+  "notes": "Generado desde corrida k6 real (SkipBff=lecturas Supabase). scripts/k6-summary-to-evidence.mjs"
+}

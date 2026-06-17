@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard ISO/IEC 25000 — Calzatura Vilchez</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="kicker">Tesis · Calidad de Software</span>
+        <h1 id="page-title">Dashboard de Cumplimiento ISO/IEC 25000</h1>
+        <p id="page-subtitle" class="subtitle"></p>
+      </div>
+      <nav class="main-nav" aria-label="Navegación principal">
+        <a href="#resumen" class="nav-link active">Resumen</a>
+        <a href="#graficos" class="nav-link">Gráficos</a>
+        <a href="#correlacion" class="nav-link">Adecuación funcional</a>
+        <a href="#instrumentos" class="nav-link">Listas de cotejo</a>
+        <a href="#detalle" class="nav-link">Detalle</a>
+        <a href="/adecuacion-funcional/" class="nav-link nav-cta">Módulo CF/COF/TECP →</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page">
+    <!-- Resumen -->
+    <section id="resumen" class="section">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">Modelo de calidad · ISO/IEC 9126 · familia 25000</p>
+          <h2>Cumplimiento global del sistema</h2>
+          <p id="hero-scope" class="lead"></p>
+          <div class="meta-cards" id="meta-cards"></div>
+        </div>
+        <div class="hero-visual">
+          <div class="ring-card">
+            <svg viewBox="0 0 120 120" width="140" height="140" id="overall-ring" aria-hidden="true"></svg>
+            <div class="ring-center">
+              <span class="ring-pct" id="overall-pct">--%</span>
+              <span class="ring-label">Global</span>
+            </div>
+          </div>
+          <div class="donut-wrap">
+            <svg id="status-donut" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Distribución de subcaracterísticas"></svg>
+            <div class="donut-legend" id="donut-legend"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gráficos -->
+    <section id="graficos" class="section">
+      <div class="section-head">
+        <h2>Análisis estadístico por característica</h2>
+        <p class="muted">Radar comparativo, barras agrupadas y distribución de cumplimiento interno.</p>
+      </div>
+      <div class="charts-grid">
+        <article class="panel chart-panel">
+          <h3>Radar — 6 características</h3>
+          <div class="radar-wrap">
+            <svg id="radar-chart" viewBox="0 0 420 420"></svg>
+          </div>
+        </article>
+        <article class="panel chart-panel">
+          <h3>Barras — cumplimiento por característica</h3>
+          <div class="bars-wrap" id="characteristic-bars"></div>
+        </article>
+      </div>
+      <article class="panel chart-panel full-width">
+        <h3>Barras agrupadas — todas las subcaracterísticas</h3>
+        <p class="muted chart-note">Cada grupo corresponde a una característica principal del modelo ISO.</p>
+        <div class="grouped-bars-wrap" id="grouped-bars"></div>
+      </article>
+    </section>
+
+    <!-- Correlación live CF/COF/TECP -->
+    <section id="correlacion" class="section">
+      <div class="section-head">
+        <h2>Correlación — Adecuación Funcional (ISO/IEC 25010)</h2>
+        <p class="muted">
+          Indicadores CF, COF y TECP calculados en tiempo real desde el registro del programa.
+          Se vinculan con la característica <strong>Funcionalidad</strong> del modelo 25000.
+        </p>
+      </div>
+      <div id="correlation-panel" class="correlation-panel">
+        <div class="loading-state">Cargando indicadores correlacionados…</div>
+      </div>
+    </section>
+
+    <!-- Instrumentos -->
+    <section id="instrumentos" class="section">
+      <div class="section-head">
+        <h2>Listas de cotejo por subcaracterística</h2>
+        <p class="muted">Formato académico dicotómico (Sí / No) con tabla de indicadores, total al pie y observaciones — según UNAM Cap. 14.</p>
+      </div>
+      <div id="instruments-grid" class="instruments-grid"></div>
+    </section>
+
+    <!-- Detalle tablas -->
+    <section id="detalle" class="section">
+      <div class="section-head">
+        <h2>Detalle por característica</h2>
+        <p class="muted">Evidencia verificable del repositorio Calzatura Vilchez.</p>
+      </div>
+      <div id="characteristics-detail"></div>
+    </section>
+
+    <footer class="footnote">
+      <p><strong>Metodología:</strong> <span id="methodology-text"></span></p>
+      <p class="muted">Dashboard en <code>data.json</code> · Indicadores CF/COF/TECP en <a href="/adecuacion-funcional/">módulo de adecuación funcional</a> (solo cambian al editar registros).</p>
+    </footer>
+  </main>
+
+<script src="app.js"></script>
+</body>
+</html>

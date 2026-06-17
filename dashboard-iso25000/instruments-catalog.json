@@ -1,0 +1,156 @@
+{
+  "Idoneidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Gate Idoneidad (RF Must ↔ pruebas) + CU-T07",
+    "referencia": "scripts/verify-idoneidad-iso25000.mjs · documentacion/cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv · documentacion/idoneidad-trazabilidad-iso25000.md"
+  },
+  "Precisión": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Gate Precisión (9 dominios de cálculo)",
+    "referencia": "scripts/verify-precision-iso25000.mjs · documentacion/precision-trazabilidad-iso25000.md"
+  },
+  "Interoperabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Gate Interoperabilidad (9 integraciones)",
+    "referencia": "scripts/verify-interoperabilidad-iso25000.mjs · documentacion/interoperabilidad-trazabilidad-iso25000.md"
+  },
+  "Seguridad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Gate Seguridad 25010 + Checklist verde producción",
+    "referencia": "scripts/verify-seguridad-iso25000.mjs · docs/ops/checklist-verde-seguridad-produccion.md · documentacion/seguridad-trazabilidad-iso25000.md"
+  },
+  "Cumplimiento de la funcionalidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Gate Cumplimiento + CU-T05 / CU-T06",
+    "referencia": "scripts/verify-cumplimiento-iso25000.mjs · documentacion/cuadros-excel/CU-T05-requisitos.csv · documentacion/cumplimiento-trazabilidad-iso25000.md",
+    "rutaModulo": "/adecuacion-funcional/"
+  },
+  "Madurez": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Historial CI GitHub Actions + gate verify-madurez",
+    "referencia": "scripts/verify-madurez-iso25000.mjs · documentacion/fiabilidad-trazabilidad-iso25000.md · .github/workflows/ci.yml"
+  },
+  "Tolerancia a Fallos": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist controles de tolerancia a fallos",
+    "referencia": "documentacion/08-pruebas-y-calidad.md · error boundaries · idempotencia webhook Stripe"
+  },
+  "Capacidad de Recuperación": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist recuperación y respaldos",
+    "referencia": "scripts/restore-drill-check.mjs · documentacion/13-checklist-cierre-defensa.md (sección F)"
+  },
+  "Cumplimiento de Fiabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist RNF-CAP-02 (pruebas de carga k6)",
+    "referencia": "documentacion/08-pruebas-y-calidad.md §5.1 · load-tests/ · npm run load:mixed2000"
+  },
+  "Inteligibilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist revisión UX — rutas y nomenclatura",
+    "referencia": "documentacion/plantillas/PL-03-registro-ejecucion-prueba.md · revisión manual flujos públicos"
+  },
+  "Facilidad de Aprendizaje": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist feedback y ayudas contextuales",
+    "referencia": "documentacion/08-pruebas-y-calidad.md · checkout y panel admin"
+  },
+  "Operabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist operabilidad formularios y panel IA",
+    "referencia": "documentacion/08-pruebas-y-calidad.md · RNF-USA-01 (parcial)"
+  },
+  "Atractividad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist coherencia visual de la interfaz",
+    "referencia": "Revisión manual UI · Tailwind v4 · guía de marca Calzatura Vilchez"
+  },
+  "Cumplimiento de la Usabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist RNF-USA-01 (cuestionario SUS)",
+    "referencia": "documentacion/08-pruebas-y-calidad.md · documentacion/05-especificacion-requisitos-software-SRS.md"
+  },
+  "Comportamiento en el tiempo": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist RNF-PER-01 (latencia catálogo)",
+    "referencia": "documentacion/08-pruebas-y-calidad.md · Lighthouse / DevTools"
+  },
+  "Uso de Recursos": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist optimización de recursos BFF",
+    "referencia": "bff/README.txt · PUBLIC_CATALOG_CACHE_TTL_SEC · documentacion/08-pruebas-y-calidad.md"
+  },
+  "Cumplimiento de la Eficiencia": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist RNF-CAP-02 ejecución load tests",
+    "referencia": "documentacion/08-pruebas-y-calidad.md §5.1 · scripts/run-load-test.ps1"
+  },
+  "Analizabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist SonarQube + ESLint (0 errores)",
+    "referencia": "sonar-project.properties · calzatura-vilchez/eslint-report.json · CI SonarQube Analysis"
+  },
+  "Cambiabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist arquitectura por dominios",
+    "referencia": "calzatura-vilchez/src/domains/ · calzatura-vilchez/src/routes/paths.ts"
+  },
+  "Estabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist regresión CI (E2E + Vitest)",
+    "referencia": "documentacion/13-checklist-cierre-defensa.md (sección D) · calzatura-vilchez/e2e/"
+  },
+  "Capacidad de ser probada": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist cobertura Vitest vs meta 60 %",
+    "referencia": "calzatura-vilchez/coverage/lcov.info · npm run test:coverage"
+  },
+  "Cumplimiento de la Mantenibilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist SonarQube Quality Gate",
+    "referencia": "CI job SonarQube Analysis · documentacion/13-checklist-cierre-defensa.md"
+  },
+  "Adaptabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist responsive + cobertura E2E",
+    "referencia": "calzatura-vilchez/playwright.config.ts · breakpoints móvil/tablet/escritorio"
+  },
+  "Facilidad de Instalación": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist despliegue Docker reproducible",
+    "referencia": "docker-compose.yml · DOCKER.md · documentacion/09-instalacion-y-despliegue.md"
+  },
+  "Coexistencia": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist coexistencia de integraciones",
+    "referencia": "documentacion/10-operacion-y-mantenimiento.md · Firebase + Supabase + Stripe + Render IA"
+  },
+  "Intercambiabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist variables de entorno intercambiables",
+    "referencia": "bff/env.example · VITE_AI_SERVICE_URL · documentacion/10-operacion-y-mantenimiento.md"
+  },
+  "Cumplimiento de la Portabilidad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Checklist pruebas de portabilidad documentadas",
+    "referencia": "documentacion/08-pruebas-y-calidad.md · documentacion/13-checklist-cierre-defensa.md"
+  },
+  "cf": {
+    "tipo": "Lista de cotejo",
+    "nombre": "CU-T05 — RF Must implementados (CF)",
+    "referencia": "documentacion/cuadros-excel/CU-T05-requisitos.csv · modulo qc_funciones",
+    "rutaModulo": "/adecuacion-funcional/"
+  },
+  "cof": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Matriz transacciones funcionales (COF)",
+    "referencia": "qc_transacciones_funcionales · pruebas checkout/stock/admin",
+    "rutaModulo": "/adecuacion-funcional/"
+  },
+  "tecp": {
+    "tipo": "Lista de cotejo",
+    "nombre": "CU-T07 — casos de prueba ejecutados (TECP)",
+    "referencia": "documentacion/cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv · Playwright/Vitest",
+    "rutaModulo": "/adecuacion-funcional/"
+  }
+}

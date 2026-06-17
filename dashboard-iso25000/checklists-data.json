@@ -1,0 +1,1299 @@
+{
+  "meta": {
+    "formato": "Lista de cotejo dicotómica (UNAM Cap. 14 · Sí/No)",
+    "fuenteFormato": "https://cuaed.unam.mx/publicaciones/libro-evaluacion/pdf/Capitulo-14-LISTA-DE-COTEJO.pdf",
+    "proyecto": "Calzatura Vilchez — Sistema Web E-Commerce con IA",
+    "evaluador": "Ing. Calidad — Tesis UCV",
+    "fecha": "2026-06-17",
+    "instruccionesGenerales": "Instrumento de verificación con escala dicotómica (cumple / no cumple). No sustituye la revisión del evaluador; registra la presencia o ausencia de cada indicador."
+  },
+  "checklists": {
+    "Idoneidad": {
+      "caracteristica": "Funcionalidad",
+      "color": "#2f6fb3",
+      "titulo": "Lista de cotejo — Idoneidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Idoneidad» (Funcionalidad) del modelo ISO/IEC 25000.",
+      "referencia": "scripts/verify-idoneidad-iso25000.mjs · documentacion/cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv · documentacion/idoneidad-trazabilidad-iso25000.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Documentación de trazabilidad idoneidad presente",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Matriz CU-T07 incluye TC-IDON-001 (recorrido integrador)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Suite E2E ≥ 34 specs Playwright",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "RF Must catálogo (RF-CAT-01, RF-CAT-02) con evidencia",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "RF Must autenticación (RF-AUT-01…04) con evidencia",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 6,
+          "indicador": "RF Must carrito/checkout/pedidos con evidencia",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 7,
+          "indicador": "RF Must administración (RF-ADM) con evidencia E2E",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 8,
+          "indicador": "RF Must IA/riesgo (RF-IA) con evidencia",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 9,
+          "indicador": "Gate verify-idoneidad-iso25000.mjs en VERDE",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        }
+      ]
+    },
+    "Precisión": {
+      "caracteristica": "Funcionalidad",
+      "color": "#2f6fb3",
+      "titulo": "Lista de cotejo — Precisión",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Precisión» (Funcionalidad) del modelo ISO/IEC 25000.",
+      "referencia": "scripts/verify-precision-iso25000.mjs · documentacion/precision-trazabilidad-iso25000.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Dominio stock talla/color verificado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Dominio checkout catálogo vivo verificado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Dominio BFF totales y precios server-side",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Dominio variantes producto",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Dominio reglas comerciales BD",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 6,
+          "indicador": "Dominio finanzas y márgenes",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 7,
+          "indicador": "Dominio ventas tienda",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 8,
+          "indicador": "Dominio importación Excel",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 9,
+          "indicador": "Dominio predicción / IRE",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 10,
+          "indicador": "Gate verify-precision-iso25000.mjs en VERDE",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        }
+      ]
+    },
+    "Interoperabilidad": {
+      "caracteristica": "Funcionalidad",
+      "color": "#2f6fb3",
+      "titulo": "Lista de cotejo — Interoperabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Interoperabilidad» (Funcionalidad) del modelo ISO/IEC 25000.",
+      "referencia": "scripts/verify-interoperabilidad-iso25000.mjs · documentacion/interoperabilidad-trazabilidad-iso25000.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Integración Firebase Auth verificada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Integración Supabase + RLS verificada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Integración BFF Node verificada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Integración Stripe + webhook verificada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Integración servicio IA FastAPI verificada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 6,
+          "indicador": "Integración delivery (ORS/Nominatim/Google)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 7,
+          "indicador": "Integración APISPERU DNI",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 8,
+          "indicador": "Integración Cloudinary",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 9,
+          "indicador": "Integración Upstash caché",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 10,
+          "indicador": "Gate verify-interoperabilidad-iso25000.mjs en VERDE",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        }
+      ]
+    },
+    "Seguridad": {
+      "caracteristica": "Funcionalidad",
+      "color": "#2f6fb3",
+      "titulo": "Lista de cotejo — Seguridad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Seguridad» (Funcionalidad) del modelo ISO/IEC 25000.",
+      "referencia": "scripts/verify-seguridad-iso25000.mjs · docs/ops/checklist-verde-seguridad-produccion.md · documentacion/seguridad-trazabilidad-iso25000.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Confidencialidad: RLS + PII enmascarada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Integridad: sin mutaciones directas desde cliente",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Autenticidad: Firebase Auth + App Check DNI",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Trazabilidad: auditoría admin registrada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Control acceso UI (RNF-SEG-01) TC-SEG-001…005",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 6,
+          "indicador": "BFF fail-closed y políticas audit",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 7,
+          "indicador": "Headers HTTP Hosting + BFF",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 8,
+          "indicador": "Rate limits / anti-abuso BFF",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 9,
+          "indicador": "DAST ZAP producción v2 sin altas críticas",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 10,
+          "indicador": "Checklist verde seguridad producción revisado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        }
+      ]
+    },
+    "Cumplimiento de la funcionalidad": {
+      "caracteristica": "Funcionalidad",
+      "color": "#2f6fb3",
+      "titulo": "Lista de cotejo — Cumplimiento de la funcionalidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la funcionalidad» (Funcionalidad) del modelo ISO/IEC 25000.",
+      "referencia": "scripts/verify-cumplimiento-iso25000.mjs · documentacion/cuadros-excel/CU-T05-requisitos.csv · documentacion/cumplimiento-trazabilidad-iso25000.md",
+      "rutaModulo": "/adecuacion-funcional/",
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "CU-T05: 26 RF Must registrados",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "CU-T05: RF legales (RF-LEG) implementados",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "CU-T06 trazabilidad estado del arte",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Ley 29571: libro de reclamaciones (TC-CMP-001/004)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Ley 29733: privacidad y cookies (TC-CMP-002/003)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 6,
+          "indicador": "Manifest iso25000-must-rf alineado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 7,
+          "indicador": "Gate verify-cumplimiento-iso25000.mjs en VERDE",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        }
+      ]
+    },
+    "Madurez": {
+      "caracteristica": "Fiabilidad",
+      "color": "#1ba6c4",
+      "titulo": "Lista de cotejo — Madurez",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Madurez» (Fiabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "scripts/verify-madurez-iso25000.mjs · documentacion/fiabilidad-trazabilidad-iso25000.md · .github/workflows/ci.yml",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "CI lint/typecheck/unit en success (ci.yml → Lint + Tests + Build)",
+          "cumple": true,
+          "observacion": "ci.yml lint+unit+typecheck; npm audit limpio; gh último run success"
+        },
+        {
+          "n": 2,
+          "indicador": "CI Integration E2E en success (ci-integration.yml)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "SonarQube Analysis en success (sonarqube.yml)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Security DevSecOps Gates en success (security-devsecops.yml)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "CI servicio IA en success (ci.yml → AI Service + Docker build)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 6,
+          "indicador": "Controles ops estáticos en CI (readiness, backtest, restore drill fixture)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 7,
+          "indicador": "Último run en success — 4 workflows de madurez en main",
+          "cumple": true,
+          "observacion": "gh run list --limit 1: ci, integration, sonarqube, devsecops en success (2026-06-15)"
+        },
+        {
+          "n": 8,
+          "indicador": "Gate verify-madurez-iso25000.mjs documentado y ejecutable",
+          "cumple": true,
+          "observacion": "verify-madurez-iso25000.mjs valida 8/8 ítems"
+        }
+      ]
+    },
+    "Tolerancia a Fallos": {
+      "caracteristica": "Fiabilidad",
+      "color": "#1ba6c4",
+      "titulo": "Lista de cotejo — Tolerancia a Fallos",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Tolerancia a Fallos» (Fiabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/08-pruebas-y-calidad.md · error boundaries · idempotencia webhook Stripe",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Error boundary en rutas críticas",
+          "cumple": true,
+          "observacion": "AppErrorBoundary en main.tsx (global SPA)"
+        },
+        {
+          "n": 2,
+          "indicador": "Idempotencia webhook Stripe (estado pagado)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Warnings visibles en panel IA ante datos insuficientes",
+          "cumple": true,
+          "observacion": "TC-PRED-003 E2E — banner datos insuficientes"
+        },
+        {
+          "n": 4,
+          "indicador": "Validación fail-closed en BFF",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Manejo de errores en checkout y admin",
+          "cumple": true,
+          "observacion": "TC-CHK-ERR-001 E2E checkout + admin-dashboard error historial"
+        }
+      ]
+    },
+    "Capacidad de Recuperación": {
+      "caracteristica": "Fiabilidad",
+      "color": "#1ba6c4",
+      "titulo": "Lista de cotejo — Capacidad de Recuperación",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Capacidad de Recuperación» (Fiabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "scripts/restore-drill-check.mjs · documentacion/13-checklist-cierre-defensa.md (sección F)",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Backups Firebase configurados (proveedor)",
+          "cumple": true,
+          "observacion": "10-operacion §6 + runbook §4 Firebase Hosting"
+        },
+        {
+          "n": 2,
+          "indicador": "Backups Supabase configurados (proveedor)",
+          "cumple": true,
+          "observacion": "10-operacion §6 PITR Supabase + runbook §2"
+        },
+        {
+          "n": 3,
+          "indicador": "Runbook recuperación ante desastres documentado",
+          "cumple": true,
+          "observacion": "docs/ops/runbook-recuperacion-desastres.md"
+        },
+        {
+          "n": 4,
+          "indicador": "Prueba de restauración registrada",
+          "cumple": true,
+          "observacion": "restore-drill-evidence.json — drill live readonly 2026-06-17 (58 migraciones, REST counts OK)"
+        },
+        {
+          "n": 5,
+          "indicador": "Script restore-drill-check ejecutado con evidencia",
+          "cumple": true,
+          "observacion": "restore-drill-check.mjs + generate-restore-drill-evidence-live.mjs"
+        }
+      ]
+    },
+    "Cumplimiento de Fiabilidad": {
+      "caracteristica": "Fiabilidad",
+      "color": "#1ba6c4",
+      "titulo": "Lista de cotejo — Cumplimiento de Fiabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de Fiabilidad» (Fiabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/08-pruebas-y-calidad.md §5.1 · load-tests/ · npm run load:mixed2000",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "RNF-CAP-02 definido con metas de carga",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Scripts k6 en load-tests/ disponibles",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Escenario smoke k6 con evidencia archivada",
+          "cumple": true,
+          "observacion": "k6-smoke-evidence.json — corrida live 2026-06-17 (20 VU, 0% http fail, p95 cat 248ms)"
+        },
+        {
+          "n": 4,
+          "indicador": "Escenario mixed1000 con evidencia archivada",
+          "cumple": true,
+          "observacion": "k6-mixed1000-evidence.json — corrida live 2026-06-17 (1000 VU SkipBff, 0.08% fail)"
+        },
+        {
+          "n": 5,
+          "indicador": "Escenario mixed2000 planificado (README fases)",
+          "cumple": true,
+          "observacion": "load-tests/README.md fases → mixed2000 planificado"
+        },
+        {
+          "n": 6,
+          "indicador": "Resultados archivados en artifacts/load-tests/",
+          "cumple": true,
+          "observacion": "docs/ops/k6-*-evidence.json (live-run) + summaries en artifacts/load-tests/"
+        },
+        {
+          "n": 7,
+          "indicador": "Gate verify-cumplimiento-fiabilidad-iso25000.mjs en VERDE",
+          "cumple": true,
+          "observacion": "verify-cumplimiento-fiabilidad-iso25000.mjs — 7/7 ítems"
+        }
+      ]
+    },
+    "Inteligibilidad": {
+      "caracteristica": "Usabilidad",
+      "color": "#3ec9b0",
+      "titulo": "Lista de cotejo — Inteligibilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Inteligibilidad» (Usabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/plantillas/PL-03-registro-ejecucion-prueba.md · revisión manual flujos públicos",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Navegación jerárquica por dominios clara",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Rutas catálogo/producto/carrito/checkout identificables",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Nomenclatura consistente en menús",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Etiquetas comprensibles para usuario final",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Sin jerga técnica en flujos públicos",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 6,
+          "indicador": "Ayudas visuales en acciones principales",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Facilidad de Aprendizaje": {
+      "caracteristica": "Usabilidad",
+      "color": "#3ec9b0",
+      "titulo": "Lista de cotejo — Facilidad de Aprendizaje",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Facilidad de Aprendizaje» (Usabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/08-pruebas-y-calidad.md · checkout y panel admin",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Toasts de feedback inmediato",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Validación en tiempo real en formularios",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Ayudas contextuales en checkout",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Mensajes de error accionables en admin",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Selectores persistidos en panel IA",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Operabilidad": {
+      "caracteristica": "Usabilidad",
+      "color": "#3ec9b0",
+      "titulo": "Lista de cotejo — Operabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Operabilidad» (Usabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/08-pruebas-y-calidad.md · RNF-USA-01 (parcial)",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Formularios operables con teclado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Acciones frecuentes ≤ 3 clics en admin",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Panel IA con selectores de horizonte",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Historial IA persistido (localStorage)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Confirmaciones en acciones destructivas",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Atractividad": {
+      "caracteristica": "Usabilidad",
+      "color": "#3ec9b0",
+      "titulo": "Lista de cotejo — Atractividad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Atractividad» (Usabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "Revisión manual UI · Tailwind v4 · guía de marca Calzatura Vilchez",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Coherencia visual Tailwind v4",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Animaciones framer-motion en KPIs",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Tipografía y contraste legibles",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Iconografía consistente",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Responsive sin roturas visuales graves",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Cumplimiento de la Usabilidad": {
+      "caracteristica": "Usabilidad",
+      "color": "#3ec9b0",
+      "titulo": "Lista de cotejo — Cumplimiento de la Usabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Usabilidad» (Usabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/08-pruebas-y-calidad.md · documentacion/05-especificacion-requisitos-software-SRS.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "RNF-USA-01 definido en SRS",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Cuestionario SUS preparado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Sesión SUS con usuarios externos realizada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Resultado SUS ≥ umbral aceptable (70)",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        },
+        {
+          "n": 5,
+          "indicador": "Mejoras derivadas documentadas",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Comportamiento en el tiempo": {
+      "caracteristica": "Eficiencia",
+      "color": "#39b06a",
+      "titulo": "Lista de cotejo — Comportamiento en el tiempo",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Comportamiento en el tiempo» (Eficiencia) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/08-pruebas-y-calidad.md · Lighthouse / DevTools",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Build Vite optimizado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Code-splitting por dominio",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Rutas lazy cargadas",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "RNF-PER-01 latencia catálogo medida",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Meta latencia catálogo cumplida (< 3 s p95)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 6,
+          "indicador": "Gate Lighthouse/performance en CI",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Uso de Recursos": {
+      "caracteristica": "Eficiencia",
+      "color": "#39b06a",
+      "titulo": "Lista de cotejo — Uso de Recursos",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Uso de Recursos» (Eficiencia) del modelo ISO/IEC 25000.",
+      "referencia": "bff/README.txt · PUBLIC_CATALOG_CACHE_TTL_SEC · documentacion/08-pruebas-y-calidad.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Caché catálogo Upstash en BFF activa",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "TTL PUBLIC_CATALOG_CACHE_TTL_SEC configurado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Lecturas Supabase reducidas en catálogo",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Imágenes optimizadas (Cloudinary transforms)",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Bundle frontend sin regresión grave de tamaño",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Cumplimiento de la Eficiencia": {
+      "caracteristica": "Eficiencia",
+      "color": "#39b06a",
+      "titulo": "Lista de cotejo — Cumplimiento de la Eficiencia",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Eficiencia» (Eficiencia) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/08-pruebas-y-calidad.md §5.1 · scripts/run-load-test.ps1",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "RNF-CAP-02 documentado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "load:smoke ejecutado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "load:mixed1000 ejecutado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "load:mixed2000 ejecutado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Metas p95/fallo HTTP documentadas",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        },
+        {
+          "n": 6,
+          "indicador": "k6 integrado en pipeline CI",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Analizabilidad": {
+      "caracteristica": "Mantenibilidad",
+      "color": "#3a9b3f",
+      "titulo": "Lista de cotejo — Analizabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Analizabilidad» (Mantenibilidad) del modelo ISO/IEC 25000.",
+      "referencia": "sonar-project.properties · calzatura-vilchez/eslint-report.json · CI SonarQube Analysis",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "SonarQube Cloud configurado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "ESLint 0 errores en último reporte",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "ESLint 0 warnings en último reporte",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Issues críticos Sonar resueltos",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Trazabilidad de deuda técnica visible",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        }
+      ]
+    },
+    "Cambiabilidad": {
+      "caracteristica": "Mantenibilidad",
+      "color": "#3a9b3f",
+      "titulo": "Lista de cotejo — Cambiabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cambiabilidad» (Mantenibilidad) del modelo ISO/IEC 25000.",
+      "referencia": "calzatura-vilchez/src/domains/ · calzatura-vilchez/src/routes/paths.ts",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Arquitectura src/domains/ aplicada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Rutas centralizadas paths.ts",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Componentes reutilizables por dominio",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "BFF modular por routers",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Cambios localizados sin efecto cascada documentado",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Estabilidad": {
+      "caracteristica": "Mantenibilidad",
+      "color": "#3a9b3f",
+      "titulo": "Lista de cotejo — Estabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Estabilidad» (Mantenibilidad) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/13-checklist-cierre-defensa.md (sección D) · calzatura-vilchez/e2e/",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "≥ 34 specs E2E Playwright",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Vitest unitarios en CI",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Regresión antes de merge a main",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Sin flaky tests críticos abiertos",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Smoke spec en cada PR",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Capacidad de ser probada": {
+      "caracteristica": "Mantenibilidad",
+      "color": "#3a9b3f",
+      "titulo": "Lista de cotejo — Capacidad de ser probada",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Capacidad de ser probada» (Mantenibilidad) del modelo ISO/IEC 25000.",
+      "referencia": "calzatura-vilchez/coverage/lcov.info · npm run test:coverage",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Vitest coverage líneas ≥ 60 %",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Vitest coverage funciones ≥ 60 %",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Vitest coverage ramas ≥ 50 %",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Dominios críticos con tests dedicados",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        },
+        {
+          "n": 5,
+          "indicador": "Mocks/fixtures para integraciones externas",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Cumplimiento de la Mantenibilidad": {
+      "caracteristica": "Mantenibilidad",
+      "color": "#3a9b3f",
+      "titulo": "Lista de cotejo — Cumplimiento de la Mantenibilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Mantenibilidad» (Mantenibilidad) del modelo ISO/IEC 25000.",
+      "referencia": "CI job SonarQube Analysis · documentacion/13-checklist-cierre-defensa.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "SonarQube Quality Gate passing",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Política de ramas main protegida",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "CODEOWNERS o revisión obligatoria",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Documentación actualizada por release",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Deuda técnica triaged en backlog",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Adaptabilidad": {
+      "caracteristica": "Portabilidad",
+      "color": "#2f8f4e",
+      "titulo": "Lista de cotejo — Adaptabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Adaptabilidad» (Portabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "calzatura-vilchez/playwright.config.ts · breakpoints móvil/tablet/escritorio",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Breakpoints móvil/tablet/escritorio",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Home responsive verificada",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Catálogo responsive verificado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Checkout responsive verificado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "E2E cross-browser (Firefox/WebKit)",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        },
+        {
+          "n": 6,
+          "indicador": "Matriz navegadores documentada",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Facilidad de Instalación": {
+      "caracteristica": "Portabilidad",
+      "color": "#2f8f4e",
+      "titulo": "Lista de cotejo — Facilidad de Instalación",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Facilidad de Instalación» (Portabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "docker-compose.yml · DOCKER.md · documentacion/09-instalacion-y-despliegue.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Dockerfile frontend presente",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "docker-compose 3 servicios",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "DOCKER.md con pasos reproducibles",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Variables .env.example documentadas",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Build npm run build sin errores",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Coexistencia": {
+      "caracteristica": "Portabilidad",
+      "color": "#2f8f4e",
+      "titulo": "Lista de cotejo — Coexistencia",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Coexistencia» (Portabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/10-operacion-y-mantenimiento.md · Firebase + Supabase + Stripe + Render IA",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Firebase Auth coexistiendo con Supabase datos",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Stripe sin conflicto con checkout BFF",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Servicio IA en dominio separado",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Cloudinary sin bloquear catálogo",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 5,
+          "indicador": "Upstash sin degradar latencia crítica",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Intercambiabilidad": {
+      "caracteristica": "Portabilidad",
+      "color": "#2f8f4e",
+      "titulo": "Lista de cotejo — Intercambiabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Intercambiabilidad» (Portabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "bff/env.example · VITE_AI_SERVICE_URL · documentacion/10-operacion-y-mantenimiento.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "VITE_AI_SERVICE_URL configurable",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "SUPABASE_URL configurable",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "BFF URL configurable en frontend",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Proveedor Auth intercambiable (documentado)",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        },
+        {
+          "n": 5,
+          "indicador": "Desacoplamiento IA vía contrato HTTP",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    },
+    "Cumplimiento de la Portabilidad": {
+      "caracteristica": "Portabilidad",
+      "color": "#2f8f4e",
+      "titulo": "Lista de cotejo — Cumplimiento de la Portabilidad",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Portabilidad» (Portabilidad) del modelo ISO/IEC 25000.",
+      "referencia": "documentacion/08-pruebas-y-calidad.md · documentacion/13-checklist-cierre-defensa.md",
+      "rutaModulo": null,
+      "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
+      "items": [
+        {
+          "n": 1,
+          "indicador": "Plan pruebas portabilidad en 08-pruebas-y-calidad",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 2,
+          "indicador": "Matriz SO/navegadores definida",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 3,
+          "indicador": "Evidencia ejecución en ≥ 2 navegadores",
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
+        },
+        {
+          "n": 4,
+          "indicador": "Despliegue Firebase Hosting documentado",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        },
+        {
+          "n": 5,
+          "indicador": "Despliegue BFF Render documentado",
+          "cumple": false,
+          "observacion": "Pendiente o evidencia insuficiente."
+        }
+      ]
+    }
+  }
+}

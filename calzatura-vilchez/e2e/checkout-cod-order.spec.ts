@@ -114,4 +114,62 @@ test.describe("checkout COD → createOrder BFF", () => {
       await context.close();
     }
   });
+
+  test("createOrder fallido muestra error accionable en checkout (TC-CHK-ERR-001)", async ({ browser, baseURL }) => {
+    const url = baseURL ?? "http://127.0.0.1:5173";
+    const origin = new URL(url).origin;
+    const context = await browser.newContext({
+      storageState: storageStateForUser(origin, CHECKOUT_USER),
+    });
+    const page = await context.newPage();
+    await page.addInitScript(
+      ({ key, items }) => {
+        sessionStorage.setItem(key, JSON.stringify(items));
+      },
+      { key: CART_SESSION_KEY, items: CART_ITEMS },
+    );
+    await mockClientFirebaseAuth(page, CHECKOUT_USER);
+    await mockSupabasePublicProductos(page, [CHECKOUT_PRODUCT]);
+    await mockBffCheckoutDelivery(page);
+
+    const matchCreateOrder = (routeUrl: URL) => /\/createOrder\/?$/i.test(routeUrl.pathname);
+    await page.route(matchCreateOrder, async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.fallback();
+        return;
+      }
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({ error: "Stock no disponible en servidor" }),
+      });
+    });
+
+    try {
+      await page.goto("/checkout");
+      await waitForCheckoutHydrated(page, CHECKOUT_PRODUCT.nombre);
+
+      await page.locator("#checkout-nombre").fill("Ana");
+      await page.locator("#checkout-apellido").fill("García");
+      await page.locator("#checkout-direccion").fill("Av. Benavides 123");
+      await page.locator("#checkout-ciudad").fill("Lima");
+      await page.locator("#checkout-distrito").fill("Miraflores");
+      await page.locator("#checkout-telefono").fill("999 888 777");
+
+      await expect(page.locator(".checkout-delivery-suggest-btn").first()).toBeVisible({ timeout: 15_000 });
+      await page.locator(".checkout-delivery-suggest-btn").first().click();
+
+      await page.getByRole("button", { name: /Continuar al Pago/i }).click();
+      await expect(page.getByText(/Método de Pago/i)).toBeVisible({ timeout: 10_000 });
+
+      await page.getByLabel(/Pago contra entrega/i).check();
+      await page.getByRole("button", { name: /Confirmar Pedido/i }).click();
+
+      await expect(page.locator(".checkout-error-state")).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(/No se pudo confirmar el pedido/i)).toBeVisible();
+      await expect(page.locator(".checkout-error-state")).toContainText(/Stock no disponible/i);
+    } finally {
+      await context.close();
+    }
+  });
 });

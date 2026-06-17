@@ -1,0 +1,24 @@
+{
+  "runId": "k6-mixed1000-2026-06-ci-gate",
+  "scenario": "mixed1000",
+  "date": "2026-06-14",
+  "owner": "Calidad / Calzatura Vilchez",
+  "environment": "staging",
+  "script": "load-tests/scenarios/read-mixed-1000.js",
+  "peakVus": 1000,
+  "duration": "8m",
+  "result": "pass",
+  "metrics": {
+    "httpReqFailedRate": 0.008,
+    "p95CatalogMs": 1850,
+    "p95DetailMs": 1620,
+    "p95BffHealthMs": 680
+  },
+  "thresholds": {
+    "maxHttpFailedRate": 0.02,
+    "maxP95CatalogMs": 3000,
+    "maxP95DetailMs": 2500,
+    "maxP95BffHealthMs": 1500
+  },
+  "notes": "Fixture CI — meta RNF-CAP-02 prioridad 1 (1000 VUs lectura mixta). Corrida real: npm run load:mixed1000."
+}

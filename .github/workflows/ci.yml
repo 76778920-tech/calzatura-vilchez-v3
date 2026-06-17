@@ -63,6 +63,24 @@ jobs:
             --max-rpo-minutes 1440 \
             --output artifacts/restore-drill/ci-summary.json
 
+      - name: K6 load evidence - fixtures validos
+        run: |
+          node scripts/k6-evidence-check.mjs \
+            --evidence docs/ops/k6-smoke-evidence.json \
+            --output artifacts/load-tests/k6-smoke-summary.ci.json
+          node scripts/k6-evidence-check.mjs \
+            --evidence docs/ops/k6-mixed1000-evidence.json \
+            --output artifacts/load-tests/k6-mixed1000-summary.ci.json
+
+      - name: Gate Fiabilidad ISO 25010 (estatico)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node scripts/verify-madurez-iso25000.mjs --check-ci --check-audit
+          node scripts/verify-tolerancia-fallos-iso25000.mjs
+          node scripts/verify-recuperacion-iso25000.mjs
+          node scripts/verify-cumplimiento-fiabilidad-iso25000.mjs --run-evidence-check
+
       - name: Subir evidencia estatica de controles
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
