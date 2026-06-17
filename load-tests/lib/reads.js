@@ -2,15 +2,20 @@ import http from "k6/http";
 import { check, fail } from "k6";
 import { supabaseHeaders } from "./targets.js";
 
+function bffOpts(cfg, tags, timeout = "30s") {
+  const opts = { tags, timeout };
+  if (cfg.loadTestToken) {
+    opts.headers = { "X-Load-Test-Token": cfg.loadTestToken };
+  }
+  return opts;
+}
+
 /** fetchPublicProducts() vía BFF (caché). Si no hay BFF, cae a Supabase directo. */
 export function readBffCatalogActive(cfg) {
   if (!cfg.bffBaseUrl) {
     return readCatalogList(cfg);
   }
-  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/active`, {
-    tags: { name: "bff_catalog_active" },
-    timeout: "30s",
-  });
+  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/active`, bffOpts(cfg, { name: "bff_catalog_active" }));
   check(res, {
     "bff catalog active 200": (r) => r.status === 200,
     "bff catalog active tiene products": (r) => {
@@ -30,10 +35,7 @@ export function readBffCatalogPage(cfg, page = 1, limit = 48) {
     return readCatalogList(cfg);
   }
   const url = `${cfg.bffBaseUrl}/public/catalog?page=${page}&limit=${limit}`;
-  const res = http.get(url, {
-    tags: { name: "bff_catalog_page" },
-    timeout: "30s",
-  });
+  const res = http.get(url, bffOpts(cfg, { name: "bff_catalog_page" }));
   check(res, {
     "bff catalog page 200": (r) => r.status === 200,
     "bff catalog page tiene products": (r) => {
@@ -53,10 +55,7 @@ export function readBffCatalogBrowse(cfg, page = 1, limit = 24) {
     return readCatalogList(cfg);
   }
   const url = `${cfg.bffBaseUrl}/public/catalog/browse?page=${page}&limit=${limit}&categoria=todos`;
-  const res = http.get(url, {
-    tags: { name: "bff_catalog_browse" },
-    timeout: "30s",
-  });
+  const res = http.get(url, bffOpts(cfg, { name: "bff_catalog_browse" }));
   check(res, {
     "bff catalog browse 200": (r) => r.status === 200,
     "bff catalog browse tiene products": (r) => {
@@ -75,10 +74,7 @@ export function readBffProductDetail(cfg, productId) {
   if (!cfg.bffBaseUrl || !productId) {
     return readProductDetail(cfg, productId);
   }
-  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/product/${encodeURIComponent(productId)}`, {
-    tags: { name: "bff_product_detail" },
-    timeout: "20s",
-  });
+  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/product/${encodeURIComponent(productId)}`, bffOpts(cfg, { name: "bff_product_detail" }, "20s"));
   check(res, { "bff product detail 200": (r) => r.status === 200 });
   return res;
 }
@@ -88,10 +84,7 @@ export function readBffFeatured(cfg) {
   if (!cfg.bffBaseUrl) {
     return readFeatured(cfg);
   }
-  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/featured?limit=24`, {
-    tags: { name: "bff_featured" },
-    timeout: "20s",
-  });
+  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/featured?limit=24`, bffOpts(cfg, { name: "bff_featured" }, "20s"));
   check(res, { "bff featured 200": (r) => r.status === 200 });
   return res;
 }
@@ -101,10 +94,7 @@ export function readBffCatalogIndex(cfg) {
   if (!cfg.bffBaseUrl) {
     return readCatalogList(cfg);
   }
-  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/index`, {
-    tags: { name: "bff_catalog_index" },
-    timeout: "25s",
-  });
+  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/index`, bffOpts(cfg, { name: "bff_catalog_index" }, "25s"));
   check(res, { "bff catalog index 200": (r) => r.status === 200 });
   return res;
 }
@@ -114,10 +104,7 @@ export function readBffFamilyCounts(cfg) {
   if (!cfg.bffBaseUrl) {
     return readFamilyCounts(cfg);
   }
-  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/family-counts`, {
-    tags: { name: "bff_family_counts" },
-    timeout: "25s",
-  });
+  const res = http.get(`${cfg.bffBaseUrl}/public/catalog/family-counts`, bffOpts(cfg, { name: "bff_family_counts" }, "25s"));
   check(res, {
     "bff family counts 200": (r) => r.status === 200,
   });
@@ -197,10 +184,7 @@ export function readBffHealth(cfg) {
   if (!cfg.bffBaseUrl) {
     return null;
   }
-  const res = http.get(`${cfg.bffBaseUrl}/health`, {
-    tags: { name: "bff_health" },
-    timeout: "15s",
-  });
+  const res = http.get(`${cfg.bffBaseUrl}/health`, bffOpts(cfg, { name: "bff_health" }, "15s"));
   check(res, {
     "bff health 200": (r) => r.status === 200,
   });
@@ -211,10 +195,7 @@ export function readDeliveryQuote(cfg) {
   if (!cfg.bffBaseUrl) {
     return null;
   }
-  const res = http.get(`${cfg.bffBaseUrl}/delivery/quote?${cfg.deliveryQuoteQuery}`, {
-    tags: { name: "bff_delivery_quote" },
-    timeout: "20s",
-  });
+  const res = http.get(`${cfg.bffBaseUrl}/delivery/quote?${cfg.deliveryQuoteQuery}`, bffOpts(cfg, { name: "bff_delivery_quote" }, "20s"));
   check(res, {
     "delivery quote 2xx o rate limit": (r) =>
       (r.status >= 200 && r.status < 300) || r.status === 429,

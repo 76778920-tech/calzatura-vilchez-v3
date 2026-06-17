@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 function parseArgs(argv) {
-  const args = { summary: "", scenario: "", output: "", peakVus: 0, script: "" };
+  const args = { summary: "", scenario: "", output: "", peakVus: 0, script: "", withBff: false, bffLocal: false };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     const next = () => {
@@ -23,6 +23,8 @@ function parseArgs(argv) {
     else if (a === "--output") args.output = next();
     else if (a === "--peak-vus") args.peakVus = Number(next());
     else if (a === "--script") args.script = next();
+    else if (a === "--with-bff") args.withBff = true;
+    else if (a === "--bff-local") args.bffLocal = true;
     else throw new Error(`Unknown arg: ${a}`);
   }
   if (!args.summary || !args.scenario || !args.output) {
@@ -95,13 +97,17 @@ function main() {
   const peakVus = args.peakVus || metrics.vus_max?.max || metrics.vus?.max || 0;
   const today = new Date().toISOString().slice(0, 10);
 
+  const withBff = args.withBff;
+  const bffLocal = args.bffLocal;
+
   const evidence = {
-    runId: `k6-${args.scenario}-live-${today}`,
+    runId: `k6-${args.scenario}-live-${today}${withBff ? "-bff" : ""}`,
     scenario: args.scenario,
     date: today,
     owner: "Calidad / Calzatura Vilchez",
-    environment: process.env.LOAD_ENV || "production",
+    environment: bffLocal ? "local-bff+supabase-prod" : process.env.LOAD_ENV || "production",
     evidenceType: "live-run",
+    bffIncluded: withBff,
     script: args.script || scriptMap[args.scenario] || "",
     peakVus,
     duration: "see k6 summary",
@@ -111,10 +117,15 @@ function main() {
       p95CatalogMs: Math.round(p95Catalog),
       p95DetailMs: Math.round(p95Detail),
       p95BffHealthMs: Math.round(p95Bff || 0),
+      p95BffCatalogActiveMs: Math.round(
+        metricValue(metrics, "http_req_duration{name:bff_catalog_active}") || p95Catalog,
+      ),
     },
     thresholds: { ...thresholds, maxP95CatalogMs: catalogLimit },
     k6SummaryPath: path.relative(ROOT, summaryPath).replace(/\\/g, "/"),
-    notes: "Generado desde corrida k6 real (SkipBff=lecturas Supabase). scripts/k6-summary-to-evidence.mjs",
+    notes: withBff
+      ? "Corrida k6 real con BFF (/public/catalog/*, /health). BFF local + LOAD_TEST_TOKEN (bypass rate-limit controlado); Supabase producción."
+      : "Generado desde corrida k6 real (SkipBff=lecturas Supabase). scripts/k6-summary-to-evidence.mjs",
   };
 
   const outPath = path.resolve(args.output);

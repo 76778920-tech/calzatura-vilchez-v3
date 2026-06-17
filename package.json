@@ -24,10 +24,14 @@
     "ops:k6-evidence": "node scripts/k6-summary-to-evidence.mjs",
     "sonar": "node ./node_modules/sonarqube-scanner/bin/sonar-scanner.js",
     "load:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario smoke",
+    "load:smoke:bff": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario smoke -StartLocalBff",
     "load:catalog": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario catalog",
     "load:mixed500": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed500",
+    "load:mixed500:bff": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed500 -StartLocalBff",
     "load:mixed1000": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed1000",
-    "load:mixed2000": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed2000"
+    "load:mixed1000:bff": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed1000 -StartLocalBff",
+    "load:mixed2000": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed2000",
+    "ops:k6-evidence:bff": "node scripts/k6-summary-to-evidence.mjs --summary artifacts/load-tests/k6-mixed1000-20260617-153431.json --scenario mixed1000 --peak-vus 1000 --with-bff --bff-local --output docs/ops/k6-mixed1000-bff-evidence.json"
   },
   "devDependencies": {
     "sonarqube-scanner": "4.3.6"

@@ -25,6 +25,7 @@ Desde la raíz del repo:
 .\scripts\run-load-test.ps1 -Scenario smoke
 .\scripts\run-load-test.ps1 -Scenario catalog
 .\scripts\run-load-test.ps1 -Scenario mixed1000
+.\scripts\run-load-test.ps1 -Scenario mixed1000 -StartLocalBff
 .\scripts\run-load-test.ps1 -Scenario mixed2000
 ```
 
@@ -75,6 +76,7 @@ Si no se cumple: revisar plan Supabase, índices, caché BFF, réplicas Render (
 - Por defecto **bloquea** URLs de producción (`web.app`, `onrender.com`, `supabase.co`) salvo `ALLOW_PROD_LOAD=true`.
 - No ejecutar `mixed2000` contra producción en horario comercial sin autorización.
 - Los 429 en `/delivery/quote` indican **rate limit** (diseño), no necesariamente caída del sistema.
+- Para **carga BFF catálogo** sin falsos 429: `npm run load:mixed1000:bff` (BFF local + `LOAD_TEST_TOKEN` + misma BD Supabase). En Render remoto, definir `LOAD_TEST_TOKEN` solo en ventana aprobada.
 
 ## Evidencias
 

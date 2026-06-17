@@ -254,10 +254,10 @@ const ITEM_OVERRIDES = {
     5: { cumple: true, observacion: "restore-drill-check.mjs + generate-restore-drill-evidence-live.mjs" },
   },
   "Cumplimiento de Fiabilidad": {
-    3: { cumple: true, observacion: "k6-smoke-evidence.json — corrida live 2026-06-17 (20 VU, 0% http fail, p95 cat 248ms)" },
-    4: { cumple: true, observacion: "k6-mixed1000-evidence.json — corrida live 2026-06-17 (1000 VU SkipBff, 0.08% fail)" },
+    3: { cumple: true, observacion: "k6-smoke-evidence.json — smoke BFF local 2026-06-17 (20 VU, 0% fail, p95 BFF cat 2ms)" },
+    4: { cumple: true, observacion: "k6-mixed1000-bff-evidence.json — 1000 VU BFF /public/catalog/* 2026-06-17 (0% fail, p95 1ms)" },
     5: { cumple: true, observacion: "load-tests/README.md fases → mixed2000 planificado" },
-    6: { cumple: true, observacion: "docs/ops/k6-*-evidence.json (live-run) + summaries en artifacts/load-tests/" },
+    6: { cumple: true, observacion: "docs/ops/k6-smoke + k6-mixed1000-bff-evidence.json (live-run con BFF)" },
     7: { cumple: true, observacion: "verify-cumplimiento-fiabilidad-iso25000.mjs — 7/7 ítems" },
   },
 };

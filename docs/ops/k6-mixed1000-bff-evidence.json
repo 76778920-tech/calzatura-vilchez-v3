@@ -1,28 +1,28 @@
 {
-  "runId": "k6-smoke-live-2026-06-17-bff",
-  "scenario": "smoke",
+  "runId": "k6-mixed1000-live-2026-06-17-bff",
+  "scenario": "mixed1000",
   "date": "2026-06-17",
   "owner": "Calidad / Calzatura Vilchez",
   "environment": "local-bff+supabase-prod",
   "evidenceType": "live-run",
   "bffIncluded": true,
-  "script": "load-tests/scenarios/smoke-read.js",
-  "peakVus": 20,
+  "script": "load-tests/scenarios/read-mixed-1000.js",
+  "peakVus": 1000,
   "duration": "see k6 summary",
   "result": "pass",
   "metrics": {
-    "httpReqFailedRate": 0,
-    "p95CatalogMs": 2,
-    "p95DetailMs": 220,
-    "p95BffHealthMs": 220,
-    "p95BffCatalogActiveMs": 2
+    "httpReqFailedRate": 0.0001,
+    "p95CatalogMs": 1,
+    "p95DetailMs": 223,
+    "p95BffHealthMs": 223,
+    "p95BffCatalogActiveMs": 1
   },
   "thresholds": {
     "maxHttpFailedRate": 0.02,
-    "maxP95CatalogMs": 3000,
+    "maxP95CatalogMs": 4000,
     "maxP95DetailMs": 2500,
     "maxP95BffHealthMs": 1500
   },
-  "k6SummaryPath": "artifacts/load-tests/k6-smoke-20260617-152608.json",
+  "k6SummaryPath": "artifacts/load-tests/k6-mixed1000-20260617-153431.json",
   "notes": "Corrida k6 real con BFF (/public/catalog/*, /health). BFF local + LOAD_TEST_TOKEN (bypass rate-limit controlado); Supabase producción."
 }

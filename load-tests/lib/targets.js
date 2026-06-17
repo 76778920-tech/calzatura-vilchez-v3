@@ -49,6 +49,7 @@ export function getConfig() {
     loadEnv,
     restBase: `${supabaseUrl}/rest/v1`,
     deliveryQuoteQuery: `destLat=${destLat}&destLng=${destLng}`,
+    loadTestToken: String(__ENV.LOAD_TEST_TOKEN || "").trim(),
     maxVus: Number(__ENV.LOAD_MAX_VUS || "2000"),
     rampUp: __ENV.LOAD_RAMP_UP || "5m",
     steady: __ENV.LOAD_STEADY || "10m",

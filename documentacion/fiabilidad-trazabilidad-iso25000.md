@@ -85,8 +85,9 @@ Fallos en push mobile iOS por **SCA npm audit** en `calzatura-vilchez/functions`
 
 | Escenario | Script | Evidencia |
 |-----------|--------|-----------|
-| Smoke (20 VUs) | `load-tests/scenarios/smoke-read.js` | `docs/ops/k6-smoke-evidence.json` (live 2026-06-17) |
-| Mixed 1000 VUs | `load-tests/scenarios/read-mixed-1000.js` | `docs/ops/k6-mixed1000-evidence.json` (live SkipBff 2026-06-17) |
+| Smoke (20 VUs) | `load-tests/scenarios/smoke-read.js` | `docs/ops/k6-smoke-evidence.json` (BFF local 2026-06-17) |
+| Mixed 1000 VUs + BFF | `load-tests/scenarios/read-mixed-1000.js` | `docs/ops/k6-mixed1000-bff-evidence.json` (BFF catálogo 2026-06-17) |
+| Mixed 1000 VUs datastore | mismo script con `-SkipBff` | `docs/ops/k6-mixed1000-evidence.json` (solo Supabase) |
 | Mixed 2000 VUs | `load-tests/scenarios/read-mixed-2000.js` | Planificado — `load-tests/README.md` § Fases |
 
 **Gate:** `npm run ops:verify-cumplimiento-fiabilidad -- --run-evidence-check`  

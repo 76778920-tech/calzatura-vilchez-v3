@@ -3,6 +3,7 @@
 const { getClientIp } = require("./clientIp.cjs");
 const { consumeRateLimit } = require("./securityStore.cjs");
 const { onRateLimitExceeded, SURFACES, parseThreshold } = require("./securityMonitor.cjs");
+const { isLoadTestBypass } = require("./loadTestBypass.cjs");
 
 function buildRateLimitSpecs() {
   return {
@@ -74,6 +75,9 @@ function specLabel(spec) {
  * @returns {Promise<{ limited: boolean, count: number }>}
  */
 async function enforceRateLimit(req, surface, logServerError) {
+  if (isLoadTestBypass(req)) {
+    return { limited: false, count: 0, bypassed: true };
+  }
   const spec = buildRateLimitSpecs()[surface];
   if (!spec) {
     throw new Error(`publicRateLimit: superficie desconocida ${surface}`);

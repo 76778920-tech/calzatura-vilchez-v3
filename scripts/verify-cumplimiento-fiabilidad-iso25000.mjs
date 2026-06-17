@@ -58,14 +58,19 @@ function checkItem5() {
 }
 
 function checkItem6() {
-  const live = ["docs/ops/k6-smoke-evidence.json", "docs/ops/k6-mixed1000-evidence.json"];
+  const live = [
+    "docs/ops/k6-smoke-evidence.json",
+    "docs/ops/k6-mixed1000-bff-evidence.json",
+  ];
   const missing = live.filter((s) => !exists(s));
   if (missing.length > 0) return fail(`Ítem 6: faltan ${missing.join(", ")}`);
   for (const f of live) {
     const ev = JSON.parse(read(f));
     if (ev.evidenceType !== "live-run") return fail(`Ítem 6: ${f} no es corrida live`);
   }
-  return ok("Ítem 6: evidencia k6 live archivada en docs/ops/");
+  const bff = JSON.parse(read("docs/ops/k6-mixed1000-bff-evidence.json"));
+  if (!bff.bffIncluded) return fail("Ítem 6: mixed1000-bff sin bffIncluded");
+  return ok("Ítem 6: evidencia k6 live (smoke + mixed1000 BFF) archivada en docs/ops/");
 }
 
 function checkItem7() {
@@ -81,7 +86,7 @@ function main() {
   if (runCheck) {
     for (const [ev, out] of [
       ["docs/ops/k6-smoke-evidence.json", "artifacts/load-tests/k6-smoke-summary.ci.json"],
-      ["docs/ops/k6-mixed1000-evidence.json", "artifacts/load-tests/k6-mixed1000-summary.ci.json"],
+      ["docs/ops/k6-mixed1000-bff-evidence.json", "artifacts/load-tests/k6-mixed1000-summary.ci.json"],
     ]) {
       spawnSync("node", ["scripts/k6-evidence-check.mjs", "--evidence", ev, "--output", out], { cwd: ROOT, stdio: "inherit" });
     }
@@ -91,7 +96,7 @@ function main() {
     1: checkItem1(),
     2: checkItem2(),
     3: checkEvidenceItem(3, "docs/ops/k6-smoke-evidence.json", runCheck),
-    4: checkEvidenceItem(4, "docs/ops/k6-mixed1000-evidence.json", runCheck),
+    4: checkEvidenceItem(4, "docs/ops/k6-mixed1000-bff-evidence.json", runCheck),
     5: checkItem5(),
     6: checkItem6(),
     7: checkItem7(),

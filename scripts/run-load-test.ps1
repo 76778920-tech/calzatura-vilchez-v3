@@ -4,7 +4,8 @@ param(
   [string]$Scenario = "smoke",
   [string]$ConfigFile = "load-tests/config.env",
   [string]$OutDir = "artifacts/load-tests",
-  [switch]$SkipBff
+  [switch]$SkipBff,
+  [switch]$StartLocalBff
 )
 
 $ErrorActionPreference = "Stop"
@@ -62,6 +63,44 @@ if ($SkipBff) {
   Write-Host "SkipBff: lecturas solo Supabase (sin hammer BFF Render)"
 }
 
+function Ensure-BffEnvForLocal {
+  if (-not $env:SUPABASE_URL -and $env:VITE_SUPABASE_URL) { $env:SUPABASE_URL = $env:VITE_SUPABASE_URL }
+  if (-not $env:SUPABASE_SERVICE_ROLE_KEY) {
+    Write-Error "Falta SUPABASE_SERVICE_ROLE_KEY (raíz .env) para BFF local"
+  }
+  if (-not $env:LOAD_TEST_TOKEN) {
+    $env:LOAD_TEST_TOKEN = [guid]::NewGuid().ToString()
+    Write-Host "LOAD_TEST_TOKEN generado para bypass rate-limit en BFF local"
+  }
+}
+
+$bffProc = $null
+if ($StartLocalBff) {
+  Ensure-BffEnvForLocal
+  $env:BFF_BASE_URL = "http://127.0.0.1:8787"
+  $env:VITE_BACKEND_API_URL = $env:BFF_BASE_URL
+  $env:LOAD_ENV = "local"
+  $env:PORT = "8787"
+  $bffDir = Join-Path $repoRoot "calzatura-vilchez\bff"
+  Write-Host "Iniciando BFF local en $env:BFF_BASE_URL (LOAD_TEST_TOKEN activo)"
+  $bffProc = Start-Process -FilePath "node" -ArgumentList "server.cjs" -WorkingDirectory $bffDir -PassThru -WindowStyle Hidden
+  $deadline = (Get-Date).AddSeconds(45)
+  $ready = $false
+  while ((Get-Date) -lt $deadline) {
+    try {
+      $r = Invoke-WebRequest -Uri "$($env:BFF_BASE_URL)/health" -UseBasicParsing -TimeoutSec 3
+      if ($r.StatusCode -eq 200) { $ready = $true; break }
+    } catch { Start-Sleep -Seconds 2 }
+  }
+  if (-not $ready) {
+    if ($bffProc -and -not $bffProc.HasExited) { Stop-Process -Id $bffProc.Id -Force -ErrorAction SilentlyContinue }
+    Write-Error "BFF local no respondió en /health"
+  }
+  Write-Host "BFF local listo"
+} elseif (-not $SkipBff -and $env:BFF_BASE_URL -and $env:LOAD_TEST_TOKEN) {
+  Write-Host "LOAD_TEST_TOKEN: bypass rate-limit si el BFF remoto lo tiene configurado"
+}
+
 $scriptMap = @{
   smoke      = "load-tests/scenarios/smoke-read.js"
   catalog    = "load-tests/scenarios/read-catalog-stress.js"
@@ -80,5 +119,13 @@ Write-Host "Script: $k6Script"
 Write-Host "LOAD_ENV=$env:LOAD_ENV ALLOW_PROD_LOAD=$env:ALLOW_PROD_LOAD"
 Write-Host "Resumen: $summary"
 
-k6 run $k6Script --summary-export $summary
-exit $LASTEXITCODE
+try {
+  k6 run $k6Script --summary-export $summary
+  $code = $LASTEXITCODE
+} finally {
+  if ($bffProc -and -not $bffProc.HasExited) {
+    Stop-Process -Id $bffProc.Id -Force -ErrorAction SilentlyContinue
+    Write-Host "BFF local detenido"
+  }
+}
+exit $code
