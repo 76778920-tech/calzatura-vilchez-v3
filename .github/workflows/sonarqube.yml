@@ -36,7 +36,9 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: calzatura-vilchez/package-lock.json
+          cache-dependency-path: |
+            calzatura-vilchez/package-lock.json
+            package-lock.json
 
       - name: Instalar dependencias web
         working-directory: calzatura-vilchez
@@ -146,79 +148,16 @@ jobs:
           SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
         run: node scripts/close-sonar-stale-coverage-shim-issues.mjs
 
-      - name: Ejecutar analisis SonarQube (intento 1)
-        id: sonar-scan-1
+      - name: Instalar sonar-scanner (monorepo raiz)
         if: steps.sonar-config.outputs.ready == 'true'
-        continue-on-error: true
-        uses: SonarSource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432 # v8.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          # qualitygate.wait=true → exit code 3 si el Quality Gate en SonarCloud esta Failed.
-          args: >
-            "-Dsonar.qualitygate.wait=true"
-            "-Dsonar.projectBaseDir=."
-            "-Dsonar.newCode.referenceBranch=main"
-            "-Dsonar.javascript.lcov.reportPaths=calzatura-vilchez/coverage/lcov.info"
-            "-Dsonar.python.coverage.reportPaths=ai-service/coverage.xml"
+        run: npm ci --ignore-scripts
 
-      - name: Esperar antes de reintentar Sonar (503 / saturacion SonarCloud)
-        if: steps.sonar-config.outputs.ready == 'true' && steps.sonar-scan-1.outcome == 'failure'
-        run: sleep 90
-
-      - name: Ejecutar analisis SonarQube (intento 2)
-        id: sonar-scan-2
-        if: steps.sonar-config.outputs.ready == 'true' && steps.sonar-scan-1.outcome == 'failure'
-        continue-on-error: true
-        uses: SonarSource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432 # v8.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            "-Dsonar.qualitygate.wait=true"
-            "-Dsonar.projectBaseDir=."
-            "-Dsonar.newCode.referenceBranch=main"
-            "-Dsonar.javascript.lcov.reportPaths=calzatura-vilchez/coverage/lcov.info"
-            "-Dsonar.python.coverage.reportPaths=ai-service/coverage.xml"
-
-      - name: Esperar antes de reintentar Sonar (intento 3)
-        if: steps.sonar-config.outputs.ready == 'true' && steps.sonar-scan-1.outcome == 'failure' && steps.sonar-scan-2.outcome == 'failure'
-        run: sleep 120
-
-      - name: Ejecutar analisis SonarQube (intento 3)
-        id: sonar-scan-3
-        if: steps.sonar-config.outputs.ready == 'true' && steps.sonar-scan-1.outcome == 'failure' && steps.sonar-scan-2.outcome == 'failure'
-        continue-on-error: true
-        uses: SonarSource/sonarqube-scan-action@59db25f34e16620e48ab4bb9e4a5dce155cb5432 # v8.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            "-Dsonar.qualitygate.wait=true"
-            "-Dsonar.projectBaseDir=."
-            "-Dsonar.newCode.referenceBranch=main"
-            "-Dsonar.javascript.lcov.reportPaths=calzatura-vilchez/coverage/lcov.info"
-            "-Dsonar.python.coverage.reportPaths=ai-service/coverage.xml"
-
-      - name: Verificar resultado del analisis SonarQube
+      - name: Ejecutar analisis SonarQube (reintentos ante 503)
         if: steps.sonar-config.outputs.ready == 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ "${{ steps.sonar-scan-1.outcome }}" = "success" ]; then
-            echo "SonarQube OK (intento 1)"
-            exit 0
-          fi
-          if [ "${{ steps.sonar-scan-2.outcome }}" = "success" ]; then
-            echo "SonarQube OK (intento 2)"
-            exit 0
-          fi
-          if [ "${{ steps.sonar-scan-3.outcome }}" = "success" ]; then
-            echo "SonarQube OK (intento 3)"
-            exit 0
-          fi
-          echo "::error::SonarQube fallo tras 3 intentos (p. ej. HTTP 503 al subir el informe). Reejecuta el workflow o comprueba https://status.sonarcloud.io"
-          exit 1
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ env.SONAR_HOST_URL }}
+        run: node scripts/run-sonar-scan-with-retry.mjs
 
       - name: Reintentar cierre issues fantasma (post-scan)
         if: always() && steps.sonar-config.outputs.ready == 'true'

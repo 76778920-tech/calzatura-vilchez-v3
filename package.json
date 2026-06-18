@@ -29,6 +29,7 @@
     "ops:restore-drill:live": "node scripts/generate-restore-drill-evidence-live.mjs",
     "ops:k6-evidence": "node scripts/k6-summary-to-evidence.mjs",
     "sonar": "node ./node_modules/sonarqube-scanner/bin/sonar-scanner.js",
+    "sonar:ci": "node scripts/run-sonar-scan-with-retry.mjs",
     "load:smoke": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario smoke",
     "load:smoke:bff": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario smoke -StartLocalBff",
     "load:catalog": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario catalog",
