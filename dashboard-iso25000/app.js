@@ -707,8 +707,11 @@
 
   function renderRadar(svg, chars) {
     const n = chars.length;
-    const cx = 210, cy = 210, maxR = 118, labelR = 168;
-    svg.setAttribute("viewBox", "0 0 420 420");
+    const cx = 170;
+    const cy = 170;
+    const maxR = 82;
+    const labelR = 128;
+    svg.setAttribute("viewBox", "0 0 340 340");
     const rings = [20, 40, 60, 80, 100];
     const angleFor = (i) => (Math.PI * 2 * i) / n - Math.PI / 2;
     const pointAt = (i, value, radius = maxR) => {
