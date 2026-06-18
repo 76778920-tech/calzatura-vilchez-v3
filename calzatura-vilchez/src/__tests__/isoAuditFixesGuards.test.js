@@ -67,6 +67,7 @@ describe("ISO audit remediation guards", () => {
   });
 
   it("Sonar espera quality gate bloqueante", () => {
-    expect(sonarWorkflow).toContain("qualitygate.wait=true");
+    expect(sonarProps).toContain("sonar.qualitygate.wait=true");
+    expect(sonarWorkflow).toContain("run-sonar-scan-with-retry.mjs");
   });
 });
