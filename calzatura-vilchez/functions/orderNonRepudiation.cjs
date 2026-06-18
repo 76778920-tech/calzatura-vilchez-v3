@@ -80,7 +80,7 @@ function buildPayload(order) {
 }
 
 function payloadCanonicalJson(payload) {
-  const keys = Object.keys(payload).sort();
+  const keys = Object.keys(payload).sort((a, b) => a.localeCompare(b));
   /** @type {Record<string, unknown>} */
   const sorted = {};
   for (const k of keys) sorted[k] = payload[k];
