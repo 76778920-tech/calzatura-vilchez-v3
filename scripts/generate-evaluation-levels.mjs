@@ -1,0 +1,153 @@
+#!/usr/bin/env node
+/**
+ * Genera dashboard-iso25000/evaluation-levels.json — Nivel 2 (casos de prueba) y Nivel 3 (evidencias).
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const DATA = JSON.parse(fs.readFileSync(path.join(ROOT, "dashboard-iso25000/data.json"), "utf8"));
+
+/** @type {Record<string, { nivel2: Array<{codigo:string, prueba:string, cumple:boolean, referencia?:string}>, nivel3: Array<{codigo:string, prueba:string, evidencia:string}> }>} */
+const LEVELS_BY_SUB = {
+  Idoneidad: {
+    nivel2: [
+      { codigo: "TC-IDON-001", prueba: "Recorrido integrador compra Must", cumple: true, referencia: "e2e/idoneidad-journey.spec.ts" },
+      { codigo: "TC-AUT-REG-001", prueba: "Registro usuario válido", cumple: true, referencia: "e2e/register-validation.spec.ts" },
+    ],
+    nivel3: [{ codigo: "EV-IDON", prueba: "Matriz CU-T07 + gate idoneidad", evidencia: "documentacion/idoneidad-trazabilidad-iso25000.md" }],
+  },
+  Precisión: {
+    nivel2: [{ codigo: "TC-PREC-ALL", prueba: "9 dominios de cálculo Vitest", cumple: true, referencia: "scripts/verify-precision-iso25000.mjs" }],
+    nivel3: [{ codigo: "EV-PREC", prueba: "Trazabilidad precisión", evidencia: "documentacion/precision-trazabilidad-iso25000.md" }],
+  },
+  "Cumplimiento de la funcionalidad": {
+    nivel2: [
+      { codigo: "TC-CMP-001", prueba: "Libro de reclamaciones", cumple: true, referencia: "e2e/legal-pages.spec.ts" },
+      { codigo: "TC-CMP-002", prueba: "Privacidad Ley 29733", cumple: true, referencia: "privacidad.json" },
+    ],
+    nivel3: [{ codigo: "EV-CMP", prueba: "CU-T05 / CU-T06", evidencia: "documentacion/cumplimiento-trazabilidad-iso25000.md" }],
+  },
+  Confidencialidad: {
+    nivel2: [{ codigo: "PT-RLS-01", prueba: "Contrato RLS migraciones", cumple: true, referencia: "scripts/validate-supabase-rls-matrix.mjs" }],
+    nivel3: [{ codigo: "EV-SEC-CONF", prueba: "RLS + PII", evidencia: "bff/privacy.cjs · supabase/rls-matrix.contract.json" }],
+  },
+  Integridad: {
+    nivel2: [{ codigo: "TC-SEG-INT", prueba: "Guards anti-mutación cliente", cumple: true, referencia: "supabaseDirectAccessGuard.test.js" }],
+    nivel3: [{ codigo: "EV-SEC-INT", prueba: "Triggers y BFF server-side", evidencia: "precisionBffGuards.test.js" }],
+  },
+  Autenticidad: {
+    nivel2: [
+      { codigo: "TC-SEG-001", prueba: "Rutas /admin/* sin sesión", cumple: true, referencia: "e2e/seguridad-access-guards.spec.ts" },
+      { codigo: "TC-SEG-002", prueba: "Rutas /staff/* sin sesión", cumple: true, referencia: "e2e/seguridad-access-guards.spec.ts" },
+      { codigo: "TC-SEG-003", prueba: "Rutas cliente autenticadas", cumple: true, referencia: "e2e/seguridad-access-guards.spec.ts" },
+    ],
+    nivel3: [{ codigo: "EV-SEC-AUT", prueba: "Firebase Auth + App Check", evidencia: "documentacion/seguridad-trazabilidad-iso25000.md" }],
+  },
+  Responsabilidad: {
+    nivel2: [
+      { codigo: "TC-SEG-004", prueba: "BFF admin fail-closed", cumple: true, referencia: "bffAuditEndpointPolicy.test.js" },
+      { codigo: "TC-SEG-005", prueba: "ZAP producción v2", cumple: true, referencia: "securityZapProduction.guard.test.js" },
+    ],
+    nivel3: [{ codigo: "EV-SEC-RESP", prueba: "Checklist verde producción", evidencia: "docs/ops/checklist-verde-seguridad-produccion.md" }],
+  },
+  "No repudio": {
+    nivel2: [
+      { codigo: "TC-NR-001", prueba: "Firma PKCS#7 al crear pedido", cumple: true, referencia: "orderNonRepudiation.test.js" },
+      { codigo: "TC-NR-002", prueba: "Re-firma tras webhook Stripe", cumple: true, referencia: "bff/server.cjs refreshOrderNonRepudiation" },
+      { codigo: "TC-AUD-001", prueba: "Auditoría admin trazable", cumple: true, referencia: "e2e/admin-audit-trail.spec.ts" },
+    ],
+    nivel3: [
+      { codigo: "EV-SEC-NR", prueba: "Migración columnas nr*", evidencia: "supabase/migrations/20260616120000_pedidos_pkcs7_non_repudiation.sql" },
+      { codigo: "EV-SEC-NR2", prueba: "Verificación admin PKCS#7", evidencia: "GET /admin/verifyOrderNonRepudiation" },
+    ],
+  },
+  Madurez: {
+    nivel2: [{ codigo: "TC-CI-001", prueba: "Workflows CI en success", cumple: true, referencia: "scripts/verify-madurez-iso25000.mjs" }],
+    nivel3: [{ codigo: "EV-MAD", prueba: "Historial GitHub Actions", evidencia: ".github/workflows/ci.yml" }],
+  },
+  "Tolerancia a Fallos": {
+    nivel2: [{ codigo: "TC-CHK-ERR-001", prueba: "Errores checkout/admin", cumple: true, referencia: "e2e/checkout-cod-order.spec.ts" }],
+    nivel3: [{ codigo: "EV-TF", prueba: "Error boundaries + idempotencia Stripe", evidencia: "documentacion/08-pruebas-y-calidad.md" }],
+  },
+  "Capacidad de Recuperación": {
+    nivel2: [{ codigo: "TC-DR-001", prueba: "Restore drill fixture", cumple: true, referencia: "scripts/restore-drill-check.mjs" }],
+    nivel3: [{ codigo: "EV-REC", prueba: "Runbook DR", evidencia: "docs/ops/runbook-recuperacion-desastres.md" }],
+  },
+  "Cumplimiento de Fiabilidad": {
+    nivel2: [
+      { codigo: "TC-K6-SMOKE", prueba: "k6 smoke BFF", cumple: true, referencia: "docs/ops/k6-smoke-evidence.json" },
+      { codigo: "TC-K6-1000", prueba: "k6 mixed1000 BFF", cumple: true, referencia: "docs/ops/k6-mixed1000-bff-evidence.json" },
+    ],
+    nivel3: [{ codigo: "EV-FIA", prueba: "Evidencia carga archivada", evidencia: "artifacts/load-tests/" }],
+  },
+  Interoperabilidad: {
+    nivel2: [
+      { codigo: "TC-INT-001", prueba: "BFF ↔ Supabase pedido COD", cumple: true, referencia: "e2e/checkout-cod-order.spec.ts" },
+      { codigo: "TC-INT-002", prueba: "Stripe Checkout", cumple: true, referencia: "e2e/checkout-stripe.spec.ts" },
+      { codigo: "TC-INT-003", prueba: "Servicio IA", cumple: true, referencia: "e2e/admin-predictions.spec.ts" },
+      { codigo: "TC-INT-004", prueba: "APISPERU DNI", cumple: true, referencia: "e2e/register-validation.spec.ts" },
+      { codigo: "TC-INT-005", prueba: "Firebase ↔ Supabase perfil", cumple: true, referencia: "e2e/profile-save.spec.ts" },
+    ],
+    nivel3: [{ codigo: "EV-INT", prueba: "Gate interoperabilidad", evidencia: "documentacion/interoperabilidad-trazabilidad-iso25000.md" }],
+  },
+  Coexistencia: {
+    nivel2: [
+      { codigo: "TC-INT-003", prueba: "IA en dominio separado", cumple: true, referencia: "documentacion/10-operacion-y-mantenimiento.md" },
+      { codigo: "TC-INT-004", prueba: "Stripe + BFF checkout", cumple: true, referencia: "bff/server.cjs" },
+    ],
+    nivel3: [{ codigo: "EV-COEX", prueba: "Despliegue multi-servicio", evidencia: "Firebase + Supabase + Stripe + Render IA" }],
+  },
+  Adaptabilidad: {
+    nivel2: [
+      { codigo: "TC-UI-001", prueba: "Responsive móvil/tablet/escritorio", cumple: true, referencia: "playwright.config.ts" },
+      { codigo: "TC-UI-002", prueba: "E2E Chromium breakpoints", cumple: true, referencia: "e2e/*.spec.ts" },
+    ],
+    nivel3: [
+      { codigo: "PT01", prueba: "Instalación Windows 10 (Docker)", evidencia: "DOCKER.md · captura despliegue" },
+      { codigo: "PT03", prueba: "Cambio de resolución", evidencia: "documentacion/planes-de-prueba.md §4.6" },
+    ],
+  },
+  "Facilidad de Instalación": {
+    nivel2: [{ codigo: "TC-DOCKER-001", prueba: "docker-compose 3 servicios", cumple: true, referencia: "docker-compose.yml" }],
+    nivel3: [
+      { codigo: "PT01", prueba: "Instalación entorno limpio", evidencia: "Tiempo promedio ~2–3 min registrado" },
+      { codigo: "PT02", prueba: "Instalación Windows 11", evidencia: "documentacion/08-pruebas-y-calidad.md" },
+    ],
+  },
+  Reemplazabilidad: {
+    nivel2: [
+      { codigo: "TC-REP-001", prueba: "Sustituye ventas manuales", cumple: true, referencia: "e-commerce checkout" },
+      { codigo: "TC-REP-002", prueba: "Variables VITE_AI_SERVICE_URL", cumple: true, referencia: "bff/env.example" },
+    ],
+    nivel3: [{ codigo: "PT04", prueba: "Validación dueño negocio", evidencia: "Acta / minuta validación procesos" }],
+  },
+};
+
+const levels = {};
+for (const char of DATA.characteristics) {
+  for (const sub of char.subcharacteristics) {
+    const block = LEVELS_BY_SUB[sub.name];
+    levels[sub.name] = block ?? {
+      nivel2: [],
+      nivel3: [{ codigo: "EV-DOC", prueba: "Evidencia documental", evidencia: sub.evidence?.slice(0, 120) || "—" }],
+    };
+  }
+}
+
+const out = {
+  meta: {
+    descripcion: "Nivel 2: casos de prueba · Nivel 3: capturas y actas",
+    generado: DATA.meta.generatedAt,
+    proyecto: DATA.meta.project,
+  },
+  levels,
+};
+
+fs.writeFileSync(
+  path.join(ROOT, "dashboard-iso25000/evaluation-levels.json"),
+  JSON.stringify(out, null, 2) + "\n",
+  "utf8",
+);
+console.log(`OK: ${Object.keys(levels).length} bloques de evaluación → dashboard-iso25000/evaluation-levels.json`);

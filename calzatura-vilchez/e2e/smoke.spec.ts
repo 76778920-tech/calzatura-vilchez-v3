@@ -69,8 +69,10 @@ test.describe("smoke tienda publica", () => {
 });
 
 test.describe("smoke admin (sin sesion)", () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test("panel productos redirige a login si no hay sesion", async ({ page }) => {
     await page.goto("/admin/productos");
-    await expect(page).toHaveURL(/\/login/);
+    await expect(page).toHaveURL(/\/admin\/login/);
   });
 });

@@ -58,3 +58,24 @@ TC-SMOKE-005,RF administración / smoke,AdminUsers,/admin/usuarios renderiza hea
 TC-SMOKE-006,RF administración / smoke,AdminManufacturers,/admin/fabricantes renderiza heading 'Fabricantes',Idem,"getByRole heading name=/Fabricantes/ visible",E2E automatizado,Pasado
 TC-SMOKE-007,RF administración / smoke,AdminPredictions,/admin/predicciones renderiza heading 'Inteligencia Artificial',IA mock con respuesta mínima exitosa (predicciones vacías),"getByRole heading name=/Inteligencia Artificial/ visible",E2E automatizado,Pasado
 TC-SMOKE-008,RF administración / smoke,AdminData,/admin/datos renderiza heading 'Gestión de Datos Excel',Idem,"getByRole heading name=/Gestión de Datos/ visible",E2E automatizado,Pasado
+TC-IDON-001,RF-CAT-01; RF-CAT-02; RF-CAR-01; RF-CHK-01; RF-PED-01; RF-PED-03,Idoneidad,Flujo Must integrador catálogo → ficha → carrito → checkout COD → historial,Cliente autenticado E2E; mocks BFF/Supabase,"Pedido creado; /pedido-exitoso; producto visible en /mis-pedidos",E2E automatizado,Pasado
+TC-AUT-REG-001,RF-AUT-01,Registro,DNI inválido bloqueado sin llamar Firebase,/registro,"Error DNI 8 dígitos; identitytoolkit no llamado",E2E automatizado,Pasado
+TC-AUT-REG-002,RF-AUT-01,Registro,Contraseña corta bloqueada tras lookup DNI,/registro + mock lookup-dni,"register-password-error visible; identitytoolkit no llamado",E2E automatizado,Pasado
+TC-PREC-001,RF-CAR-01 / precisión,CartStock,Cantidad en carrito no excede stock disponible,Producto mock stock=3,"Toast o bloqueo al superar stock",E2E automatizado,Pasado
+TC-PREC-002,RF-RN-01 / precisión,AdminCommercial,Trigger cv_guard_producto_finanzas rechaza precio fuera de rango,RPC mock finanzas,"Toast mensaje financiero legible",E2E automatizado,Pasado
+TC-PREC-003,RF-ADM-08 / precisión,AdminSales,Cantidad mayor al stock no llama RPC ventas,Stock talla=1 cantidad=5,"Toast supera stock; RPC no llamado",E2E automatizado,Pasado
+TC-INT-001,Interoperabilidad / BFF,BFFCheckout,Pedido COD vía BFF createOrder + Supabase mock,Cliente E2E checkout-cod-order,"Pedido creado; respuesta BFF 200",E2E automatizado,Pasado
+TC-INT-002,Interoperabilidad / Stripe,BFFStripe,createCheckoutSession devuelve URL Stripe,Mock BFF checkout-stripe,"Redirect a checkout.stripe.com",E2E automatizado,Pasado
+TC-INT-003,Interoperabilidad / IA,AdminPredictions,Contrato /api/predict/combined renderiza tabla,Admin + mock IA combined,"Heading Inteligencia Artificial; fila predicción",E2E automatizado,Pasado
+TC-INT-004,Interoperabilidad / DNI,BFFLookup,Registro llama lookup-dni antes de Firebase,register-validation TC-AUT-REG-002,"lookup-dni interceptado; password error sin identitytoolkit",E2E automatizado,Pasado
+TC-INT-005,Interoperabilidad / Auth+BD,ProfilePage,PATCH perfil Supabase tras sesión Firebase,profile-save TC-PERF-001,"Toast Perfil actualizado; PATCH moqueado",E2E automatizado,Pasado
+TC-SEG-001,RNF-SEG-01 / Seguridad 25010,AdminGuards,Todas las rutas /admin/* exigen login admin sin sesión,storageState vacío en Playwright,"Redirect a /admin/login para 9 rutas",E2E automatizado,Pasado
+TC-SEG-002,RNF-SEG-01 / Seguridad 25010,StaffGuards,Todas las rutas /staff/* exigen login tienda,storageState vacío,"Redirect a /login (no admin login)",E2E automatizado,Pasado
+TC-SEG-003,RNF-SEG-01 / Seguridad 25010,ClientGuards,Checkout/perfil/favoritos/pedidos exigen sesión,storageState vacío,"Redirect a /login",E2E automatizado,Pasado
+TC-SEG-004,RNF-SEG-02 / Seguridad 25010,BFFGuards,BFF fail-closed y sin secretos hardcodeados,isoP0SecurityGuards + bffAuditEndpointPolicy,"Guards estáticos en verde",Vitest guard,Pasado
+TC-SEG-005,RNF-SEG / Seguridad 25010,ZAPProd,ZAP producción sin altas; medias aceptadas documentadas,securityZapProduction.guard.test.js + zap-production-report-v2.json,"0 High/Critical; CSP unsafe-inline aceptado",Vitest guard,Pasado
+TC-CMP-001,RF-LEG-01 / Ley 29571,LegalLibro,Página libro reclamaciones cita Ley 29571 y plazos 3/15 días hábiles,/legal/libro-reclamaciones,"Heading Libro de reclamaciones; texto 29571; plazos tres (3) y quince (15) días hábiles",E2E automatizado,Pasado
+TC-CMP-002,RF-LEG-02 / Ley 29733,LegalPrivacidad,Política privacidad cita Ley 29733 y ANPDP,/legal/politica-privacidad,"Heading Política de privacidad; texto 29733 y ANPDP visible",E2E automatizado,Pasado
+TC-CMP-003,RF-LEG-03 / cookies,LegalCookies,Banner y política cookies con consentimiento,localStorage sin consent + force banner,"Política cookies visible; modal preferencias desde banner",E2E automatizado,Pasado
+TC-CMP-004,RF-LEG-04 / Ley 29571,LegalTerminos,Términos y condiciones cita Ley 29571 y libro reclamaciones,/legal/terminos-condiciones,"Heading Términos y condiciones; 29571 y Libro de reclamaciones",E2E automatizado,Pasado
+TC-CMP-005,SRS Must + RF-LEG / CU-T05,CumplimientoSRS,26 Must + 4 RF-LEG en CU-T05 Implementado; manifest evidencia,functionalComplianceSrs.guard.test.js + iso25000-must-rf-manifest.mjs,"Sin RF faltantes; TC-CMP en CU-T07",Vitest guard,Pasado

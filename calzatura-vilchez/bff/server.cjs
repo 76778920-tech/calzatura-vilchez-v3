@@ -8,6 +8,7 @@ const { createClient } = require("@supabase/supabase-js");
 const admin = require("firebase-admin");
 const { discountOrderStockRpc, applyOrderStatusStockSideEffects } = require("../functions/fnUtils");
 const { ORDER_STATUSES, assertOrderStatusTransition } = require("../functions/orderStatusPolicy");
+const { persistOrderNonRepudiation, verifyOrderRecord } = require("../functions/orderNonRepudiation.cjs");
 
 function loadAllowedOrigins() {
   const defaults = [
@@ -1397,6 +1398,11 @@ async function updateOrder(supabase, orderId, patch) {
   }
 }
 
+async function refreshOrderNonRepudiation(supabase, orderId) {
+  const order = await fetchOrderOrThrow(supabase, orderId);
+  await persistOrderNonRepudiation(supabase, order);
+}
+
 function resolveColorBucket(colorStock, talla, quantity, preferredColor, fallbackColor) {
   const t = String(talla || "").trim();
   if (!t || !colorStock) return null;
@@ -1775,6 +1781,13 @@ app.post("/createOrder", (req, res) => {
           }
         }
 
+        try {
+          await refreshOrderNonRepudiation(supabase, orderId);
+        } catch (nrErr) {
+          await supabase.from("pedidos").delete().eq("id", orderId);
+          throw nrErr;
+        }
+
         return res.status(200).json({
           orderId,
           subtotal: draft.subtotal,
@@ -1866,6 +1879,8 @@ app.post("/updateOrderStatus", (req, res) => {
         decodedToken.email || "",
         { from: currentEstado, to: estado, source: "updateOrderStatus" },
       );
+
+      await refreshOrderNonRepudiation(supabase, orderId);
 
       return res.status(200).json({ orderId, estado });
     } catch (error) {
@@ -2766,6 +2781,7 @@ app.post("/stripeWebhook", async (req, res) => {
               stripeSessionId,
             },
           );
+          await refreshOrderNonRepudiation(supabase, orderId);
         }
       } catch (error) {
         logServerError("Stripe webhook order error:", error);
@@ -2837,6 +2853,32 @@ app.get("/orders/:orderId", (req, res) => {
       return res.status(200).json({ order: safeOrder });
     } catch (error) {
       logServerError("orders/:orderId error:", error);
+      return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
+    }
+  });
+});
+
+app.get("/admin/verifyOrderNonRepudiation", (req, res) => {
+  cors(req, res, async () => {
+    try {
+      const decodedToken = await verifyFirebaseUser(req);
+      const supabase = getSupabaseAdmin();
+      await assertAdminRole(supabase, decodedToken.uid);
+      const orderId = String(req.query.orderId || "").trim();
+      if (!orderId) {
+        return res.status(400).json({ error: "orderId requerido" });
+      }
+      const order = await fetchOrderOrThrow(supabase, orderId);
+      const result = verifyOrderRecord(order);
+      return res.status(200).json({
+        orderId,
+        valid: result.valid,
+        reason: result.reason,
+        nrSignedAt: order.nrSignedAt || null,
+        nrSignatureVersion: order.nrSignatureVersion || null,
+      });
+    } catch (error) {
+      logServerError("admin/verifyOrderNonRepudiation error:", error);
       return res.status(httpErrorStatus(error)).json({ error: publicError(error) });
     }
   });

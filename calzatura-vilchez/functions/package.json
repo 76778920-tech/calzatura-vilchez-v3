@@ -16,6 +16,7 @@
     "cors": "^2.8.5",
     "firebase-admin": "^13.10.0",
     "firebase-functions": "^7.2.5",
+    "node-forge": "^1.4.0",
     "stripe": "^15.0.0"
   },
   "overrides": {

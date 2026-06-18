@@ -54,5 +54,5 @@ Filas correspondientes en `documentacion/cuadros-excel/CU-T08-automatizacion-res
 - [x] `documentacion-general-sistema.md` — stack Supabase.  
 - [x] `formato-09` — IN-10, IN-28, restricciones operativas, criterio viabilidad.  
 - [x] Matriz CU-T07 — una sola copia en `documentacion/cuadros-excel/`.  
-- [ ] Revisar BPMN pedidos/pagos vs código (tarea continua).  
-- [ ] Vincular cada PR-xx del catálogo a un **RF-** en `CU-T05-requisitos.csv`.
+- [x] Revisar BPMN pedidos/pagos vs código (tarea continua).  
+- [x] Vincular cada PR-xx del catálogo a un **RF-** en `CU-T05-requisitos.csv`.

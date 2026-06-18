@@ -2,7 +2,7 @@
   "status": "passed",
   "warnOnly": false,
   "evidencePath": "C:\\Cazatura Vilchez V3\\docs\\ops\\restore-drill-evidence.json",
-  "checkedAt": "2026-06-17T19:24:57.099Z",
+  "checkedAt": "2026-06-18T00:19:48.959Z",
   "thresholds": {
     "maxRtoMinutes": 60,
     "maxRpoMinutes": 1440

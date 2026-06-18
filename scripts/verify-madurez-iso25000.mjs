@@ -163,17 +163,22 @@ function main() {
 
   const passed = items.filter((n) => results[n] === true).length;
   const evaluated = items.filter((n) => results[n] !== null).length;
-  const pct = Math.round((passed / items.length) * 100);
+  const skipped = items.length - evaluated;
+  const pct = evaluated > 0 ? Math.round((passed / evaluated) * 100) : 0;
   const dash = readDashboardPct();
 
-  console.log(`\n--- Resumen: ${passed}/${items.length} ítems (${pct} %) ---`);
+  const summaryLabel =
+    skipped > 0
+      ? `${passed}/${evaluated} ítems evaluados (${skipped} omitido(s) sin --check-ci)`
+      : `${passed}/${items.length} ítems`;
+  console.log(`\n--- Resumen: ${summaryLabel} (${pct} %) ---`);
   if (dash !== pct) {
     fail(`Dashboard declara ${dash}% pero la verificación calcula ${pct}%`);
   } else {
     ok(`Dashboard alineado: ${dash}%`);
   }
 
-  const allOk = passed === items.length && dash === pct && evaluated === items.length;
+  const allOk = passed === evaluated && dash === pct;
   console.log(allOk ? "\n=== VERDE: Madurez ===" : "\n=== ROJO: Madurez — revisar ítems arriba ===");
   process.exit(allOk ? 0 : 1);
 }

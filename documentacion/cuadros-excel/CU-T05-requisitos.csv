@@ -1,15 +1,70 @@
 Req_ID,Tipo,Modulo,Enunciado_resumido,Prioridad,Estado,Fuente,Version_SRS
+
 RF-CAT-01,RF,Catalogo,Listar productos con filtros taxonomicos,Must,Implementado,05-SRS,1.0
+
 RF-CAT-02,RF,Catalogo,Ficha producto con stock talla color,Must,Implementado,05-SRS,1.0
+
+RF-AUT-01,RF,Auth,Registro usuario validacion DNI,Must,Implementado,05-SRS,1.0
+
 RF-AUT-02,RF,Auth,Login logout Firebase Auth,Must,Implementado,05-SRS,1.0
+
+RF-AUT-03,RF,Auth,Perfil telefono y direcciones,Must,Implementado,05-SRS,1.0
+
+RF-AUT-04,RF,Auth,Sincronizacion perfil en Supabase usuarios,Must,Implementado,05-SRS,1.0
+
+RF-CAR-01,RF,Carrito,CRUD carrito con talla color,Must,Implementado,05-SRS,1.0
+
+RF-CHK-01,RF,Checkout,Captura direccion metodo pago,Must,Implementado,05-SRS,1.0
+
 RF-PED-01,RF,Pedidos,Crear pedido en Supabase,Must,Implementado,05-SRS,1.0
+
+RF-PAG-01,RF,Pagos,Stripe checkout,Must,Implementado,05-SRS,1.0
+
+RF-PED-03,RF,Pedidos,Historial pedidos cliente,Must,Implementado,05-SRS,1.0
+
+RF-ADM-01,RF,Admin,Dashboard indicadores negocio,Must,Implementado,05-SRS,1.0
+
 RF-ADM-02,RF,Admin,CRUD productos con reglas comerciales,Must,Implementado,05-SRS,1.0
+
+RF-ADM-03,RF,Admin,Stock por talla y color,Must,Implementado,05-SRS,1.0
+
 RF-ADM-05,RF,Admin,Codigos unicos producto,Must,Implementado,05-SRS,1.0
-RF-ADM-13,RF,Admin,Campana comercial en producto,Should,Implementado,05-SRS,1.0
+
+RF-ADM-06,RF,Admin,Finanzas producto costos margenes,Must,Implementado,05-SRS,1.0
+
+RF-ADM-07,RF,Admin,Cambio estado pedidos admin,Must,Implementado,05-SRS,1.0
+
+RF-ADM-08,RF,Admin,Ventas diarias y ganancias,Must,Implementado,05-SRS,1.0
+
+RF-ADM-11,RF,Admin,Gestion usuarios y roles,Must,Implementado,05-SRS,1.0
+
+RF-FAV-01,RF,Favoritos,Favoritos por usuario,Must,Implementado,05-SRS,1.0
+
+RF-IA-01,RF,IA,Definicion formal riesgo empresarial R,Must,Implementado,05-SRS;07,1.0
+
+RF-IA-02,RF,IA,Modelo consume atributos documentados,Must,Implementado,05-SRS;07,1.0
+
+RF-IA-04,RF,IA,Limites sesgos y riesgos de uso del modelo,Must,Implementado,05-SRS;07,1.0
+
 RF-RN-01,RF,BD,Restricciones comerciales en servidor,Must,Implementado,05-SRS,1.0
-RF-IA-01,RF,IA,Definicion formal riesgo empresarial R,Must,Pendiente,05-SRS;07,1.0
-RF-IA-02,RF,IA,Modelo consume atributos documentados,Must,Pendiente,05-SRS;07,1.0
-RF-IA-03,RF,IA,Exposicion prediccion usuario autorizado,Should,Pendiente,05-SRS;07,1.0
+
+RF-RN-02,RF,BD,RPC atomicos producto,Must,Implementado,05-SRS,1.0
+
+RF-LEG-01,RF,Legal,Libro reclamaciones virtual Ley 29571,Must,Implementado,05-SRS;10-operacion,1.0
+
+RF-LEG-02,RF,Legal,Politica privacidad Ley 29733,Must,Implementado,05-SRS;10-operacion,1.0
+
+RF-LEG-03,RF,Legal,Politica cookies y consentimiento,Must,Implementado,05-SRS;10-operacion,1.0
+
+RF-LEG-04,RF,Legal,Terminos y condiciones comercio electronico,Must,Implementado,05-SRS;10-operacion,1.0
+
+RF-ADM-13,RF,Admin,Campana comercial en producto,Should,Implementado,05-SRS,1.0
+
+RF-IA-03,RF,IA,Exposicion prediccion usuario autorizado,Should,Implementado,05-SRS;07,1.0
+
 RNF-SEG-01,RNF,Seguridad,Rutas admin requieren sesion valida,Must,Implementado,05-SRS,1.0
+
 RNF-SEG-02,RNF,Seguridad,No secretos en repositorio,Must,Implementado,05-SRS,1.0
+
 RNF-REL-01,RNF,Datos,Migraciones SQL reproducibles,Must,Implementado,05-SRS,1.0
+

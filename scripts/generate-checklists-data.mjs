@@ -48,17 +48,35 @@ const ITEMS_BY_SUB = {
     "Integración Upstash caché",
     "Gate verify-interoperabilidad-iso25000.mjs en VERDE",
   ],
-  Seguridad: [
-    "Confidencialidad: RLS + PII enmascarada",
-    "Integridad: sin mutaciones directas desde cliente",
-    "Autenticidad: Firebase Auth + App Check DNI",
-    "Trazabilidad: auditoría admin registrada",
-    "Control acceso UI (RNF-SEG-01) TC-SEG-001…005",
-    "BFF fail-closed y políticas audit",
-    "Headers HTTP Hosting + BFF",
-    "Rate limits / anti-abuso BFF",
-    "DAST ZAP producción v2 sin altas críticas",
-    "Checklist verde seguridad producción revisado",
+  Confidencialidad: [
+    "RLS Supabase validado (validate-supabase-rls-matrix.mjs)",
+    "PII enmascarada en BFF (privacy.cjs + bffPrivacy.test.ts)",
+    "Headers HTTP seguros (firebase.json + BFF)",
+    "Rate limits y anti-abuso BFF",
+  ],
+  Integridad: [
+    "Guard sin mutaciones directas desde cliente",
+    "Triggers cv_guard_* en migraciones Supabase",
+    "Totales y precios validados server-side (precisionBffGuards)",
+  ],
+  Autenticidad: [
+    "Firebase Auth + verifyIdToken en BFF",
+    "App Check en lookup DNI (register-validation E2E)",
+    "RNF-SEG-01 rutas admin/staff/cliente (TC-SEG-001…003)",
+  ],
+  Responsabilidad: [
+    "Auditoría admin registrada (admin-audit-trail E2E)",
+    "BFF fail-closed + políticas audit (TC-SEG-004)",
+    "DAST ZAP producción v2 sin altas críticas (TC-SEG-005)",
+    "Checklist verde seguridad producción documentado",
+  ],
+  "No repudio": [
+    "Registro de acciones en tabla auditoría (BFF + admin)",
+    "Trigger trg_audit_pedido_insert en INSERT pedidos",
+    "Webhook Stripe firmado + logAudit source stripe_webhook",
+    "Idempotencia pedidos (idempotencyKey BFF/Functions)",
+    "Firma PKCS#7 del pedido (nrPkcs7Signature en BD)",
+    "Verificación admin GET /admin/verifyOrderNonRepudiation",
   ],
   "Cumplimiento de la funcionalidad": [
     "CU-T05: 26 RF Must registrados",
@@ -197,32 +215,34 @@ const ITEMS_BY_SUB = {
     "Deuda técnica triaged en backlog",
   ],
   Adaptabilidad: [
-    "Breakpoints móvil/tablet/escritorio",
-    "Home responsive verificada",
-    "Catálogo responsive verificado",
-    "Checkout responsive verificado",
-    "E2E cross-browser (Firefox/WebKit)",
-    "Matriz navegadores documentada",
+    "Funciona en Windows 10 (Docker / hosting)",
+    "Funciona en Windows 11 (Docker / hosting)",
+    "Funciona en diferentes resoluciones (móvil/tablet/escritorio)",
+    "Funciona con distintas configuraciones regionales (es-PE)",
+    "Mantiene funcionalidad sin modificar código fuente",
+    "Matriz navegadores documentada (planes-de-prueba §4.6)",
   ],
   "Facilidad de Instalación": [
     "Dockerfile frontend presente",
-    "docker-compose 3 servicios",
+    "docker-compose 3 servicios operativos",
     "DOCKER.md con pasos reproducibles",
     "Variables .env.example documentadas",
-    "Build npm run build sin errores",
+    "Tiempo instalación ≤ 3 min (excelente) medido",
+    "Build npm run build sin errores en entorno limpio",
   ],
   Coexistencia: [
     "Firebase Auth coexistiendo con Supabase datos",
     "Stripe sin conflicto con checkout BFF",
-    "Servicio IA en dominio separado",
+    "Servicio IA en dominio separado (Render)",
     "Cloudinary sin bloquear catálogo",
     "Upstash sin degradar latencia crítica",
   ],
-  Intercambiabilidad: [
+  Reemplazabilidad: [
+    "Sustituye proceso manual de ventas",
+    "Sustituye registro manual de inventario",
+    "Sustituye generación manual de reportes",
+    "Mantiene información histórica al migrar",
     "VITE_AI_SERVICE_URL configurable",
-    "SUPABASE_URL configurable",
-    "BFF URL configurable en frontend",
-    "Proveedor Auth intercambiable (documentado)",
     "Desacoplamiento IA vía contrato HTTP",
   ],
   "Cumplimiento de la Portabilidad": [
@@ -260,6 +280,14 @@ const ITEM_OVERRIDES = {
     6: { cumple: true, observacion: "docs/ops/k6-smoke + k6-mixed1000-bff-evidence.json (live-run con BFF)" },
     7: { cumple: true, observacion: "verify-cumplimiento-fiabilidad-iso25000.mjs — 7/7 ítems" },
   },
+  "No repudio": {
+    1: { cumple: true, observacion: "audit.ts + POST /audit BFF + admin-audit-trail E2E" },
+    2: { cumple: true, observacion: "supabase/migrations/20260503100000_audit_pedidos_trigger.sql — trg_audit_pedido_insert" },
+    3: { cumple: true, observacion: "functions/index.js logAuditFn source stripe_webhook tras checkout.session.completed" },
+    4: { cumple: true, observacion: "bff/server.cjs idempotencyKey + functions/fnUtils.js findOrderByIdempotency" },
+    5: { cumple: true, observacion: "functions/orderNonRepudiation.cjs — PKCS#7 en nrPkcs7Signature (migración 20260616120000)" },
+    6: { cumple: true, observacion: "GET /admin/verifyOrderNonRepudiation — verifyOrderRecord()" },
+  },
 };
 
 function distributeCumple(total, pct) {
@@ -279,7 +307,7 @@ for (const char of DATA.characteristics) {
       caracteristica: char.name,
       color: char.color,
       titulo: `Lista de cotejo — ${sub.name}`,
-      objetivo: `Verificar el cumplimiento de la subcaracterística «${sub.name}» (${char.name}) del modelo ISO/IEC 25000.`,
+      objetivo: `Verificar el cumplimiento de la subcaracterística «${sub.name}» (${char.name}) según ISO/IEC 25010.`,
       referencia: cat.referencia || "—",
       rutaModulo: cat.rutaModulo || null,
       instrucciones:
@@ -307,7 +335,7 @@ const out = {
     evaluador: "Ing. Calidad — Tesis UCV",
     fecha: DATA.meta.generatedAt,
     instruccionesGenerales:
-      "Instrumento de verificación con escala dicotómica (cumple / no cumple). No sustituye la revisión del evaluador; registra la presencia o ausencia de cada indicador.",
+      "Evaluación en tres niveles: (1) lista de cotejo Sí/No — instrumento principal; (2) casos de prueba con evidencia objetiva (TC-*, gates verify-*); (3) capturas y actas para sustento ante jurado. El % = ítems cumplidos ÷ total × 100.",
   },
   checklists,
 };
@@ -317,4 +345,27 @@ fs.writeFileSync(
   JSON.stringify(out, null, 2) + "\n",
   "utf8",
 );
+
+let synced = 0;
+for (const char of DATA.characteristics) {
+  for (const sub of char.subcharacteristics) {
+    const cl = checklists[sub.name];
+    if (!cl?.items?.length) continue;
+    const yes = cl.items.filter((i) => i.cumple).length;
+    const pct = Math.round((yes / cl.items.length) * 100);
+    if (sub.percent !== pct) {
+      sub.percent = pct;
+      synced++;
+    }
+  }
+}
+if (synced > 0) {
+  fs.writeFileSync(
+    path.join(ROOT, "dashboard-iso25000/data.json"),
+    JSON.stringify(DATA, null, 2) + "\n",
+    "utf8",
+  );
+}
+
 console.log(`OK: ${Object.keys(checklists).length} listas de cotejo → dashboard-iso25000/checklists-data.json`);
+if (synced > 0) console.log(`OK: ${synced} porcentajes sincronizados en data.json desde listas de cotejo`);

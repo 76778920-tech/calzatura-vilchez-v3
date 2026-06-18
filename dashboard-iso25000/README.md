@@ -4,7 +4,7 @@ Dashboard unificado en **http://localhost:4321** que integra:
 
 | Ruta | Contenido |
 |------|-----------|
-| `/` | Dashboard principal — 6 características ISO, gráficos, instrumentos |
+| `/` | Dashboard principal — 8 características ISO 25010, gráficos, instrumentos |
 | `/adecuacion-funcional/` | Módulo CF / COF / TECP (React, datos en vivo) |
 | `/api/*` | API REST del módulo de adecuación funcional |
 
@@ -30,7 +30,8 @@ Abre **http://localhost:4321**
 ## Qué incluye el dashboard principal (4321)
 
 - **Resumen global** con anillo de cumplimiento y donut de distribución (cumple / parcial / no cumple)
-- **Radar** y **barras** por las 6 características
+- **Radar** y **barras** por las 8 características (ISO/IEC 25010)
+- **Listas de cotejo** con evaluación en **3 niveles** (cotejo + casos de prueba + evidencias)
 - **Barras agrupadas** con todas las subcaracterísticas
 - **Correlación en vivo** con CF, COF y TECP (lee `/api/evaluaciones`)
 - **Listas de cotejo expandibles** por subcaracterística — formato UNAM (tabla Sí / No / Observaciones)
@@ -47,7 +48,7 @@ La característica **Funcionalidad** del modelo 25000 se vincula con:
 
 ## Actualizar porcentajes estáticos
 
-Edita **`data.json`** para las 6 características y subcaracterísticas del modelo 25000.
+Edita **`data.json`** para las características y subcaracterísticas del modelo 25010 (ver `documentacion/modelo-calidad-25010-alineacion.md`).
 
 Los indicadores CF/COF/TECP **no** se editan en `data.json` — se gestionan en `/adecuacion-funcional/`.
 
@@ -75,7 +76,9 @@ dashboard-iso25000/
 ├── index.html      # Dashboard principal
 ├── app.js          # Gráficos, instrumentos, correlación
 ├── styles.css
-└── data.json       # Modelo 25000 (6 características)
+├── data.json       # Modelo 25010 (8 características)
+├── checklists-data.json
+└── evaluation-levels.json  # Nivel 2 casos de prueba + Nivel 3 evidencias
 
 modulo-adecuacion-funcional-iso25010/
 ├── dist/           # Build servido en /adecuacion-funcional/

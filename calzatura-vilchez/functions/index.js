@@ -24,6 +24,7 @@ const {
   aiAdminProxyErrorStatus, aiAdminProxyErrorMessage,
 } = require("./fnUtils");
 const { ORDER_STATUSES, assertOrderStatusTransition } = require("./orderStatusPolicy");
+const { persistOrderNonRepudiation, verifyOrderRecord } = require("./orderNonRepudiation.cjs");
 const {
   sanitizeAuditEmail,
   sanitizeAuditEntityLabel,
@@ -280,6 +281,11 @@ async function updateOrder(supabase, orderId, patch) {
   }
 }
 
+async function refreshOrderNonRepudiation(supabase, orderId) {
+  const order = await fetchOrderOrThrow(supabase, orderId);
+  await persistOrderNonRepudiation(supabase, order);
+}
+
 async function respondIdempotentPendingOrder(supabase, uid, idempotencyKey, res) {
   if (!idempotencyKey) return false;
   const existing = await findOrderByIdempotency(supabase, uid, idempotencyKey);
@@ -374,6 +380,13 @@ async function handleCreateOrder(req, res) {
         await supabase.from("pedidos").delete().eq("id", orderId);
         throw discountErr;
       }
+    }
+
+    try {
+      await refreshOrderNonRepudiation(supabase, orderId);
+    } catch (nrErr) {
+      await supabase.from("pedidos").delete().eq("id", orderId);
+      throw nrErr;
     }
 
     return res.status(200).json({
@@ -475,6 +488,8 @@ exports.updateOrderStatus = onRequest(
           usuarioEmail: strOr(decodedToken.email),
           detalle: { from: currentEstado, to: estado, source: "updateOrderStatus" },
         });
+
+        await refreshOrderNonRepudiation(supabase, orderId);
 
         return res.status(200).json({ orderId, estado });
       } catch (error) {
@@ -665,6 +680,7 @@ async function applyStripeCheckoutCompleted(supabase, event) {
       stripeSessionId: session.id,
     },
   });
+  await refreshOrderNonRepudiation(supabase, orderId);
 }
 
 async function handleStripeCheckoutSessionCompleted(supabase, event, res) {

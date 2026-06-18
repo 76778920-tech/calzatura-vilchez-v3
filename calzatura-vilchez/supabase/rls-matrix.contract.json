@@ -28,6 +28,8 @@
     "list_ventas_diarias_by_fecha",
     "list_ventas_diarias_since",
     "insert_auditoria_event",
-    "list_auditoria_events"
+    "list_auditoria_events",
+    "create_product_variants_atomic",
+    "update_product_atomic"
   ]
 }
