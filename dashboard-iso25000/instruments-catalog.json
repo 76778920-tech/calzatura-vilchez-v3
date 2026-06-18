@@ -11,8 +11,13 @@
   },
   "Interoperabilidad": {
     "tipo": "Lista de cotejo",
-    "nombre": "Gate Interoperabilidad (9 integraciones · ISO 25010 Compatibilidad)",
+    "nombre": "Gate Interoperabilidad (9 integraciones · ISO 9126 Funcionalidad)",
     "referencia": "scripts/verify-interoperabilidad-iso25000.mjs · documentacion/interoperabilidad-trazabilidad-iso25000.md"
+  },
+  "Seguridad": {
+    "tipo": "Lista de cotejo",
+    "nombre": "Seguridad integrada (RLS, integridad, autenticidad, auditoría, PKCS#7)",
+    "referencia": "scripts/verify-seguridad-iso25000.mjs · functions/orderNonRepudiation.cjs · documentacion/seguridad-trazabilidad-iso25000.md"
   },
   "Confidencialidad": {
     "tipo": "Lista de cotejo",
@@ -120,7 +125,7 @@
     "nombre": "Checklist regresión CI (E2E + Vitest)",
     "referencia": "documentacion/13-checklist-cierre-defensa.md (sección D) · calzatura-vilchez/e2e/"
   },
-  "Capacidad de ser probada": {
+  "Pruebabilidad": {
     "tipo": "Lista de cotejo",
     "nombre": "Checklist cobertura Vitest vs meta 60 %",
     "referencia": "calzatura-vilchez/coverage/lcov.info · npm run test:coverage"
@@ -142,12 +147,12 @@
   },
   "Coexistencia": {
     "tipo": "Lista de cotejo",
-    "nombre": "Checklist coexistencia de integraciones (ISO 25010 · Compatibilidad)",
+    "nombre": "Checklist coexistencia de integraciones (ISO 9126 Portabilidad)",
     "referencia": "documentacion/10-operacion-y-mantenimiento.md · Firebase + Supabase + Stripe + Render IA"
   },
-  "Reemplazabilidad": {
+  "Intercambiabilidad": {
     "tipo": "Lista de cotejo",
-    "nombre": "Checklist reemplazabilidad de procesos y componentes",
+    "nombre": "Checklist intercambiabilidad de procesos y componentes",
     "referencia": "documentacion/modelo-calidad-25010-alineacion.md · variables entorno · validación negocio"
   },
   "Cumplimiento de la Portabilidad": {

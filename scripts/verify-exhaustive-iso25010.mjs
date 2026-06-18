@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verificación exhaustiva: Seguridad 100%, PKCS#7, modelo ISO 25010, dashboard.
+ * Verificación exhaustiva: modelo ISO 9126, Seguridad (Funcionalidad), PKCS#7, dashboard.
  * Uso: node scripts/verify-exhaustive-iso25010.mjs
  */
 import fs from "node:fs";
@@ -18,38 +18,40 @@ const data = JSON.parse(fs.readFileSync(path.join(ROOT, "dashboard-iso25000/data
 const chk = JSON.parse(fs.readFileSync(path.join(ROOT, "dashboard-iso25000/checklists-data.json"), "utf8"));
 const levels = JSON.parse(fs.readFileSync(path.join(ROOT, "dashboard-iso25000/evaluation-levels.json"), "utf8"));
 
-const sec = data.characteristics.find((c) => c.id === "seguridad");
 const func = data.characteristics.find((c) => c.id === "funcionalidad");
 const port = data.characteristics.find((c) => c.id === "portabilidad");
 
-if (data.characteristics.length !== 8) fail(`Características: ${data.characteristics.length} (esperado 8)`);
-if (func?.subcharacteristics.some((s) => s.name === "Seguridad")) fail("Seguridad aún bajo Funcionalidad");
-if (port?.subcharacteristics.some((s) => s.name === "Coexistencia")) fail("Coexistencia en Portabilidad");
-
-if (!sec) {
-  fail("Falta característica Seguridad");
-} else {
-  for (const s of sec.subcharacteristics) {
-    if (s.percent !== 100) fail(`data.json Seguridad/${s.name}=${s.percent}%`);
-    const cl = chk.checklists[s.name];
-    if (!cl) fail(`Sin checklist ${s.name}`);
-    else {
-      if (cl.caracteristica !== "Seguridad") fail(`${s.name} checklist bajo ${cl.caracteristica}`);
-      const yes = cl.items.filter((i) => i.cumple).length;
-      const pct = Math.round((yes / cl.items.length) * 100);
-      if (pct !== 100) fail(`Checklist ${s.name}=${pct}% (${yes}/${cl.items.length})`);
-      if (cl.items.some((i) => !i.cumple)) fail(`Checklist ${s.name} tiene ítems No`);
-    }
-    if (!levels.levels[s.name]) fail(`Sin evaluation-levels ${s.name}`);
-  }
+if (data.characteristics.length !== 6) fail(`Características: ${data.characteristics.length} (esperado 6 ISO 9126)`);
+if (data.characteristics.some((c) => c.id === "seguridad" || c.id === "compatibilidad")) {
+  fail("No debe haber Seguridad ni Compatibilidad como características de primer nivel (9126)");
+}
+if (!func?.subcharacteristics.some((s) => s.name === "Seguridad")) {
+  fail("Falta Seguridad bajo Funcionalidad");
+}
+if (!func?.subcharacteristics.some((s) => s.name === "Interoperabilidad")) {
+  fail("Falta Interoperabilidad bajo Funcionalidad");
+}
+if (!port?.subcharacteristics.some((s) => s.name === "Coexistencia")) {
+  fail("Falta Coexistencia bajo Portabilidad");
 }
 
-const nrCl = chk.checklists["No repudio"];
-if (!nrCl) fail("Sin checklist No repudio");
-else {
-  const pkcs = nrCl.items.find((i) => /PKCS#7/i.test(i.indicador));
-  if (!pkcs?.cumple) fail("Ítem PKCS#7 no cumple");
-  if (nrCl.items.length < 6) fail(`No repudio: solo ${nrCl.items.length} ítems (esperado ≥6)`);
+const secSub = func?.subcharacteristics.find((s) => s.name === "Seguridad");
+if (!secSub) {
+  fail("Sin subcaracterística Seguridad");
+} else {
+  if (secSub.percent !== 100) fail(`data.json Funcionalidad/Seguridad=${secSub.percent}%`);
+  const cl = chk.checklists.Seguridad;
+  if (!cl) fail("Sin checklist Seguridad");
+  else {
+    if (cl.caracteristica !== "Funcionalidad") fail(`Checklist Seguridad bajo ${cl.caracteristica}`);
+    const yes = cl.items.filter((i) => i.cumple).length;
+    const pct = Math.round((yes / cl.items.length) * 100);
+    if (pct !== 100) fail(`Checklist Seguridad=${pct}% (${yes}/${cl.items.length})`);
+    const pkcs = cl.items.find((i) => /PKCS#7/i.test(i.indicador));
+    if (!pkcs?.cumple) fail("Ítem PKCS#7 no cumple en checklist Seguridad");
+    if (cl.items.length < 20) fail(`Seguridad: solo ${cl.items.length} ítems (esperado ≥20)`);
+  }
+  if (!levels.levels.Seguridad) fail("Sin evaluation-levels Seguridad");
 }
 
 const nrModPath = path.join(ROOT, "calzatura-vilchez/functions/orderNonRepudiation.cjs");
@@ -81,7 +83,6 @@ if (!bff.includes("verifyOrderNonRepudiation")) fail("BFF sin endpoint verifyOrd
 if ((fn.match(/refreshOrderNonRepudiation/g) || []).length < 3) fail("Functions: refreshOrderNonRepudiation < 3");
 if (!sql.includes("nrPkcs7Signature")) fail("Migración sin nrPkcs7Signature");
 
-// node-forge instalado en functions
 const forgePath = path.join(ROOT, "calzatura-vilchez/functions/node_modules/node-forge/package.json");
 if (!fs.existsSync(forgePath)) fail("node-forge no instalado en functions/");
 
@@ -116,7 +117,6 @@ for (let i = 0; i < 20; i++) {
   if (bad.valid) fail(`Iter ${i}: tampering no detectado`);
 }
 
-// Sync data.json ↔ checklist
 for (const c of data.characteristics) {
   for (const s of c.subcharacteristics) {
     const cl = chk.checklists[s.name];
@@ -127,10 +127,10 @@ for (const c of data.characteristics) {
   }
 }
 
-console.log("=== Verificación exhaustiva ISO 25010 + PKCS#7 ===\n");
+console.log("=== Verificación exhaustiva ISO 9126 + PKCS#7 ===\n");
 console.log(`Características: ${data.characteristics.length}`);
-console.log(`Seguridad: ${sec?.subcharacteristics.map((s) => `${s.name}=${s.percent}%`).join(", ")}`);
-console.log(`No repudio checklist: ${nrCl?.items.filter((i) => i.cumple).length}/${nrCl?.items.length} Sí`);
+console.log(`Funcionalidad/Seguridad: ${secSub?.percent}%`);
+console.log(`Checklist Seguridad: ${chk.checklists.Seguridad?.items.filter((i) => i.cumple).length}/${chk.checklists.Seguridad?.items.length} Sí`);
 console.log(`PKCS#7 stress: 20/20 roundtrips + tamper detectado`);
 
 if (fails.length) {

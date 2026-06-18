@@ -1,31 +1,39 @@
-# Alineación del modelo de calidad — ISO/IEC 25010
+# Alineación del modelo de calidad — ISO/IEC 9126-1 (presentación)
 
 **Proyecto:** Calzatura Vilchez · Tesis UCV  
-**Norma:** ISO/IEC 25010:2011 (SQuaRE 25000)
+**Norma de presentación:** ISO/IEC 9126-1:2001 — **Calidad interna / Calidad externa** (6 características)  
+**Referencia visual:** diagrama circular Funcionalidad · Fiabilidad · Usabilidad · Eficiencia · Mantenibilidad · Portabilidad.
+
+El dashboard en `http://localhost:4321` y `dashboard-iso25000/data.json` siguen **esta taxonomía**, no la de 8 características de ISO/IEC 25010.
 
 ---
 
-## 1. Modelo íntegro (8 características)
+## §9126 — Modelo íntegro (6 características, 27 subcaracterísticas)
 
-| # | Característica 25010 | Subcaracterísticas oficiales | Extensiones del proyecto |
-|---|---------------------|------------------------------|--------------------------|
-| 1 | Funcionalidad | Idoneidad, Precisión | Cumplimiento de la funcionalidad |
-| 2 | **Seguridad** | Confidencialidad, Integridad, No repudio, Responsabilidad, Autenticidad | — |
-| 3 | Fiabilidad | Madurez, Tolerancia a fallos, Recuperación | Cumplimiento de Fiabilidad |
-| 4 | Usabilidad | Inteligibilidad … Atractividad | Cumplimiento de la Usabilidad |
-| 5 | Eficiencia | Comportamiento en el tiempo, Uso de recursos | Cumplimiento de la Eficiencia |
-| 6 | Mantenibilidad | Analizabilidad … Capacidad de ser probada | Cumplimiento de la Mantenibilidad |
-| 7 | Compatibilidad | Coexistencia, Interoperabilidad | — |
-| 8 | Portabilidad | Adaptabilidad, Instalación, Reemplazabilidad | Cumplimiento de la Portabilidad |
+| # | Característica | Subcaracterísticas (9126) |
+|---|----------------|---------------------------|
+| 1 | **Funcionalidad** | Idoneidad, Precisión, Interoperabilidad, **Seguridad**, Cumplimiento de la funcionalidad |
+| 2 | **Fiabilidad** | Madurez, Tolerancia a fallos, Capacidad de recuperación, Cumplimiento de la fiabilidad |
+| 3 | **Usabilidad** | Inteligibilidad, Facilidad de aprendizaje, Operabilidad, Atractividad, Cumplimiento de la usabilidad |
+| 4 | **Eficiencia** | Comportamiento en el tiempo, Utilización de recursos, Cumplimiento de la eficiencia |
+| 5 | **Mantenibilidad** | Analizabilidad, Cambiabilidad, Estabilidad, **Pruebabilidad**, Cumplimiento de mantenibilidad |
+| 6 | **Portabilidad** | Adaptabilidad, Facilidad de instalación, **Coexistencia**, **Intercambiabilidad**, Cumplimiento de portabilidad |
 
-**Correcciones aplicadas respecto al modelo 9126 heredado:**
-- Coexistencia e Interoperabilidad → **Compatibilidad** (no Funcionalidad / Portabilidad).
-- Seguridad → **característica de primer nivel** (no subcaracterística de Funcionalidad).
-- Intercambiabilidad → **Reemplazabilidad** en Portabilidad.
+**Notas de mapeo respecto a ISO/IEC 25010 (solo trazabilidad técnica, no UI):**
+
+| Concepto 25010 | Ubicación 9126 (dashboard) |
+|----------------|----------------------------|
+| Seguridad (característica) | **Funcionalidad → Seguridad** (lista de cotejo unificada) |
+| Compatibilidad → Interoperabilidad | **Funcionalidad → Interoperabilidad** |
+| Compatibilidad → Coexistencia | **Portabilidad → Coexistencia** |
+| Portabilidad → Reemplazabilidad | **Portabilidad → Intercambiabilidad** |
+| Mantenibilidad → Capacidad de ser probada | **Mantenibilidad → Pruebabilidad** |
+
+Los gates `verify-*-iso25000.mjs` y la documentación de trazabilidad conservan el sufijo histórico; el **instrumento de evaluación visible** es 9126.
 
 ---
 
-## 2. Metodología de evaluación (tres niveles)
+## Metodología de evaluación (tres niveles)
 
 | Nivel | Instrumento | Archivo | Uso en tesis |
 |-------|-------------|---------|--------------|
@@ -33,37 +41,22 @@
 | **2** | Casos de prueba | `evaluation-levels.json` → `nivel2` | Evidencia **objetiva** (TC-*, gates verify-*) |
 | **3** | Capturas y actas | `evaluation-levels.json` → `nivel3` | **Sustento ante jurado** (PT01–PT04, actas) |
 
-El dashboard muestra los tres niveles en la pestaña **Listas de cotejo**. Los gráficos usan el % del Nivel 1.
-
-**Portabilidad:** pruebas técnicas objetivas (no encuestas Likert).
-
-### Fórmulas
-
-- **Adaptabilidad** = ítems cumplidos / ítems evaluados × 100  
-- **Facilidad de instalación** = checklist + tiempo promedio de instalación (&lt;3 min excelente, 3–5 bueno, &gt;5 regular)  
-- **Reemplazabilidad** = procesos sustituidos / procesos identificados × 100  
-
 ---
 
-## 3. No repudio criptográfico (PKCS#7)
-
-Implementado en `calzatura-vilchez/functions/orderNonRepudiation.cjs`: cada pedido recibe firma **PKCS#7** sobre payload canónico (total, ítems, estado, usuario). Columnas `nrPayloadHash`, `nrPkcs7Signature`, `nrSignedAt` en `pedidos`. Prueba unitaria: `orderNonRepudiation.test.js`. Gate admin: `/admin/verifyOrderNonRepudiation`.
-
----
-
-## 4. Regenerar instrumentos
+## Auditoría estructural
 
 ```bash
 npm run dashboard:checklists
 npm run dashboard:iso:audit-model
+node scripts/verify-exhaustive-iso25010.mjs
 ```
 
-Regenera listas de cotejo, niveles 2–3 y sincroniza `%` en `data.json`.
+El script `audit-iso25010-model.mjs` valida **6 características / 27 subcaracterísticas** según 9126.
 
 ---
 
-## 5. Referencias
+## Referencias
 
-- ISO/IEC 25010:2011  
-- ISO/IEC 9126-1:2001 (histórico)  
+- ISO/IEC 9126-1:2001  
+- ISO/IEC 25010:2011 (mapeo técnico interno)  
 - UNAM Cap. 14 — Lista de cotejo dicotómica

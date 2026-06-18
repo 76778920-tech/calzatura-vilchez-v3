@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Auditoría estructural ISO/IEC 25010 del dashboard.
+ * Auditoría estructural ISO/IEC 9126-1 del dashboard (6 características).
  * Uso: node scripts/audit-iso25010-model.mjs
  */
 import fs from "node:fs";
@@ -12,6 +12,34 @@ const data = JSON.parse(fs.readFileSync(path.join(ROOT, "dashboard-iso25000/data
 const chk = JSON.parse(fs.readFileSync(path.join(ROOT, "dashboard-iso25000/checklists-data.json"), "utf8"));
 const levels = JSON.parse(fs.readFileSync(path.join(ROOT, "dashboard-iso25000/evaluation-levels.json"), "utf8"));
 
+/** Taxonomía ISO/IEC 9126-1 — calidad interna/externa (diagrama de referencia). */
+const ISO9126 = {
+  funcionalidad: ["Idoneidad", "Precisión", "Interoperabilidad", "Seguridad", "Cumplimiento de la funcionalidad"],
+  fiabilidad: ["Madurez", "Tolerancia a Fallos", "Capacidad de Recuperación", "Cumplimiento de Fiabilidad"],
+  usabilidad: [
+    "Inteligibilidad",
+    "Facilidad de Aprendizaje",
+    "Operabilidad",
+    "Atractividad",
+    "Cumplimiento de la Usabilidad",
+  ],
+  eficiencia: ["Comportamiento en el tiempo", "Uso de Recursos", "Cumplimiento de la Eficiencia"],
+  mantenibilidad: [
+    "Analizabilidad",
+    "Cambiabilidad",
+    "Estabilidad",
+    "Pruebabilidad",
+    "Cumplimiento de la Mantenibilidad",
+  ],
+  portabilidad: [
+    "Adaptabilidad",
+    "Facilidad de Instalación",
+    "Coexistencia",
+    "Intercambiabilidad",
+    "Cumplimiento de la Portabilidad",
+  ],
+};
+
 const fails = [];
 const warns = [];
 
@@ -22,29 +50,51 @@ function warn(msg) {
   warns.push(msg);
 }
 
-const port = data.characteristics.find((c) => c.id === "portabilidad");
-const compat = data.characteristics.find((c) => c.id === "compatibilidad");
-const func = data.characteristics.find((c) => c.id === "funcionalidad");
-const sec = data.characteristics.find((c) => c.id === "seguridad");
+if (data.characteristics.length !== 6) {
+  fail(`Esperadas 6 características ISO 9126, hay ${data.characteristics.length}`);
+}
 
-const SEC_SUBS = ["Confidencialidad", "Integridad", "No repudio", "Responsabilidad", "Autenticidad"];
-
-if (data.characteristics.length !== 8) fail(`Esperadas 8 características ISO 25010, hay ${data.characteristics.length}`);
-if (port.subcharacteristics.some((s) => s.name === "Coexistencia")) fail("Coexistencia aún en Portabilidad");
-if (func.subcharacteristics.some((s) => s.name === "Interoperabilidad")) fail("Interoperabilidad aún en Funcionalidad");
-if (func.subcharacteristics.some((s) => s.name === "Seguridad")) fail("Seguridad aún bajo Funcionalidad");
-if (!sec) fail("Falta característica Seguridad de primer nivel");
-else {
-  for (const n of SEC_SUBS) {
-    if (!sec.subcharacteristics.some((s) => s.name === n)) fail(`Falta ${n} en Seguridad`);
+for (const [id, subs] of Object.entries(ISO9126)) {
+  const char = data.characteristics.find((c) => c.id === id);
+  if (!char) {
+    fail(`Falta característica ${id}`);
+    continue;
+  }
+  if (char.subcharacteristics.length !== subs.length) {
+    fail(`${char.name}: esperadas ${subs.length} subcaracterísticas, hay ${char.subcharacteristics.length}`);
+  }
+  for (const name of subs) {
+    if (!char.subcharacteristics.some((s) => s.name === name)) {
+      fail(`${char.name}: falta subcaracterística «${name}»`);
+    }
+  }
+  for (const sub of char.subcharacteristics) {
+    if (!subs.includes(sub.name)) {
+      fail(`${char.name}: subcaracterística extra «${sub.name}» (no está en ISO 9126)`);
+    }
   }
 }
-if (!compat.subcharacteristics.some((s) => s.name === "Coexistencia")) fail("Falta Coexistencia en Compatibilidad");
-if (!compat.subcharacteristics.some((s) => s.name === "Interoperabilidad")) fail("Falta Interoperabilidad en Compatibilidad");
-if (port.subcharacteristics.some((s) => s.name === "Intercambiabilidad")) fail("Intercambiabilidad sin renombrar a Reemplazabilidad");
 
-for (const c of ["Adaptabilidad", "Facilidad de Instalación", "Reemplazabilidad"]) {
-  if (!port.subcharacteristics.some((s) => s.name === c)) fail(`Falta ${c} en Portabilidad`);
+if (data.characteristics.some((c) => c.id === "seguridad")) {
+  fail("Seguridad no debe ser característica de primer nivel (9126: subcaracterística de Funcionalidad)");
+}
+if (data.characteristics.some((c) => c.id === "compatibilidad")) {
+  fail("Compatibilidad no existe en ISO 9126 (Interoperabilidad → Funcionalidad; Coexistencia → Portabilidad)");
+}
+
+const func = data.characteristics.find((c) => c.id === "funcionalidad");
+const port = data.characteristics.find((c) => c.id === "portabilidad");
+if (func && !func.subcharacteristics.some((s) => s.name === "Seguridad")) {
+  fail("Falta Seguridad bajo Funcionalidad");
+}
+if (func && !func.subcharacteristics.some((s) => s.name === "Interoperabilidad")) {
+  fail("Falta Interoperabilidad bajo Funcionalidad");
+}
+if (port && !port.subcharacteristics.some((s) => s.name === "Coexistencia")) {
+  fail("Falta Coexistencia bajo Portabilidad");
+}
+if (port && port.subcharacteristics.some((s) => s.name === "Reemplazabilidad")) {
+  fail("Reemplazabilidad debe llamarse Intercambiabilidad (9126)");
 }
 
 const subs = data.characteristics.flatMap((c) =>
@@ -68,13 +118,13 @@ for (const { char, sub, pct } of subs) {
   if (!levels.levels[sub]) fail(`Sin evaluation-levels: ${sub}`);
 }
 
-console.log("=== Auditoría ISO/IEC 25010 ===\n");
+console.log("=== Auditoría ISO/IEC 9126-1 ===\n");
 console.log(`Características: ${data.characteristics.length}`);
 console.log(`Subcaracterísticas: ${subs.length}`);
 console.log(`Listas de cotejo: ${Object.keys(chk.checklists).length}`);
 console.log(`Bloques evaluación 3 niveles: ${Object.keys(levels.levels).length}\n`);
 
-if (fails.length === 0) console.log("Estructura 25010: OK");
+if (fails.length === 0) console.log("Estructura 9126: OK");
 else fails.forEach((m) => console.log("FAIL:", m));
 
 if (warns.length) {

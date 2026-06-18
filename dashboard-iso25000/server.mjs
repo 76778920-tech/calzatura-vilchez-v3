@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Servidor unificado ISO/IEC 25000 — puerto 4321
- *   /                        → Dashboard principal (8 características ISO 25010)
+ *   /                        → Dashboard principal (6 características ISO 9126)
  *   /adecuacion-funcional/*  → Módulo CF/COF/TECP (React)
  *   /api/*                   → API del módulo de adecuación funcional
  */

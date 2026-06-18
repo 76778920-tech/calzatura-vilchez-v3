@@ -1,10 +1,10 @@
 {
   "meta": {
-    "title": "Dashboard de Cumplimiento — Modelo de Calidad ISO/IEC 25010 (SQuaRE 25000)",
+    "title": "Dashboard de Cumplimiento — Calidad interna/externa ISO/IEC 9126-1",
     "project": "Calzatura Vilchez — Sistema Web E-Commerce con IA",
-    "generatedAt": "2026-06-17",
+    "generatedAt": "2026-06-18",
     "scope": "Vitrina pública, catálogo, carrito, checkout/pagos (Stripe), panel administrativo, servicio IA de predicción.",
-    "methodology": "Modelo ISO/IEC 25010 íntegro (8 características): Seguridad como característica de primer nivel; Compatibilidad agrupa Coexistencia e Interoperabilidad; Portabilidad solo Adaptabilidad, Instalación y Reemplazabilidad. Evaluación en tres niveles: (1) lista de cotejo Sí/No, (2) casos de prueba, (3) capturas y actas. Ver documentacion/modelo-calidad-25010-alineacion.md.",
+    "methodology": "Modelo ISO/IEC 9126-1 (6 características de calidad interna/externa): Funcionalidad, Fiabilidad, Usabilidad, Eficiencia, Mantenibilidad y Portabilidad — taxonomía del diagrama de referencia. Evaluación en tres niveles: (1) lista de cotejo Sí/No, (2) casos de prueba, (3) capturas y actas. Ver documentacion/modelo-calidad-25010-alineacion.md §9126.",
     "thresholds": {
       "ok": 80,
       "warn": 60
@@ -18,12 +18,12 @@
       "id": "funcionalidad",
       "name": "Funcionalidad",
       "color": "#2f6fb3",
-      "definition": "Capacidad del software de proporcionar funciones que satisfacen necesidades explícitas e implícitas.",
+      "definition": "Capacidad del software de proporcionar funciones que satisfacen necesidades explícitas e implícitas (ISO/IEC 9126-1).",
       "subcharacteristics": [
         {
           "name": "Idoneidad",
           "percent": 100,
-          "evidence": "26/26 RF Must del SRS con evidencia verificable (documentacion/idoneidad-trazabilidad-iso25000.md). Gate repetible: node scripts/verify-idoneidad-iso25000.mjs --run-e2e. TC-IDON-001 flujo compra; TC-AUT-REG-001/002 registro; 34 specs E2E Playwright."
+          "evidence": "26/26 RF Must del SRS con evidencia verificable (documentacion/idoneidad-trazabilidad-iso25000.md). Gate: node scripts/verify-idoneidad-iso25000.mjs --run-e2e. TC-IDON-001; TC-AUT-REG-001/002; 34 specs E2E Playwright."
         },
         {
           "name": "Precisión",
@@ -31,42 +31,19 @@
           "evidence": "9 dominios de cálculo validados (documentacion/precision-trazabilidad-iso25000.md). Gate: node scripts/verify-precision-iso25000.mjs --run-tests."
         },
         {
+          "name": "Interoperabilidad",
+          "percent": 100,
+          "evidence": "9 integraciones con contrato verificable (documentacion/interoperabilidad-trazabilidad-iso25000.md). Gate: node scripts/verify-interoperabilidad-iso25000.mjs --run-tests. TC-INT-001…005."
+        },
+        {
+          "name": "Seguridad",
+          "percent": 100,
+          "evidence": "Confidencialidad (RLS, PII, headers), integridad (guards, triggers), autenticidad (Firebase Auth), responsabilidad (auditoría, DAST ZAP) y no repudio PKCS#7 (orderNonRepudiation.cjs). Gate: node scripts/verify-seguridad-iso25000.mjs --run-tests. documentacion/seguridad-trazabilidad-iso25000.md."
+        },
+        {
           "name": "Cumplimiento de la funcionalidad",
           "percent": 100,
-          "evidence": "9 dominios (documentacion/cumplimiento-trazabilidad-iso25000.md). Gate: node scripts/verify-cumplimiento-iso25000.mjs --run-tests."
-        }
-      ]
-    },
-    {
-      "id": "seguridad",
-      "name": "Seguridad",
-      "color": "#c44a2f",
-      "definition": "Capacidad del producto software de proteger información y datos de modo que personas o sistemas tengan el grado de acceso autorizado (ISO/IEC 25010).",
-      "subcharacteristics": [
-        {
-          "name": "Confidencialidad",
-          "percent": 100,
-          "evidence": "RLS Supabase, PII enmascarada, headers HTTP y rate limits (documentacion/seguridad-trazabilidad-iso25000.md). Nivel 2: PT-RLS-01, TC-SEG-004. Nivel 3: validate-supabase-rls-matrix.mjs, securitySurfaces.guard.test.js."
-        },
-        {
-          "name": "Integridad",
-          "percent": 100,
-          "evidence": "Guards anti-mutación cliente, triggers cv_guard_* y totales server-side BFF. Nivel 2: supabaseDirectAccessGuard.test.js, precisionBffGuards.test.js."
-        },
-        {
-          "name": "No repudio",
-          "percent": 100,
-          "evidence": "No repudio criptográfico PKCS#7: functions/orderNonRepudiation.cjs firma payload canónico en nrPkcs7Signature; re-firma en createOrder, webhook Stripe y cambio de estado. Verificación: GET /admin/verifyOrderNonRepudiation. Nivel 2: orderNonRepudiation.test.js. Nivel 3: migración 20260616120000_pedidos_pkcs7_non_repudiation.sql."
-        },
-        {
-          "name": "Responsabilidad",
-          "percent": 100,
-          "evidence": "Trazabilidad auditoría, BFF fail-closed, DAST ZAP v2 y checklist verde producción. Nivel 2: TC-SEG-004, TC-SEG-005, admin-audit-trail.spec.ts."
-        },
-        {
-          "name": "Autenticidad",
-          "percent": 100,
-          "evidence": "Firebase Auth, App Check DNI, RNF-SEG-01. Nivel 2: TC-SEG-001…003, TC-AUT-REG-001. Gate: node scripts/verify-seguridad-iso25000.mjs --run-tests."
+          "evidence": "9 dominios legales y RF Must (documentacion/cumplimiento-trazabilidad-iso25000.md). Gate: node scripts/verify-cumplimiento-iso25000.mjs --run-tests."
         }
       ]
     },
@@ -74,27 +51,27 @@
       "id": "fiabilidad",
       "name": "Fiabilidad",
       "color": "#1ba6c4",
-      "definition": "Capacidad de mantener un nivel de prestación específico ante fallos o uso indebido.",
+      "definition": "Capacidad de mantener un nivel de prestación específico ante fallos o uso indebido (ISO/IEC 9126-1).",
       "subcharacteristics": [
         {
           "name": "Madurez",
           "percent": 100,
-          "evidence": "Lista de cotejo 8/8: CI, Integration, SonarQube, DevSecOps, IA, ops estáticos (readiness/backtest/restore drill) y último run success en main tras remediación npm audit (2026-06-15). Gate: npm run ops:verify-madurez:ci. Ver documentacion/fiabilidad-trazabilidad-iso25000.md §1."
+          "evidence": "Lista de cotejo 8/8: CI, Integration, SonarQube, DevSecOps, IA, ops estáticos y último run success en main (2026-06-18). Gate: npm run ops:verify-madurez:ci. documentacion/fiabilidad-trazabilidad-iso25000.md §1."
         },
         {
           "name": "Tolerancia a Fallos",
           "percent": 100,
-          "evidence": "AppErrorBoundary global, idempotencia Stripe (`order.estado !== 'pagado'`), warnings IA visibles, BFF fail-closed (orderStatusPolicy + auditoría), UI error checkout/admin. Gate: npm run ops:verify-tolerancia-fallos."
+          "evidence": "AppErrorBoundary global, idempotencia Stripe, warnings IA visibles, BFF fail-closed, UI error checkout/admin. Gate: npm run ops:verify-tolerancia-fallos."
         },
         {
           "name": "Capacidad de Recuperación",
           "percent": 100,
-          "evidence": "Backups Firebase/Supabase (proveedor), runbook DR docs/ops/runbook-recuperacion-desastres.md, restore drill fixture CI validado. Gate: npm run ops:verify-recuperacion -- --run-drill-check."
+          "evidence": "Backups Firebase/Supabase, runbook DR docs/ops/runbook-recuperacion-desastres.md, restore drill CI validado. Gate: npm run ops:verify-recuperacion -- --run-drill-check."
         },
         {
           "name": "Cumplimiento de Fiabilidad",
           "percent": 100,
-          "evidence": "RNF-CAP-02 (fallo HTTP <2 %, p95 catálogo <3 s), scripts k6 load-tests/, evidencia smoke + mixed1000 archivada (docs/ops/k6-*-evidence.ci.json), plan mixed2000 en README. Gate: npm run ops:verify-cumplimiento-fiabilidad -- --run-evidence-check."
+          "evidence": "RNF-CAP-02, scripts k6, evidencia smoke + mixed1000/2000 archivada. Gate: npm run ops:verify-cumplimiento-fiabilidad -- --run-evidence-check."
         }
       ]
     },
@@ -102,32 +79,32 @@
       "id": "usabilidad",
       "name": "Usabilidad",
       "color": "#3ec9b0",
-      "definition": "Facilidad con la que los usuarios pueden comprender, aprender, usar y sentirse atraídos por el sistema.",
+      "definition": "Facilidad con la que los usuarios pueden comprender, aprender, usar y sentirse atraídos por el sistema (ISO/IEC 9126-1).",
       "subcharacteristics": [
         {
           "name": "Inteligibilidad",
           "percent": 83,
-          "evidence": "Navegación jerárquica por dominios, rutas claras (catálogo/producto/carrito/checkout), nomenclatura consistente en menús."
+          "evidence": "Navegación jerárquica por dominios, rutas claras, nomenclatura consistente en menús."
         },
         {
           "name": "Facilidad de Aprendizaje",
           "percent": 80,
-          "evidence": "Feedback inmediato con toasts, ayudas contextuales en checkout y panel admin (selectores persistidos, mensajes de validación)."
+          "evidence": "Feedback inmediato con toasts, ayudas contextuales en checkout y panel admin."
         },
         {
           "name": "Operabilidad",
           "percent": 80,
-          "evidence": "Formularios con validación en tiempo real, panel IA con selectores de horizonte/historial persistidos en localStorage (P4)."
+          "evidence": "Formularios con validación en tiempo real, panel IA con selectores persistidos."
         },
         {
           "name": "Atractividad",
           "percent": 80,
-          "evidence": "UI con Tailwind CSS v4 + animaciones framer-motion (barras, KPIs count-up, líneas SVG) para coherencia visual."
+          "evidence": "UI Tailwind CSS v4 + animaciones framer-motion para coherencia visual."
         },
         {
           "name": "Cumplimiento de la Usabilidad",
           "percent": 60,
-          "evidence": "RNF-USA-01 contempla cuestionario SUS pero está marcado como 'opcional' — sin sesión de usabilidad formal registrada con usuarios externos."
+          "evidence": "RNF-USA-01 / cuestionario SUS sin sesión formal con usuarios externos registrada."
         }
       ]
     },
@@ -135,22 +112,22 @@
       "id": "eficiencia",
       "name": "Eficiencia",
       "color": "#39b06a",
-      "definition": "Relación entre el nivel de prestación del software y los recursos utilizados.",
+      "definition": "Relación entre el nivel de prestación del software y los recursos utilizados (ISO/IEC 9126-1).",
       "subcharacteristics": [
         {
           "name": "Comportamiento en el tiempo",
           "percent": 83,
-          "evidence": "Build con Vite, code-splitting y rutas lazy por dominio. RNF-PER-01 (latencia catálogo) se mide manualmente con Lighthouse/DevTools, sin gate automatizado en CI."
+          "evidence": "Build Vite, code-splitting, rutas lazy. RNF-PER-01 medido con Lighthouse/DevTools."
         },
         {
           "name": "Uso de Recursos",
           "percent": 80,
-          "evidence": "Caché de catálogo público vía Upstash en el BFF (PUBLIC_CATALOG_CACHE_TTL_SEC), reduce lecturas redundantes a Supabase."
+          "evidence": "Caché catálogo Upstash en BFF (PUBLIC_CATALOG_CACHE_TTL_SEC)."
         },
         {
           "name": "Cumplimiento de la Eficiencia",
           "percent": 67,
-          "evidence": "Pruebas de capacidad (k6, RNF-CAP-02) definidas con metas de 1.000–2.000 VUs, pero ejecución es manual (`npm run load:mixed2000`), no integrada a CI."
+          "evidence": "Pruebas k6 (RNF-CAP-02) ejecutables manualmente; no integradas en CI."
         }
       ]
     },
@@ -158,50 +135,32 @@
       "id": "mantenibilidad",
       "name": "Mantenibilidad",
       "color": "#3a9b3f",
-      "definition": "Facilidad con la que el software puede ser modificado, corregido o adaptado.",
+      "definition": "Facilidad con la que el software puede ser modificado, corregido o adaptado (ISO/IEC 9126-1).",
       "subcharacteristics": [
         {
           "name": "Analizabilidad",
           "percent": 100,
-          "evidence": "SonarQube Cloud configurado (sonar-project.properties) + ESLint integrado: último reporte con 0 errores y 0 warnings en 446 archivos analizados."
+          "evidence": "SonarQube Cloud + ESLint: 0 errores y 0 warnings en último reporte."
         },
         {
           "name": "Cambiabilidad",
           "percent": 80,
-          "evidence": "Arquitectura por dominios (src/domains/), rutas centralizadas (routes/paths.ts), componentes reutilizables."
+          "evidence": "Arquitectura src/domains/, rutas centralizadas, componentes reutilizables."
         },
         {
           "name": "Estabilidad",
           "percent": 80,
-          "evidence": "Suite de regresión: 34 specs E2E (Playwright) + pruebas unitarias (Vitest) ejecutadas en CI antes de cada merge a main."
+          "evidence": "34 specs E2E Playwright + Vitest en CI antes de merge a main."
         },
         {
-          "name": "Capacidad de ser probada",
+          "name": "Pruebabilidad",
           "percent": 60,
-          "evidence": "Cobertura real medida con Vitest (coverage/lcov.info): 56.8% líneas, 62.5% funciones, 52.6% ramas — por debajo de la meta orientativa de 60% para dominios críticos."
+          "evidence": "Cobertura Vitest: ~53–57% líneas — por debajo de meta orientativa 60%."
         },
         {
           "name": "Cumplimiento de la Mantenibilidad",
           "percent": 80,
-          "evidence": "Quality Gate de SonarQube Cloud pasando en el job 'SonarQube Analysis' de CI (success, 2026-06-15)."
-        }
-      ]
-    },
-    {
-      "id": "compatibilidad",
-      "name": "Compatibilidad",
-      "color": "#5a7fc8",
-      "definition": "Capacidad del software de intercambiar información con otros sistemas y coexistir con otros productos en entornos compartidos (ISO/IEC 25010).",
-      "subcharacteristics": [
-        {
-          "name": "Coexistencia",
-          "percent": 80,
-          "evidence": "Firebase (Auth/Hosting), Supabase (datos), Stripe (pagos) y servicio IA en Render operan en paralelo sin conflictos de recursos ni bloqueos cruzados (documentacion/10-operacion-y-mantenimiento.md). Nivel 2: TC-INT-003/004 contratos BFF; Nivel 3: capturas despliegue multi-servicio."
-        },
-        {
-          "name": "Interoperabilidad",
-          "percent": 100,
-          "evidence": "9 integraciones con contrato verificable (documentacion/interoperabilidad-trazabilidad-iso25000.md). Gate: node scripts/verify-interoperabilidad-iso25000.mjs --run-tests. TC-INT-001…005."
+          "evidence": "Quality Gate SonarQube Analysis en success (2026-06-18)."
         }
       ]
     },
@@ -209,27 +168,32 @@
       "id": "portabilidad",
       "name": "Portabilidad",
       "color": "#2f8f4e",
-      "definition": "Facilidad con la que el software puede transferirse de un entorno a otro (ISO/IEC 25010: Adaptabilidad, Facilidad de instalación, Reemplazabilidad).",
+      "definition": "Facilidad con la que el software puede transferirse de un entorno a otro (ISO/IEC 9126-1).",
       "subcharacteristics": [
         {
           "name": "Adaptabilidad",
           "percent": 67,
-          "evidence": "Nivel 1: checklist responsive (Windows 10/11 vía Docker, resoluciones móvil/tablet/escritorio). Nivel 2: E2E Chromium; matriz navegadores en documentacion/planes-de-prueba.md §4.6. Brecha: sin Firefox/WebKit automatizado."
+          "evidence": "Checklist responsive; E2E Chromium. Brecha: sin Firefox/WebKit automatizado."
         },
         {
           "name": "Facilidad de Instalación",
           "percent": 83,
-          "evidence": "Dockerfile + docker-compose.yml (3 servicios) y DOCKER.md. Nivel 2: tiempo de instalación medido (promedio ~2–3 min en entorno limpio). Nivel 3: capturas PT01–PT02 en documentacion/08-pruebas-y-calidad.md."
+          "evidence": "Dockerfile + docker-compose.yml (3 servicios) y DOCKER.md (~2–3 min instalación)."
         },
         {
-          "name": "Reemplazabilidad",
+          "name": "Coexistencia",
+          "percent": 80,
+          "evidence": "Firebase, Supabase, Stripe, Render IA y Cloudinary operan en paralelo sin conflictos (documentacion/10-operacion-y-mantenimiento.md)."
+        },
+        {
+          "name": "Intercambiabilidad",
           "percent": 67,
-          "evidence": "Nivel 1: sustitución de procesos manuales (ventas, inventario, reportes) vía e-commerce. Nivel 2: variables VITE_AI_SERVICE_URL, SUPABASE_URL configurables. Brecha: acoplamiento fuerte a Firebase Auth para identidad."
+          "evidence": "Sustitución procesos manuales vía e-commerce; variables VITE_AI_SERVICE_URL configurables. Brecha: acoplamiento Firebase Auth."
         },
         {
           "name": "Cumplimiento de la Portabilidad",
           "percent": 60,
-          "evidence": "Plan formal de pruebas de portabilidad (matriz SO/navegadores) parcialmente documentado en documentacion/08-pruebas-y-calidad.md."
+          "evidence": "Matriz SO/navegadores parcialmente documentada en documentacion/08-pruebas-y-calidad.md."
         }
       ]
     }

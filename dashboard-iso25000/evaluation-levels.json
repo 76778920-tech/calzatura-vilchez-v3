@@ -1,7 +1,7 @@
 {
   "meta": {
     "descripcion": "Nivel 2: casos de prueba · Nivel 3: capturas y actas",
-    "generado": "2026-06-17",
+    "generado": "2026-06-18",
     "proyecto": "Calzatura Vilchez — Sistema Web E-Commerce con IA"
   },
   "levels": {
@@ -45,6 +45,99 @@
         }
       ]
     },
+    "Interoperabilidad": {
+      "nivel2": [
+        {
+          "codigo": "TC-INT-001",
+          "prueba": "BFF ↔ Supabase pedido COD",
+          "cumple": true,
+          "referencia": "e2e/checkout-cod-order.spec.ts"
+        },
+        {
+          "codigo": "TC-INT-002",
+          "prueba": "Stripe Checkout",
+          "cumple": true,
+          "referencia": "e2e/checkout-stripe.spec.ts"
+        },
+        {
+          "codigo": "TC-INT-003",
+          "prueba": "Servicio IA",
+          "cumple": true,
+          "referencia": "e2e/admin-predictions.spec.ts"
+        },
+        {
+          "codigo": "TC-INT-004",
+          "prueba": "APISPERU DNI",
+          "cumple": true,
+          "referencia": "e2e/register-validation.spec.ts"
+        },
+        {
+          "codigo": "TC-INT-005",
+          "prueba": "Firebase ↔ Supabase perfil",
+          "cumple": true,
+          "referencia": "e2e/profile-save.spec.ts"
+        }
+      ],
+      "nivel3": [
+        {
+          "codigo": "EV-INT",
+          "prueba": "Gate interoperabilidad",
+          "evidencia": "documentacion/interoperabilidad-trazabilidad-iso25000.md"
+        }
+      ]
+    },
+    "Seguridad": {
+      "nivel2": [
+        {
+          "codigo": "PT-RLS-01",
+          "prueba": "Contrato RLS migraciones",
+          "cumple": true,
+          "referencia": "scripts/validate-supabase-rls-matrix.mjs"
+        },
+        {
+          "codigo": "TC-SEG-001",
+          "prueba": "Rutas /admin/* sin sesión",
+          "cumple": true,
+          "referencia": "e2e/seguridad-access-guards.spec.ts"
+        },
+        {
+          "codigo": "TC-SEG-004",
+          "prueba": "BFF admin fail-closed",
+          "cumple": true,
+          "referencia": "bffAuditEndpointPolicy.test.js"
+        },
+        {
+          "codigo": "TC-SEG-005",
+          "prueba": "ZAP producción v2",
+          "cumple": true,
+          "referencia": "securityZapProduction.guard.test.js"
+        },
+        {
+          "codigo": "TC-NR-001",
+          "prueba": "Firma PKCS#7 al crear pedido",
+          "cumple": true,
+          "referencia": "orderNonRepudiation.test.js"
+        },
+        {
+          "codigo": "TC-AUD-001",
+          "prueba": "Auditoría admin trazable",
+          "cumple": true,
+          "referencia": "e2e/admin-audit-trail.spec.ts"
+        }
+      ],
+      "nivel3": [
+        {
+          "codigo": "EV-SEC",
+          "prueba": "Trazabilidad seguridad",
+          "evidencia": "documentacion/seguridad-trazabilidad-iso25000.md"
+        },
+        {
+          "codigo": "EV-SEC-NR",
+          "prueba": "Migración columnas nr*",
+          "evidencia": "supabase/migrations/20260616120000_pedidos_pkcs7_non_repudiation.sql"
+        }
+      ]
+    },
     "Cumplimiento de la funcionalidad": {
       "nivel2": [
         {
@@ -65,126 +158,6 @@
           "codigo": "EV-CMP",
           "prueba": "CU-T05 / CU-T06",
           "evidencia": "documentacion/cumplimiento-trazabilidad-iso25000.md"
-        }
-      ]
-    },
-    "Confidencialidad": {
-      "nivel2": [
-        {
-          "codigo": "PT-RLS-01",
-          "prueba": "Contrato RLS migraciones",
-          "cumple": true,
-          "referencia": "scripts/validate-supabase-rls-matrix.mjs"
-        }
-      ],
-      "nivel3": [
-        {
-          "codigo": "EV-SEC-CONF",
-          "prueba": "RLS + PII",
-          "evidencia": "bff/privacy.cjs · supabase/rls-matrix.contract.json"
-        }
-      ]
-    },
-    "Integridad": {
-      "nivel2": [
-        {
-          "codigo": "TC-SEG-INT",
-          "prueba": "Guards anti-mutación cliente",
-          "cumple": true,
-          "referencia": "supabaseDirectAccessGuard.test.js"
-        }
-      ],
-      "nivel3": [
-        {
-          "codigo": "EV-SEC-INT",
-          "prueba": "Triggers y BFF server-side",
-          "evidencia": "precisionBffGuards.test.js"
-        }
-      ]
-    },
-    "No repudio": {
-      "nivel2": [
-        {
-          "codigo": "TC-NR-001",
-          "prueba": "Firma PKCS#7 al crear pedido",
-          "cumple": true,
-          "referencia": "orderNonRepudiation.test.js"
-        },
-        {
-          "codigo": "TC-NR-002",
-          "prueba": "Re-firma tras webhook Stripe",
-          "cumple": true,
-          "referencia": "bff/server.cjs refreshOrderNonRepudiation"
-        },
-        {
-          "codigo": "TC-AUD-001",
-          "prueba": "Auditoría admin trazable",
-          "cumple": true,
-          "referencia": "e2e/admin-audit-trail.spec.ts"
-        }
-      ],
-      "nivel3": [
-        {
-          "codigo": "EV-SEC-NR",
-          "prueba": "Migración columnas nr*",
-          "evidencia": "supabase/migrations/20260616120000_pedidos_pkcs7_non_repudiation.sql"
-        },
-        {
-          "codigo": "EV-SEC-NR2",
-          "prueba": "Verificación admin PKCS#7",
-          "evidencia": "GET /admin/verifyOrderNonRepudiation"
-        }
-      ]
-    },
-    "Responsabilidad": {
-      "nivel2": [
-        {
-          "codigo": "TC-SEG-004",
-          "prueba": "BFF admin fail-closed",
-          "cumple": true,
-          "referencia": "bffAuditEndpointPolicy.test.js"
-        },
-        {
-          "codigo": "TC-SEG-005",
-          "prueba": "ZAP producción v2",
-          "cumple": true,
-          "referencia": "securityZapProduction.guard.test.js"
-        }
-      ],
-      "nivel3": [
-        {
-          "codigo": "EV-SEC-RESP",
-          "prueba": "Checklist verde producción",
-          "evidencia": "docs/ops/checklist-verde-seguridad-produccion.md"
-        }
-      ]
-    },
-    "Autenticidad": {
-      "nivel2": [
-        {
-          "codigo": "TC-SEG-001",
-          "prueba": "Rutas /admin/* sin sesión",
-          "cumple": true,
-          "referencia": "e2e/seguridad-access-guards.spec.ts"
-        },
-        {
-          "codigo": "TC-SEG-002",
-          "prueba": "Rutas /staff/* sin sesión",
-          "cumple": true,
-          "referencia": "e2e/seguridad-access-guards.spec.ts"
-        },
-        {
-          "codigo": "TC-SEG-003",
-          "prueba": "Rutas cliente autenticadas",
-          "cumple": true,
-          "referencia": "e2e/seguridad-access-guards.spec.ts"
-        }
-      ],
-      "nivel3": [
-        {
-          "codigo": "EV-SEC-AUT",
-          "prueba": "Firebase Auth + App Check",
-          "evidencia": "documentacion/seguridad-trazabilidad-iso25000.md"
         }
       ]
     },
@@ -268,7 +241,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Navegación jerárquica por dominios, rutas claras (catálogo/producto/carrito/checkout), nomenclatura consistente en menús"
+          "evidencia": "Navegación jerárquica por dominios, rutas claras, nomenclatura consistente en menús."
         }
       ]
     },
@@ -278,7 +251,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Feedback inmediato con toasts, ayudas contextuales en checkout y panel admin (selectores persistidos, mensajes de valida"
+          "evidencia": "Feedback inmediato con toasts, ayudas contextuales en checkout y panel admin."
         }
       ]
     },
@@ -288,7 +261,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Formularios con validación en tiempo real, panel IA con selectores de horizonte/historial persistidos en localStorage (P"
+          "evidencia": "Formularios con validación en tiempo real, panel IA con selectores persistidos."
         }
       ]
     },
@@ -298,7 +271,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "UI con Tailwind CSS v4 + animaciones framer-motion (barras, KPIs count-up, líneas SVG) para coherencia visual."
+          "evidencia": "UI Tailwind CSS v4 + animaciones framer-motion para coherencia visual."
         }
       ]
     },
@@ -308,7 +281,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "RNF-USA-01 contempla cuestionario SUS pero está marcado como 'opcional' — sin sesión de usabilidad formal registrada con"
+          "evidencia": "RNF-USA-01 / cuestionario SUS sin sesión formal con usuarios externos registrada."
         }
       ]
     },
@@ -318,7 +291,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Build con Vite, code-splitting y rutas lazy por dominio. RNF-PER-01 (latencia catálogo) se mide manualmente con Lighthou"
+          "evidencia": "Build Vite, code-splitting, rutas lazy. RNF-PER-01 medido con Lighthouse/DevTools."
         }
       ]
     },
@@ -328,7 +301,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Caché de catálogo público vía Upstash en el BFF (PUBLIC_CATALOG_CACHE_TTL_SEC), reduce lecturas redundantes a Supabase."
+          "evidencia": "Caché catálogo Upstash en BFF (PUBLIC_CATALOG_CACHE_TTL_SEC)."
         }
       ]
     },
@@ -338,7 +311,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Pruebas de capacidad (k6, RNF-CAP-02) definidas con metas de 1.000–2.000 VUs, pero ejecución es manual (`npm run load:mi"
+          "evidencia": "Pruebas k6 (RNF-CAP-02) ejecutables manualmente; no integradas en CI."
         }
       ]
     },
@@ -348,7 +321,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "SonarQube Cloud configurado (sonar-project.properties) + ESLint integrado: último reporte con 0 errores y 0 warnings en "
+          "evidencia": "SonarQube Cloud + ESLint: 0 errores y 0 warnings en último reporte."
         }
       ]
     },
@@ -358,7 +331,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Arquitectura por dominios (src/domains/), rutas centralizadas (routes/paths.ts), componentes reutilizables."
+          "evidencia": "Arquitectura src/domains/, rutas centralizadas, componentes reutilizables."
         }
       ]
     },
@@ -368,17 +341,24 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Suite de regresión: 34 specs E2E (Playwright) + pruebas unitarias (Vitest) ejecutadas en CI antes de cada merge a main."
+          "evidencia": "34 specs E2E Playwright + Vitest en CI antes de merge a main."
         }
       ]
     },
-    "Capacidad de ser probada": {
-      "nivel2": [],
+    "Pruebabilidad": {
+      "nivel2": [
+        {
+          "codigo": "TC-COV-001",
+          "prueba": "Cobertura Vitest dominios críticos",
+          "cumple": false,
+          "referencia": "calzatura-vilchez/coverage/lcov.info"
+        }
+      ],
       "nivel3": [
         {
-          "codigo": "EV-DOC",
-          "prueba": "Evidencia documental",
-          "evidencia": "Cobertura real medida con Vitest (coverage/lcov.info): 56.8% líneas, 62.5% funciones, 52.6% ramas — por debajo de la met"
+          "codigo": "EV-PRU",
+          "prueba": "Meta cobertura 60%",
+          "evidencia": "npm run test:coverage en calzatura-vilchez"
         }
       ]
     },
@@ -388,71 +368,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Quality Gate de SonarQube Cloud pasando en el job 'SonarQube Analysis' de CI (success, 2026-06-15)."
-        }
-      ]
-    },
-    "Coexistencia": {
-      "nivel2": [
-        {
-          "codigo": "TC-INT-003",
-          "prueba": "IA en dominio separado",
-          "cumple": true,
-          "referencia": "documentacion/10-operacion-y-mantenimiento.md"
-        },
-        {
-          "codigo": "TC-INT-004",
-          "prueba": "Stripe + BFF checkout",
-          "cumple": true,
-          "referencia": "bff/server.cjs"
-        }
-      ],
-      "nivel3": [
-        {
-          "codigo": "EV-COEX",
-          "prueba": "Despliegue multi-servicio",
-          "evidencia": "Firebase + Supabase + Stripe + Render IA"
-        }
-      ]
-    },
-    "Interoperabilidad": {
-      "nivel2": [
-        {
-          "codigo": "TC-INT-001",
-          "prueba": "BFF ↔ Supabase pedido COD",
-          "cumple": true,
-          "referencia": "e2e/checkout-cod-order.spec.ts"
-        },
-        {
-          "codigo": "TC-INT-002",
-          "prueba": "Stripe Checkout",
-          "cumple": true,
-          "referencia": "e2e/checkout-stripe.spec.ts"
-        },
-        {
-          "codigo": "TC-INT-003",
-          "prueba": "Servicio IA",
-          "cumple": true,
-          "referencia": "e2e/admin-predictions.spec.ts"
-        },
-        {
-          "codigo": "TC-INT-004",
-          "prueba": "APISPERU DNI",
-          "cumple": true,
-          "referencia": "e2e/register-validation.spec.ts"
-        },
-        {
-          "codigo": "TC-INT-005",
-          "prueba": "Firebase ↔ Supabase perfil",
-          "cumple": true,
-          "referencia": "e2e/profile-save.spec.ts"
-        }
-      ],
-      "nivel3": [
-        {
-          "codigo": "EV-INT",
-          "prueba": "Gate interoperabilidad",
-          "evidencia": "documentacion/interoperabilidad-trazabilidad-iso25000.md"
+          "evidencia": "Quality Gate SonarQube Analysis en success (2026-06-18)."
         }
       ]
     },
@@ -506,7 +422,30 @@
         }
       ]
     },
-    "Reemplazabilidad": {
+    "Coexistencia": {
+      "nivel2": [
+        {
+          "codigo": "TC-INT-003",
+          "prueba": "IA en dominio separado",
+          "cumple": true,
+          "referencia": "documentacion/10-operacion-y-mantenimiento.md"
+        },
+        {
+          "codigo": "TC-INT-004",
+          "prueba": "Stripe + BFF checkout",
+          "cumple": true,
+          "referencia": "bff/server.cjs"
+        }
+      ],
+      "nivel3": [
+        {
+          "codigo": "EV-COEX",
+          "prueba": "Despliegue multi-servicio",
+          "evidencia": "Firebase + Supabase + Stripe + Render IA"
+        }
+      ]
+    },
+    "Intercambiabilidad": {
       "nivel2": [
         {
           "codigo": "TC-REP-001",
@@ -535,7 +474,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Plan formal de pruebas de portabilidad (matriz SO/navegadores) parcialmente documentado en documentacion/08-pruebas-y-ca"
+          "evidencia": "Matriz SO/navegadores parcialmente documentada en documentacion/08-pruebas-y-calidad.md."
         }
       ]
     }

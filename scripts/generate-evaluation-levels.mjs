@@ -29,39 +29,12 @@ const LEVELS_BY_SUB = {
     ],
     nivel3: [{ codigo: "EV-CMP", prueba: "CU-T05 / CU-T06", evidencia: "documentacion/cumplimiento-trazabilidad-iso25000.md" }],
   },
-  Confidencialidad: {
-    nivel2: [{ codigo: "PT-RLS-01", prueba: "Contrato RLS migraciones", cumple: true, referencia: "scripts/validate-supabase-rls-matrix.mjs" }],
-    nivel3: [{ codigo: "EV-SEC-CONF", prueba: "RLS + PII", evidencia: "bff/privacy.cjs · supabase/rls-matrix.contract.json" }],
-  },
-  Integridad: {
-    nivel2: [{ codigo: "TC-SEG-INT", prueba: "Guards anti-mutación cliente", cumple: true, referencia: "supabaseDirectAccessGuard.test.js" }],
-    nivel3: [{ codigo: "EV-SEC-INT", prueba: "Triggers y BFF server-side", evidencia: "precisionBffGuards.test.js" }],
-  },
-  Autenticidad: {
+  Coexistencia: {
     nivel2: [
-      { codigo: "TC-SEG-001", prueba: "Rutas /admin/* sin sesión", cumple: true, referencia: "e2e/seguridad-access-guards.spec.ts" },
-      { codigo: "TC-SEG-002", prueba: "Rutas /staff/* sin sesión", cumple: true, referencia: "e2e/seguridad-access-guards.spec.ts" },
-      { codigo: "TC-SEG-003", prueba: "Rutas cliente autenticadas", cumple: true, referencia: "e2e/seguridad-access-guards.spec.ts" },
+      { codigo: "TC-INT-003", prueba: "IA en dominio separado", cumple: true, referencia: "documentacion/10-operacion-y-mantenimiento.md" },
+      { codigo: "TC-INT-004", prueba: "Stripe + BFF checkout", cumple: true, referencia: "bff/server.cjs" },
     ],
-    nivel3: [{ codigo: "EV-SEC-AUT", prueba: "Firebase Auth + App Check", evidencia: "documentacion/seguridad-trazabilidad-iso25000.md" }],
-  },
-  Responsabilidad: {
-    nivel2: [
-      { codigo: "TC-SEG-004", prueba: "BFF admin fail-closed", cumple: true, referencia: "bffAuditEndpointPolicy.test.js" },
-      { codigo: "TC-SEG-005", prueba: "ZAP producción v2", cumple: true, referencia: "securityZapProduction.guard.test.js" },
-    ],
-    nivel3: [{ codigo: "EV-SEC-RESP", prueba: "Checklist verde producción", evidencia: "docs/ops/checklist-verde-seguridad-produccion.md" }],
-  },
-  "No repudio": {
-    nivel2: [
-      { codigo: "TC-NR-001", prueba: "Firma PKCS#7 al crear pedido", cumple: true, referencia: "orderNonRepudiation.test.js" },
-      { codigo: "TC-NR-002", prueba: "Re-firma tras webhook Stripe", cumple: true, referencia: "bff/server.cjs refreshOrderNonRepudiation" },
-      { codigo: "TC-AUD-001", prueba: "Auditoría admin trazable", cumple: true, referencia: "e2e/admin-audit-trail.spec.ts" },
-    ],
-    nivel3: [
-      { codigo: "EV-SEC-NR", prueba: "Migración columnas nr*", evidencia: "supabase/migrations/20260616120000_pedidos_pkcs7_non_repudiation.sql" },
-      { codigo: "EV-SEC-NR2", prueba: "Verificación admin PKCS#7", evidencia: "GET /admin/verifyOrderNonRepudiation" },
-    ],
+    nivel3: [{ codigo: "EV-COEX", prueba: "Despliegue multi-servicio", evidencia: "Firebase + Supabase + Stripe + Render IA" }],
   },
   Madurez: {
     nivel2: [{ codigo: "TC-CI-001", prueba: "Workflows CI en success", cumple: true, referencia: "scripts/verify-madurez-iso25000.mjs" }],
@@ -92,12 +65,19 @@ const LEVELS_BY_SUB = {
     ],
     nivel3: [{ codigo: "EV-INT", prueba: "Gate interoperabilidad", evidencia: "documentacion/interoperabilidad-trazabilidad-iso25000.md" }],
   },
-  Coexistencia: {
+  Seguridad: {
     nivel2: [
-      { codigo: "TC-INT-003", prueba: "IA en dominio separado", cumple: true, referencia: "documentacion/10-operacion-y-mantenimiento.md" },
-      { codigo: "TC-INT-004", prueba: "Stripe + BFF checkout", cumple: true, referencia: "bff/server.cjs" },
+      { codigo: "PT-RLS-01", prueba: "Contrato RLS migraciones", cumple: true, referencia: "scripts/validate-supabase-rls-matrix.mjs" },
+      { codigo: "TC-SEG-001", prueba: "Rutas /admin/* sin sesión", cumple: true, referencia: "e2e/seguridad-access-guards.spec.ts" },
+      { codigo: "TC-SEG-004", prueba: "BFF admin fail-closed", cumple: true, referencia: "bffAuditEndpointPolicy.test.js" },
+      { codigo: "TC-SEG-005", prueba: "ZAP producción v2", cumple: true, referencia: "securityZapProduction.guard.test.js" },
+      { codigo: "TC-NR-001", prueba: "Firma PKCS#7 al crear pedido", cumple: true, referencia: "orderNonRepudiation.test.js" },
+      { codigo: "TC-AUD-001", prueba: "Auditoría admin trazable", cumple: true, referencia: "e2e/admin-audit-trail.spec.ts" },
     ],
-    nivel3: [{ codigo: "EV-COEX", prueba: "Despliegue multi-servicio", evidencia: "Firebase + Supabase + Stripe + Render IA" }],
+    nivel3: [
+      { codigo: "EV-SEC", prueba: "Trazabilidad seguridad", evidencia: "documentacion/seguridad-trazabilidad-iso25000.md" },
+      { codigo: "EV-SEC-NR", prueba: "Migración columnas nr*", evidencia: "supabase/migrations/20260616120000_pedidos_pkcs7_non_repudiation.sql" },
+    ],
   },
   Adaptabilidad: {
     nivel2: [
@@ -116,7 +96,11 @@ const LEVELS_BY_SUB = {
       { codigo: "PT02", prueba: "Instalación Windows 11", evidencia: "documentacion/08-pruebas-y-calidad.md" },
     ],
   },
-  Reemplazabilidad: {
+  Pruebabilidad: {
+    nivel2: [{ codigo: "TC-COV-001", prueba: "Cobertura Vitest dominios críticos", cumple: false, referencia: "calzatura-vilchez/coverage/lcov.info" }],
+    nivel3: [{ codigo: "EV-PRU", prueba: "Meta cobertura 60%", evidencia: "npm run test:coverage en calzatura-vilchez" }],
+  },
+  Intercambiabilidad: {
     nivel2: [
       { codigo: "TC-REP-001", prueba: "Sustituye ventas manuales", cumple: true, referencia: "e-commerce checkout" },
       { codigo: "TC-REP-002", prueba: "Variables VITE_AI_SERVICE_URL", cumple: true, referencia: "bff/env.example" },

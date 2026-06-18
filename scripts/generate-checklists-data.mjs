@@ -48,6 +48,29 @@ const ITEMS_BY_SUB = {
     "Integración Upstash caché",
     "Gate verify-interoperabilidad-iso25000.mjs en VERDE",
   ],
+  Seguridad: [
+    "RLS Supabase validado (validate-supabase-rls-matrix.mjs)",
+    "PII enmascarada en BFF (privacy.cjs + bffPrivacy.test.ts)",
+    "Headers HTTP seguros (firebase.json + BFF)",
+    "Rate limits y anti-abuso BFF",
+    "Guard sin mutaciones directas desde cliente",
+    "Triggers cv_guard_* en migraciones Supabase",
+    "Totales y precios validados server-side (precisionBffGuards)",
+    "Firebase Auth + verifyIdToken en BFF",
+    "App Check en lookup DNI (register-validation E2E)",
+    "RNF-SEG-01 rutas admin/staff/cliente (TC-SEG-001…003)",
+    "Auditoría admin registrada (admin-audit-trail E2E)",
+    "BFF fail-closed + políticas audit (TC-SEG-004)",
+    "DAST ZAP producción v2 sin altas críticas (TC-SEG-005)",
+    "Checklist verde seguridad producción documentado",
+    "Registro de acciones en tabla auditoría (BFF + admin)",
+    "Trigger trg_audit_pedido_insert en INSERT pedidos",
+    "Webhook Stripe firmado + logAudit source stripe_webhook",
+    "Idempotencia pedidos (idempotencyKey BFF/Functions)",
+    "Firma PKCS#7 del pedido (nrPkcs7Signature en BD)",
+    "Verificación admin GET /admin/verifyOrderNonRepudiation",
+    "Gate verify-seguridad-iso25000.mjs en VERDE",
+  ],
   Confidencialidad: [
     "RLS Supabase validado (validate-supabase-rls-matrix.mjs)",
     "PII enmascarada en BFF (privacy.cjs + bffPrivacy.test.ts)",
@@ -200,7 +223,7 @@ const ITEMS_BY_SUB = {
     "Sin flaky tests críticos abiertos",
     "Smoke spec en cada PR",
   ],
-  "Capacidad de ser probada": [
+  Pruebabilidad: [
     "Vitest coverage líneas ≥ 60 %",
     "Vitest coverage funciones ≥ 60 %",
     "Vitest coverage ramas ≥ 50 %",
@@ -237,7 +260,7 @@ const ITEMS_BY_SUB = {
     "Cloudinary sin bloquear catálogo",
     "Upstash sin degradar latencia crítica",
   ],
-  Reemplazabilidad: [
+  Intercambiabilidad: [
     "Sustituye proceso manual de ventas",
     "Sustituye registro manual de inventario",
     "Sustituye generación manual de reportes",
@@ -280,13 +303,14 @@ const ITEM_OVERRIDES = {
     6: { cumple: true, observacion: "docs/ops/k6-smoke + k6-mixed1000-bff-evidence.json (live-run con BFF)" },
     7: { cumple: true, observacion: "verify-cumplimiento-fiabilidad-iso25000.mjs — 7/7 ítems" },
   },
-  "No repudio": {
-    1: { cumple: true, observacion: "audit.ts + POST /audit BFF + admin-audit-trail E2E" },
-    2: { cumple: true, observacion: "supabase/migrations/20260503100000_audit_pedidos_trigger.sql — trg_audit_pedido_insert" },
-    3: { cumple: true, observacion: "functions/index.js logAuditFn source stripe_webhook tras checkout.session.completed" },
-    4: { cumple: true, observacion: "bff/server.cjs idempotencyKey + functions/fnUtils.js findOrderByIdempotency" },
-    5: { cumple: true, observacion: "functions/orderNonRepudiation.cjs — PKCS#7 en nrPkcs7Signature (migración 20260616120000)" },
-    6: { cumple: true, observacion: "GET /admin/verifyOrderNonRepudiation — verifyOrderRecord()" },
+  Seguridad: {
+    15: { cumple: true, observacion: "audit.ts + POST /audit BFF + admin-audit-trail E2E" },
+    16: { cumple: true, observacion: "supabase/migrations/20260503100000_audit_pedidos_trigger.sql — trg_audit_pedido_insert" },
+    17: { cumple: true, observacion: "functions/index.js logAuditFn source stripe_webhook tras checkout.session.completed" },
+    18: { cumple: true, observacion: "bff/server.cjs idempotencyKey + functions/fnUtils.js findOrderByIdempotency" },
+    19: { cumple: true, observacion: "functions/orderNonRepudiation.cjs — PKCS#7 en nrPkcs7Signature (migración 20260616120000)" },
+    20: { cumple: true, observacion: "GET /admin/verifyOrderNonRepudiation — verifyOrderRecord()" },
+    21: { cumple: true, observacion: "scripts/verify-seguridad-iso25000.mjs — gate en VERDE" },
   },
 };
 
@@ -307,7 +331,7 @@ for (const char of DATA.characteristics) {
       caracteristica: char.name,
       color: char.color,
       titulo: `Lista de cotejo — ${sub.name}`,
-      objetivo: `Verificar el cumplimiento de la subcaracterística «${sub.name}» (${char.name}) según ISO/IEC 25010.`,
+      objetivo: `Verificar el cumplimiento de la subcaracterística «${sub.name}» (${char.name}) según ISO/IEC 9126-1.`,
       referencia: cat.referencia || "—",
       rutaModulo: cat.rutaModulo || null,
       instrucciones:
