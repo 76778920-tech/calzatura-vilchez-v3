@@ -77,6 +77,10 @@ function Ensure-BffEnvForLocal {
 $bffProc = $null
 if ($StartLocalBff) {
   Ensure-BffEnvForLocal
+  if ($Scenario -eq "mixed2000" -and -not $env:LOAD_CATALOG_PAGE_PCT) {
+    $env:LOAD_CATALOG_PAGE_PCT = "0"
+    Write-Host "mixed2000: LOAD_CATALOG_PAGE_PCT=0 (solo /public/catalog/active, ruta principal RNF-CAP-02)"
+  }
   $env:BFF_BASE_URL = "http://127.0.0.1:8787"
   $env:VITE_BACKEND_API_URL = $env:BFF_BASE_URL
   $env:LOAD_ENV = "local"

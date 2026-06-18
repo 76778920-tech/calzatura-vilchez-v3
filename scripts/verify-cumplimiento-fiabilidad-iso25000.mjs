@@ -54,7 +54,15 @@ function checkEvidenceItem(n, file, runCheck) {
 }
 
 function checkItem5() {
-  return read("load-tests/README.md").includes("mixed2000") ? ok("Ítem 5: plan mixed2000 en README") : fail("Ítem 5: sin plan mixed2000");
+  if (!exists("docs/ops/k6-mixed2000-bff-evidence.json")) {
+    return fail("Ítem 5: falta docs/ops/k6-mixed2000-bff-evidence.json");
+  }
+  const ev = JSON.parse(read("docs/ops/k6-mixed2000-bff-evidence.json"));
+  if (!["pass", "passed"].includes(String(ev.result).toLowerCase())) {
+    return fail("Ítem 5: mixed2000-bff result no pass");
+  }
+  if (!ev.bffIncluded) return fail("Ítem 5: mixed2000 sin bffIncluded");
+  return ok("Ítem 5: k6-mixed2000-bff-evidence.json (2000 VU BFF live)");
 }
 
 function checkItem6() {

@@ -256,7 +256,7 @@ const ITEM_OVERRIDES = {
   "Cumplimiento de Fiabilidad": {
     3: { cumple: true, observacion: "k6-smoke-evidence.json — smoke BFF local 2026-06-17 (20 VU, 0% fail, p95 BFF cat 2ms)" },
     4: { cumple: true, observacion: "k6-mixed1000-bff-evidence.json — 1000 VU BFF /public/catalog/* 2026-06-17 (0% fail, p95 1ms)" },
-    5: { cumple: true, observacion: "load-tests/README.md fases → mixed2000 planificado" },
+    5: { cumple: true, observacion: "k6-mixed2000-bff-evidence.json — 2000 VU BFF 2026-06-17 (0.07% fail, p95 active 1ms)" },
     6: { cumple: true, observacion: "docs/ops/k6-smoke + k6-mixed1000-bff-evidence.json (live-run con BFF)" },
     7: { cumple: true, observacion: "verify-cumplimiento-fiabilidad-iso25000.mjs — 7/7 ítems" },
   },

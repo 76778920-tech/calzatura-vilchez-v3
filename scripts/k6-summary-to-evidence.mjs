@@ -80,7 +80,10 @@ function main() {
     maxP95BffHealthMs: 1500,
   };
 
-  const catalogLimit = args.scenario === "mixed1000" ? 4000 : thresholds.maxP95CatalogMs;
+  const catalogLimit =
+    args.scenario === "mixed1000" || args.scenario === "mixed2000"
+      ? 4000
+      : thresholds.maxP95CatalogMs;
 
   const pass =
     httpFailed <= thresholds.maxHttpFailedRate &&

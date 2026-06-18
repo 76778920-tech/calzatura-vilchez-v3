@@ -88,7 +88,7 @@ Los reportes JSON se guardan en `artifacts/load-tests/` (gitignored salvo `.gitk
 2. `npm run load:mixed500` — 500 VUs lectura mixta (~8 min con ramp 2m+5m+1m)  
 3. `npm run load:mixed1000` — 1.000 VUs; p95 catálogo BFF &lt; 2 s, errores &lt; 1 %  
 3. Subir a `catalog` 1000 → 1400 VUs solo catálogo  
-4. `mixed2000` cuando pase umbrales por escenario  
+4. `mixed2000` con `npm run load:mixed2000:bff` (BFF local + LOAD_TEST_TOKEN; catálogo vía `/public/catalog/active`)  
 
 ## Interpretar resultados (500 VUs — ejecución real)
 

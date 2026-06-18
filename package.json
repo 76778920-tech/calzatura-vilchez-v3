@@ -31,6 +31,7 @@
     "load:mixed1000": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed1000",
     "load:mixed1000:bff": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed1000 -StartLocalBff",
     "load:mixed2000": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed2000",
+    "load:mixed2000:bff": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed2000 -StartLocalBff",
     "ops:k6-evidence:bff": "node scripts/k6-summary-to-evidence.mjs --summary artifacts/load-tests/k6-mixed1000-20260617-153431.json --scenario mixed1000 --peak-vus 1000 --with-bff --bff-local --output docs/ops/k6-mixed1000-bff-evidence.json"
   },
   "devDependencies": {

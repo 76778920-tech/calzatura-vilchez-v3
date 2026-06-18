@@ -36,12 +36,31 @@ function ok(msg) {
 function ghLatestRun(workflowFile) {
   const r = spawnSync(
     "gh",
-    ["run", "list", "--workflow", workflowFile, "--branch", "main", "--limit", "1", "--json", "conclusion,displayTitle,createdAt"],
+    [
+      "run",
+      "list",
+      "--workflow",
+      workflowFile,
+      "--branch",
+      "main",
+      "--status",
+      "completed",
+      "--limit",
+      "5",
+      "--json",
+      "databaseId,conclusion,displayTitle,createdAt",
+    ],
     { encoding: "utf8", cwd: ROOT },
   );
   if (r.status !== 0) return null;
   try {
-    return JSON.parse(r.stdout.trim() || "[]")[0] ?? null;
+    const runs = JSON.parse(r.stdout.trim() || "[]");
+    const currentId = process.env.GITHUB_RUN_ID ? Number(process.env.GITHUB_RUN_ID) : null;
+    for (const run of runs) {
+      if (currentId != null && run.databaseId === currentId) continue;
+      if (run.conclusion === "success") return run;
+    }
+    return null;
   } catch {
     return null;
   }

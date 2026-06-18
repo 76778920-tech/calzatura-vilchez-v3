@@ -1,0 +1,28 @@
+{
+  "runId": "k6-mixed2000-live-2026-06-17-bff",
+  "scenario": "mixed2000",
+  "date": "2026-06-17",
+  "owner": "Calidad / Calzatura Vilchez",
+  "environment": "local-bff+supabase-prod",
+  "evidenceType": "live-run",
+  "bffIncluded": true,
+  "script": "load-tests/scenarios/read-mixed-2000.js",
+  "peakVus": 2000,
+  "duration": "see k6 summary",
+  "result": "pass",
+  "metrics": {
+    "httpReqFailedRate": 0.0008,
+    "p95CatalogMs": 1,
+    "p95DetailMs": 739,
+    "p95BffHealthMs": 1,
+    "p95BffCatalogActiveMs": 1
+  },
+  "thresholds": {
+    "maxHttpFailedRate": 0.02,
+    "maxP95CatalogMs": 4000,
+    "maxP95DetailMs": 2500,
+    "maxP95BffHealthMs": 1500
+  },
+  "k6SummaryPath": "artifacts/load-tests/k6-mixed2000-20260617-184937.json",
+  "notes": "Corrida k6 real con BFF (/public/catalog/*, /health). BFF local + LOAD_TEST_TOKEN (bypass rate-limit controlado); Supabase producción."
+}

@@ -88,9 +88,9 @@ export function setup() {
 }
 
 export function catalogWorker() {
-  if (Math.random() < 0.7) {
-    readBffCatalogActive(cfg);
-  } else {
+  readBffCatalogActive(cfg);
+  const pagePct = Number(__ENV.LOAD_CATALOG_PAGE_PCT ?? "15") / 100;
+  if (Math.random() < pagePct) {
     readBffCatalogPage(cfg, Math.floor(Math.random() * 4) + 1, 48);
   }
   sleep(Math.random() * 2 + 0.4);

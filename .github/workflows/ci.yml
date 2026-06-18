@@ -71,6 +71,9 @@ jobs:
           node scripts/k6-evidence-check.mjs \
             --evidence docs/ops/k6-mixed1000-bff-evidence.json \
             --output artifacts/load-tests/k6-mixed1000-summary.ci.json
+          node scripts/k6-evidence-check.mjs \
+            --evidence docs/ops/k6-mixed2000-bff-evidence.json \
+            --output artifacts/load-tests/k6-mixed2000-summary.ci.json
 
       - name: Gate Fiabilidad ISO 25010 (estatico)
         env:
