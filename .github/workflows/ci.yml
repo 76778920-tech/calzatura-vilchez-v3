@@ -27,7 +27,7 @@ jobs:
 
   ops-controls-static:
     name: Controles medibles IA/DevOps (estaticos)
-    needs: [supabase-migrations]
+    needs: [supabase-migrations, test-and-build, e2e, ai-service]
     runs-on: ubuntu-latest
     steps:
       - name: Clonar repositorio

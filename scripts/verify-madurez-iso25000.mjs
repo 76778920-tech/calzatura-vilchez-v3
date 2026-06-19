@@ -3,9 +3,11 @@
  * Verificación Madurez — un ítem de lista de cotejo por validación.
  * Uso: node scripts/verify-madurez-iso25000.mjs [--check-ci] [--check-audit]
  *
- * Regla CI (--check-ci): el run del workflow para GITHUB_SHA debe terminar en success.
- * Si aún está en curso (p. ej. SonarQube en paralelo con ci.yml), espera hasta SONAR_WAIT_MS.
- * No se acepta un success antiguo mientras el run del commit actual falla o sigue pendiente.
+ * Regla CI (--check-ci):
+ * - Workflows externos (integration, sonar, devsecops): último run completado en main o
+ *   run del GITHUB_SHA con espera (SonarQube).
+ * - ci.yml ejecutándose dentro de ci.yml: jobs hermanos ya completados en GITHUB_RUN_ID
+ *   (evita ciclo: el gate no puede exigir success del workflow que aún incluye este job).
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -20,12 +22,19 @@ const GH_POLL_INTERVAL_MS = 30_000;
 /** Tiempo máximo de espera al run de Sonar del mismo commit (ci.yml y sonarqube.yml van en paralelo). */
 const SONAR_WAIT_MS = Number(process.env.MADUREZ_SONAR_WAIT_MS ?? 10 * 60_000);
 
+/** Jobs de ci.yml que deben estar en success antes de validar madurez (mismo workflow run). */
+const CI_CORE_JOBS = {
+  lint: ["Lint + Tests + Build"],
+  ai: ["AI Service + IRE Schema Check"],
+  all: ["Lint + Tests + Build", "E2E Playwright (Chromium)", "AI Service + IRE Schema Check"],
+};
+
 const WORKFLOWS = {
-  1: { file: "ci.yml", jobHint: "Lint + Tests + Build", label: "CI lint/typecheck/unit" },
-  2: { file: "ci-integration.yml", jobHint: null, label: "CI Integration E2E" },
-  3: { file: "sonarqube.yml", jobHint: null, label: "SonarQube Analysis", waitForSha: true },
-  4: { file: "security-devsecops.yml", jobHint: null, label: "Security DevSecOps Gates" },
-  5: { file: "ci.yml", jobHint: "AI Service", label: "CI servicio IA" },
+  1: { file: "ci.yml", coreJobs: CI_CORE_JOBS.lint, label: "CI lint/typecheck/unit" },
+  2: { file: "ci-integration.yml", label: "CI Integration E2E" },
+  3: { file: "sonarqube.yml", label: "SonarQube Analysis", waitForSha: true },
+  4: { file: "security-devsecops.yml", label: "Security DevSecOps Gates" },
+  5: { file: "ci.yml", coreJobs: CI_CORE_JOBS.ai, label: "CI servicio IA" },
   7: { file: "ci.yml", label: "Último run workflows madurez" },
 };
 
@@ -69,6 +78,48 @@ function ghListRuns(workflowFile, { status = null, limit = 10 } = {}) {
 
 function isActiveRun(run) {
   return run.status === "in_progress" || run.status === "queued" || run.status === "waiting";
+}
+
+function isInsideCiWorkflowRun() {
+  const ref = process.env.GITHUB_WORKFLOW_REF ?? "";
+  return Boolean(process.env.GITHUB_RUN_ID) && ref.includes("/workflows/ci.yml");
+}
+
+function ghCurrentRunJobsOk(requiredJobNames) {
+  const runId = process.env.GITHUB_RUN_ID;
+  if (!runId) return null;
+
+  const r = spawnSync("gh", ["run", "view", runId, "--json", "jobs,createdAt"], {
+    encoding: "utf8",
+    cwd: ROOT,
+  });
+  if (r.status !== 0) return { run: null, reason: "gh run view no disponible" };
+
+  let payload;
+  try {
+    payload = JSON.parse(r.stdout.trim() || "{}");
+  } catch {
+    return { run: null, reason: "respuesta gh inválida" };
+  }
+
+  const jobs = payload.jobs ?? [];
+  const problems = [];
+
+  for (const required of requiredJobNames) {
+    const job = jobs.find((j) => j.name === required);
+    if (!job) {
+      problems.push(`${required}: no encontrado en el run actual`);
+      continue;
+    }
+    if (job.status !== "completed" || job.conclusion !== "success") {
+      problems.push(`${required}: ${job.conclusion ?? job.status}`);
+    }
+  }
+
+  if (problems.length > 0) {
+    return { run: null, reason: problems.join("; ") };
+  }
+  return { run: { createdAt: payload.createdAt ?? new Date().toISOString() }, reason: null };
 }
 
 /**
@@ -133,7 +184,11 @@ async function ghRunForCurrentSha(workflowFile, { wait = false, maxWaitMs = SONA
   }
 }
 
-async function ghWorkflowCheck(workflowFile, { waitForSha = false } = {}) {
+async function ghWorkflowCheck(workflowFile, { waitForSha = false, coreJobs = null } = {}) {
+  if (workflowFile === "ci.yml" && isInsideCiWorkflowRun() && coreJobs?.length) {
+    const sibling = ghCurrentRunJobsOk(coreJobs);
+    if (sibling) return sibling;
+  }
   if (process.env.GITHUB_SHA?.trim() && waitForSha) {
     return ghRunForCurrentSha(workflowFile, { wait: true });
   }
@@ -175,11 +230,12 @@ async function checkItem1(checkCi, checkAudit) {
     pass = fe && fn ? ok("Ítem 1: npm audit high/critical limpio (frontend + functions)") && pass : fail("Ítem 1: npm audit falla — commitear package-lock.json") && false;
   }
   if (checkCi) {
-    const result = await ghWorkflowCheck("ci.yml");
+    const result = await ghWorkflowCheck("ci.yml", { coreJobs: CI_CORE_JOBS.lint });
+    const label = isInsideCiWorkflowRun() ? "ci.yml jobs lint/build" : "último ci.yml";
     pass =
       result?.run && !result.reason
-        ? ok(`Ítem 1: último ci.yml success (${result.run.createdAt})`) && pass
-        : fail(`Ítem 1: último ci.yml = ${formatWorkflowFailure("ci.yml", result)}`) && false;
+        ? ok(`Ítem 1: ${label} success (${result.run.createdAt})`) && pass
+        : fail(`Ítem 1: ${label} = ${formatWorkflowFailure("ci.yml", result)}`) && false;
   }
   return pass;
 }
@@ -191,7 +247,10 @@ async function checkWorkflowItem(n, checkCi) {
     : fail(`Ítem ${n}: falta ${wf.file}`);
   if (!pass || !checkCi) return pass;
 
-  const result = await ghWorkflowCheck(wf.file, { waitForSha: Boolean(wf.waitForSha) });
+  const result = await ghWorkflowCheck(wf.file, {
+    waitForSha: Boolean(wf.waitForSha),
+    coreJobs: wf.coreJobs ?? null,
+  });
   return result?.run && !result.reason
     ? ok(`Ítem ${n}: ${wf.label} — success (${result.run.createdAt})`) && pass
     : fail(`Ítem ${n}: ${wf.label} — ${formatWorkflowFailure(wf.file, result)}`) && false;
@@ -213,14 +272,14 @@ async function checkItem7(checkCi) {
     return null;
   }
   const files = [
-    { file: "ci.yml", waitForSha: false },
+    { file: "ci.yml", waitForSha: false, coreJobs: CI_CORE_JOBS.all },
     { file: "ci-integration.yml", waitForSha: false },
     { file: "sonarqube.yml", waitForSha: true },
     { file: "security-devsecops.yml", waitForSha: false },
   ];
   let pass = true;
-  for (const { file, waitForSha } of files) {
-    const result = await ghWorkflowCheck(file, { waitForSha });
+  for (const { file, waitForSha, coreJobs = null } of files) {
+    const result = await ghWorkflowCheck(file, { waitForSha, coreJobs });
     pass =
       result?.run && !result.reason
         ? ok(`Ítem 7: ${file} success`) && pass
