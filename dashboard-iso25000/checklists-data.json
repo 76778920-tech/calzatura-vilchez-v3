@@ -1155,7 +1155,7 @@
       "color": "#2f8f4e",
       "titulo": "Lista de cotejo — Adaptabilidad",
       "objetivo": "Verificar el cumplimiento de la subcaracterística «Adaptabilidad» (Portabilidad) según ISO/IEC 9126-1.",
-      "referencia": "calzatura-vilchez/playwright.config.ts · breakpoints móvil/tablet/escritorio",
+      "referencia": "documentacion/portabilidad-mapeo-iso25023.md · playwright.config.ts",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
       "items": [
@@ -1175,7 +1175,7 @@
           "n": 3,
           "indicador": "Funciona en diferentes resoluciones (móvil/tablet/escritorio)",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "ISO 25023 FAd-3 — viewports web móvil/tablet/escritorio (Playwright); no equivale a app nativa iOS"
         },
         {
           "n": 4,
@@ -1185,15 +1185,21 @@
         },
         {
           "n": 5,
-          "indicador": "Mantiene funcionalidad sin modificar código fuente",
+          "indicador": "Adaptabilidad SO móvil declarado (Android + iOS) — ISO 25023 FAd-2",
           "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "observacion": "ISO 25023 FAd-2 — SO móvil declarado Android+iOS; verificado 1/2 (APK Android sí; IPA iOS no — firma Apple/Codemagic)"
         },
         {
           "n": 6,
           "indicador": "Matriz navegadores documentada (planes-de-prueba §4.6)",
+          "cumple": true,
+          "observacion": "ISO 25023 FAd-3 — firefox/webkit/iphone-safari web · browser-matrix-evidence.json (Safari web ≠ IPA)"
+        },
+        {
+          "n": 7,
+          "indicador": "SO iOS nativo: funciones críticas verificadas en dispositivo (FAd-2)",
           "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "observacion": "ISO 25023 FAd-2 E-IOS — Flutter compilable; sin IPA en dispositivo (Codemagic: No matching profiles)"
         }
       ]
     },
@@ -1202,7 +1208,7 @@
       "color": "#2f8f4e",
       "titulo": "Lista de cotejo — Facilidad de Instalación",
       "objetivo": "Verificar el cumplimiento de la subcaracterística «Facilidad de Instalación» (Portabilidad) según ISO/IEC 9126-1.",
-      "referencia": "docker-compose.yml · DOCKER.md · documentacion/09-instalacion-y-despliegue.md",
+      "referencia": "DOCKER.md · portabilidad-mapeo-iso25023.md §4 · codemagic.yaml",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
       "items": [
@@ -1239,8 +1245,20 @@
         {
           "n": 6,
           "indicador": "Build npm run build sin errores en entorno limpio",
+          "cumple": true,
+          "observacion": "ISO 25023 FIn-1 E-WEB — .github/workflows/ci.yml job test-and-build: npm run build en CI"
+        },
+        {
+          "n": 7,
+          "indicador": "Instalación Android APK reproducible (ISO 25023 FIn-1)",
+          "cumple": true,
+          "observacion": "ISO 25023 FIn-1 E-AND — artifacts/apk/ · flutter build apk · grupo Codemagic calzatura_mobile"
+        },
+        {
+          "n": 8,
+          "indicador": "Instalación iOS IPA reproducible (ISO 25023 FIn-1)",
           "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "observacion": "ISO 25023 FIn-1 E-IOS — codemagic.yaml listo; bloqueado certificados Apple Developer / perfil com.calzaturavilchez…"
         }
       ]
     },
@@ -1298,37 +1316,37 @@
           "n": 1,
           "indicador": "Sustituye proceso manual de ventas",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "ISO 25023 FRe-1 — checkout COD/Stripe vía BFF · e2e/checkout-cod-order.spec.ts · e2e/checkout-stripe.spec.ts · bff/server.cjs createOrder"
         },
         {
           "n": 2,
           "indicador": "Sustituye registro manual de inventario",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "ISO 25023 FRe-1 — inventario digital admin web/móvil · Supabase productos · AdminProducts · admin_products_page.dart (BFF /admin/products)"
         },
         {
           "n": 3,
           "indicador": "Sustituye generación manual de reportes",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "ISO 25023 FRe-1 — reportes/predicciones IA · AdminPredictions · admin_predictions_page.dart · servicio IA /api/predict/combined"
         },
         {
           "n": 4,
           "indicador": "Mantiene información histórica al migrar",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "ISO 25023 FRe-1 — histórico Supabase + migraciones · restore-drill-evidence.json · documentacion/10-operacion-y-mantenimiento.md §6 PITR"
         },
         {
           "n": 5,
-          "indicador": "VITE_AI_SERVICE_URL configurable",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "indicador": "URL servicio IA configurable (web y Android admin)",
+          "cumple": true,
+          "observacion": "ISO 25023 FRe-1 — Web: VITE_AI_SERVICE_URL | VITE_AI_ADMIN_PROXY_URL · .env.example · aiAdminClient · Dockerfile · ci/deploy (rebuild hosting al cambiar VITE_*). Android admin: AI_SERVICE_URL · mobile/.env.example · codemagic.yaml (rebuild APK). Proxy BFF/Function: URL IA en env servidor."
         },
         {
           "n": 6,
           "indicador": "Desacoplamiento IA vía contrato HTTP",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "ISO 25023 FRe-1 — contrato HTTP api-referencia §2.0 · 9 rutas PROXY_ROUTES · guard Vitest · admin-predictions E2E · test_api_contract.py. Nuevo IA: compatible Supabase + JSON. Web→Firebase ID token; Android admin→Bearer. Límite: proveedor identidad (Firebase) fuera de alcance."
         }
       ]
     },
@@ -1345,25 +1363,25 @@
           "n": 1,
           "indicador": "Plan pruebas portabilidad en 08-pruebas-y-calidad",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "08-pruebas-y-calidad.md §9 + adaptabilidad-trazabilidad-iso25000.md"
         },
         {
           "n": 2,
           "indicador": "Matriz SO/navegadores definida",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "planes-de-prueba §4.6 (web) + portabilidad-mapeo-iso25023.md §1 (SO móvil E-AND/E-IOS declarados aparte)"
         },
         {
           "n": 3,
           "indicador": "Evidencia ejecución en ≥ 2 navegadores",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "docs/ops/browser-matrix-evidence.json — ≥2 motores (firefox, webkit)"
         },
         {
           "n": 4,
           "indicador": "Despliegue Firebase Hosting documentado",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "Evidencia conforme al repositorio."
         },
         {
           "n": 5,

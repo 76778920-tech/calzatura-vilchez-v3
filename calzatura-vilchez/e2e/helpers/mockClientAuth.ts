@@ -143,6 +143,9 @@ const E2E_DELIVERY_CANDIDATE = {
 
 /** Checkout con BFF + ORS proxy: geocodificación y distancia simuladas. */
 export async function mockBffCheckoutDelivery(page: Page): Promise<void> {
+  await page.route("**/maps.googleapis.com/**", (route) => route.abort());
+  await page.route("**/maps.gstatic.com/**", (route) => route.abort());
+
   const matchDelivery = (url: URL) => url.pathname.startsWith("/delivery/");
   await page.route(matchDelivery, async (route) => {
     const path = new URL(route.request().url()).pathname;

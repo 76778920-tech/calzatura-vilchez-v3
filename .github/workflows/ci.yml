@@ -291,13 +291,13 @@ jobs:
           path: ~/.cache/ms-playwright
           key: pw-browsers-${{ steps.pw-version.outputs.version }}
 
-      - name: Instalar Chromium + dependencias del sistema (primera vez)
+      - name: Instalar Chromium + Firefox + WebKit + dependencias (primera vez)
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: node scripts/run-playwright.mjs install --with-deps chromium
+        run: node scripts/run-playwright.mjs install --with-deps chromium firefox webkit
 
       - name: Instalar dependencias del sistema (cache hit)
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: node scripts/run-playwright.mjs install-deps chromium
+        run: node scripts/run-playwright.mjs install-deps chromium firefox webkit
 
       - name: Ejecutar pruebas E2E
         run: npm run test:e2e
@@ -305,6 +305,8 @@ jobs:
           CI: "true"
           VITE_E2E: "true"
           VITE_ORS_API_KEY: ""
+          VITE_GOOGLE_MAPS_API_KEY: ""
+          VITE_GOOGLE_MAPS_MAP_ID: ""
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://ci-placeholder.supabase.co' }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_ci_placeholder' }}
           VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY || 'pk_test_ci_placeholder' }}

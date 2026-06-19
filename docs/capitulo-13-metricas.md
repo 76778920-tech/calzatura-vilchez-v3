@@ -147,11 +147,12 @@ La evaluación de calidad del sistema se realizó en base a la norma **ISO/IEC 2
 | **Seguridad** | Autenticidad | Firebase Auth + RLS en Supabase | ✅ Satisfactorio |
 | **Mantenibilidad** | Modularidad | Arquitectura domain-based (`src/domains/`) | ✅ Satisfactorio |
 | **Mantenibilidad** | Testeabilidad | Cobertura unitaria + E2E automatizadas | ✅ Satisfactorio |
-| **Portabilidad** | Adaptabilidad | Docker multi-stage build, variables de entorno | ✅ Satisfactorio |
-| **Portabilidad** | Instalabilidad | `docker compose up` levanta el sistema completo | ✅ Satisfactorio |
+| **Portabilidad** | Adaptabilidad | Docker, variables de entorno, matriz navegadores (Playwright) | ✅ Web/Android verificado; brecha iOS nativa (~71 % subcar.) — `portabilidad-mapeo-iso25023.md` |
+| **Portabilidad** | Instalabilidad | Docker Compose, CI build, APK Android | ✅ Docker/APK; IPA iOS pendiente (~88 % subcar.) |
+| **Portabilidad** | Intercambiabilidad | URL IA + contrato HTTP (web/Android admin) | ✅ 100 % ítems checklist — gate `ops:verify-intercambiabilidad` |
 | **Eficiencia de Desempeño** | Comportamiento temporal | AI Service con modelo Random Forest (inferencia < 500ms) | ✅ Satisfactorio |
 | **Usabilidad** | Operabilidad | Pruebas E2E de interfaz con Playwright | ✅ Satisfactorio |
 
 ### Conclusión de la evaluación
 
-El sistema Calzatura Vilchez cumple con los criterios de calidad establecidos por ISO/IEC 25010 en las características evaluadas. Las áreas con mayor solidez son la adecuación funcional (validada por pruebas automatizadas) y la seguridad (garantizada mediante Firebase Auth, RLS en Supabase y gestión segura de secretos). La portabilidad está garantizada mediante la containerización Docker implementada en el Capítulo 10.
+El sistema Calzatura Vilchez cumple con los criterios de calidad establecidos por ISO/IEC 25010 en las características evaluadas, con evidencia trazable en el dashboard ISO 25000 del repositorio. Las áreas con mayor solidez son la adecuación funcional (pruebas automatizadas E2E y unitarias) y la seguridad (Firebase Auth, RLS en Supabase, gestión de secretos). La **portabilidad** alcanza aproximadamente **84 %** en media simple del checklist (web y Android verificados; brechas declaradas: IPA iOS, medición Upstash, doc BFF Render) — no se afirma cobertura total; véase `documentacion/portabilidad-mapeo-iso25023.md` y Capítulo 10 (Docker).

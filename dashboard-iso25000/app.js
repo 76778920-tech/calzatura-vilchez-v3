@@ -99,22 +99,14 @@
   document.getElementById("page-title").textContent = meta.title;
   document.getElementById("page-subtitle").textContent = meta.project;
   document.getElementById("hero-scope").textContent = meta.scope;
-  document.getElementById("methodology-text").textContent = meta.methodology;
 
   document.getElementById("overall-pct").textContent = overall + "%";
   $("header-kpi-value").textContent = overall + "%";
+  const ringStatus = document.getElementById("ring-status-label");
+  if (ringStatus) ringStatus.textContent = statusLabel(statusFor(overall));
+  const donutTag = document.getElementById("donut-tag");
+  if (donutTag) donutTag.textContent = `${allSubs.length} subcaract.`;
   renderRing(document.getElementById("overall-ring"), overall, statusColor(statusFor(overall)));
-
-  const heroBadges = document.getElementById("hero-badge-row");
-  if (heroBadges) {
-    heroBadges.innerHTML = [
-      `<span class="hero-chip ${statusFor(overall)}">${statusLabel(statusFor(overall))}</span>`,
-      `<span class="hero-chip neutral">${allSubs.length} subcaracterísticas</span>`,
-      `<span class="hero-chip ok">${counts.ok} cumplen (≥${OK}%)</span>`,
-      counts.warn ? `<span class="hero-chip warn">${counts.warn} parciales</span>` : "",
-      counts.bad ? `<span class="hero-chip bad">${counts.bad} no cumplen</span>` : "",
-    ].filter(Boolean).join("");
-  }
 
   // --- Meta cards ---
   const metaCards = document.getElementById("meta-cards");
@@ -123,11 +115,12 @@
     [counts.warn, "Parciales " + WARN + "–" + (OK - 1) + "%", "warn"],
     [counts.bad, "No cumple (< " + WARN + "%)", "bad"],
     [allSubs.length, "Total evaluadas", "neutral"],
-  ].forEach(([num, label, st]) => metaCards.appendChild(metaCard(num, label, st)));
+  ].forEach(([num, label, st], i) => metaCards.appendChild(metaCard(num, label, st, i)));
 
-  function metaCard(num, label, status) {
+  function metaCard(num, label, status, index = 0) {
     const div = document.createElement("div");
-    div.className = "meta-card " + status;
+    div.className = `meta-card ${status} hero-reveal`;
+    div.style.setProperty("--reveal-i", index + 1);
     const iconKey = status === "neutral" ? "neutral" : status;
     div.innerHTML = `
       <div class="meta-card-inner">
@@ -147,26 +140,31 @@
     ["ok", "Cumple (≥" + OK + "%)", counts.ok],
     ["warn", "Parcial", counts.warn],
     ["bad", "No cumple", counts.bad],
-  ].forEach(([st, lbl, n]) => {
+  ].forEach(([st, lbl, n], i) => {
     const row = document.createElement("div");
-    row.className = "legend-row";
+    row.className = `legend-row legend-row--${st}`;
     row.innerHTML = `<span class="dot ${st}"></span><span>${lbl}</span><strong>${n}</strong>`;
     legend.appendChild(row);
   });
 
   // --- Barras características ---
   const barsWrap = document.getElementById("characteristic-bars");
-  charAverages.forEach((c) => barsWrap.appendChild(barRow(c.name, c.avg, c.color)));
+  charAverages.forEach((c, i) => barsWrap.appendChild(barRow(c.name, c.avg, c.color, i)));
 
-  function barRow(name, pct, color) {
+  function barRow(name, pct, color, index = 0) {
+    const st = statusFor(pct);
     const row = document.createElement("div");
-    row.className = "bar-row";
+    row.className = `bar-row bar-row--${st}`;
+    row.style.setProperty("--bar-i", index);
+    row.style.setProperty("--bar-accent", color);
     row.innerHTML = `
-      <span class="bar-name">${name}</span>
-      <span class="bar-track"><span class="bar-fill" data-width="${pct}" style="background:${color}"></span></span>
-      <span class="bar-pct">${pct}%</span>`;
+      <span class="bar-name"><span class="bar-dot" aria-hidden="true"></span>${name}</span>
+      <span class="bar-track"><span class="bar-fill ${st}" data-width="${pct}" style="background:${color}"></span></span>
+      <span class="bar-pct bar-pct--${st}">${pct}%</span>`;
     return row;
   }
+
+  renderChartKpiStrip();
 
   // --- Radar ---
   renderRadar(document.getElementById("radar-chart"), charAverages);
@@ -185,6 +183,42 @@
   // --- Correlación live (diferido) ---
   setTimeout(() => loadCorrelation($("correlation-panel"), QC_ROUTE), 0);
 
+  let radarSpinRaf = null;
+  let radarSpinAngle = 0;
+  const RADAR_SPIN_PERIOD = 36; // segundos por vuelta
+
+  function applyRadarSpin(angle) {
+    const spinG = document.querySelector("#radar-chart .radar-spin");
+    if (!spinG) return;
+    spinG.setAttribute("transform", `rotate(${angle} 0 0)`);
+    spinG.querySelectorAll(".radar-label-upright").forEach((g) => {
+      const lx = g.getAttribute("data-lx");
+      const ly = g.getAttribute("data-ly");
+      g.setAttribute("transform", `translate(${lx} ${ly}) rotate(${-angle})`);
+    });
+  }
+
+  function startRadarSpin() {
+    stopRadarSpin();
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+    if (!document.querySelector("#radar-chart .radar-spin")) return;
+
+    let last = performance.now();
+    const step = (now) => {
+      const dt = Math.min((now - last) / 1000, 0.05);
+      last = now;
+      radarSpinAngle = (radarSpinAngle + (360 / RADAR_SPIN_PERIOD) * dt) % 360;
+      applyRadarSpin(radarSpinAngle);
+      radarSpinRaf = requestAnimationFrame(step);
+    };
+    radarSpinRaf = requestAnimationFrame(step);
+  }
+
+  function stopRadarSpin() {
+    if (radarSpinRaf != null) cancelAnimationFrame(radarSpinRaf);
+    radarSpinRaf = null;
+  }
+
   const TAB_IDS = ["resumen", "graficos", "correlacion", "instrumentos", "detalle"];
 
   function setupTabs() {
@@ -201,8 +235,13 @@
     }
 
     function onTabShown(tabId) {
-      applyBarWidths();
-      if (tabId === "resumen") animateRingNow(true);
+      if (tabId === "graficos") {
+        animateChartsTab();
+      } else {
+        stopRadarSpin();
+        applyBarWidths();
+      }
+      if (tabId === "resumen") animateResumenTab();
       scheduleLayout(moveNavIndicator);
     }
 
@@ -539,9 +578,101 @@
 
   function applyBarWidths() {
     document.querySelectorAll(".bar-fill[data-width], .sub-bar-fill[data-width], .mini-bar-fill[data-width]").forEach((el) => {
+      if (el.closest("#graficos")) return;
       const w = el.getAttribute("data-width");
       if (w != null) el.style.width = w + "%";
     });
+  }
+
+  function barDelayMs(el, fallback = 0) {
+    const row = el.closest(".bar-row, .sub-bar-row");
+    const idx = row?.style.getPropertyValue("--bar-i") || row?.style.getPropertyValue("--sub-i");
+    const n = idx !== "" ? Number(idx) : fallback;
+    return Math.min(n * 55, 480);
+  }
+
+  function animateResumenTab() {
+    const tab = document.getElementById("resumen");
+    if (!tab?.classList.contains("is-active")) return;
+
+    tab.querySelectorAll(".hero-reveal").forEach((el) => el.classList.remove("is-visible"));
+
+    const run = () => {
+      tab.querySelectorAll(".hero-reveal").forEach((el) => el.classList.add("is-visible"));
+      animateRingNow(true);
+    };
+
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => requestAnimationFrame(run));
+    } else {
+      setTimeout(run, 16);
+    }
+  }
+
+  function animateChartsTab() {
+    const tab = document.getElementById("graficos");
+    if (!tab?.classList.contains("is-active")) return;
+
+    tab.querySelectorAll(".bar-fill[data-width], .sub-bar-fill[data-width]").forEach((el) => {
+      el.style.transition = "none";
+      el.style.width = "0";
+    });
+
+    tab.querySelectorAll(".group-block").forEach((block) => block.classList.remove("is-revealed"));
+    tab.querySelectorAll(".chart-animate").forEach((panel) => panel.classList.remove("is-visible"));
+
+    const radarPoly = document.querySelector("#radar-chart .radar-data-poly");
+    const radarDots = document.querySelectorAll("#radar-chart .radar-vertex, #radar-chart .radar-vertex-halo");
+    stopRadarSpin();
+    if (radarPoly) radarPoly.classList.remove("is-drawn");
+    radarDots.forEach((d) => d.classList.remove("is-visible"));
+
+    const run = () => {
+      tab.querySelectorAll(".chart-animate").forEach((panel) => panel.classList.add("is-visible"));
+
+      tab.querySelectorAll(".bar-fill[data-width], .sub-bar-fill[data-width]").forEach((el, i) => {
+        const w = el.getAttribute("data-width");
+        const delay = barDelayMs(el, i);
+        el.style.transition = `width 1.15s cubic-bezier(0.22, 1, 0.36, 1) ${delay}ms`;
+        if (w != null) el.style.width = w + "%";
+      });
+
+      tab.querySelectorAll(".group-block").forEach((block, i) => {
+        block.style.setProperty("--group-i", i);
+        setTimeout(() => block.classList.add("is-revealed"), 80 + i * 70);
+      });
+
+      if (radarPoly) {
+        setTimeout(() => radarPoly.classList.add("is-drawn"), 120);
+        radarDots.forEach((d, i) => {
+          setTimeout(() => d.classList.add("is-visible"), 280 + i * 45);
+        });
+        setTimeout(() => startRadarSpin(), 900);
+      }
+    };
+
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => requestAnimationFrame(run));
+    } else {
+      setTimeout(run, 16);
+    }
+  }
+
+  function renderChartKpiStrip() {
+    const strip = document.getElementById("chart-kpi-strip");
+    if (!strip) return;
+    const chips = charAverages.map((c) => {
+      const st = statusFor(c.avg);
+      return `<div class="chart-kpi chart-kpi--${st}" style="--kpi-accent:${c.color}">
+        <span class="chart-kpi-dot" aria-hidden="true"></span>
+        <span class="chart-kpi-label">${c.name}</span>
+        <strong class="chart-kpi-value">${c.avg}%</strong>
+      </div>`;
+    }).join("");
+    strip.innerHTML = chips + `<div class="chart-kpi chart-kpi--overall chart-kpi--${statusFor(overall)}">
+      <span class="chart-kpi-label">Global ISO 9126</span>
+      <strong class="chart-kpi-value">${overall}%</strong>
+    </div>`;
   }
 
   function animateRingNow(force = false) {
@@ -643,61 +774,81 @@
       <defs>
         <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="${color}"/>
+          <stop offset="55%" stop-color="#5aafff"/>
           <stop offset="100%" stop-color="#7c5cff"/>
         </linearGradient>
+        <filter id="ringGlow" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="3" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
       </defs>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="10"/>
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#ringGrad)" stroke-width="10"
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="11"/>
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="url(#ringGrad)" stroke-width="11"
         stroke-linecap="round" stroke-dasharray="${circumference}" stroke-dashoffset="${circumference}"
-        data-ring="1" data-ring-offset="${offset}"
+        data-ring="1" data-ring-offset="${offset}" filter="url(#ringGlow)"
         transform="rotate(-90 ${cx} ${cy})"/>`;
   }
 
   function renderDonut(svg, counts) {
     const total = counts.ok + counts.warn + counts.bad || 1;
-    const cx = 100, cy = 100, r = 70, ir = 44;
+    const cx = 100, cy = 100, r = 72, ir = 46;
+    const pad = 0.04;
     const slices = [
-      { n: counts.ok, id: "donutOk", c1: "#5ef5a0", c2: "#2e9e5b" },
-      { n: counts.warn, id: "donutWarn", c1: "#ffd060", c2: "#c98a1a" },
-      { n: counts.bad, id: "donutBad", c1: "#ff9a8a", c2: "#d9483d" },
+      { n: counts.ok, id: "donutOk", cls: "donut-slice--ok", c1: "#5ef5a0", c2: "#2e9e5b" },
+      { n: counts.warn, id: "donutWarn", cls: "donut-slice--warn", c1: "#ffd060", c2: "#c98a1a" },
+      { n: counts.bad, id: "donutBad", cls: "donut-slice--bad", c1: "#ff9a8a", c2: "#d9483d" },
     ];
-    let defs = slices.map((s) => `<linearGradient id="${s.id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${s.c1}"/><stop offset="100%" stop-color="${s.c2}"/></linearGradient>`).join("");
-    let angle = -Math.PI / 2;
+    let defs = `<filter id="donutGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>`;
+    defs += slices.map((s) => `<linearGradient id="${s.id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="${s.c1}"/><stop offset="100%" stop-color="${s.c2}"/></linearGradient>`).join("");
+    let angle = -Math.PI / 2 + pad;
     let paths = "";
-    slices.forEach(({ n, id }) => {
+    slices.forEach(({ n, id, cls }) => {
       if (!n) return;
-      const sweep = (n / total) * Math.PI * 2;
+      let sweep = (n / total) * Math.PI * 2 - pad;
+      if (sweep <= 0) return;
       const x1 = cx + r * Math.cos(angle);
       const y1 = cy + r * Math.sin(angle);
-      angle += sweep;
-      const x2 = cx + r * Math.cos(angle);
-      const y2 = cy + r * Math.sin(angle);
-      const ix1 = cx + ir * Math.cos(angle - sweep);
-      const iy1 = cy + ir * Math.sin(angle - sweep);
-      const ix2 = cx + ir * Math.cos(angle);
-      const iy2 = cy + ir * Math.sin(angle);
+      angle += sweep + pad;
+      const x2 = cx + r * Math.cos(angle - pad);
+      const y2 = cy + r * Math.sin(angle - pad);
+      const ix1 = cx + ir * Math.cos(angle - sweep - pad);
+      const iy1 = cy + ir * Math.sin(angle - sweep - pad);
+      const ix2 = cx + ir * Math.cos(angle - pad);
+      const iy2 = cy + ir * Math.sin(angle - pad);
       const large = sweep > Math.PI ? 1 : 0;
-      paths += `<path d="M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${ir} ${ir} 0 ${large} 0 ${ix1} ${iy1} Z" fill="url(#${id})"/>`;
+      paths += `<path class="donut-slice ${cls}" d="M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${ir} ${ir} 0 ${large} 0 ${ix1} ${iy1} Z" fill="url(#${id})" filter="url(#donutGlow)"/>`;
     });
-    svg.innerHTML = `<defs>${defs}</defs>${paths}<text x="${cx}" y="${cy - 4}" text-anchor="middle" font-size="22" font-weight="700" fill="#f4f6fa" font-family="JetBrains Mono, monospace">${total}</text>
-      <text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="10" fill="#8b94a8" letter-spacing="0.08em">SUBCARACT.</text>`;
+    svg.innerHTML = `<defs>${defs}</defs>${paths}
+      <circle cx="${cx}" cy="${cy}" r="${ir - 6}" fill="rgba(0,0,0,0.35)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+      <text x="${cx}" y="${cy - 6}" text-anchor="middle" font-size="28" font-weight="700" fill="#f4f6fa" font-family="JetBrains Mono, monospace">${total}</text>
+      <text x="${cx}" y="${cy + 18}" text-anchor="middle" font-size="11" fill="#8b94a8" letter-spacing="0.1em" font-weight="600">SUBCARACT.</text>`;
   }
 
   function renderGroupedBars(wrap, chars) {
-    chars.forEach((c) => {
+    chars.forEach((c, gi) => {
+      const groupAvg = Math.round(avg(c.subcharacteristics.map((s) => s.percent)));
       const group = document.createElement("div");
       group.className = "group-block";
-      group.innerHTML = `<div class="group-label" style="color:${c.color}">${c.name}</div>`;
+      group.style.setProperty("--group-i", gi);
+      group.innerHTML = `
+        <div class="group-head">
+          <div class="group-label" style="color:${c.color}">${c.name}</div>
+          <span class="group-avg-badge" style="--badge-color:${c.color}">${groupAvg}%</span>
+        </div>`;
       const bars = document.createElement("div");
       bars.className = "group-bars";
-      c.subcharacteristics.forEach((s) => {
+      c.subcharacteristics.forEach((s, si) => {
         const st = statusFor(s.percent);
         const row = document.createElement("div");
-        row.className = "sub-bar-row";
+        row.className = `sub-bar-row sub-bar-row--${st}`;
+        row.style.setProperty("--sub-i", si);
         row.innerHTML = `
           <span class="sub-bar-name" title="${s.name}">${s.name}</span>
           <span class="sub-bar-track"><span class="sub-bar-fill ${st}" data-width="${s.percent}" style="background:${statusColor(st)}"></span></span>
-          <span class="sub-bar-pct">${s.percent}%</span>`;
+          <span class="sub-bar-pct sub-bar-pct--${st}">${s.percent}%</span>`;
         bars.appendChild(row);
       });
       group.appendChild(bars);
@@ -707,48 +858,88 @@
 
   function renderRadar(svg, chars) {
     const n = chars.length;
-    const cx = 170;
-    const cy = 170;
-    const maxR = 82;
+    const cx = 180;
+    const cy = 180;
+    const maxR = 92;
     const labelR = 128;
-    svg.setAttribute("viewBox", "0 0 340 340");
+    svg.setAttribute("viewBox", "0 0 360 360");
     const rings = [20, 40, 60, 80, 100];
     const angleFor = (i) => (Math.PI * 2 * i) / n - Math.PI / 2;
     const pointAt = (i, value, radius = maxR) => {
       const a = angleFor(i);
       const r = (value / 100) * radius;
-      return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+      return [r * Math.cos(a), r * Math.sin(a)];
     };
-    let svgParts = "";
-    rings.forEach((ring) => {
+    const labelAt = (i) => pointAt(i, 100, labelR);
+
+    let spinBody = "";
+    rings.forEach((ring, ri) => {
       const pts = chars.map((_, i) => pointAt(i, ring).join(",")).join(" ");
-      svgParts += `<polygon points="${pts}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>`;
+      const isOuter = ring === 100;
+      spinBody += `<polygon class="radar-ring${isOuter ? " radar-ring--outer" : ""}" points="${pts}" fill="none" stroke="${isOuter ? "rgba(90,175,255,0.18)" : "rgba(255,255,255,0.06)"}" stroke-width="${isOuter ? 1.2 : 0.8}"/>`;
     });
     chars.forEach((_, i) => {
       const [x, y] = pointAt(i, 100);
-      svgParts += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>`;
+      spinBody += `<line class="radar-axis" x1="0" y1="0" x2="${x}" y2="${y}" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>`;
     });
+
+    spinBody += `<circle class="radar-hub" r="3.5" fill="#7ec4ff" filter="url(#hubGlow)"/>
+      <circle class="radar-hub-ring" r="10" fill="none" stroke="rgba(90,175,255,0.25)" stroke-width="1"/>`;
+
     const dataPts = chars.map((c, i) => pointAt(i, c.avg).join(",")).join(" ");
-    svgParts += `<polygon points="${dataPts}" fill="url(#radarFill)" stroke="#5aafff" stroke-width="2.5"/>`;
-    svgParts = `<defs>
-      <linearGradient id="radarFill" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="rgba(90,175,255,0.35)"/>
-        <stop offset="100%" stop-color="rgba(124,92,255,0.15)"/>
-      </linearGradient>
-    </defs>` + svgParts;
+    spinBody += `<polygon class="radar-data-poly" points="${dataPts}" fill="url(#radarFill)" stroke="url(#radarStroke)" stroke-width="2.5" stroke-linejoin="round" filter="url(#polyGlow)"/>`;
     chars.forEach((c, i) => {
       const [x, y] = pointAt(i, c.avg);
-      svgParts += `<circle cx="${x}" cy="${y}" r="6" fill="${c.color}" stroke="#fff" stroke-width="1.2"/>`;
+      spinBody += `<circle class="radar-vertex-halo" cx="${x}" cy="${y}" r="11" fill="${c.color}" opacity="0.18"/>
+        <circle class="radar-vertex" cx="${x}" cy="${y}" r="5.5" fill="${c.color}" stroke="#fff" stroke-width="1.5" filter="url(#vertexGlow)"/>`;
     });
+
     chars.forEach((c, i) => {
-      const [x, y] = pointAt(i, 100, labelR);
-      let anchor = "middle";
-      if (Math.abs(x - cx) >= 5) anchor = x > cx ? "start" : "end";
+      const [lx, ly] = labelAt(i);
       const shortName = c.name.length > 14 ? c.name.slice(0, 13) + "…" : c.name;
-      svgParts += `<text x="${x}" y="${y}" font-size="12" font-weight="600" fill="#eef1f6" text-anchor="${anchor}" dominant-baseline="middle">${shortName}</text>
-        <text x="${x}" y="${y + 15}" font-size="11" fill="${c.color}" font-weight="700" text-anchor="${anchor}" dominant-baseline="middle">${c.avg}%</text>`;
+      const st = statusFor(c.avg);
+      const pctColor = statusColor(st);
+      const pillW = Math.min(108, Math.max(76, shortName.length * 6.8 + 18));
+      const pillStroke = st === "ok" ? "rgba(46,158,91,0.35)" : st === "warn" ? "rgba(224,169,44,0.35)" : "rgba(217,72,61,0.35)";
+      spinBody += `<g class="radar-label-upright" data-lx="${lx}" data-ly="${ly}" transform="translate(${lx} ${ly})">
+        <rect class="radar-label-pill" x="${-pillW / 2}" y="-17" width="${pillW}" height="34" rx="8" fill="rgba(6,8,14,0.78)" stroke="${pillStroke}" stroke-width="1"/>
+        <text class="radar-label" y="-5" font-size="12.5" font-weight="700" fill="#f0f3f8" text-anchor="middle" dominant-baseline="middle" filter="url(#labelShadow)">${shortName}</text>
+        <text class="radar-label-pct" y="11" font-size="12" fill="${pctColor}" font-weight="800" text-anchor="middle" dominant-baseline="middle">${c.avg}%</text>
+      </g>`;
     });
-    svg.innerHTML = svgParts;
+
+    svg.innerHTML = `<defs>
+      <linearGradient id="radarFill" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="rgba(90,175,255,0.48)"/>
+        <stop offset="45%" stop-color="rgba(124,92,255,0.28)"/>
+        <stop offset="100%" stop-color="rgba(46,158,91,0.22)"/>
+      </linearGradient>
+      <linearGradient id="radarStroke" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#6eb8ff"/>
+        <stop offset="50%" stop-color="#8b6cff"/>
+        <stop offset="100%" stop-color="#4fd4a0"/>
+      </linearGradient>
+      <filter id="hubGlow" x="-100%" y="-100%" width="300%" height="300%">
+        <feGaussianBlur stdDeviation="3" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="vertexGlow" x="-80%" y="-80%" width="260%" height="260%">
+        <feGaussianBlur stdDeviation="2.5" result="b"/>
+        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="polyGlow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur"/>
+        <feFlood flood-color="#5aafff" flood-opacity="0.35" result="color"/>
+        <feComposite in="color" in2="blur" operator="in" result="glow"/>
+        <feMerge><feMergeNode in="glow"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <filter id="labelShadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="1" stdDeviation="1.2" flood-color="#000" flood-opacity="0.65"/>
+      </filter>
+    </defs>
+    <g transform="translate(${cx} ${cy})">
+      <g class="radar-spin">${spinBody}</g>
+    </g>`;
   }
 
   } catch (err) {

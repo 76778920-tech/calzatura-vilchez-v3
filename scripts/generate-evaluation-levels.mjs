@@ -81,16 +81,23 @@ const LEVELS_BY_SUB = {
   },
   Adaptabilidad: {
     nivel2: [
-      { codigo: "TC-UI-001", prueba: "Responsive móvil/tablet/escritorio", cumple: true, referencia: "playwright.config.ts" },
-      { codigo: "TC-UI-002", prueba: "E2E Chromium breakpoints", cumple: true, referencia: "e2e/*.spec.ts" },
+      { codigo: "TC-UI-001", prueba: "Responsive móvil/tablet/escritorio (FAd-3 web)", cumple: true, referencia: "playwright.config.ts" },
+      { codigo: "TC-MAN-BRW-002", prueba: "Flujo tienda Firefox (FAd-3)", cumple: true, referencia: "e2e/idoneidad-journey.spec.ts · firefox" },
+      { codigo: "TC-MAN-BRW-003", prueba: "Safari web / iPhone Safari (FAd-3)", cumple: true, referencia: "e2e/browser-matrix.spec.ts · webkit · iphone-safari" },
+      { codigo: "FAd-2-AND", prueba: "SO Android — APK funcional", cumple: true, referencia: "artifacts/apk/" },
+      { codigo: "FAd-2-IOS", prueba: "SO iOS nativo — IPA", cumple: false, referencia: "portabilidad-mapeo-iso25023.md §3 ítems 5/7" },
     ],
     nivel3: [
-      { codigo: "PT01", prueba: "Instalación Windows 10 (Docker)", evidencia: "DOCKER.md · captura despliegue" },
-      { codigo: "PT03", prueba: "Cambio de resolución", evidencia: "documentacion/planes-de-prueba.md §4.6" },
+      { codigo: "PT01", prueba: "Instalación Windows 10 (Docker)", evidencia: "DOCKER.md" },
+      { codigo: "PT-IOS", prueba: "Brecha iOS documentada", evidencia: "portabilidad-mapeo-iso25023.md §1 E-IOS" },
     ],
   },
   "Facilidad de Instalación": {
-    nivel2: [{ codigo: "TC-DOCKER-001", prueba: "docker-compose 3 servicios", cumple: true, referencia: "docker-compose.yml" }],
+    nivel2: [
+      { codigo: "TC-DOCKER-001", prueba: "docker-compose 3 servicios (FIn web)", cumple: true, referencia: "docker-compose.yml" },
+      { codigo: "FIn-AND", prueba: "Instalación APK Android", cumple: true, referencia: "checklist ítem 7" },
+      { codigo: "FIn-IOS", prueba: "Instalación IPA iOS", cumple: false, referencia: "checklist ítem 8 · Codemagic" },
+    ],
     nivel3: [
       { codigo: "PT01", prueba: "Instalación entorno limpio", evidencia: "Tiempo promedio ~2–3 min registrado" },
       { codigo: "PT02", prueba: "Instalación Windows 11", evidencia: "documentacion/08-pruebas-y-calidad.md" },
@@ -102,10 +109,14 @@ const LEVELS_BY_SUB = {
   },
   Intercambiabilidad: {
     nivel2: [
-      { codigo: "TC-REP-001", prueba: "Sustituye ventas manuales", cumple: true, referencia: "e-commerce checkout" },
-      { codigo: "TC-REP-002", prueba: "Variables VITE_AI_SERVICE_URL", cumple: true, referencia: "bff/env.example" },
+      { codigo: "TC-REP-001", prueba: "Sustituye ventas manuales", cumple: true, referencia: "e2e/checkout-cod-order.spec.ts · checkout-stripe.spec.ts" },
+      { codigo: "TC-REP-002", prueba: "URL IA web (VITE_*) y Android (AI_SERVICE_URL)", cumple: true, referencia: "calzatura-vilchez/.env.example · calzatura-vilchez-mobile/.env.example · codemagic.yaml" },
+      { codigo: "TC-REP-003", prueba: "Contrato HTTP + compatibilidad Supabase/JSON", cumple: true, referencia: "docs/04-api/api-referencia.md §2.0 · test_api_contract.py" },
     ],
-    nivel3: [{ codigo: "PT04", prueba: "Validación dueño negocio", evidencia: "Acta / minuta validación procesos" }],
+    nivel3: [
+      { codigo: "EV-REP", prueba: "Gate intercambiabilidad", evidencia: "scripts/verify-intercambiabilidad-iso25000.mjs" },
+      { codigo: "PT04", prueba: "Validación dueño negocio", evidencia: "Acta / minuta validación procesos" },
+    ],
   },
 };
 

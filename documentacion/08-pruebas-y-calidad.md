@@ -15,7 +15,7 @@
 | Tipo | Herramienta / método | Ubicación en repo | Nº de archivos |
 |------|----------------------|-------------------|----------------|
 | Unitarias / integración ligera (frontend) | Vitest | `src/__tests__/` + `src/utils/emailValidation.test.ts` | 16 archivos |
-| E2E UI | Playwright (Chromium) | `e2e/*.spec.ts`, `playwright.config.ts` | 27 archivos |
+| E2E UI | Playwright (Chromium + Firefox + WebKit) | `e2e/*.spec.ts`, `playwright.config.ts` | 37 archivos |
 | Unitarias / integración (servicio IA) | Pytest | `ai-service/tests/` | 7 suites |
 | Manuales | Checklist | `plantillas/PL-03-registro-ejecucion-prueba.md` | — |
 | Exploratorias | Sesión guiada | Acta en anexo | — |
@@ -33,6 +33,8 @@
 ## 2. Matriz requisito ↔ prueba
 
 **Fuente editable:** `cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv`  
+**Cierre Adaptabilidad (71 %):** `adaptabilidad-trazabilidad-iso25000.md` + **`portabilidad-mapeo-iso25023.md`** (FAd-2/FAd-3/FIn). Gate `npm run ops:verify-adaptabilidad`. Brecha iOS: ítems 5 y 7 checklist, no matriz Safari web.
+
 **Cierre Idoneidad (RF Must 100 %):** `idoneidad-trazabilidad-iso25000.md` — recorrido integrador `e2e/idoneidad-journey.spec.ts` (TC-IDON-001). Verificación: `npm run ops:verify-idoneidad` (raíz) o `npm run test:e2e:idoneidad` (calzatura-vilchez).
 
 **Cierre Precisión (100 %):** `precision-trazabilidad-iso25000.md` — gate `npm run ops:verify-precision -- --run-tests` (raíz).
@@ -113,8 +115,44 @@ Plantilla: `PL-04-registro-incidente-produccion.md`.
 - Capturas de Vitest verde en CI.  
 - Checklist UAT firmado.
 
-## 9. Historial de versiones
+## 9. Portabilidad — Adaptabilidad (ISO 25010)
+
+**Trazabilidad completa:** `documentacion/adaptabilidad-trazabilidad-iso25000.md` · **`documentacion/portabilidad-mapeo-iso25023.md`** (mapeo ISO 25023 FAd/FIn)  
+**Gate:** `npm run ops:verify-adaptabilidad` (añadir `--run-e2e` para matriz Firefox/WebKit/iPhone).
+
+### 9.1 Configuración sin modificar código
+
+| Canal | Plantilla env | Despliegue |
+|-------|---------------|------------|
+| Web SPA | `calzatura-vilchez/.env.example` | Firebase Hosting (secrets `VITE_*` en GitHub Actions) |
+| BFF | `bff/env.example` | Render |
+| IA | `ai-service/.env.example` | Render / Docker |
+| Móvil | `calzatura-vilchez-mobile/.env.example` | Codemagic (`calzatura_mobile`) / APK local |
+| Local | `.env.example` (raíz) + `DOCKER.md` | `docker compose up` (3 servicios) |
+
+Mismo commit/build; solo cambian URLs y claves entre local, staging y producción.
+
+### 9.2 Matriz de navegadores (planes-de-prueba §4.6)
+
+| Herramienta | Alcance |
+|-------------|---------|
+| Playwright `chromium` | Suite E2E completa (TC-MAN-BRW-001 Chrome, TC-MAN-BRW-004 Edge) |
+| Playwright `firefox` | TC-IDON-001 + `e2e/browser-matrix.spec.ts` (TC-MAN-BRW-002) |
+| Playwright `webkit` | TC-MAN-BRW-003 Safari desktop |
+| Playwright `iphone-safari` | TC-MAN-BRW-003 iPhone Safari (web) |
+
+```bash
+cd calzatura-vilchez
+npm run test:e2e:portabilidad   # Firefox + WebKit + iPhone
+```
+
+Evidencia JSON: `docs/ops/browser-matrix-evidence.json` · reporte HTML: `playwright-report/`.
+
+**Limitante:** app nativa iOS (IPA) pendiente de certificados Apple; navegación en iPhone vía Safari web cubierta por `iphone-safari`.
+
+## 10. Historial de versiones
 
 | Versión | Fecha | Descripción |
 |---------|-------|-------------|
 | 1.0 | 2026-05-01 | Versión inicial. |
+| 1.1 | 2026-06-16 | §9 Adaptabilidad: matriz navegadores Playwright + gate verify-adaptabilidad. |

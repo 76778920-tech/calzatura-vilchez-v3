@@ -172,13 +172,13 @@
       "subcharacteristics": [
         {
           "name": "Adaptabilidad",
-          "percent": 67,
-          "evidence": "Checklist responsive; E2E Chromium. Brecha: sin Firefox/WebKit automatizado."
+          "percent": 71,
+          "evidence": "ISO 25023 FAd-2: Android verificado, iOS nativo no (IPA). FAd-3 web: Playwright firefox/webkit/iphone-safari. Ver portabilidad-mapeo-iso25023.md."
         },
         {
           "name": "Facilidad de Instalación",
-          "percent": 83,
-          "evidence": "Dockerfile + docker-compose.yml (3 servicios) y DOCKER.md (~2–3 min instalación)."
+          "percent": 88,
+          "evidence": "ISO 25023 FIn-1: Docker/web OK; APK Android sí; IPA iOS bloqueado firma Apple. Ver portabilidad-mapeo-iso25023.md §4."
         },
         {
           "name": "Coexistencia",
@@ -187,13 +187,13 @@
         },
         {
           "name": "Intercambiabilidad",
-          "percent": 67,
-          "evidence": "Sustitución procesos manuales vía e-commerce; variables VITE_AI_SERVICE_URL configurables. Brecha: acoplamiento Firebase Auth."
+          "percent": 100,
+          "evidence": "ISO 25023 FRe-1: e-commerce sustituye procesos manuales; IA desacoplada por URL (web VITE_AI_SERVICE_URL, Android AI_SERVICE_URL) y contrato HTTP §2.0. Rebuild front/APK al cambiar URL embebida; modo proxy web evita rebuild si solo cambia upstream servidor. Nuevo IA debe ser compatible Supabase+JSON. Límite: Firebase Auth (identidad) no incluido."
         },
         {
           "name": "Cumplimiento de la Portabilidad",
-          "percent": 60,
-          "evidence": "Matriz SO/navegadores parcialmente documentada en documentacion/08-pruebas-y-calidad.md."
+          "percent": 80,
+          "evidence": "Plan §9 + matriz web §4.6; SO móvil nativo en portabilidad-mapeo-iso25023.md. Pendiente: doc BFF Render (ítem 5)."
         }
       ]
     }

@@ -242,8 +242,9 @@ const ITEMS_BY_SUB = {
     "Funciona en Windows 11 (Docker / hosting)",
     "Funciona en diferentes resoluciones (móvil/tablet/escritorio)",
     "Funciona con distintas configuraciones regionales (es-PE)",
-    "Mantiene funcionalidad sin modificar código fuente",
+    "Adaptabilidad SO móvil declarado (Android + iOS) — ISO 25023 FAd-2",
     "Matriz navegadores documentada (planes-de-prueba §4.6)",
+    "SO iOS nativo: funciones críticas verificadas en dispositivo (FAd-2)",
   ],
   "Facilidad de Instalación": [
     "Dockerfile frontend presente",
@@ -252,6 +253,8 @@ const ITEMS_BY_SUB = {
     "Variables .env.example documentadas",
     "Tiempo instalación ≤ 3 min (excelente) medido",
     "Build npm run build sin errores en entorno limpio",
+    "Instalación Android APK reproducible (ISO 25023 FIn-1)",
+    "Instalación iOS IPA reproducible (ISO 25023 FIn-1)",
   ],
   Coexistencia: [
     "Firebase Auth coexistiendo con Supabase datos",
@@ -265,7 +268,7 @@ const ITEMS_BY_SUB = {
     "Sustituye registro manual de inventario",
     "Sustituye generación manual de reportes",
     "Mantiene información histórica al migrar",
-    "VITE_AI_SERVICE_URL configurable",
+    "URL servicio IA configurable (web y Android admin)",
     "Desacoplamiento IA vía contrato HTTP",
   ],
   "Cumplimiento de la Portabilidad": [
@@ -302,6 +305,83 @@ const ITEM_OVERRIDES = {
     5: { cumple: true, observacion: "k6-mixed2000-bff-evidence.json — 2000 VU BFF 2026-06-17 (0.07% fail, p95 active 1ms)" },
     6: { cumple: true, observacion: "docs/ops/k6-smoke + k6-mixed1000-bff-evidence.json (live-run con BFF)" },
     7: { cumple: true, observacion: "verify-cumplimiento-fiabilidad-iso25000.mjs — 7/7 ítems" },
+  },
+  Adaptabilidad: {
+    3: {
+      cumple: true,
+      observacion: "ISO 25023 FAd-3 — viewports web móvil/tablet/escritorio (Playwright); no equivale a app nativa iOS",
+    },
+    5: {
+      cumple: false,
+      observacion:
+        "ISO 25023 FAd-2 — SO móvil declarado Android+iOS; verificado 1/2 (APK Android sí; IPA iOS no — firma Apple/Codemagic)",
+    },
+    6: {
+      cumple: true,
+      observacion:
+        "ISO 25023 FAd-3 — firefox/webkit/iphone-safari web · browser-matrix-evidence.json (Safari web ≠ IPA)",
+    },
+    7: {
+      cumple: false,
+      observacion:
+        "ISO 25023 FAd-2 E-IOS — Flutter compilable; sin IPA en dispositivo (Codemagic: No matching profiles)",
+    },
+  },
+  Intercambiabilidad: {
+    1: {
+      cumple: true,
+      observacion:
+        "ISO 25023 FRe-1 — checkout COD/Stripe vía BFF · e2e/checkout-cod-order.spec.ts · e2e/checkout-stripe.spec.ts · bff/server.cjs createOrder",
+    },
+    2: {
+      cumple: true,
+      observacion:
+        "ISO 25023 FRe-1 — inventario digital admin web/móvil · Supabase productos · AdminProducts · admin_products_page.dart (BFF /admin/products)",
+    },
+    3: {
+      cumple: true,
+      observacion:
+        "ISO 25023 FRe-1 — reportes/predicciones IA · AdminPredictions · admin_predictions_page.dart · servicio IA /api/predict/combined",
+    },
+    4: {
+      cumple: true,
+      observacion:
+        "ISO 25023 FRe-1 — histórico Supabase + migraciones · restore-drill-evidence.json · documentacion/10-operacion-y-mantenimiento.md §6 PITR",
+    },
+    5: {
+      cumple: true,
+      observacion:
+        "ISO 25023 FRe-1 — Web: VITE_AI_SERVICE_URL | VITE_AI_ADMIN_PROXY_URL · .env.example · aiAdminClient · Dockerfile · ci/deploy (rebuild hosting al cambiar VITE_*). Android admin: AI_SERVICE_URL · mobile/.env.example · codemagic.yaml (rebuild APK). Proxy BFF/Function: URL IA en env servidor.",
+    },
+    6: {
+      cumple: true,
+      observacion:
+        "ISO 25023 FRe-1 — contrato HTTP api-referencia §2.0 · 9 rutas PROXY_ROUTES · guard Vitest · admin-predictions E2E · test_api_contract.py. Nuevo IA: compatible Supabase + JSON. Web→Firebase ID token; Android admin→Bearer. Límite: proveedor identidad (Firebase) fuera de alcance.",
+    },
+  },
+  "Facilidad de Instalación": {
+    6: {
+      cumple: true,
+      observacion: "ISO 25023 FIn-1 E-WEB — .github/workflows/ci.yml job test-and-build: npm run build en CI",
+    },
+    7: {
+      cumple: true,
+      observacion: "ISO 25023 FIn-1 E-AND — artifacts/apk/ · flutter build apk · grupo Codemagic calzatura_mobile",
+    },
+    8: {
+      cumple: false,
+      observacion:
+        "ISO 25023 FIn-1 E-IOS — codemagic.yaml listo; bloqueado certificados Apple Developer / perfil com.calzaturavilchez…",
+    },
+  },
+  "Cumplimiento de la Portabilidad": {
+    1: { cumple: true, observacion: "08-pruebas-y-calidad.md §9 + adaptabilidad-trazabilidad-iso25000.md" },
+    2: {
+      cumple: true,
+      observacion:
+        "planes-de-prueba §4.6 (web) + portabilidad-mapeo-iso25023.md §1 (SO móvil E-AND/E-IOS declarados aparte)",
+    },
+    3: { cumple: true, observacion: "docs/ops/browser-matrix-evidence.json — ≥2 motores (firefox, webkit)" },
   },
   Seguridad: {
     15: { cumple: true, observacion: "audit.ts + POST /audit BFF + admin-audit-trail E2E" },

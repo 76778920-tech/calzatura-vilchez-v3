@@ -14,7 +14,9 @@
 
 Panel de predicciones de demanda usando el servicio IA externo (Render). Llama a `/api/predict/combined` con timeout de 45 s, maneja AbortError (cold start), errores de sesión y fallos genéricos. Muestra tabla de predicciones por producto con estado de stock, tendencia, días hasta agotarse, importancia de features (Random Forest) y gráficos de proyección semanal. Incluye asistente de chat (`PromptInputBox`) y botones de Reintentar.
 
-Ruta de acceso al servicio IA: `aiAdminFetch` → proxy BFF (`VITE_AI_ADMIN_PROXY_URL`) o directo con Bearer token (`VITE_AI_SERVICE_URL` + `VITE_AI_SERVICE_BEARER_TOKEN`). La ruta está cargada con `lazy()` en App.tsx para no inflar el bundle inicial.
+Ruta de acceso al servicio IA: `aiAdminFetch` → **directo** (`VITE_AI_SERVICE_URL` + Firebase ID token) o **proxy** (`VITE_AI_ADMIN_PROXY_URL` → Cloud Function/BFF `aiAdminProxy`). Sin `VITE_AI_SERVICE_BEARER_TOKEN` en el bundle (Option B; `vite.config.ts` lo rechaza). La ruta está cargada con `lazy()` en App.tsx para no inflar el bundle inicial.
+
+Contrato e intercambiabilidad: `docs/04-api/api-referencia.md` §2.0 · `npm run ops:verify-intercambiabilidad`.
 
 ---
 
@@ -63,7 +65,7 @@ Ruta de acceso al servicio IA: `aiAdminFetch` → proxy BFF (`VITE_AI_ADMIN_PROX
 
 | Riesgo | Descripción | Recomendación |
 |---|---|---|
-| Token en bundle (A1) | Hasta activar el proxy BFF en todos los entornos de producción, `VITE_AI_SERVICE_BEARER_TOKEN` puede estar en el build del frontend. | Completar el despliegue del proxy (`VITE_AI_ADMIN_PROXY_URL`) y eliminar las variables `VITE_AI_*` del bundle. Documentado en `operaciones-credenciales.md`. |
+| Auth IA (A1) | **Cerrado (Option B):** el web admin envía Firebase ID token; el build rechaza `VITE_AI_SERVICE_BEARER_TOKEN`. Alternativa proxy: `VITE_AI_ADMIN_PROXY_URL`. | Mantener alineado con `api-referencia.md` §1.1 y gate `ops:verify-intercambiabilidad`. |
 | Mantenibilidad (A6) | El componente supera las 2 400 líneas: predicciones, chat, gráficos, importancia de features, drift. | Principal deuda técnica del admin. Extraer `PredictionTable`, `PredictionDetailModal` y `AIChatPanel` como componentes separados cuando haya capacidad. |
 | Cold start de Render (A7) | El plan gratuito de Render puede tardar 20–30 s en cold start. El timeout de 45 s mitiga el bloqueo, pero no elimina la espera del usuario. | Monitorizar en Render Dashboard; considerar plan de pago o warm-up periódico si el uso lo justifica. |
 | Cobertura E2E parcial (A5) | Los tests mockean el servicio IA con JSON mínimo. No se prueban el chat, los filtros de predicción ni el scroll de detalle. | Ampliar cuando se tenga mock estable del contrato JSON de `/api/predict/combined`. |

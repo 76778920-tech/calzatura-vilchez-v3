@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="dark">
 <title>Dashboard ISO/IEC 25000 — Calzatura Vilchez</title>
-<link rel="stylesheet" href="styles.css?v=12">
+<link rel="stylesheet" href="styles.css?v=27">
 </head>
 <body>
   <div class="ambient-bg" aria-hidden="true">
@@ -50,78 +50,91 @@
     <main class="main-content" id="main-scroll">
       <div class="tab-viewport">
 
-        <div id="resumen" class="tab-panel is-active" data-tab="resumen" role="tabpanel" aria-labelledby="tab-link-resumen">
-          <header class="hero-header">
+        <div id="resumen" class="tab-panel tab-resumen is-active" data-tab="resumen" role="tabpanel" aria-labelledby="tab-link-resumen">
+          <header class="hero-header hero-reveal">
             <p class="eyebrow">Modelo de calidad · ISO/IEC 9126-1 · calidad interna/externa</p>
             <h2 class="gradient-heading">Cumplimiento global del sistema</h2>
             <p id="hero-scope" class="lead"></p>
-            <div class="hero-badge-row" id="hero-badge-row"></div>
           </header>
+
           <div class="hero-dashboard">
-            <div class="hero-metrics">
+            <section class="hero-metrics" aria-label="Indicadores de cumplimiento">
+              <h3 class="hero-section-title hero-reveal" style="--reveal-i:1">Indicadores clave</h3>
               <div class="meta-cards" id="meta-cards"></div>
-            </div>
-            <aside class="hero-visuals" aria-label="Visualizaciones de cumplimiento">
-              <article class="bento-card bento-ring glass-panel">
-                <div class="bento-label">Score global</div>
-                <div class="ring-card">
-                  <svg viewBox="0 0 120 120" width="140" height="140" id="overall-ring" aria-hidden="true"></svg>
-                  <div class="ring-center">
-                    <span class="ring-pct" id="overall-pct">--%</span>
-                    <span class="ring-label">ISO 25000</span>
+            </section>
+            <section class="hero-visuals hero-visuals--bottom" aria-label="Visualizaciones de cumplimiento">
+              <h3 class="hero-section-title hero-reveal" style="--reveal-i:2">Visualización global</h3>
+              <div class="hero-charts-grid">
+                <article class="bento-card bento-ring glass-panel hero-chart-card hero-reveal" style="--reveal-i:3">
+                  <div class="hero-chart-grid" aria-hidden="true"></div>
+                  <div class="bento-card-head">
+                    <div class="bento-label">Score global</div>
+                    <span class="bento-tag bento-tag--glow">ISO 25000</span>
                   </div>
-                </div>
-              </article>
-              <article class="bento-card bento-donut glass-panel">
-                <div class="bento-label">Distribución</div>
-                <div class="donut-wrap">
-                  <svg id="status-donut" viewBox="0 0 200 200" width="180" height="180" role="img" aria-label="Distribución de subcaracterísticas"></svg>
-                  <div class="donut-legend" id="donut-legend"></div>
-                </div>
-              </article>
-            </aside>
+                  <div class="ring-stage">
+                    <div class="ring-glow" aria-hidden="true"></div>
+                    <div class="ring-orbit" aria-hidden="true"></div>
+                    <div class="ring-card">
+                      <svg viewBox="0 0 120 120" id="overall-ring" aria-hidden="true"></svg>
+                      <div class="ring-center">
+                        <span class="ring-pct" id="overall-pct">--%</span>
+                        <span class="ring-label" id="ring-status-label">Cumplimiento</span>
+                      </div>
+                    </div>
+                  </div>
+                </article>
+                <article class="bento-card bento-donut glass-panel hero-chart-card hero-reveal" style="--reveal-i:4">
+                  <div class="hero-chart-grid" aria-hidden="true"></div>
+                  <div class="bento-card-head">
+                    <div class="bento-label">Distribución por estado</div>
+                    <span class="bento-tag" id="donut-tag">27 subcaract.</span>
+                  </div>
+                  <div class="donut-stage">
+                    <div class="donut-wrap">
+                      <svg id="status-donut" viewBox="0 0 200 200" role="img" aria-label="Distribución de subcaracterísticas"></svg>
+                    </div>
+                    <div class="donut-legend" id="donut-legend"></div>
+                  </div>
+                </article>
+              </div>
+            </section>
           </div>
-          <details class="methodology-note footnote glass-panel">
-            <summary>Metodología y fuentes de datos</summary>
-            <div class="methodology-body">
-              <p><strong>Metodología:</strong> <span id="methodology-text"></span></p>
-              <p class="muted">Dashboard en <code>data.json</code> · Indicadores CF/COF/TECP en <a href="/adecuacion-funcional/">módulo de adecuación funcional</a>.</p>
-            </div>
-          </details>
         </div>
 
         <div id="graficos" class="tab-panel tab-graficos" data-tab="graficos" role="tabpanel" hidden>
-          <header class="section-head">
+          <header class="section-head section-head--charts">
             <span class="section-index">01</span>
             <div>
               <h2>Análisis estadístico por característica</h2>
               <p class="muted">Radar comparativo, barras por dominio y distribución de todas las subcaracterísticas.</p>
             </div>
           </header>
-          <div class="charts-grid">
-            <article class="panel chart-panel glass-panel">
+          <div class="chart-kpi-strip" id="chart-kpi-strip" aria-label="Resumen de cumplimiento"></div>
+          <div class="charts-grid charts-grid--top">
+            <article class="panel chart-panel chart-panel--radar glass-panel chart-animate" style="--chart-i:0">
               <div class="panel-header">
                 <h3>Radar — características ISO 9126</h3>
-                <span class="panel-tag">Comparativo</span>
+                <span class="panel-tag panel-tag--glow">Comparativo</span>
               </div>
               <div class="radar-wrap">
-                <svg id="radar-chart" viewBox="0 0 340 340"></svg>
+                <div class="radar-glow" aria-hidden="true"></div>
+                <svg id="radar-chart" viewBox="0 0 360 360" role="img" aria-label="Radar de cumplimiento ISO 9126"></svg>
               </div>
             </article>
-            <article class="panel chart-panel glass-panel">
+            <article class="panel chart-panel chart-panel--bars glass-panel chart-animate" style="--chart-i:1">
               <div class="panel-header">
                 <h3>Barras — cumplimiento por característica</h3>
                 <span class="panel-tag">Por dominio</span>
               </div>
-              <div class="bars-wrap" id="characteristic-bars"></div>
+              <div class="bars-wrap bars-wrap--domain" id="characteristic-bars"></div>
             </article>
           </div>
-          <article class="panel chart-panel full-width glass-panel">
+          <article class="panel chart-panel chart-panel--grouped full-width glass-panel chart-animate" style="--chart-i:2">
             <div class="panel-header">
               <h3>Barras agrupadas — todas las subcaracterísticas</h3>
               <span class="panel-tag">Detalle ISO</span>
             </div>
-            <p class="muted chart-note">Cada grupo corresponde a una característica principal del modelo ISO.</p>
+            <p class="muted chart-note">Cada grupo corresponde a una característica principal del modelo ISO 9126.</p>
             <div class="grouped-bars-wrap" id="grouped-bars"></div>
           </article>
         </div>
@@ -171,6 +184,6 @@
     </main>
   </div>
 
-<script src="app.js?v=12"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>

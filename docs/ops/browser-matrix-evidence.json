@@ -1,0 +1,31 @@
+{
+  "meta": {
+    "instrument": "Matriz compatibilidad navegadores — planes-de-prueba.md §4.6",
+    "gate": "npm run test:e2e:portabilidad",
+    "generatedAt": "2026-06-16T22:05:00-05:00",
+    "environment": "Windows 11 · Playwright 1.59 · CI=true · VITE_E2E=true",
+    "specs": [
+      "calzatura-vilchez/e2e/browser-matrix.spec.ts",
+      "calzatura-vilchez/e2e/idoneidad-journey.spec.ts"
+    ]
+  },
+  "cases": [
+    { "id": "TC-MAN-BRW-001", "browser": "Chrome (Chromium)", "project": "chromium", "automatedInThisRun": false, "note": "Suite E2E completa en CI (job principal)" },
+    { "id": "TC-MAN-BRW-002", "browser": "Firefox (latest)", "project": "firefox", "spec": "browser-matrix + TC-IDON-001", "status": "passed", "durationMs": 6600 },
+    { "id": "TC-MAN-BRW-003", "browser": "Safari WebKit (desktop)", "project": "webkit", "spec": "browser-matrix + TC-IDON-001", "status": "passed", "durationMs": 6700 },
+    { "id": "TC-MAN-BRW-003", "browser": "iPhone Safari (390×844)", "project": "iphone-safari", "spec": "browser-matrix + TC-IDON-001", "status": "passed", "durationMs": 7100 },
+    { "id": "TC-MAN-BRW-004", "browser": "Edge (Blink)", "project": "chromium", "automatedInThisRun": false, "note": "Motor Chromium — equivalente a TC-MAN-BRW-001" }
+  ],
+  "projects": [
+    { "name": "firefox", "tests": 2, "passed": 2, "failed": 0, "status": "passed" },
+    { "name": "webkit", "tests": 2, "passed": 2, "failed": 0, "status": "passed" },
+    { "name": "iphone-safari", "tests": 2, "passed": 2, "failed": 0, "status": "passed" }
+  ],
+  "summary": {
+    "totalTests": 6,
+    "passed": 6,
+    "failed": 0,
+    "distinctEngines": ["firefox", "webkit"],
+    "reportHtml": "calzatura-vilchez/playwright-report/index.html"
+  }
+}

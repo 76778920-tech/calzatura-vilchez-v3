@@ -137,13 +137,13 @@
   },
   "Adaptabilidad": {
     "tipo": "Lista de cotejo",
-    "nombre": "Checklist responsive + cobertura E2E",
-    "referencia": "calzatura-vilchez/playwright.config.ts · breakpoints móvil/tablet/escritorio"
+    "nombre": "Checklist adaptabilidad ISO 25023 FAd-1/2/3",
+    "referencia": "documentacion/portabilidad-mapeo-iso25023.md · playwright.config.ts"
   },
   "Facilidad de Instalación": {
     "tipo": "Lista de cotejo",
-    "nombre": "Checklist despliegue Docker reproducible",
-    "referencia": "docker-compose.yml · DOCKER.md · documentacion/09-instalacion-y-despliegue.md"
+    "nombre": "Checklist instalabilidad ISO 25023 FIn (Docker + APK/IPA)",
+    "referencia": "DOCKER.md · portabilidad-mapeo-iso25023.md §4 · codemagic.yaml"
   },
   "Coexistencia": {
     "tipo": "Lista de cotejo",

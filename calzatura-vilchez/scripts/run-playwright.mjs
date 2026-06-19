@@ -55,6 +55,8 @@ const env = {
   ...process.env,
   // Mismo valor que playwright.config webServer.env (evita servidor reutilizado sin E2E).
   VITE_E2E: "true",
+  VITE_GOOGLE_MAPS_API_KEY: "",
+  VITE_GOOGLE_MAPS_MAP_ID: "",
 };
 delete env.NO_COLOR;
 delete env.FORCE_COLOR;

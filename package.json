@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "ops:verify-idoneidad": "node scripts/verify-idoneidad-iso25000.mjs",
+    "ops:verify-adaptabilidad": "node scripts/verify-adaptabilidad-iso25000.mjs",
+    "ops:verify-intercambiabilidad": "node scripts/verify-intercambiabilidad-iso25000.mjs",
     "ops:verify-precision": "node scripts/verify-precision-iso25000.mjs",
     "ops:verify-interoperabilidad": "node scripts/verify-interoperabilidad-iso25000.mjs",
     "ops:verify-seguridad": "node scripts/verify-seguridad-iso25000.mjs",

@@ -14,13 +14,25 @@
 
 ## 1. Autenticación
 
-Todos los endpoints del servicio IA (excepto `GET /` y `GET /api/health`) requieren autenticación mediante Bearer Token.
+Todos los endpoints del servicio IA (excepto `GET /` y `GET /api/health`) requieren un header `Authorization: Bearer …`.
+
+### 1.1 Cliente web admin (producción — Option B)
+
+El frontend (`aiAdminClient.ts`) envía el **Firebase ID token** de la sesión admin. No usa `VITE_AI_SERVICE_BEARER_TOKEN` en el bundle (rechazado en build por `vite.config.ts`). El servicio IA en Render verifica la firma JWT y comprueba el email en `SUPERADMIN_EMAILS`.
+
+```http
+Authorization: Bearer <firebase_id_token>
+```
+
+### 1.2 Token de servicio (scripts, pruebas, integraciones servidor)
+
+Para llamadas directas al servicio IA sin sesión Firebase (p. ej. `curl`, pytest, load tests):
 
 ```http
 Authorization: Bearer <AI_SERVICE_BEARER_TOKEN>
 ```
 
-El token se configura en la variable de entorno `AI_SERVICE_BEARER_TOKEN` del servicio IA y en la variable de entorno del frontend para que el cliente web lo incluya en cada solicitud.
+El token se configura en `AI_SERVICE_BEARER_TOKEN` del servicio IA (`ai-service/.env`).
 
 **Respuesta ante token inválido:**
 ```json
@@ -41,6 +53,38 @@ HTTP 503 Service Unavailable
 ---
 
 ## 2. Endpoints del Servicio IA (FastAPI)
+
+### 2.0 Contrato HTTP del cliente admin (`aiAdminClient.ts`)
+
+El panel de administración consume el servicio IA mediante HTTP (`aiAdminFetch`). La URL base se configura con `VITE_AI_SERVICE_URL` (directo) o `VITE_AI_ADMIN_PROXY_URL` (proxy legado). Rutas en lista blanca:
+
+| Ruta | Método | Uso en frontend |
+|---|---|---|
+| `/api/predict/combined` | GET | Predicciones admin (demanda + ingresos + IRE) |
+| `/api/sales/weekly-chart` | GET | Gráfico semanal de ventas |
+| `/api/model/metrics` | GET | Métricas del modelo ML |
+| `/api/ire/historial` | GET | Historial IRE |
+| `/api/cache/invalidate` | POST | Invalidar caché tras cambios de datos |
+| `/api/campaign/active` | GET | Campaña comercial activa |
+| `/api/campaign/feedback` | POST | Feedback admin sobre campaña |
+| `/api/predict/campaign-detection` | GET | Detección de campaña |
+| `/api/campaign/learning-stats` | GET | Estadísticas de aprendizaje |
+
+Contrato automatizado: `src/__tests__/interoperabilityAiClientGuard.test.js` · `ai-service/tests/test_api_contract.py` · E2E `e2e/admin-predictions.spec.ts`.
+
+**Configuración de URL (intercambiabilidad):**
+
+| Cliente | Variable | Rebuild al cambiar URL |
+|---------|----------|------------------------|
+| Web admin (directo) | `VITE_AI_SERVICE_URL` | Sí — `npm run build` + deploy Hosting |
+| Web admin (proxy) | `VITE_AI_ADMIN_PROXY_URL` → upstream en BFF/Function | No en front si el proxy no cambia; sí redeploy proxy con nueva `AI_SERVICE_URL` servidor |
+| Android admin | `AI_SERVICE_URL` en `calzatura-vilchez-mobile/.env` / Codemagic | Sí — rebuild APK |
+
+**Auth hacia el IA:** web admin envía **Firebase ID token** (`aiAdminClient.ts`); Android admin envía **Bearer** (`AI_SERVICE_BEARER_TOKEN` en build móvil). El servicio IA acepta ambos (`firebase_verifier.py` + token de servicio).
+
+**Compatibilidad del IA sustituto:** debe leer **Supabase** (mismos datos) y devolver el **JSON** documentado en §2.3+ (p. ej. `/api/predict/combined`). Cambiar solo la URL sin contrato compatible no es sustitución válida.
+
+---
 
 ### 2.1 GET `/`
 Verificación de estado del servicio.
@@ -479,10 +523,10 @@ Las políticas RLS de Supabase garantizan automáticamente que solo se retornan 
 | `VITE_FIREBASE_API_KEY` | API Key de Firebase |
 | `VITE_FIREBASE_AUTH_DOMAIN` | Auth domain de Firebase |
 | `VITE_FIREBASE_PROJECT_ID` | ID del proyecto Firebase |
-| `VITE_AI_SERVICE_URL` | URL base del servicio IA |
-| `VITE_AI_SERVICE_TOKEN` | Bearer Token del servicio IA |
+| `VITE_AI_SERVICE_URL` | URL base del servicio IA (modo directo HTTP) |
+| `VITE_AI_ADMIN_PROXY_URL` | URL del proxy legado Cloud Function (opcional; alternativa a directo) |
 | `VITE_CLOUDINARY_CLOUD_NAME` | Nombre del cloud en Cloudinary |
 | `VITE_CLOUDINARY_UPLOAD_PRESET` | Upload preset de Cloudinary |
 | `VITE_DNI_API_KEY` | API Key del servicio de validación DNI |
 
-**Nota de seguridad (ISO/IEC 27001, Control A.9.4.3):** Todas las variables `.env` deben estar excluidas del repositorio git mediante `.gitignore`. Las variables `VITE_*` son accesibles en el bundle del frontend (no son secretas desde la perspectiva del servidor), pero el `SUPABASE_SERVICE_KEY` y el `AI_SERVICE_BEARER_TOKEN` son secretos y nunca deben exponerse en el código fuente o en el bundle del cliente.
+**Nota de seguridad (ISO/IEC 27001, Control A.9.4.3):** Todas las variables `.env` deben estar excluidas del repositorio git mediante `.gitignore`. Las variables `VITE_*` son accesibles en el bundle del frontend; **no** incluir secretos de servicio IA en el cliente — la sesión admin usa Firebase ID token. El `SUPABASE_SERVICE_KEY` y el `AI_SERVICE_BEARER_TOKEN` son secretos de servidor y nunca deben exponerse en el bundle.

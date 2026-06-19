@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:5173";
 
+/** TC-MAN-BRW-002/003/004 (Safari vía WebKit) — matriz §4.6 sin duplicar suite admin en CI. */
+const browserMatrixSpecs = ["**/idoneidad-journey.spec.ts", "**/browser-matrix.spec.ts"];
+
 export default defineConfig({
   testDir: "e2e",
   fullyParallel: true,
@@ -22,7 +25,24 @@ export default defineConfig({
     // de Firebase están moquead en los tests de admin.
     storageState: "e2e/.auth/admin.json",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "firefox",
+      testMatch: browserMatrixSpecs,
+      use: { ...devices["Desktop Firefox"] },
+    },
+    {
+      name: "webkit",
+      testMatch: browserMatrixSpecs,
+      use: { ...devices["Desktop Safari"] },
+    },
+    {
+      name: "iphone-safari",
+      testMatch: browserMatrixSpecs,
+      use: { ...devices["iPhone 13"] },
+    },
+  ],
   webServer: {
     command: "npm run dev -- --host 127.0.0.1 --port 5173 --strictPort",
     url: baseURL,
@@ -41,6 +61,9 @@ export default defineConfig({
       // E2E mockea las rutas directas del servicio IA. Evita heredar el proxy
       // real desde GitHub Actions, porque eso salta los page.route("**/api/**").
       VITE_AI_ADMIN_PROXY_URL: "",
+      // Evita cargar Maps JS en E2E (WebKit/Firefox fallan con keys inválidas de .env.local).
+      VITE_GOOGLE_MAPS_API_KEY: "",
+      VITE_GOOGLE_MAPS_MAP_ID: "",
     },
   },
 });

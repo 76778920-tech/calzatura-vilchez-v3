@@ -303,16 +303,20 @@ jobs:
 
       - name: Instalar Chromium + dependencias del sistema (primera vez)
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: node scripts/run-playwright.mjs install --with-deps chromium
+        run: node scripts/run-playwright.mjs install --with-deps chromium firefox webkit
 
       - name: Instalar dependencias del sistema (cache hit)
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: node scripts/run-playwright.mjs install-deps chromium
+        run: node scripts/run-playwright.mjs install-deps chromium firefox webkit
 
       - name: Ejecutar pruebas E2E
         run: npm run test:e2e
         env:
           CI: "true"
+          VITE_E2E: "true"
+          VITE_ORS_API_KEY: ""
+          VITE_GOOGLE_MAPS_API_KEY: ""
+          VITE_GOOGLE_MAPS_MAP_ID: ""
           VITE_BACKEND_API_URL: http://127.0.0.1:5173
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
