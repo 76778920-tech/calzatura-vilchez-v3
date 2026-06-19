@@ -1,19 +1,8 @@
-import 'package:animations/animations.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/admin/presentation/pages/admin_dashboard_page.dart';
-import '../../features/admin/presentation/pages/admin_data_page.dart';
-import '../../features/admin/presentation/pages/admin_manufacturers_page.dart';
-import '../../features/admin/presentation/pages/admin_orders_page.dart';
-import '../../features/admin/presentation/pages/admin_products_page.dart';
-import '../../features/admin/data/panel_scope_provider.dart';
-import '../../features/admin/presentation/pages/admin_sales_page.dart';
-import '../../features/admin/presentation/pages/staff_sales_page.dart';
-import '../../features/admin/presentation/pages/admin_users_page.dart';
-import '../../features/profile/presentation/pages/edit_profile_page.dart';
+import '../config/app_platform.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/splash_page.dart';
@@ -26,22 +15,23 @@ import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/orders/presentation/pages/orders_page.dart';
 import '../../features/orders/presentation/pages/order_success_page.dart';
 import '../../features/product/presentation/pages/product_detail_page.dart';
+import '../../features/profile/presentation/pages/edit_profile_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/sensors/presentation/pages/device_sensors_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/wishlist/presentation/pages/wishlist_page.dart';
+import 'admin_routes.dart';
+import 'app_router_transitions.dart';
 import 'auth_navigation.dart';
-
-const _forceAdminDashboard = bool.fromEnvironment('CV_FORCE_ADMIN_DASHBOARD');
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
   final roleAsync = ref.watch(userRoleProvider);
 
   return GoRouter(
-    initialLocation: _forceAdminDashboard ? '/admin' : '/splash',
+    initialLocation: AppPlatform.forceAdminDashboard ? '/admin' : '/splash',
     redirect: (context, state) {
-      if (_forceAdminDashboard) {
+      if (AppPlatform.forceAdminDashboard) {
         return state.matchedLocation.startsWith('/admin') ? null : '/admin';
       }
 
@@ -53,6 +43,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
       if (isLoading && loc != '/splash') return '/splash';
 
+      // iOS: sin panel admin/trabajador — cualquier /admin → home
+      if (!AppPlatform.adminPanelsEnabled && loc.startsWith('/admin')) {
+        return '/home';
+      }
+
       if (!isAuth) {
         if (loc.startsWith('/admin')) return '/home';
         if (loc.startsWith('/profile/')) {
@@ -63,16 +58,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      // Forzar verificación de email antes de continuar
       final firebaseUser = FirebaseAuth.instance.currentUser;
       final emailVerified = firebaseUser?.emailVerified ?? false;
       if (isAuth && !emailVerified && loc != '/verify-email') {
         return '/verify-email';
       }
 
-      if (isAuth && !isOnAuth) {
-        if (loc.startsWith('/admin/predicciones')) return '/admin';
-
+      if (isAuth && !isOnAuth && AppPlatform.adminPanelsEnabled) {
         final role = roleAsync.valueOrNull;
         if (role == 'admin' || role == 'trabajador') {
           const allowed = [
@@ -113,7 +105,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         final role = roleAsync.valueOrNull;
         final redirect = safeRedirectFrom(state);
         if (redirect != null) return redirect;
-        if (role == 'admin' || role == 'trabajador') return '/admin';
+        if (AppPlatform.adminPanelsEnabled &&
+            (role == 'admin' || role == 'trabajador')) {
+          return '/admin';
+        }
         return '/home';
       }
 
@@ -122,88 +117,48 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/splash',
-        pageBuilder: (ctx, s) => NoTransitionPage(child: SplashPage()),
+        pageBuilder: (ctx, s) => noTransitionPage(SplashPage()),
       ),
       GoRoute(
         path: '/login',
-        pageBuilder: (ctx, s) => _fadePage(const LoginPage()),
+        pageBuilder: (ctx, s) => fadePage(const LoginPage()),
       ),
       GoRoute(
         path: '/register',
-        pageBuilder: (ctx, s) => _sharedAxisPage(const RegisterPage()),
+        pageBuilder: (ctx, s) => sharedAxisPage(const RegisterPage()),
       ),
       GoRoute(
         path: '/verify-email',
-        pageBuilder: (ctx, s) => _sharedAxisPage(const VerifyEmailPage()),
+        pageBuilder: (ctx, s) => sharedAxisPage(const VerifyEmailPage()),
       ),
       GoRoute(
         path: '/checkout',
-        pageBuilder: (ctx, s) => _sharedAxisPage(const CheckoutPage()),
+        pageBuilder: (ctx, s) => sharedAxisPage(const CheckoutPage()),
       ),
       GoRoute(
         path: '/order-success/:id',
-        pageBuilder: (ctx, state) => _sharedAxisPage(
+        pageBuilder: (ctx, state) => sharedAxisPage(
           OrderSuccessPage(orderId: state.pathParameters['id']!),
         ),
       ),
-      GoRoute(
-        path: '/admin',
-        pageBuilder: (ctx, s) => _fadePage(const AdminDashboardPage()),
-        routes: [
-          GoRoute(
-            path: 'productos',
-            pageBuilder: (ctx, s) => _sharedAxisPage(const AdminProductsPage()),
-          ),
-          GoRoute(
-            path: 'pedidos',
-            pageBuilder: (ctx, s) => _sharedAxisPage(const AdminOrdersPage()),
-          ),
-          GoRoute(
-            path: 'ventas',
-            pageBuilder: (ctx, s) => _sharedAxisPage(
-              Consumer(
-                builder: (context, ref, _) {
-                  final profile = ref.watch(userProfileBffProvider).valueOrNull;
-                  final isStaff = profile?['rol'] == 'trabajador';
-                  return isStaff
-                      ? const StaffSalesPage()
-                      : const AdminSalesPage();
-                },
-              ),
-            ),
-          ),
-          GoRoute(
-            path: 'usuarios',
-            pageBuilder: (ctx, s) => _sharedAxisPage(const AdminUsersPage()),
-          ),
-          GoRoute(
-            path: 'fabricantes',
-            pageBuilder: (ctx, s) =>
-                _sharedAxisPage(const AdminManufacturersPage()),
-          ),
-          GoRoute(
-            path: 'datos',
-            pageBuilder: (ctx, s) => _sharedAxisPage(const AdminDataPage()),
-          ),
-        ],
-      ),
+      if (AppPlatform.adminPanelsEnabled) buildAdminRoute(),
       ShellRoute(
         builder: (context, state, child) => ShellPage(child: child),
         routes: [
           GoRoute(
             path: '/home',
-            pageBuilder: (ctx, s) => _fadePage(const HomePage()),
+            pageBuilder: (ctx, s) => fadePage(const HomePage()),
           ),
           GoRoute(
             path: '/catalog',
-            pageBuilder: (ctx, s) => _fadePage(const CatalogPage()),
+            pageBuilder: (ctx, s) => fadePage(const CatalogPage()),
             routes: [
               GoRoute(
                 path: ':id',
                 pageBuilder: (ctx, state) {
                   final id = state.pathParameters['id']!;
                   final extra = state.extra as Map<String, dynamic>?;
-                  return _fadePage(
+                  return fadePage(
                     ProductDetailPage(productId: id, heroData: extra),
                   );
                 },
@@ -212,29 +167,29 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: '/wishlist',
-            pageBuilder: (ctx, s) => _fadePage(const WishlistPage()),
+            pageBuilder: (ctx, s) => fadePage(const WishlistPage()),
           ),
           GoRoute(
             path: '/cart',
-            pageBuilder: (ctx, s) => _sharedAxisPage(const CartPage()),
+            pageBuilder: (ctx, s) => sharedAxisPage(const CartPage()),
           ),
           GoRoute(
             path: '/profile',
-            pageBuilder: (ctx, s) => _fadePage(const ProfilePage()),
+            pageBuilder: (ctx, s) => fadePage(const ProfilePage()),
             routes: [
               GoRoute(
                 path: 'orders',
-                pageBuilder: (ctx, s) => _sharedAxisPage(const OrdersPage()),
+                pageBuilder: (ctx, s) => sharedAxisPage(const OrdersPage()),
               ),
               GoRoute(
                 path: 'edit',
                 pageBuilder: (ctx, s) =>
-                    _sharedAxisPage(const EditProfilePage()),
+                    sharedAxisPage(const EditProfilePage()),
               ),
               GoRoute(
                 path: 'sensors',
                 pageBuilder: (ctx, s) =>
-                    _sharedAxisPage(const DeviceSensorsPage()),
+                    sharedAxisPage(const DeviceSensorsPage()),
               ),
             ],
           ),
@@ -243,26 +198,3 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
-
-CustomTransitionPage<T> _fadePage<T>(Widget child) {
-  return CustomTransitionPage<T>(
-    child: child,
-    transitionDuration: const Duration(milliseconds: 250),
-    transitionsBuilder: (ctx, animation, secondary, c) =>
-        FadeTransition(opacity: animation, child: c),
-  );
-}
-
-CustomTransitionPage<T> _sharedAxisPage<T>(Widget child) {
-  return CustomTransitionPage<T>(
-    child: child,
-    transitionDuration: const Duration(milliseconds: 300),
-    transitionsBuilder: (ctx, animation, secondaryAnimation, c) =>
-        SharedAxisTransition(
-          animation: animation,
-          secondaryAnimation: secondaryAnimation,
-          transitionType: SharedAxisTransitionType.horizontal,
-          child: c,
-        ),
-  );
-}

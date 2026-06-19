@@ -59,6 +59,14 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
   bool _geocoding = false;
   DateTime? _lastGeoRequest;
 
+  /// Espejo de web `pagoDisabledByDelivery`: exige ubicación y cotización válidas.
+  bool get _pagoDisabledByDelivery =>
+      _quoteLoading ||
+      _quoteError != null ||
+      _quote == null ||
+      _confirmedLat == null ||
+      (_quote?.isOutOfRange ?? false);
+
   @override
   void initState() {
     super.initState();
@@ -258,10 +266,20 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
       return;
     }
 
+    if (_quote == null || _confirmedLat == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Confirma tu dirección en el mapa o elige una sugerencia para calcular el envío.'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
     setState(() => _submitting = true);
 
     try {
-      final envio = _quote?.cost ?? 0.0;
+      final envio = _quote!.cost;
       final direccion = OrderAddress(
         nombre: _nombreCtrl.text.trim(),
         apellido: _apellidoCtrl.text.trim(),
@@ -589,7 +607,7 @@ class _CheckoutPageState extends ConsumerState<CheckoutPage> {
                         SizedBox(
                           height: 54,
                           child: ElevatedButton(
-                            onPressed: _submitting ? null : _submit,
+                            onPressed: (_submitting || _pagoDisabledByDelivery) ? null : _submit,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.black,
                               foregroundColor: Colors.white,

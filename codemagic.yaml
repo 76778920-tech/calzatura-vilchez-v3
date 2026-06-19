@@ -1,5 +1,15 @@
 # Monorepo: app Flutter en calzatura-vilchez-mobile/
 # Guía Práctica N° 13 — compilación iOS (Codemagic).
+# iOS = app de cliente únicamente (sin panel admin/trabajador).
+#
+# FIRMA GRATIS (como en la guía del docente):
+#   distribution_type: development  + certificado "Apple Development"
+#   NO usar app_store (eso exige Apple Developer Program de pago).
+#
+# Codemagic → Team settings → Code signing identities:
+#   1) iOS certificates → Generate o subir .p12 → tipo Apple Development
+#   2) iOS provisioning profiles → Fetch/Upload → perfil Development
+#      para com.calzaturavilchez.calzaturaVilchezMobile
 workflows:
   ios-build:
     name: Calzatura Vilchez iOS
@@ -10,7 +20,7 @@ workflows:
       flutter: stable
       xcode: latest
       ios_signing:
-        distribution_type: app_store
+        distribution_type: development
         bundle_identifier: com.calzaturavilchez.calzaturaVilchezMobile
       vars:
         BUNDLE_ID: com.calzaturavilchez.calzaturaVilchezMobile
@@ -37,9 +47,11 @@ workflows:
         script: |
           flutter analyze
           flutter test
+      - name: Aplicar perfiles de firma (Codemagic)
+        script: xcode-project use-profiles
       - name: Build IPA
         script: |
           flutter build ipa --release \
-            --export-options-plist=ios/ExportOptions.plist
+            --export-options-plist=ios/ExportOptions-development.plist
     artifacts:
       - build/ios/ipa/*.ipa

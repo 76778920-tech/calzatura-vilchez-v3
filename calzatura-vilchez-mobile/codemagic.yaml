@@ -1,11 +1,8 @@
 # Guía Práctica N° 13 — compilación iOS (Codemagic).
-# Auth: Firebase | Datos: Supabase (no Firestore).
+# Usar el codemagic.yaml de la RAÍZ del monorepo (working_directory: calzatura-vilchez-mobile).
+# Este archivo es referencia; Codemagic del repo usa ../codemagic.yaml en main.
 #
-# Pasos manuales en codemagic.io:
-# 1. Conectar repositorio (raíz: calzatura-vilchez-mobile).
-# 2. Team settings → iOS code signing → certificado + perfil App Store.
-# 3. Variables de entorno según .env.example (SUPABASE_*, BACKEND_API_URL, etc.).
-# 4. (Opcional) Integración App Store Connect para TestFlight automático.
+# iOS = app de cliente. Firma GRATIS: development + Apple Development (no app_store).
 workflows:
   ios-build:
     name: Calzatura Vilchez iOS
@@ -15,7 +12,7 @@ workflows:
       flutter: stable
       xcode: latest
       ios_signing:
-        distribution_type: app_store
+        distribution_type: development
         bundle_identifier: com.calzaturavilchez.calzaturaVilchezMobile
       vars:
         BUNDLE_ID: com.calzaturavilchez.calzaturaVilchezMobile
@@ -42,9 +39,11 @@ workflows:
         script: |
           flutter analyze
           flutter test
+      - name: Aplicar perfiles de firma (Codemagic)
+        script: xcode-project use-profiles
       - name: Build IPA
         script: |
           flutter build ipa --release \
-            --export-options-plist=ios/ExportOptions.plist
+            --export-options-plist=ios/ExportOptions-development.plist
     artifacts:
       - build/ios/ipa/*.ipa

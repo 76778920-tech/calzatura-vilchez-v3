@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/config/app_platform.dart';
 import '../../../../core/config/env.dart';
 import '../../../admin/data/panel_scope_provider.dart';
 import '../../data/auth_repository.dart';
@@ -21,8 +22,9 @@ final userRoleProvider = FutureProvider<String>((ref) async {
   return (profile?['rol'] as String?) ?? 'cliente';
 });
 
-/// Acceso al shell `/admin` (admin o trabajador de tienda).
+/// Acceso al shell `/admin` (admin o trabajador — solo Android).
 final isAdminProvider = Provider<bool>((ref) {
+  if (!AppPlatform.adminPanelsEnabled) return false;
   final role = ref.watch(userRoleProvider).valueOrNull;
   return role == 'admin' || role == 'trabajador';
 });

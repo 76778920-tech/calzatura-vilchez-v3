@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/config/app_platform.dart';
+import '../../../../core/config/web_app_links.dart';
 import '../../../../core/router/auth_navigation.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/open_external_url.dart';
 import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
@@ -129,7 +132,7 @@ class ProfilePage extends ConsumerWidget {
                                     ),
                                   ),
                                   child: Text(
-                                    role.toUpperCase(),
+                                    AppPlatform.displayRole(role).toUpperCase(),
                                     style: const TextStyle(
                                       color: AppColors.gold,
                                       fontSize: 10,
@@ -242,19 +245,43 @@ class ProfilePage extends ConsumerWidget {
                 _ProfileTile(
                   icon: Icons.help_outline_rounded,
                   label: 'Ayuda y soporte',
-                  onTap: () {},
+                  onTap: () => openExternalUrl(WebAppLinks.helpFaq),
                 ).animate(delay: 300.ms).fadeIn().slideX(begin: -0.1),
+                _ProfileTile(
+                  icon: Icons.storefront_outlined,
+                  label: 'Nuestras tiendas',
+                  onTap: () => openExternalUrl(WebAppLinks.stores),
+                ).animate(delay: 310.ms).fadeIn().slideX(begin: -0.1),
                 _ProfileTile(
                   icon: Icons.sensors_rounded,
                   label: 'Sensores del dispositivo',
                   subtitle: 'Acelerómetro, giroscopio y más',
                   onTap: () => context.push('/profile/sensors'),
                 ).animate(delay: 275.ms).fadeIn().slideX(begin: -0.1),
+                const SizedBox(height: 16),
+
+                const _SectionTitle(title: 'Legal'),
+                const SizedBox(height: 8),
+                _ProfileTile(
+                  icon: Icons.privacy_tip_outlined,
+                  label: 'Política de privacidad',
+                  onTap: () => openExternalUrl(WebAppLinks.privacy),
+                ).animate(delay: 320.ms).fadeIn().slideX(begin: -0.1),
+                _ProfileTile(
+                  icon: Icons.description_outlined,
+                  label: 'Términos y condiciones',
+                  onTap: () => openExternalUrl(WebAppLinks.terms),
+                ).animate(delay: 330.ms).fadeIn().slideX(begin: -0.1),
+                _ProfileTile(
+                  icon: Icons.gavel_outlined,
+                  label: 'Libro de reclamaciones',
+                  onTap: () => openExternalUrl(WebAppLinks.complaints),
+                ).animate(delay: 340.ms).fadeIn().slideX(begin: -0.1),
                 _ProfileTile(
                   icon: Icons.info_outline_rounded,
                   label: 'Acerca de',
                   subtitle: 'Versión 1.0.0',
-                  onTap: () {},
+                  onTap: () => openExternalUrl(WebAppLinks.helpContact),
                 ).animate(delay: 350.ms).fadeIn().slideX(begin: -0.1),
                 const SizedBox(height: 24),
 

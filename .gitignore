@@ -1,7 +1,10 @@
 # Word lock files (created while a .docx is open)
 ~$*
 
-# Supabase CLI local state (project ref, versions cache)
+# Mobile signing keys (never commit)
+artifacts/signing/
+*.p12
+*.mobileprovision
 calzatura-vilchez/supabase/.temp/
 
 # Logs

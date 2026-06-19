@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../../../core/config/env.dart';
+import '../../../core/utils/idempotency_key.dart';
 import '../../cart/domain/cart_item.dart';
 
 class OrderAddress {
@@ -159,11 +160,13 @@ class OrdersRepository {
 
     final idToken = await user.getIdToken();
     final base = Env.backendApiUrl.replaceAll(RegExp(r'/$'), '');
+    final idempotencyKey = newIdempotencyKey();
     final response = await _client.post(
       Uri.parse('$base/createOrder'),
       headers: {
         'Content-Type': 'application/json',
         'Authorization': 'Bearer $idToken',
+        'Idempotency-Key': idempotencyKey,
       },
       body: jsonEncode({
         'items': items
