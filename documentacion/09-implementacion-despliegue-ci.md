@@ -134,7 +134,8 @@ No usar `db pull` para “arreglar” prod salvo que quieras traer SQL generado 
 |--------|---------|-----------|
 | Calidad | `npm run quality` | test + lint + typecheck + build |
 | Tests unit | `npm run test` | Vitest |
-| E2E | `npm run test:e2e` | Playwright |
+| E2E | `npm run test:e2e` | Playwright (Chromium — suite principal) |
+| E2E portabilidad | `npm run test:e2e:portabilidad` | Firefox, WebKit, iPhone Safari (§4.6) |
 
 ## 6. Integración continua (CI)
 

@@ -299,17 +299,19 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cache/ms-playwright
-          key: pw-browsers-${{ steps.pw-version.outputs.version }}
+          key: pw-browsers-${{ steps.pw-version.outputs.version }}-chromium-firefox-webkit
 
-      - name: Instalar Chromium + dependencias del sistema (primera vez)
+      - name: Instalar Chromium + Firefox + WebKit + dependencias (sin caché)
         if: steps.pw-cache.outputs.cache-hit != 'true'
         run: node scripts/run-playwright.mjs install --with-deps chromium firefox webkit
 
-      - name: Instalar dependencias del sistema (cache hit)
+      - name: Asegurar binarios Playwright (caché hit)
         if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: node scripts/run-playwright.mjs install-deps chromium firefox webkit
+        run: |
+          node scripts/run-playwright.mjs install chromium firefox webkit
+          node scripts/run-playwright.mjs install-deps chromium firefox webkit
 
-      - name: Ejecutar pruebas E2E
+      - name: Ejecutar pruebas E2E (Chromium)
         run: npm run test:e2e
         env:
           CI: "true"
@@ -326,6 +328,31 @@ jobs:
           VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
           VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
           # VITE_AI_SERVICE_BEARER_TOKEN omitido: E2E usa mocks de red (page.route), no llama al servicio real.
+          VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          E2E_ADMIN_EMAIL: ${{ secrets.E2E_ADMIN_EMAIL }}
+          E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
+
+      - name: Ejecutar E2E portabilidad (Firefox, WebKit, iPhone Safari)
+        run: npm run test:e2e:portabilidad
+        env:
+          CI: "true"
+          VITE_E2E: "true"
+          VITE_ORS_API_KEY: ""
+          VITE_GOOGLE_MAPS_API_KEY: ""
+          VITE_GOOGLE_MAPS_MAP_ID: ""
+          VITE_BACKEND_API_URL: http://127.0.0.1:5173
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_STRIPE_PUBLIC_KEY: ${{ secrets.VITE_STRIPE_PUBLIC_KEY }}
+          VITE_CLOUDINARY_CLOUD_NAME: ${{ secrets.VITE_CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET: ${{ secrets.VITE_CLOUDINARY_UPLOAD_PRESET }}
+          VITE_DNI_LOOKUP_URL: ${{ secrets.VITE_DNI_LOOKUP_URL }}
+          VITE_AI_SERVICE_URL: ${{ secrets.VITE_AI_SERVICE_URL }}
           VITE_AI_ADMIN_PROXY_URL: ${{ secrets.VITE_AI_ADMIN_PROXY_URL }}
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
