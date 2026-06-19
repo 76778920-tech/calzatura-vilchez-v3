@@ -383,6 +383,41 @@ const ITEM_OVERRIDES = {
     },
     3: { cumple: true, observacion: "docs/ops/browser-matrix-evidence.json — ≥2 motores (firefox, webkit)" },
   },
+  Analizabilidad: {
+    4: { cumple: true, observacion: "SonarQube Analysis success en main (gh run list sonarqube.yml)" },
+    5: { cumple: true, observacion: "docs/SONAR_SEGUIMIENTO.md + docs/TECH-DEBT-BACKLOG.md" },
+  },
+  Cambiabilidad: {
+    5: {
+      cumple: true,
+      observacion: "documentacion/mantenibilidad-trazabilidad-iso25000.md §2 matriz dominio→impacto→regresión",
+    },
+  },
+  Estabilidad: {
+    1: { cumple: true, observacion: "132 tests Chromium en 37 specs (playwright test --list)" },
+    5: { cumple: true, observacion: "npm run test:e2e:smoke en PR · suite completa en push main (ci.yml)" },
+  },
+  Pruebabilidad: {
+    1: { cumple: true, observacion: "Vitest coverage líneas ≥60% (CI job test-and-build, scope vitest.config.ts)" },
+    2: { cumple: true, observacion: "Vitest coverage funciones ≥60%" },
+    3: { cumple: true, observacion: "Vitest coverage ramas ≥50%" },
+    4: {
+      cumple: true,
+      observacion:
+        "carrito/pedidos/productos/ventas/admin — unit+guard+E2E (mantenibilidad-trazabilidad §4)",
+    },
+    5: {
+      cumple: true,
+      observacion: "setup.ts Supabase + e2e/helpers/mock* (Firebase, BFF, IA, checkout)",
+    },
+  },
+  "Cumplimiento de la Mantenibilidad": {
+    1: { cumple: true, observacion: "SonarQube Quality Gate passing (sonarqube.yml)" },
+    2: { cumple: true, observacion: "CI obligatorio en pull_request→main (ci.yml + sonarqube.yml)" },
+    3: { cumple: true, observacion: ".github/CODEOWNERS — revisión por área" },
+    4: { cumple: true, observacion: "CHANGELOG.md + documentacion/13-checklist-cierre-defensa.md" },
+    5: { cumple: true, observacion: "docs/TECH-DEBT-BACKLOG.md — triage TD-01…TD-07" },
+  },
   Seguridad: {
     15: { cumple: true, observacion: "audit.ts + POST /audit BFF + admin-audit-trail E2E" },
     16: { cumple: true, observacion: "supabase/migrations/20260503100000_audit_pedidos_trigger.sql — trg_audit_pedido_insert" },

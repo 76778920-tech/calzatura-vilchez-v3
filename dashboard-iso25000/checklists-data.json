@@ -4,7 +4,7 @@
     "fuenteFormato": "https://cuaed.unam.mx/publicaciones/libro-evaluacion/pdf/Capitulo-14-LISTA-DE-COTEJO.pdf",
     "proyecto": "Calzatura Vilchez — Sistema Web E-Commerce con IA",
     "evaluador": "Ing. Calidad — Tesis UCV",
-    "fecha": "2026-06-18",
+    "fecha": "2026-06-19",
     "instruccionesGenerales": "Evaluación en tres niveles: (1) lista de cotejo Sí/No — instrumento principal; (2) casos de prueba con evidencia objetiva (TC-*, gates verify-*); (3) capturas y actas para sustento ante jurado. El % = ítems cumplidos ÷ total × 100."
   },
   "checklists": {
@@ -976,13 +976,13 @@
           "n": 4,
           "indicador": "Issues críticos Sonar resueltos",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "SonarQube Analysis success en main (gh run list sonarqube.yml)"
         },
         {
           "n": 5,
           "indicador": "Trazabilidad de deuda técnica visible",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "docs/SONAR_SEGUIMIENTO.md + docs/TECH-DEBT-BACKLOG.md"
         }
       ]
     },
@@ -1022,8 +1022,8 @@
         {
           "n": 5,
           "indicador": "Cambios localizados sin efecto cascada documentado",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "documentacion/mantenibilidad-trazabilidad-iso25000.md §2 matriz dominio→impacto→regresión"
         }
       ]
     },
@@ -1040,7 +1040,7 @@
           "n": 1,
           "indicador": "≥ 34 specs E2E Playwright",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "132 tests Chromium en 37 specs (playwright test --list)"
         },
         {
           "n": 2,
@@ -1063,8 +1063,8 @@
         {
           "n": 5,
           "indicador": "Smoke spec en cada PR",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "npm run test:e2e:smoke en PR · suite completa en push main (ci.yml)"
         }
       ]
     },
@@ -1081,31 +1081,31 @@
           "n": 1,
           "indicador": "Vitest coverage líneas ≥ 60 %",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Vitest coverage líneas ≥60% (CI job test-and-build, scope vitest.config.ts)"
         },
         {
           "n": 2,
           "indicador": "Vitest coverage funciones ≥ 60 %",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Vitest coverage funciones ≥60%"
         },
         {
           "n": 3,
           "indicador": "Vitest coverage ramas ≥ 50 %",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Vitest coverage ramas ≥50%"
         },
         {
           "n": 4,
           "indicador": "Dominios críticos con tests dedicados",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "carrito/pedidos/productos/ventas/admin — unit+guard+E2E (mantenibilidad-trazabilidad §4)"
         },
         {
           "n": 5,
           "indicador": "Mocks/fixtures para integraciones externas",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "setup.ts Supabase + e2e/helpers/mock* (Firebase, BFF, IA, checkout)"
         }
       ]
     },
@@ -1122,31 +1122,31 @@
           "n": 1,
           "indicador": "SonarQube Quality Gate passing",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "SonarQube Quality Gate passing (sonarqube.yml)"
         },
         {
           "n": 2,
           "indicador": "Política de ramas main protegida",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "CI obligatorio en pull_request→main (ci.yml + sonarqube.yml)"
         },
         {
           "n": 3,
           "indicador": "CODEOWNERS o revisión obligatoria",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": ".github/CODEOWNERS — revisión por área"
         },
         {
           "n": 4,
           "indicador": "Documentación actualizada por release",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "CHANGELOG.md + documentacion/13-checklist-cierre-defensa.md"
         },
         {
           "n": 5,
           "indicador": "Deuda técnica triaged en backlog",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "docs/TECH-DEBT-BACKLOG.md — triage TD-01…TD-07"
         }
       ]
     },

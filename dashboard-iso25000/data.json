@@ -2,7 +2,7 @@
   "meta": {
     "title": "Dashboard de Cumplimiento — Calidad interna/externa ISO/IEC 9126-1",
     "project": "Calzatura Vilchez — Sistema Web E-Commerce con IA",
-    "generatedAt": "2026-06-18",
+    "generatedAt": "2026-06-19",
     "scope": "Vitrina pública, catálogo, carrito, checkout/pagos (Stripe), panel administrativo, servicio IA de predicción.",
     "methodology": "Modelo ISO/IEC 9126-1 (6 características de calidad interna/externa): Funcionalidad, Fiabilidad, Usabilidad, Eficiencia, Mantenibilidad y Portabilidad — taxonomía del diagrama de referencia. Evaluación en tres niveles: (1) lista de cotejo Sí/No, (2) casos de prueba, (3) capturas y actas. Ver documentacion/modelo-calidad-25010-alineacion.md §9126.",
     "thresholds": {
@@ -140,27 +140,27 @@
         {
           "name": "Analizabilidad",
           "percent": 100,
-          "evidence": "SonarQube Cloud + ESLint: 0 errores y 0 warnings en último reporte."
+          "evidence": "SonarQube Cloud + ESLint 0/0 + QG passing. Gate: npm run ops:verify-mantenibilidad:ci. documentacion/mantenibilidad-trazabilidad-iso25000.md §1."
         },
         {
           "name": "Cambiabilidad",
-          "percent": 80,
-          "evidence": "Arquitectura src/domains/, rutas centralizadas, componentes reutilizables."
+          "percent": 100,
+          "evidence": "src/domains/ (11 dominios), paths.ts, matriz impacto localizado §2. Gate verify-mantenibilidad."
         },
         {
           "name": "Estabilidad",
-          "percent": 80,
-          "evidence": "34 specs E2E Playwright + Vitest en CI antes de merge a main."
+          "percent": 100,
+          "evidence": "132 E2E Chromium + Vitest CI + smoke en PR (test:e2e:smoke). documentacion/mantenibilidad-trazabilidad-iso25000.md §3."
         },
         {
           "name": "Pruebabilidad",
-          "percent": 60,
-          "evidence": "Cobertura Vitest: ~53–57% líneas — por debajo de meta orientativa 60%."
+          "percent": 100,
+          "evidence": "Vitest coverage ≥60% líneas/funciones, ≥50% ramas (scope declarado). Dominios críticos + mocks. §4."
         },
         {
           "name": "Cumplimiento de la Mantenibilidad",
-          "percent": 80,
-          "evidence": "Quality Gate SonarQube Analysis en success (2026-06-18)."
+          "percent": 100,
+          "evidence": "Sonar QG, CI en PR, CODEOWNERS, CHANGELOG, TECH-DEBT-BACKLOG. §5."
         }
       ]
     },

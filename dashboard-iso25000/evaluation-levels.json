@@ -1,7 +1,7 @@
 {
   "meta": {
     "descripcion": "Nivel 2: casos de prueba · Nivel 3: capturas y actas",
-    "generado": "2026-06-18",
+    "generado": "2026-06-19",
     "proyecto": "Calzatura Vilchez — Sistema Web E-Commerce con IA"
   },
   "levels": {
@@ -321,7 +321,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "SonarQube Cloud + ESLint: 0 errores y 0 warnings en último reporte."
+          "evidencia": "SonarQube Cloud + ESLint 0/0 + QG passing. Gate: npm run ops:verify-mantenibilidad:ci. documentacion/mantenibilidad-traz"
         }
       ]
     },
@@ -331,7 +331,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Arquitectura src/domains/, rutas centralizadas, componentes reutilizables."
+          "evidencia": "src/domains/ (11 dominios), paths.ts, matriz impacto localizado §2. Gate verify-mantenibilidad."
         }
       ]
     },
@@ -341,7 +341,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "34 specs E2E Playwright + Vitest en CI antes de merge a main."
+          "evidencia": "132 E2E Chromium + Vitest CI + smoke en PR (test:e2e:smoke). documentacion/mantenibilidad-trazabilidad-iso25000.md §3."
         }
       ]
     },
@@ -368,7 +368,7 @@
         {
           "codigo": "EV-DOC",
           "prueba": "Evidencia documental",
-          "evidencia": "Quality Gate SonarQube Analysis en success (2026-06-18)."
+          "evidencia": "Sonar QG, CI en PR, CODEOWNERS, CHANGELOG, TECH-DEBT-BACKLOG. §5."
         }
       ]
     },

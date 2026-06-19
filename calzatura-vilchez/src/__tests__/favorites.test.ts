@@ -31,6 +31,9 @@ afterEach(() => {
 });
 
 describe("favorites service", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_E2E", "");
+  });
   it("consulta favoritos via BFF", async () => {
     fetchMock.mockResolvedValue({
       ok: true,

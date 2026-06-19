@@ -1,0 +1,13 @@
+# CODEOWNERS — revisión obligatoria por área (ISO Mantenibilidad)
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+* @76778920-tech
+
+/calzatura-vilchez/src/domains/ @76778920-tech
+/calzatura-vilchez/bff/ @76778920-tech
+/calzatura-vilchez/e2e/ @76778920-tech
+/ai-service/ @76778920-tech
+/.github/workflows/ @76778920-tech
+/scripts/verify-*-iso25000.mjs @76778920-tech
+/documentacion/ @76778920-tech
+/dashboard-iso25000/ @76778920-tech

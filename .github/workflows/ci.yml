@@ -83,6 +83,7 @@ jobs:
           node scripts/verify-tolerancia-fallos-iso25000.mjs
           node scripts/verify-recuperacion-iso25000.mjs
           node scripts/verify-cumplimiento-fiabilidad-iso25000.mjs --run-evidence-check
+          node scripts/verify-mantenibilidad-iso25000.mjs --check-ci --run-coverage
 
       - name: Subir evidencia estatica de controles
         if: always()
@@ -301,8 +302,13 @@ jobs:
           node scripts/run-playwright.mjs install chromium firefox webkit
           node scripts/run-playwright.mjs install-deps chromium firefox webkit
 
-      - name: Ejecutar pruebas E2E (Chromium)
-        run: npm run test:e2e
+      - name: Ejecutar pruebas E2E (smoke en PR, suite completa en push)
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            npm run test:e2e:smoke
+          else
+            npm run test:e2e
+          fi
         env:
           CI: "true"
           VITE_E2E: "true"
@@ -329,6 +335,7 @@ jobs:
           E2E_ADMIN_PASSWORD: ${{ secrets.E2E_ADMIN_PASSWORD }}
 
       - name: Ejecutar E2E portabilidad (Firefox, WebKit, iPhone Safari)
+        if: github.event_name != 'pull_request'
         run: npm run test:e2e:portabilidad
         env:
           CI: "true"
