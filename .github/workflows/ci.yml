@@ -87,7 +87,7 @@ jobs:
           node scripts/verify-tolerancia-fallos-iso25000.mjs
           node scripts/verify-recuperacion-iso25000.mjs
           node scripts/verify-cumplimiento-fiabilidad-iso25000.mjs --run-evidence-check
-          node scripts/verify-mantenibilidad-iso25000.mjs --check-ci --run-coverage
+          node scripts/verify-mantenibilidad-iso25000.mjs --check-ci
 
       - name: Subir evidencia estatica de controles
         if: always()

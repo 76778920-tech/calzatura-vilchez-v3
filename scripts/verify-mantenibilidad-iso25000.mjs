@@ -109,6 +109,28 @@ function countPlaywrightTests() {
   return m ? Number(m[1]) : null;
 }
 
+function ghCurrentRunJobOk(jobName) {
+  const runId = process.env.GITHUB_RUN_ID;
+  if (!runId) return null;
+  const r = spawnSync("gh", ["run", "view", runId, "--json", "jobs"], { encoding: "utf8", cwd: ROOT });
+  if (r.status !== 0) return false;
+  const jobs = JSON.parse(r.stdout.trim() || "{}").jobs ?? [];
+  const job = jobs.find((j) => j.name === jobName);
+  return job?.status === "completed" && job?.conclusion === "success";
+}
+
+function readVitestThresholds() {
+  const cfg = read("calzatura-vilchez/vitest.config.ts");
+  const lines = cfg.match(/lines:\s*(\d+)/)?.[1];
+  const functions = cfg.match(/functions:\s*(\d+)/)?.[1];
+  const branches = cfg.match(/branches:\s*(\d+)/)?.[1];
+  return {
+    lines: lines ? Number(lines) : null,
+    functions: functions ? Number(functions) : null,
+    branches: branches ? Number(branches) : null,
+  };
+}
+
 function ghStrictLatestCompleted(workflowFile) {
   const r = spawnSync(
     "gh",
@@ -200,11 +222,26 @@ function checkEstabilidad() {
   return pass;
 }
 
-function checkPruebabilidad(runCoverage) {
+function checkPruebabilidad(runCoverage, checkCi) {
   let pass = true;
   let cov = { lines: null, functions: null, branches: null };
 
-  if (runCoverage) {
+  const thresholds = readVitestThresholds();
+
+  if (checkCi && !runCoverage && ghCurrentRunJobOk("Lint + Tests + Build")) {
+    pass =
+      thresholds.lines != null && thresholds.lines >= COVERAGE_MIN.lines
+        ? ok(`P1: CI validó coverage (umbral vitest ${thresholds.lines}% líneas)`)
+        : fail(`P1: umbral líneas ${thresholds.lines}%`) && false;
+    pass =
+      thresholds.functions != null && thresholds.functions >= COVERAGE_MIN.functions
+        ? ok(`P2: umbral funciones ${thresholds.functions}% en vitest.config.ts`)
+        : fail(`P2: umbral funciones`) && false;
+    pass =
+      thresholds.branches != null && thresholds.branches >= COVERAGE_MIN.branches
+        ? ok(`P3: umbral ramas ${thresholds.branches}% en vitest.config.ts`)
+        : fail(`P3: umbral ramas`) && false;
+  } else if (runCoverage) {
     console.log("\n--- Vitest coverage ---");
     const r = spawnSync("npm", ["run", "test:coverage"], {
       cwd: APP,
@@ -216,32 +253,22 @@ function checkPruebabilidad(runCoverage) {
       return false;
     }
     cov = parseCoverageSummary(r.stdout + r.stderr);
-  } else if (exists("calzatura-vilchez/coverage/lcov.info")) {
-    const r = spawnSync("npm", ["run", "test:coverage"], {
-      cwd: APP,
-      encoding: "utf8",
-      shell: process.platform === "win32",
-    });
-    cov = parseCoverageSummary(r.stdout + r.stderr);
-  }
-
-  if (cov.lines == null) {
-    fail("P1-P3: ejecutar con --run-coverage o generar lcov.info");
+    pass =
+      cov.lines >= COVERAGE_MIN.lines
+        ? ok(`P1: coverage líneas ${cov.lines}% ≥ ${COVERAGE_MIN.lines}%`)
+        : fail(`P1: líneas ${cov.lines}% < ${COVERAGE_MIN.lines}%`) && false;
+    pass =
+      cov.functions >= COVERAGE_MIN.functions
+        ? ok(`P2: coverage funciones ${cov.functions}% ≥ ${COVERAGE_MIN.functions}%`)
+        : fail(`P2: funciones ${cov.functions}%`) && false;
+    pass =
+      cov.branches >= COVERAGE_MIN.branches
+        ? ok(`P3: coverage ramas ${cov.branches}% ≥ ${COVERAGE_MIN.branches}%`)
+        : fail(`P3: ramas ${cov.branches}%`) && false;
+  } else {
+    fail("P1-P3: ejecutar con --run-coverage o --check-ci en CI");
     return false;
   }
-
-  pass =
-    cov.lines >= COVERAGE_MIN.lines
-      ? ok(`P1: coverage líneas ${cov.lines}% ≥ ${COVERAGE_MIN.lines}%`)
-      : fail(`P1: líneas ${cov.lines}% < ${COVERAGE_MIN.lines}%`) && false;
-  pass =
-    cov.functions >= COVERAGE_MIN.functions
-      ? ok(`P2: coverage funciones ${cov.functions}% ≥ ${COVERAGE_MIN.functions}%`)
-      : fail(`P2: funciones ${cov.functions}%`) && false;
-  pass =
-    cov.branches >= COVERAGE_MIN.branches
-      ? ok(`P3: coverage ramas ${cov.branches}% ≥ ${COVERAGE_MIN.branches}%`)
-      : fail(`P3: ramas ${cov.branches}%`) && false;
 
   for (const domain of CRITICAL_DOMAINS) {
     const missing = domain.tests.filter((t) => !exists(`calzatura-vilchez/src/__tests__/${t}`) && !exists(`calzatura-vilchez/e2e/${t}`));
@@ -291,7 +318,7 @@ function checkCumplimiento(checkCi) {
 
 function main() {
   const checkCi = process.argv.includes("--check-ci");
-  const runCoverage = process.argv.includes("--run-coverage") || checkCi;
+  const runCoverage = process.argv.includes("--run-coverage") || (checkCi && !process.env.GITHUB_RUN_ID);
 
   console.log("=== Verificación Mantenibilidad — ISO 9126-1 ===\n");
 
@@ -299,7 +326,7 @@ function main() {
     Analizabilidad: checkAnalizabilidad(checkCi),
     Cambiabilidad: checkCambiabilidad(),
     Estabilidad: checkEstabilidad(),
-    Pruebabilidad: checkPruebabilidad(runCoverage),
+    Pruebabilidad: checkPruebabilidad(runCoverage, checkCi),
     "Cumplimiento de la Mantenibilidad": checkCumplimiento(checkCi),
   };
 

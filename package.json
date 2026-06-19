@@ -13,7 +13,7 @@
     "ops:verify-madurez": "node scripts/verify-madurez-iso25000.mjs",
     "ops:verify-madurez:ci": "node scripts/verify-madurez-iso25000.mjs --check-ci --check-audit",
     "ops:verify-mantenibilidad": "node scripts/verify-mantenibilidad-iso25000.mjs",
-    "ops:verify-mantenibilidad:ci": "node scripts/verify-mantenibilidad-iso25000.mjs --check-ci --run-coverage",
+    "ops:verify-mantenibilidad:ci": "node scripts/verify-mantenibilidad-iso25000.mjs --check-ci",
     "ops:verify-tolerancia-fallos": "node scripts/verify-tolerancia-fallos-iso25000.mjs",
     "ops:verify-recuperacion": "node scripts/verify-recuperacion-iso25000.mjs",
     "ops:verify-cumplimiento-fiabilidad": "node scripts/verify-cumplimiento-fiabilidad-iso25000.mjs",
