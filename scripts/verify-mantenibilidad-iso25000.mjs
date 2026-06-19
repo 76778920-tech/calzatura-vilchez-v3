@@ -51,7 +51,7 @@ function ok(msg) {
   return true;
 }
 
-function parseEslintReport() {
+function parseEslintReportFromFile() {
   const raw = read("calzatura-vilchez/eslint-report.json");
   const data = JSON.parse(raw);
   let errors = 0;
@@ -63,6 +63,28 @@ function parseEslintReport() {
     }
   }
   return { errors, warnings };
+}
+
+function loadEslintReport() {
+  if (exists("calzatura-vilchez/eslint-report.json")) {
+    return parseEslintReportFromFile();
+  }
+  console.log("[mantenibilidad] Generando eslint-report.json…");
+  const r = spawnSync("npm", ["run", "lint:report"], {
+    cwd: APP,
+    encoding: "utf8",
+    shell: process.platform === "win32",
+  });
+  if (r.status !== 0) throw new Error("lint:report falló");
+  return parseEslintReportFromFile();
+}
+
+function getEslintCounts() {
+  try {
+    return loadEslintReport();
+  } catch (e) {
+    return { errors: -1, warnings: -1, error: e.message };
+  }
 }
 
 function parseCoverageSummary(stdout) {
@@ -112,9 +134,14 @@ function checkAnalizabilidad(checkCi) {
   let pass = true;
   pass = exists("sonar-project.properties") ? ok("A1: SonarQube Cloud configurado") && pass : fail("A1: falta sonar-project.properties") && false;
 
-  const eslint = parseEslintReport();
-  pass = eslint.errors === 0 ? ok("A2: ESLint 0 errores") && pass : fail(`A2: ESLint ${eslint.errors} errores`) && false;
-  pass = eslint.warnings === 0 ? ok("A3: ESLint 0 warnings") && pass : fail(`A3: ESLint ${eslint.warnings} warnings`) && false;
+  const eslint = getEslintCounts();
+  if (eslint.errors < 0) {
+    pass = fail(`A2/A3: ${eslint.error}`) && false;
+  } else {
+    pass = eslint.errors === 0 ? ok("A2: ESLint 0 errores") && pass : fail(`A2: ESLint ${eslint.errors} errores`) && false;
+    pass =
+      eslint.warnings === 0 ? ok("A3: ESLint 0 warnings") && pass : fail(`A3: ESLint ${eslint.warnings} warnings`) && false;
+  }
 
   if (checkCi) {
     pass = ghStrictLatestCompleted("sonarqube.yml")

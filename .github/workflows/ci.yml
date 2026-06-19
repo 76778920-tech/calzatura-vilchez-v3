@@ -75,6 +75,10 @@ jobs:
             --evidence docs/ops/k6-mixed2000-bff-evidence.json \
             --output artifacts/load-tests/k6-mixed2000-summary.ci.json
 
+      - name: Instalar dependencias web (gates ISO)
+        working-directory: calzatura-vilchez
+        run: npm ci --ignore-scripts
+
       - name: Gate Fiabilidad ISO 25010 (estatico)
         env:
           GH_TOKEN: ${{ github.token }}

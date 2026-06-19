@@ -31,7 +31,7 @@ const CI_CORE_JOBS = {
 
 const WORKFLOWS = {
   1: { file: "ci.yml", coreJobs: CI_CORE_JOBS.lint, label: "CI lint/typecheck/unit" },
-  2: { file: "ci-integration.yml", label: "CI Integration E2E" },
+  2: { file: "ci-integration.yml", label: "CI Integration E2E", waitForSha: true },
   3: { file: "sonarqube.yml", label: "SonarQube Analysis", waitForSha: true },
   4: { file: "security-devsecops.yml", label: "Security DevSecOps Gates" },
   5: { file: "ci.yml", coreJobs: CI_CORE_JOBS.ai, label: "CI servicio IA" },
@@ -273,7 +273,7 @@ async function checkItem7(checkCi) {
   }
   const files = [
     { file: "ci.yml", waitForSha: false, coreJobs: CI_CORE_JOBS.all },
-    { file: "ci-integration.yml", waitForSha: false },
+    { file: "ci-integration.yml", waitForSha: true },
     { file: "sonarqube.yml", waitForSha: true },
     { file: "security-devsecops.yml", waitForSha: false },
   ];
