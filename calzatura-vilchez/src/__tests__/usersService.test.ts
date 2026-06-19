@@ -37,6 +37,7 @@ const profile: UserProfile = {
   email: "a@test.com",
   nombre: "Ana",
   rol: "cliente",
+  creadoEn: "2026-01-01T00:00:00.000Z",
   telefono: "",
   direcciones: [],
 };
