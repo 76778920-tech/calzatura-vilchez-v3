@@ -17,6 +17,8 @@ workflows:
     instance_type: mac_mini_m2
     working_directory: calzatura-vilchez-mobile
     environment:
+      groups:
+        - calzatura_mobile
       flutter: stable
       xcode: latest
       ios_signing:
