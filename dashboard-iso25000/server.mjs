@@ -9,11 +9,14 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { handleEvidenceApi } from "./evidence-api.mjs";
 import { handleQcApi, seedIfEmpty } from "../modulo-adecuacion-funcional-iso25010/server/handler.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.ISO_PORT || process.argv[2] || 4321);
+const HOST = process.env.ISO_BIND_HOST || "127.0.0.1";
 const DASH_ROOT = __dirname;
+const REPO_ROOT = path.resolve(__dirname, "..");
 const QC_DIST = path.resolve(__dirname, "../modulo-adecuacion-funcional-iso25010/dist");
 const QC_BASE = "/adecuacion-funcional";
 
@@ -40,6 +43,19 @@ function serveDashboard(urlPath, res) {
   if (!filePath.startsWith(DASH_ROOT) || !fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
     return false;
   }
+  sendFile(res, filePath);
+  return true;
+}
+
+function serveEngineerReports(urlPath, res) {
+  const reports = {
+    "/stress": path.join(DASH_ROOT, "stress/index.html"),
+    "/stress/": path.join(DASH_ROOT, "stress/index.html"),
+    "/zap": path.join(REPO_ROOT, "zap-reports/zap-production-report-v4.html"),
+    "/zap/": path.join(REPO_ROOT, "zap-reports/zap-production-report-v4.html"),
+  };
+  const filePath = reports[urlPath];
+  if (!filePath || !fs.existsSync(filePath)) return false;
   sendFile(res, filePath);
   return true;
 }
@@ -82,6 +98,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   if (url.pathname.startsWith("/api/")) {
+    if (handleEvidenceApi(url, res)) return;
     try {
       await handleQcApi(req, res, url);
     } catch (e) {
@@ -91,6 +108,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (serveEngineerReports(url.pathname, res)) return;
   if (serveQcApp(url.pathname, res)) return;
   if (serveDashboard(url.pathname, res)) return;
 
@@ -98,8 +116,12 @@ const server = http.createServer(async (req, res) => {
   res.end("404 — No encontrado: " + url.pathname);
 });
 
-seedIfEmpty();
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`Dashboard ISO/IEC 25000 — http://localhost:${PORT}`);
+seedIfEmpty().catch((e) => {
+  console.error("QC seedIfEmpty:", e.message);
+});
+server.listen(PORT, HOST, () => {
+  console.log(`Dashboard ISO/IEC 25000 — http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
+  console.log(`Informe stress k6 — http://localhost:${PORT}/stress/`);
+  console.log(`Informe ZAP DAST — http://localhost:${PORT}/zap/`);
   console.log(`Adecuación Funcional (CF/COF/TECP) — http://localhost:${PORT}${QC_BASE}/`);
 });
