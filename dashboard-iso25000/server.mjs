@@ -51,8 +51,8 @@ function serveEngineerReports(urlPath, res) {
   const reports = {
     "/stress": path.join(DASH_ROOT, "stress/index.html"),
     "/stress/": path.join(DASH_ROOT, "stress/index.html"),
-    "/zap": path.join(REPO_ROOT, "zap-reports/zap-production-report-v4.html"),
-    "/zap/": path.join(REPO_ROOT, "zap-reports/zap-production-report-v4.html"),
+    "/zap": path.join(REPO_ROOT, "zap-reports/zap-production-report-v5.html"),
+    "/zap/": path.join(REPO_ROOT, "zap-reports/zap-production-report-v5.html"),
   };
   const filePath = reports[urlPath];
   if (!filePath || !fs.existsSync(filePath)) return false;
@@ -116,9 +116,11 @@ const server = http.createServer(async (req, res) => {
   res.end("404 — No encontrado: " + url.pathname);
 });
 
-seedIfEmpty().catch((e) => {
+try {
+  await seedIfEmpty();
+} catch (e) {
   console.error("QC seedIfEmpty:", e.message);
-});
+}
 server.listen(PORT, HOST, () => {
   console.log(`Dashboard ISO/IEC 25000 — http://${HOST === "0.0.0.0" ? "localhost" : HOST}:${PORT}`);
   console.log(`Informe stress k6 — http://localhost:${PORT}/stress/`);

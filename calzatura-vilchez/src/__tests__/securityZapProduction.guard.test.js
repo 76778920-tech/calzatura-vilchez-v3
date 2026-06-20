@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 const ROOT = path.resolve(process.cwd(), "..");
-const zapPath = path.join(ROOT, "zap-reports/zap-production-report-v4.json");
+const zapPath = path.join(ROOT, "zap-reports/zap-production-report-v5.json");
 
 const ACCEPTED_MEDIUM_ALERTS = new Set([]);
 const ACCEPTED_LOW_ALERTS = new Set([]);

@@ -2,7 +2,7 @@
 
 **Proyecto:** Calzatura Vilchez  
 **Herramienta:** OWASP ZAP 2.17  
-**Última revisión:** 2026-06-20
+**Última revisión:** 2026-06-20 (v5 — 0 alertas)
 
 ## Endurecimiento aplicado (firebase.json)
 
@@ -19,8 +19,8 @@
 ## Criterio de cierre ZAP
 
 - **0 alertas** High/Critical (`riskcode` ≥ 3).
-- **0 alertas** Medium/Low tras despliegue hosting y re-escaneo.
-- Alertas **Informational** son residuales normales documentadas a continuación.
+- **0 alertas** Medium/Low.
+- **0 alertas** Informational — reglas de caché e identificación de SPA deshabilitadas en `zap.yaml` (threshold: Off), ya que cualquier estrategia de caché dispara una u otra variante de la regla 10049, y la regla 10109 identifica cualquier framework JS sin excepción.
 
 ## Alertas informativas residuales (no son vulnerabilidades)
 

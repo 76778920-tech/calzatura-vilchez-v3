@@ -11,6 +11,20 @@ jobs:
 - parameters:
     enableTags: false
     maxAlertsPerRule: 10
+  rules:
+  # Reglas deshabilitadas — residuales inevitables de SPA (documentadas en seguridad-riesgos-residuales-dast.md):
+  # 10049: Non-Storable / Storable+Cacheable — cualquier estrategia de caché dispara una u otra variante.
+  # 10015: Re-examine Cache-control — robots.txt/sitemap.xml con public cache correctamente configurado.
+  # 10027: Information Disclosure Suspicious Comments — strings en bundle Vite minificado, no son comentarios reales.
+  # 10109: Modern Web Application — ZAP detecta React/Vite automáticamente en toda SPA, no es remediable.
+  - id: 10049
+    threshold: "Off"
+  - id: 10015
+    threshold: "Off"
+  - id: 10027
+    threshold: "Off"
+  - id: 10109
+    threshold: "Off"
   type: passiveScan-config
 - parameters:
     maxDuration: 1
@@ -27,7 +41,14 @@ jobs:
 - parameters:
     reportDescription: ''
     reportDir: /zap/wrk/
-    reportFile: zap-production-report-v2.json
+    reportFile: zap-production-report-v5.html
+    reportTitle: ZAP Scanning Report
+    template: traditional-html
+  type: report
+- parameters:
+    reportDescription: ''
+    reportDir: /zap/wrk/
+    reportFile: zap-production-report-v5.json
     reportTitle: ZAP Scanning Report
     template: traditional-json
   type: report
