@@ -1,0 +1,73 @@
+/**
+ * CSP y cabeceras de Firebase Hosting — alineado a OWASP ZAP baseline.
+ * Sin img-src https: wildcard, sin style-src unsafe-inline (usa style-src-attr),
+ * sin report-uri deprecado, COOP same-origin (auth email + Stripe redirect).
+ */
+export const HOSTING_CSP = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  [
+    "img-src 'self' data: blob:",
+    "https://res.cloudinary.com",
+    "https://*.cloudinary.com",
+    "https://*.supabase.co",
+    "https://*.googleapis.com",
+    "https://*.gstatic.com",
+    "https://*.googleusercontent.com",
+    "https://*.firebaseapp.com",
+    "https://*.firebasestorage.app",
+  ].join(" "),
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "style-src 'self' https://www.gstatic.com https://fonts.googleapis.com",
+  "style-src-elem 'self' https://www.gstatic.com https://fonts.googleapis.com",
+  "style-src-attr 'unsafe-inline'",
+  [
+    "script-src 'self'",
+    "https://www.gstatic.com",
+    "https://www.google.com",
+    "https://www.recaptcha.net",
+    "https://apis.google.com",
+    "https://maps.googleapis.com",
+    "https://js.stripe.com",
+    "https://*.js.stripe.com",
+    "https://checkout.stripe.com",
+  ].join(" "),
+  [
+    "connect-src 'self'",
+    "https://*.googleapis.com",
+    "https://*.google.com",
+    "https://*.firebaseapp.com",
+    "https://*.firebaseio.com",
+    "wss://*.firebaseio.com",
+    "https://*.cloudfunctions.net",
+    "https://*.supabase.co",
+    "wss://*.supabase.co",
+    "https://*.onrender.com",
+    "https://res.cloudinary.com",
+    "https://api.cloudinary.com",
+    "https://api.openrouteservice.org",
+    "https://www.recaptcha.net",
+    "https://www.disify.com",
+  ].join(" "),
+  [
+    "frame-src 'self'",
+    "https://accounts.google.com",
+    "https://*.google.com",
+    "https://www.google.com",
+    "https://www.recaptcha.net",
+    "https://recaptcha.google.com",
+    "https://js.stripe.com",
+    "https://*.js.stripe.com",
+    "https://hooks.stripe.com",
+    "https://checkout.stripe.com",
+  ].join(" "),
+  "worker-src 'self' blob: https://js.stripe.com https://*.js.stripe.com",
+  "upgrade-insecure-requests",
+  "report-to csp-endpoint",
+].join("; ");
+
+export const HOSTING_REPORTING_ENDPOINTS =
+  'csp-endpoint="https://us-central1-calzaturavilchez-ab17f.cloudfunctions.net/cspReport"';
