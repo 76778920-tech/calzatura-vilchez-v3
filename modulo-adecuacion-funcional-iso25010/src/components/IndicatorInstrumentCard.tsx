@@ -6,18 +6,18 @@ import { formatPct } from "../utils/scale";
 import type { CasoPrueba, Funcion, Transaccion } from "../api";
 
 interface MetricSlice {
-  pct: number | null;
-  classification: { label: string; level: string };
+  readonly pct: number | null;
+  readonly classification: { readonly label: string; readonly level: string };
 }
 
 interface Props {
-  indicatorId: IndicatorId;
-  metric: MetricSlice;
-  numerator: number;
-  denominator: number;
-  funciones?: Funcion[];
-  transacciones?: Transaccion[];
-  casos?: CasoPrueba[];
+  readonly indicatorId: IndicatorId;
+  readonly metric: MetricSlice;
+  readonly numerator: number;
+  readonly denominator: number;
+  readonly funciones?: Funcion[];
+  readonly transacciones?: Transaccion[];
+  readonly casos?: CasoPrueba[];
 }
 
 function buildSegments(
@@ -55,16 +55,30 @@ function buildSegments(
   return [];
 }
 
+function transaccionObservacion(t: Transaccion): string {
+  if (t.evaluada) {
+    return t.correcta ? "Transacción correcta." : "Transacción incorrecta.";
+  }
+  return "Sin evaluar.";
+}
+
+function casoObservacion(c: CasoPrueba): string {
+  if (c.ejecutado) {
+    return c.aprobado ? "Caso aprobado." : "Caso rechazado.";
+  }
+  return "Pendiente de ejecución.";
+}
+
 function ChecklistRows({
   id,
   funciones,
   transacciones,
   casos,
 }: {
-  id: IndicatorId;
-  funciones?: Funcion[];
-  transacciones?: Transaccion[];
-  casos?: CasoPrueba[];
+  readonly id: IndicatorId;
+  readonly funciones?: Funcion[];
+  readonly transacciones?: Transaccion[];
+  readonly casos?: CasoPrueba[];
 }) {
   type Row = { n: number; indicador: string; cumple: boolean; observacion: string };
 
@@ -83,14 +97,14 @@ function ChecklistRows({
       n: i + 1,
       indicador: `${t.codigo} — ${t.descripcion}`,
       cumple: Boolean(t.evaluada && t.correcta),
-      observacion: !t.evaluada ? "Sin evaluar." : t.correcta ? "Transacción correcta." : "Transacción incorrecta.",
+      observacion: transaccionObservacion(t),
     }));
   } else if (id === "tecp" && casos?.length) {
     rows = casos.map((c, i) => ({
       n: i + 1,
       indicador: `${c.codigo} — ${c.nombre}`,
       cumple: Boolean(c.ejecutado && c.aprobado),
-      observacion: !c.ejecutado ? "Pendiente de ejecución." : c.aprobado ? "Caso aprobado." : "Caso rechazado.",
+      observacion: casoObservacion(c),
     }));
   }
 
@@ -118,7 +132,7 @@ function ChecklistRows({
               <td className="col-n">{r.n}</td>
               <td className="col-ind">{r.indicador}</td>
               <td className="col-mark">{r.cumple ? "✓" : ""}</td>
-              <td className="col-mark">{!r.cumple ? "✓" : ""}</td>
+              <td className="col-mark">{r.cumple ? "" : "✓"}</td>
               <td className="col-obs">{r.observacion}</td>
             </tr>
           ))}
@@ -199,3 +213,4 @@ export function IndicatorInstrumentCard(props: Props) {
     </article>
   );
 }
+

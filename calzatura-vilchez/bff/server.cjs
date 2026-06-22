@@ -1441,6 +1441,7 @@ app.set("trust proxy", 1);
 app.use(applyCorsHeaders);
 app.use(
   express.json({
+    limit: "5mb",
     verify: (req, res, buf) => {
       req.rawBody = buf;
     },
@@ -3657,7 +3658,7 @@ app.get("/users/me", (req, res) => {
       const supabase = getSupabaseAdmin();
       const { data, error } = await supabase
         .from("usuarios")
-        .select("uid,dni,nombres,apellidos,nombre,email,rol,creadoEn,telefono,direcciones")
+        .select("uid,dni,nombres,apellidos,nombre,email,rol,creadoEn,telefono,direcciones,fotoBase64")
         .eq("uid", decodedToken.uid)
         .maybeSingle();
       if (error) throw error;
@@ -3774,11 +3775,14 @@ app.patch("/users/me", (req, res) => {
       const supabase = getSupabaseAdmin();
       const patch = req.body || {};
       const allowed = {};
-      if (typeof patch.telefono === "string" || patch.telefono === null) {
-        allowed.telefono = patch.telefono;
+      if ("telefono" in patch) {
+        allowed.telefono = typeof patch.telefono === "string" ? patch.telefono : null;
       }
       if (Array.isArray(patch.direcciones)) {
         allowed.direcciones = sanitizeProfileAddresses(patch.direcciones) || [];
+      }
+      if ("fotoBase64" in patch) {
+        allowed.fotoBase64 = typeof patch.fotoBase64 === "string" ? patch.fotoBase64 : null;
       }
       if (Object.keys(allowed).length === 0) {
         return res.status(400).json({ error: "Sin campos para actualizar" });

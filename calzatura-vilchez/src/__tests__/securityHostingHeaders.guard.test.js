@@ -14,7 +14,7 @@ function headerValue(key) {
 }
 
 function directive(name, csp) {
-  const re = new RegExp(`${name}\\s+([^;]+)`, "i");
+  const re = new RegExp(String.raw`${name}\s+([^;]+)`, "i");
   return re.exec(csp)?.[1]?.trim() ?? "";
 }
 
@@ -41,6 +41,21 @@ describe("Seguridad — headers Firebase Hosting (ISO 25010 superficie web)", ()
     expect(directive("style-src-elem", csp)).not.toContain("unsafe-inline");
     expect(directive("style-src-attr", csp)).toContain("unsafe-inline");
     expect(csp).not.toContain("unsafe-eval");
+  });
+
+  it("style-src-elem tiene hashes de Firebase Auth widget sin unsafe-inline (PCPpffvq.js)", () => {
+    const csp = headerValue("Content-Security-Policy");
+    const styleSrcElem = directive("style-src-elem", csp);
+    expect(styleSrcElem).not.toContain("'unsafe-inline'");
+    expect(styleSrcElem).toContain("'sha256-Nqnn8c1bgv+510PgxcTOldg8mkMKrFn4TvPL+rYUUG='");
+    expect(styleSrcElem).toContain("'sha256-13vrThxdyT64GcXoTNGVoRRoL0a7EGBmOJ+1emEWyws='");
+    expect(styleSrcElem).toContain("'sha256-QZ52fjvWgIOIOPr+gRIJZ7KjzNeTBm50Z+z9dH4NJ/8='");
+    expect(styleSrcElem).toContain("'sha256-yOU6eaJ75xfag0gVFUv1d5ipLRGUy94G17B1uL683EU='");
+    expect(styleSrcElem).toContain("'sha256-OpTmykz0m3o5HoX53cykwPhUeU4OECxHQ1KXpB0JJPQ='");
+    expect(styleSrcElem).toContain("'sha256-SSIM0kI/u45y4gqkri9aH+la6wn2R+xtcBj3Lzh7qOo='");
+    expect(styleSrcElem).toContain("'sha256-ZH/+PJIjvP1BctwYxclIuiMu1wItb0aasJpXYXOmU0Y='");
+    expect(styleSrcElem).toContain("'sha256-58jqDtherY9NOM+ziRgSqQY0078tAZ+qtTBjMgbM9po='");
+    expect(styleSrcElem).toContain("'sha256-7Ri/I+PfhgtpcL7hT4A0VJKI6g3pK0ZvIN09RQV4ZhI='");
   });
 
   it("COOP same-origin (email auth + Stripe redirect; sin OAuth popup)", () => {
