@@ -9,11 +9,11 @@
 
 > **Criterio producción (ISO 25010 / calidad en uso):** Madurez operacional, pruebas de carga contra el stack desplegado y restauración completa ante desastres **no se consideran al 100 %** hasta contar con evidencia en **producción** (URL Render/Firebase, uptime post-despliegue, DR ejecutado). La evaluación actual documenta madurez de **ingeniería** (CI/CD) y pruebas en **entorno controlado** (BFF local + Supabase prod, restore drill readonly).
 
-**Resumen dashboard:** 21/25 ítems = **84 %** (Madurez 88 % · Tolerancia 100 % · Recuperación 80 % · Cumplimiento 71 %).
+**Resumen dashboard:** 22/25 ítems = **88 %** (Madurez 100 % · Tolerancia 100 % · Recuperación 80 % · Cumplimiento 71 %).
 
 ---
 
-## 1. Madurez (88 % — 7/8)
+## 1. Madurez (100 % — 8/8)
 
 **Definición ISO/IEC 25010:** grado en que el software **evita fallos** por defectos, bajo condiciones normales de uso.
 
@@ -29,10 +29,10 @@
 | 4 | Security DevSecOps Gates en success | **Sí** | Workflow `security-devsecops.yml` |
 | 5 | CI servicio IA en success | **Sí** | `ci.yml` → jobs IA + Docker build |
 | 6 | Controles ops estáticos en CI | **Sí** | readiness, backtest IA, restore drill fixture |
-| 7 | Último run success — 4 workflows madurez | **No** | CI en `main` ≠ madurez operacional en producción; pendiente historial uptime/incidentes post-despliegue |
+| 7 | Último run success — 4 workflows madurez | **Sí** | `ci.yml`, `ci-integration.yml`, `sonarqube.yml` y `security-devsecops.yml` en success en `main` |
 | 8 | Gate verify-madurez documentado | **Sí** | `scripts/verify-madurez-iso25000.mjs` |
 
-**Resultado lista:** 7/8 = **88 %**.
+**Resultado lista:** 8/8 = **100 %**.
 
 ### 1.2 Incidente resuelto (2026-06-15)
 

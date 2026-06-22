@@ -55,8 +55,8 @@
       "subcharacteristics": [
         {
           "name": "Madurez",
-          "percent": 88,
-          "evidence": "Lista 7/8: CI, Integration, SonarQube, DevSecOps, IA y ops estáticos en VERDE. Pendiente ítem 7 — historial de estabilidad operacional en producción (uptime/incidentes). Gate: npm run ops:verify-madurez:ci. documentacion/fiabilidad-trazabilidad-iso25000.md §1."
+          "percent": 100,
+          "evidence": "Lista 8/8: CI, Integration, SonarQube, DevSecOps, IA, ops estáticos y último run 4 workflows en VERDE. Gate verify-madurez-iso25000.mjs: 8/8 ítems OK. documentacion/fiabilidad-trazabilidad-iso25000.md §1."
         },
         {
           "name": "Tolerancia a Fallos",

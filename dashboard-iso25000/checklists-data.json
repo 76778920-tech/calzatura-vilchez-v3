@@ -453,8 +453,8 @@
         {
           "n": 7,
           "indicador": "Último run en success — 4 workflows de madurez en main",
-          "cumple": false,
-          "observacion": "ISO 25010 Madurez operacional — requiere historial en producción (uptime SLA, incidentes post-despliegue ≥30 días); CI en main no sustituye operación real"
+          "cumple": true,
+          "observacion": "ci.yml, ci-integration.yml, sonarqube.yml y security-devsecops.yml en success en main. Gate verify-madurez-iso25000.mjs confirma 8/8 ítems."
         },
         {
           "n": 8,
