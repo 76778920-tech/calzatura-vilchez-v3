@@ -48,6 +48,7 @@ void main() {
       policy = AppSessionPolicy(
         signOut: fakeSignOut,
         inactivityTimeout: const Duration(minutes: 5),
+        backgroundGrace: const Duration(seconds: 30),
         timerFactory: fakeTimerFactory,
       );
     });
@@ -73,29 +74,57 @@ void main() {
       expect(policy.signOutCalls, 1);
     });
 
-    test('punto 2: cierra sesión al minimizar y cancela el timer', () async {
+    test('punto 2: NO cierra sesión de inmediato al minimizar (período de gracia)', () async {
       policy.startInactivityTimer();
 
       policy.onLifecycleChanged(AppLifecycleState.paused);
       await Future<void>.delayed(Duration.zero);
 
+      // Aún no hay cierre de sesión — el timer de gracia aún no disparó.
+      expect(signOutInvocations, 0);
+      // Dos timers: inactividad (cancelado) + gracia en background (activo).
+      expect(fakeTimers, hasLength(2));
+      expect(fakeTimers.last.isActive, isTrue);
+    });
+
+    test('punto 2: cierra sesión tras el período de gracia en background', () async {
+      policy.startInactivityTimer();
+
+      policy.onLifecycleChanged(AppLifecycleState.paused);
+      await Future<void>.delayed(Duration.zero);
+      expect(signOutInvocations, 0);
+
+      // Simula que pasaron los 30 s de gracia.
+      fakeTimers.last.fire();
+      await Future<void>.delayed(Duration.zero);
+
       expect(signOutInvocations, 1);
-      expect(fakeTimers.single.isActive, isFalse);
+    });
+
+    test('punto 2 gracia: NO cierra sesión si la app vuelve antes del período', () async {
+      policy.startInactivityTimer();
+
+      policy.onLifecycleChanged(AppLifecycleState.paused);
+      // Vuelve a primer plano antes de que expire el timer de gracia.
+      policy.onLifecycleChanged(AppLifecycleState.resumed);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(signOutInvocations, 0);
     });
 
     test('punto 4: reinicia timer al volver a primer plano', () async {
       policy.startInactivityTimer();
       policy.onLifecycleChanged(AppLifecycleState.paused);
       await Future<void>.delayed(Duration.zero);
-      expect(signOutInvocations, 1);
+      expect(signOutInvocations, 0);
 
-      signOutInvocations = 0;
       policy.onLifecycleChanged(AppLifecycleState.resumed);
 
-      expect(fakeTimers, hasLength(2));
-      expect(fakeTimers.last.isActive, isTrue);
+      // Exactamente un timer activo: el de inactividad recién creado.
+      final activeTimers = fakeTimers.where((t) => t.isActive).toList();
+      expect(activeTimers, hasLength(1));
 
-      fakeTimers.last.fire();
+      activeTimers.single.fire();
       await Future<void>.delayed(Duration.zero);
 
       expect(signOutInvocations, 1);
@@ -116,7 +145,7 @@ void main() {
       policy.dispose();
 
       policy.onLifecycleChanged(AppLifecycleState.paused);
-      fakeTimers.single.fire();
+      if (fakeTimers.isNotEmpty) fakeTimers.last.fire();
       await Future<void>.delayed(Duration.zero);
 
       expect(signOutInvocations, 0);
