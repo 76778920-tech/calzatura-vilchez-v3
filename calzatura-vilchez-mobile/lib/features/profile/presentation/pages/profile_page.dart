@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../core/config/app_platform.dart';
 import '../../../../core/config/web_app_links.dart';
 import '../../../../core/router/auth_navigation.dart';
@@ -12,6 +13,11 @@ import '../../../../core/utils/open_external_url.dart';
 import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/profile_provider.dart';
+
+final _appVersionProvider = FutureProvider<String>((ref) async {
+  final info = await PackageInfo.fromPlatform();
+  return info.version;
+});
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -294,7 +300,7 @@ class ProfilePage extends ConsumerWidget {
                 _ProfileTile(
                   icon: Icons.info_outline_rounded,
                   label: 'Acerca de',
-                  subtitle: 'Versión 1.0.0',
+                  subtitle: 'Versión ${ref.watch(_appVersionProvider).valueOrNull ?? '...'}',
                   onTap: () => openExternalUrl(WebAppLinks.helpContact),
                 ).animate(delay: 350.ms).fadeIn().slideX(begin: -0.1),
                 const SizedBox(height: 24),

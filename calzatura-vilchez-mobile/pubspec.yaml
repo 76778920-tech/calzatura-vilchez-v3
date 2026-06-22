@@ -1,7 +1,7 @@
 name: calzatura_vilchez_mobile
 description: "Calzatura Vilchez — App móvil con IA para predicción de riesgo empresarial"
 publish_to: 'none'
-version: 1.0.0+1
+version: 3.0.0+1
 
 environment:
   sdk: ^3.11.5
@@ -55,7 +55,10 @@ dependencies:
   latlong2: ^0.9.1
   path_provider: ^2.1.5
   share_plus: ^10.1.4
+  package_info_plus: ^8.3.0
   sensors_plus: ^7.0.0
+  tflite_flutter: ^0.12.1
+  image: 4.8.0
 
 dev_dependencies:
   flutter_test:
@@ -77,4 +80,5 @@ flutter:
   assets:
     - assets/images/
     - assets/animations/
+    - assets/teachable/
     - .env
