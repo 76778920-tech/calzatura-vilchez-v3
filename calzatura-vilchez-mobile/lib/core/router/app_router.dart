@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -74,11 +73,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         return null;
       }
 
-      final firebaseUser = FirebaseAuth.instance.currentUser;
-      final emailVerified = firebaseUser?.emailVerified ?? false;
-      if (isAuth && !emailVerified && loc != '/verify-email') {
-        return '/verify-email';
-      }
+      // Verificación de correo: NO bloqueamos la app si el correo no está verificado.
+      // El register_page.dart navega explícitamente a /verify-email al crear la cuenta.
+      // El usuario puede elegir "Continuar sin verificar" y acceder a la app normalmente.
+      // Así se evita bloquear a usuarios cuyo correo de verificación fue a spam.
 
       if (isAuth && !isOnAuth && AppPlatform.adminPanelsEnabled) {
         final role = roleAsync.valueOrNull;

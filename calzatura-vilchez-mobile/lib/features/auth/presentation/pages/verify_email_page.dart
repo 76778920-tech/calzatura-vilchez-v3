@@ -157,6 +157,36 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
                       style: TextStyle(color: Colors.white38, fontSize: 13),
                       textAlign: TextAlign.center,
                     ).animate().fadeIn(delay: 400.ms),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: Colors.amber.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.info_outline, color: Colors.amber, size: 16),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '¿No lo encuentras? Revisa tu carpeta de spam o correo no deseado.',
+                              style: TextStyle(
+                                color: Colors.amber,
+                                fontSize: 12,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ).animate().fadeIn(delay: 420.ms),
                     const SizedBox(height: 32),
 
                     // Feedback message

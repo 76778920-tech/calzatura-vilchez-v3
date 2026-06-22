@@ -135,12 +135,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       SnackBar(
         content: Text(
           ok
-              ? 'Correo enviado. Revisa tu bandeja de entrada.'
+              ? 'Correo enviado. Revisa tu bandeja de entrada o carpeta de spam.'
               : ref.read(authNotifierProvider).error?.toString() ??
                     'Error al enviar',
         ),
         backgroundColor: ok ? Colors.green.shade800 : AppColors.error,
         behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 6),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
