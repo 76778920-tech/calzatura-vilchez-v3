@@ -126,47 +126,35 @@ double _chartScaleMax(List<double> values) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 final adminKpisProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  final productos = await _supabase
+  final bff = PanelBffApi();
+  final productosRes = await _supabase
       .from('productos')
       .select()
       .count(sb.CountOption.exact);
-  final pedidosCnt = await _supabase
-      .from('pedidos')
-      .select()
-      .count(sb.CountOption.exact);
-  final usuarios = await _supabase
-      .from('usuarios')
-      .select()
-      .count(sb.CountOption.exact);
-  final pendientes = await _supabase
-      .from('pedidos')
-      .select()
-      .eq('estado', 'pendiente')
-      .count(sb.CountOption.exact);
+  final orders = await bff.fetchOrders(PanelScope.admin);
+  final users = await bff.fetchAdminUsers();
+  final sales = await bff.fetchDailySales(PanelScope.admin);
 
-  final pedidosActivos = await _supabase
-      .from('pedidos')
-      .select('total')
-      .inFilter('estado', ['pagado', 'enviado', 'entregado']);
+  final pendientes = orders.where((o) => o['estado'] == 'pendiente').length;
   double ingresosWeb = 0;
-  for (final p in List<Map<String, dynamic>>.from(pedidosActivos as List)) {
-    ingresosWeb += (p['total'] as num?)?.toDouble() ?? 0;
+  for (final p in orders) {
+    final estado = p['estado'] as String? ?? '';
+    if (['pagado', 'enviado', 'entregado'].contains(estado)) {
+      ingresosWeb += (p['total'] as num?)?.toDouble() ?? 0;
+    }
   }
-
-  final ventasTienda = await _supabase
-      .from('ventasDiarias')
-      .select('total')
-      .eq('devuelto', false);
   double ingresosTienda = 0;
-  for (final v in List<Map<String, dynamic>>.from(ventasTienda as List)) {
-    ingresosTienda += (v['total'] as num?)?.toDouble() ?? 0;
+  for (final v in sales) {
+    if (v['devuelto'] != true) {
+      ingresosTienda += (v['total'] as num?)?.toDouble() ?? 0;
+    }
   }
 
   return {
-    'productos': productos.count,
-    'pedidos': pedidosCnt.count,
-    'usuarios': usuarios.count,
-    'pendientes': pendientes.count,
+    'productos': productosRes.count,
+    'pedidos': orders.length,
+    'usuarios': users.length,
+    'pendientes': pendientes,
     'ingresosWeb': ingresosWeb,
     'ingresosTienda': ingresosTienda,
   };
@@ -175,21 +163,14 @@ final adminKpisProvider = FutureProvider<Map<String, dynamic>>((ref) async {
 final adminRecentOrdersProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
-  final data = await _supabase
-      .from('pedidos')
-      .select(
-        'id, estado, total, subtotal, envio, creadoEn, userEmail, direccion, items',
-      )
-      .order('creadoEn', ascending: false)
-      .limit(8);
-  return List<Map<String, dynamic>>.from(data as List);
+  final orders = await PanelBffApi().fetchOrders(PanelScope.admin);
+  return orders.take(8).toList();
 });
 
 final adminAllOrdersProvider = FutureProvider<List<Map<String, dynamic>>>((
   ref,
 ) async {
-  final data = await _supabase.from('pedidos').select('id, estado');
-  return List<Map<String, dynamic>>.from(data as List);
+  return PanelBffApi().fetchOrders(PanelScope.admin);
 });
 
 final adminChartProvider = FutureProvider<_ChartData>((ref) async {
@@ -200,20 +181,21 @@ final adminChartProvider = FutureProvider<_ChartData>((ref) async {
   });
   final startDate = isoDates.first;
 
-  final pedidosData = await _supabase
-      .from('pedidos')
-      .select('total, creadoEn')
-      .inFilter('estado', ['pagado', 'enviado', 'entregado'])
-      .gte('creadoEn', startDate);
+  final bff = PanelBffApi();
+  final allOrders = await bff.fetchOrders(PanelScope.admin);
+  final allSales = await bff.fetchDailySales(PanelScope.admin);
 
-  final ventasData = await _supabase
-      .from('ventasDiarias')
-      .select('total, fecha')
-      .eq('devuelto', false)
-      .gte('fecha', startDate);
+  final pedidos = allOrders.where((o) {
+    final estado = o['estado'] as String? ?? '';
+    if (!['pagado', 'enviado', 'entregado'].contains(estado)) return false;
+    final fecha = (o['creadoEn'] as String?)?.substring(0, 10) ?? '';
+    return fecha.compareTo(startDate) >= 0;
+  }).toList();
 
-  final pedidos = List<Map<String, dynamic>>.from(pedidosData as List);
-  final ventas = List<Map<String, dynamic>>.from(ventasData as List);
+  final ventas = allSales.where((v) {
+    final fecha = (v['fecha'] as String?) ?? '';
+    return fecha.compareTo(startDate) >= 0;
+  }).toList();
 
   final webValues = <double>[];
   final tiendaValues = <double>[];

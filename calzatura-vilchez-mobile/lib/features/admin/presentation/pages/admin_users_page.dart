@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../../../../core/config/env.dart';
+import '../../../../core/services/panel_bff_api.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-
-final _supabase = sb.Supabase.instance.client;
 
 // ─── Privacy helpers (mirrors web maskEmail.ts) ───────────────────────────────
 
@@ -42,16 +40,21 @@ class _UsersData {
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 final adminUsersProvider = FutureProvider.autoDispose<_UsersData>((ref) async {
+  final bff = PanelBffApi();
   final results = await Future.wait([
-    _supabase
-        .from('usuarios')
-        .select('uid, email, nombre, nombres, apellidos, dni, telefono, rol, creadoEn')
-        .order('creadoEn', ascending: false),
-    _supabase.from('pedidos').select('id, userId'),
+    bff.fetchAdminUsers(),
+    bff.fetchOrders(PanelScope.admin),
   ]);
 
-  final users = List<Map<String, dynamic>>.from(results[0] as List);
-  final orders = List<Map<String, dynamic>>.from(results[1] as List);
+  final users = results[0];
+  final orders = results[1];
+
+  final sortedUsers = List<Map<String, dynamic>>.from(users)
+    ..sort((a, b) {
+      final dateA = a['creadoEn'] as String? ?? '';
+      final dateB = b['creadoEn'] as String? ?? '';
+      return dateB.compareTo(dateA);
+    });
 
   final orderCounts = <String, int>{};
   for (final order in orders) {
@@ -59,7 +62,7 @@ final adminUsersProvider = FutureProvider.autoDispose<_UsersData>((ref) async {
     if (uid.isNotEmpty) orderCounts[uid] = (orderCounts[uid] ?? 0) + 1;
   }
 
-  return _UsersData(users: users, orderCounts: orderCounts);
+  return _UsersData(users: sortedUsers, orderCounts: orderCounts);
 });
 
 const _roles = ['cliente', 'trabajador', 'admin'];
@@ -301,10 +304,10 @@ class _AdminUsersPageState extends ConsumerState<AdminUsersPage> {
       return;
     }
 
-    await _supabase
-        .from('usuarios')
-        .update({'rol': newRole})
-        .eq('uid', user['uid']);
+    await PanelBffApi().changeUserRole(
+      uid: user['uid'] as String,
+      rol: newRole,
+    );
     ref.invalidate(adminUsersProvider);
   }
 }

@@ -14,6 +14,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 import '../../../../core/config/env.dart';
+import '../../../../core/services/panel_bff_api.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
@@ -336,36 +337,11 @@ class _VariantDraft {
 }
 
 Future<Map<String, String>> _fetchProductCodesMap() async {
-  final data = await _supabase
-      .from('productoCodigos')
-      .select('productoId, codigo');
-  return List<Map<String, dynamic>>.from(
-    data as List,
-  ).fold<Map<String, String>>({}, (acc, row) {
-    final productId = row['productoId']?.toString();
-    final code = row['codigo']?.toString().trim() ?? '';
-    if (productId != null && code.isNotEmpty) {
-      acc[productId] = code;
-    }
-    return acc;
-  });
+  return PanelBffApi().fetchProductCodes(PanelScope.admin);
 }
 
 Future<Map<String, Map<String, dynamic>>> _fetchProductFinancialsMap() async {
-  final data = await _supabase
-      .from('productoFinanzas')
-      .select(
-        'productId, costoCompra, margenMinimo, margenObjetivo, margenMaximo, precioMinimo, precioSugerido, precioMaximo',
-      );
-  return List<Map<String, dynamic>>.from(
-    data as List,
-  ).fold<Map<String, Map<String, dynamic>>>({}, (acc, row) {
-    final productId = row['productId']?.toString();
-    if (productId != null && productId.isNotEmpty) {
-      acc[productId] = Map<String, dynamic>.from(row);
-    }
-    return acc;
-  });
+  return PanelBffApi().fetchAdminProductFinanzas();
 }
 
 final adminProductsProvider =
@@ -413,18 +389,6 @@ final _adminProductsRealtimeProvider = Provider<void>((ref) {
         event: sb.PostgresChangeEvent.all,
         schema: 'public',
         table: 'productos',
-        callback: refresh,
-      )
-      .onPostgresChanges(
-        event: sb.PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'productoCodigos',
-        callback: refresh,
-      )
-      .onPostgresChanges(
-        event: sb.PostgresChangeEvent.all,
-        schema: 'public',
-        table: 'productoFinanzas',
         callback: refresh,
       )
       .subscribe();
@@ -584,15 +548,7 @@ class _AdminProductsPageState extends ConsumerState<AdminProductsPage> {
 
     if (confirmed != true) return;
 
-    await _supabase
-        .from('productoCodigos')
-        .delete()
-        .eq('productoId', product['id']);
-    await _supabase
-        .from('productoFinanzas')
-        .delete()
-        .eq('productId', product['id']);
-    await _supabase.from('productos').delete().eq('id', product['id']);
+    await PanelBffApi().deleteProductAtomic(product['id'] as String);
     ref.invalidate(adminProductsProvider);
   }
 

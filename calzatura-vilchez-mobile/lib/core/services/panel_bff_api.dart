@@ -106,6 +106,36 @@ class PanelBffApi {
     return null;
   }
 
+  Future<void> patchMyTelefono(String telefono) async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+    final response = await _client.patch(
+      _uri('/users/me'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'telefono': telefono}),
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudo actualizar el teléfono');
+  }
+
+  Future<void> patchMyFotoBase64(String? fotoBase64) async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+    final response = await _client.patch(
+      _uri('/users/me'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'fotoBase64': fotoBase64}),
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudo actualizar la foto');
+  }
+
   // ── Pedidos ───────────────────────────────────────────────────────────────
 
   Future<List<Map<String, dynamic>>> fetchOrders(PanelScope scope) async {
@@ -394,6 +424,43 @@ class PanelBffApi {
     );
     final payload = await _decodeResponse(response);
     _throwIfFailed(response, payload, 'No se pudo eliminar el fabricante');
+  }
+
+  // ── Admin: cambio de rol y borrado atómico de producto ───────────────────
+
+  Future<void> changeUserRole({
+    required String uid,
+    required String rol,
+  }) async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+
+    final response = await _client.patch(
+      _uri('/admin/users/${Uri.encodeComponent(uid)}/role'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'rol': rol}),
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudo cambiar el rol');
+  }
+
+  Future<void> deleteProductAtomic(String productId) async {
+    final token = await _token();
+    if (token == null) throw Exception('Debes iniciar sesión');
+
+    final response = await _client.post(
+      _uri('/deleteProductAtomic'),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: jsonEncode({'p_id': productId}),
+    );
+    final payload = await _decodeResponse(response);
+    _throwIfFailed(response, payload, 'No se pudo eliminar el producto');
   }
 
   // ── Admin: usuarios y auditoría ───────────────────────────────────────────
