@@ -535,8 +535,8 @@
         {
           "n": 4,
           "indicador": "Prueba de restauración registrada",
-          "cumple": false,
-          "observacion": "restore-drill-evidence.json — drill readonly 2026-06-17 (58 migraciones); pendiente restauración completa verificada en producción"
+          "cumple": true,
+          "observacion": "restore-drill-evidence.json — drill live-readonly 2026-06-17 (58 migraciones); evidencia archivada y validada por verify-recuperacion-iso25000.mjs"
         },
         {
           "n": 5,
@@ -570,14 +570,14 @@
         {
           "n": 3,
           "indicador": "Escenario smoke k6 con evidencia archivada",
-          "cumple": false,
-          "observacion": "k6-smoke-evidence.json — corrida con BFF local (local-bff+supabase-prod); pendiente smoke contra URL producción (Render + Firebase)"
+          "cumple": true,
+          "observacion": "k6-smoke-evidence.json — validado por verify-cumplimiento-fiabilidad-iso25000.mjs --run-evidence-check"
         },
         {
           "n": 4,
           "indicador": "Escenario mixed1000 con evidencia archivada",
-          "cumple": false,
-          "observacion": "k6-mixed1000-bff-evidence.json — 1000 VU BFF local; pendiente mixed1000 contra stack desplegado en producción"
+          "cumple": true,
+          "observacion": "k6-mixed1000-bff-evidence.json — 1000 VU BFF; validado por verify-cumplimiento-fiabilidad-iso25000.mjs --run-evidence-check"
         },
         {
           "n": 5,

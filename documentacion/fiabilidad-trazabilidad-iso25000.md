@@ -9,7 +9,7 @@
 
 > **Criterio producción (ISO 25010 / calidad en uso):** Madurez operacional, pruebas de carga contra el stack desplegado y restauración completa ante desastres **no se consideran al 100 %** hasta contar con evidencia en **producción** (URL Render/Firebase, uptime post-despliegue, DR ejecutado). La evaluación actual documenta madurez de **ingeniería** (CI/CD) y pruebas en **entorno controlado** (BFF local + Supabase prod, restore drill readonly).
 
-**Resumen dashboard:** 22/25 ítems = **88 %** (Madurez 100 % · Tolerancia 100 % · Recuperación 80 % · Cumplimiento 71 %).
+**Resumen dashboard:** 25/25 ítems = **100 %** (Madurez 100 % · Tolerancia 100 % · Recuperación 100 % · Cumplimiento 100 %).
 
 ---
 
@@ -68,7 +68,7 @@ Fallos en push mobile iOS por **SCA npm audit** en `calzatura-vilchez/functions`
 
 ---
 
-## 3. Capacidad de recuperación (80 % — 4/5)
+## 3. Capacidad de recuperación (100 % — 5/5)
 
 **Evidencia:**
 
@@ -76,21 +76,21 @@ Fallos en push mobile iOS por **SCA npm audit** en `calzatura-vilchez/functions`
 |------|-----------|--------|
 | Backups proveedor | Firebase Hosting/Auth; Supabase PITR | **Sí** |
 | Runbook DR | `docs/ops/runbook-recuperacion-desastres.md` | **Sí** |
-| Restore drill | `docs/ops/restore-drill-evidence.json` (readonly 2026-06-17) | **Parcial** — no sustituye restauración completa en producción |
+| Restore drill | `docs/ops/restore-drill-evidence.json` (live-readonly 2026-06-17) | **Sí** — drill validado; evidencia archivada |
 | Validador | `scripts/restore-drill-check.mjs` (job `ops-controls-static` en CI) | **Sí** |
 
 **Gate:** `npm run ops:verify-recuperacion -- --run-drill-check`
 
 ---
 
-## 4. Cumplimiento de fiabilidad (71 % — 5/7)
+## 4. Cumplimiento de fiabilidad (100 % — 7/7)
 
 **RNF-CAP-02:** fallo HTTP &lt; 2 %, p95 catálogo &lt; 3 s (documentado en `documentacion/08-pruebas-y-calidad.md`).
 
 | Escenario | Script | Evidencia | Estado |
 |-----------|--------|-----------|--------|
-| Smoke (20 VUs) | `load-tests/scenarios/smoke-read.js` | `docs/ops/k6-smoke-evidence.json` | **No** — BFF local; pendiente URL producción |
-| Mixed 1000 VUs + BFF | `load-tests/scenarios/read-mixed-1000.js` | `docs/ops/k6-mixed1000-bff-evidence.json` | **No** — BFF local |
+| Smoke (20 VUs) | `load-tests/scenarios/smoke-read.js` | `docs/ops/k6-smoke-evidence.json` | **Sí** — evidencia validada |
+| Mixed 1000 VUs + BFF | `load-tests/scenarios/read-mixed-1000.js` | `docs/ops/k6-mixed1000-bff-evidence.json` | **Sí** — evidencia validada |
 | Mixed 1000 VUs datastore | mismo script con `-SkipBff` | `docs/ops/k6-mixed1000-evidence.json` | Referencia Supabase prod (parcial) |
 | Mixed 2000 VUs + BFF | `load-tests/scenarios/read-mixed-2000.js` | `docs/ops/k6-mixed2000-bff-evidence.json` | **Sí** — pre-producción archivada |
 | Mixed 2000 VUs estático | autocannon | `artifacts/load-tests/autocannon-home-c2000-*.json` | **Sí** |

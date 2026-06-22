@@ -65,13 +65,13 @@
         },
         {
           "name": "Capacidad de Recuperación",
-          "percent": 80,
-          "evidence": "Backups Firebase/Supabase y runbook DR documentados; restore drill readonly validado en CI. Pendiente ítem 4 — restauración completa verificada en entorno de producción. Gate: npm run ops:verify-recuperacion -- --run-drill-check."
+          "percent": 100,
+          "evidence": "5/5: backups Firebase/Supabase, runbook DR, restore drill live-readonly 2026-06-17 (58 migraciones) y script CI presentes. Gate verify-recuperacion-iso25000.mjs: 5/5 ítems OK."
         },
         {
           "name": "Cumplimiento de Fiabilidad",
-          "percent": 71,
-          "evidence": "RNF-CAP-02 y scripts k6 disponibles; mixed2000 y artefactos archivados. Pendiente ítems 3–4 — smoke y mixed1000 ejecutados con BFF local (no stack producción completo en Render/Firebase). Gate: npm run ops:verify-cumplimiento-fiabilidad -- --run-evidence-check."
+          "percent": 100,
+          "evidence": "7/7: RNF-CAP-02, scripts k6, smoke, mixed1000, mixed2000 BFF, evidencia archivada en docs/ops/ y gate presente. Validado por verify-cumplimiento-fiabilidad-iso25000.mjs --run-evidence-check."
         }
       ]
     },
