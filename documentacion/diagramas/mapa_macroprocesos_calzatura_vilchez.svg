@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 920" role="img" font-family="Arial, sans-serif">
+<title>Mapa de Macroprocesos — Calzatura Vilchez (MP-01..MP-16)</title>
+<desc>16 macroprocesos, 42 procesos funcionales, sistema web e-commerce + IA v1.9.0</desc>
+<rect width="1200" height="920" fill="#f4f6f9"/>
+<rect x="0" y="0" width="1200" height="54" fill="#1a2e4a"/>
+<text x="600.0" y="34" text-anchor="middle" fill="white" font-size="22" font-weight="bold">Mapa de Macroprocesos</text>
+<text x="600.0" y="48" text-anchor="middle" fill="#90b8d8" font-size="11">Sistema Web E-Commerce + IA · Calzatura Vilchez · Web 1.9.0</text>
+<rect x="30" y="62" width="1140" height="38" fill="white" stroke="#ccc"/>
+<text x="200" y="77" text-anchor="middle" font-size="10" font-weight="bold" fill="#1a2e4a">MAPA DE MACROPROCESOS — CALZATURA VILCHEZ</text>
+<text x="200" y="91" text-anchor="middle" font-size="9" fill="#555">42 procesos (P-001..P-042) · 16 macroprocesos (MP-01..MP-16)</text>
+<text x="500" y="77" text-anchor="middle" font-size="9" font-weight="bold" fill="#333">Emisión: 2026/06/19</text>
+<text x="500" y="91" text-anchor="middle" font-size="9" fill="#333">Rev. 2</text>
+<text x="720" y="77" text-anchor="middle" font-size="9" font-weight="bold" fill="#333">Código: CV-MP-001</text>
+<text x="720" y="91" text-anchor="middle" font-size="9" fill="#333">Fuente: generar_gobierno_ia_v3.py</text>
+<text x="980" y="84" text-anchor="middle" font-size="9" fill="#333">Página 1 de 1</text>
+<text x="22" y="480" text-anchor="middle" fill="#2e6da4" font-size="10" font-weight="bold" transform="rotate(-90 22 480)">NECESIDADES DEL CLIENTE Y DEL NEGOCIO</text>
+<text x="1178" y="480" text-anchor="middle" fill="#2e6da4" font-size="10" font-weight="bold" transform="rotate(90 1178 480)">SATISFACCIÓN Y RESULTADOS (IRE · KPIs · ISO 25000)</text>
+<rect x="58" y="108" width="1084" height="28" fill="#1a3a5c" rx="3"/>
+<text x="600.0" y="126" text-anchor="middle" fill="white" font-size="11" font-weight="bold">MACROPROCESOS ESTRATÉGICOS</text>
+<rect x="58" y="136" width="1084" height="16" fill="#1a3a5c" opacity="0.85"/>
+<rect x="512.5" y="152" width="175" height="68" rx="6" fill="#2e6da4" stroke="#333" stroke-width="0.6"/>
+<text x="600.0" y="166" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-01: Dirección comercial y alcance del sist…</text>
+<text x="600.0" y="180" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Estratégico</text>
+<text x="600.0" y="191" text-anchor="middle" fill="#f5f5f5" font-size="7.5">SRS · alcance · stakeholders</text>
+<rect x="58" y="240" width="1084" height="28" fill="#4a6741" rx="3"/>
+<text x="600.0" y="258" text-anchor="middle" fill="white" font-size="11" font-weight="bold">MACROPROCESOS MISIONALES — Cadena de valor digital (cliente)</text>
+<rect x="58" y="268" width="1084" height="16" fill="#4a6741" opacity="0.85"/>
+<rect x="55.0" y="284" width="175" height="68" rx="6" fill="#607c57" stroke="#333" stroke-width="0.6"/>
+<text x="142.5" y="298" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-02: Experiencia pública y captación digita…</text>
+<text x="142.5" y="312" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Misional</text>
+<text x="142.5" y="323" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Home · tiendas · landings</text>
+<rect x="238.0" y="284" width="175" height="68" rx="6" fill="#607c57" stroke="#333" stroke-width="0.6"/>
+<text x="325.5" y="298" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-03: Gestión del catálogo comercial</text>
+<text x="325.5" y="312" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Misional</text>
+<text x="325.5" y="323" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Filtros · detalle · variantes · imágenes</text>
+<rect x="421.0" y="284" width="175" height="68" rx="6" fill="#607c57" stroke="#333" stroke-width="0.6"/>
+<text x="508.5" y="298" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-06: Identidad, clientes y privacidad</text>
+<text x="508.5" y="312" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Misional</text>
+<text x="508.5" y="323" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Registro · login · perfil · favoritos · DNI</text>
+<rect x="604.0" y="284" width="175" height="68" rx="6" fill="#607c57" stroke="#333" stroke-width="0.6"/>
+<text x="691.5" y="298" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-04: Carrito y compra web</text>
+<text x="691.5" y="312" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Misional</text>
+<text x="691.5" y="323" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Carrito · checkout · entrega · Stripe/COD</text>
+<rect x="787.0" y="284" width="175" height="68" rx="6" fill="#607c57" stroke="#333" stroke-width="0.6"/>
+<text x="874.5" y="298" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-05: Pedidos y posventa</text>
+<text x="874.5" y="312" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Misional</text>
+<text x="874.5" y="323" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Estados · historial · mapa admin · PKCS#7</text>
+<rect x="970.0" y="284" width="175" height="68" rx="6" fill="#607c57" stroke="#333" stroke-width="0.6"/>
+<text x="1057.5" y="298" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-14: Campañas y marketing digital</text>
+<text x="1057.5" y="312" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Misional</text>
+<text x="1057.5" y="323" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Landings · detección IA · KPIs</text>
+<text x="600.0" y="360" text-anchor="middle" font-size="8" fill="#4a6741">Flujo lógico: MP-02 → MP-03 → MP-06 (auth) → MP-04 → MP-05 → MP-14</text>
+<rect x="58" y="372" width="1084" height="28" fill="#4a6741" rx="3"/>
+<text x="600.0" y="390" text-anchor="middle" fill="white" font-size="11" font-weight="bold">MACROPROCESOS MISIONALES — Operación de tienda</text>
+<rect x="58" y="400" width="1084" height="16" fill="#4a6741" opacity="0.85"/>
+<rect x="512.5" y="416" width="175" height="68" rx="6" fill="#607c57" stroke="#333" stroke-width="0.6"/>
+<text x="600.0" y="430" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-08: Ventas físicas y tienda</text>
+<text x="600.0" y="444" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Misional</text>
+<text x="600.0" y="455" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Ventas diarias · devoluciones · panel staff</text>
+<rect x="58" y="504" width="1084" height="28" fill="#6b2737" rx="3"/>
+<text x="600.0" y="522" text-anchor="middle" fill="white" font-size="11" font-weight="bold">MACROPROCESOS DE APOYO</text>
+<rect x="58" y="532" width="1084" height="16" fill="#6b2737" opacity="0.85"/>
+<rect x="238.0" y="548" width="175" height="68" rx="6" fill="#8c3b4e" stroke="#333" stroke-width="0.6"/>
+<text x="325.5" y="562" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-07: Administración comercial</text>
+<text x="325.5" y="576" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Misional</text>
+<text x="325.5" y="587" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Dashboard · productos · stock · finanzas</text>
+<rect x="421.0" y="548" width="175" height="68" rx="6" fill="#8c3b4e" stroke="#333" stroke-width="0.6"/>
+<text x="508.5" y="562" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-09: Datos Excel importación/exportación</text>
+<text x="508.5" y="576" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Apoyo</text>
+<text x="508.5" y="587" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Plantillas xlsx · reglas · escenarios</text>
+<rect x="604.0" y="548" width="175" height="68" rx="6" fill="#8c3b4e" stroke="#333" stroke-width="0.6"/>
+<text x="691.5" y="562" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-15: Libro de reclamaciones</text>
+<text x="691.5" y="576" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Apoyo</text>
+<text x="691.5" y="587" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Ley 29571 · virtual · notificaciones</text>
+<rect x="787.0" y="548" width="175" height="68" rx="6" fill="#8c3b4e" stroke="#333" stroke-width="0.6"/>
+<text x="874.5" y="562" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-16: Legal, cookies y privacidad</text>
+<text x="874.5" y="576" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Apoyo</text>
+<text x="874.5" y="587" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Ley 29733 · términos · consentimiento</text>
+<rect x="58" y="636" width="1084" height="28" fill="#8b5e00" rx="3"/>
+<text x="600.0" y="654" text-anchor="middle" fill="white" font-size="11" font-weight="bold">MACROPROCESOS TECNOLÓGICOS Y DE PLATAFORMA</text>
+<rect x="58" y="664" width="1084" height="16" fill="#8b5e00" opacity="0.85"/>
+<rect x="238.0" y="680" width="175" height="68" rx="6" fill="#b07800" stroke="#333" stroke-width="0.6"/>
+<text x="325.5" y="694" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-10: Seguridad, auditoría y cumplimiento</text>
+<text x="325.5" y="708" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Apoyo</text>
+<text x="325.5" y="719" text-anchor="middle" fill="#f5f5f5" font-size="7.5">RLS · BFF · ZAP · App Check · rate limit</text>
+<rect x="421.0" y="680" width="175" height="68" rx="6" fill="#b07800" stroke="#333" stroke-width="0.6"/>
+<text x="508.5" y="694" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-11: Base de datos Supabase</text>
+<text x="508.5" y="708" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Apoyo</text>
+<text x="508.5" y="719" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Migraciones · RLS matrix · hardening</text>
+<rect x="604.0" y="680" width="175" height="68" rx="6" fill="#b07800" stroke="#333" stroke-width="0.6"/>
+<text x="691.5" y="694" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-12: Analítica, IA e IRE</text>
+<text x="691.5" y="708" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Misional</text>
+<text x="691.5" y="719" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Random Forest · IRE · campañas · backtest</text>
+<rect x="787.0" y="680" width="175" height="68" rx="6" fill="#b07800" stroke="#333" stroke-width="0.6"/>
+<text x="874.5" y="694" text-anchor="middle" fill="white" font-size="9" font-weight="bold">MP-13: DevOps, pruebas y continuidad</text>
+<text x="874.5" y="708" text-anchor="middle" fill="#f5f5f5" font-size="7.5">Apoyo</text>
+<text x="874.5" y="719" text-anchor="middle" fill="#f5f5f5" font-size="7.5">CI/CD · Sonar · k6 · restore drill</text>
+<rect x="58" y="768" width="1084" height="44" fill="#3d5166" rx="4"/>
+<text x="600.0" y="786" text-anchor="middle" fill="white" font-size="10" font-weight="bold">EVALUACIÓN Y SEGUIMIENTO — ISO/IEC 25000 · Gates verify-* · Dashboard calidad · Gobierno IA ISO 42001</text>
+<text x="600.0" y="802" text-anchor="middle" fill="#b0c8e0" font-size="8">MP-13 DevOps + MP-12 backtest + MP-10 ZAP + trazabilidad CU-T05/CU-T07</text>
+<rect x="58" y="820" width="1084" height="26" fill="#1a2e4a" rx="4"/>
+<text x="600.0" y="837" text-anchor="middle" fill="white" font-size="11" font-weight="bold" letter-spacing="1.5">MEJORAMIENTO CONTINUO</text>
+<rect x="58" y="852" width="1084" height="22" fill="#e8eef4" rx="2"/>
+<text x="600.0" y="866" text-anchor="middle" fill="#1a3a5c" font-size="8.5">42 procesos funcionales · 16 macroprocesos · Web 1.9.0 · IRE comercial-operativo (no quiebra Altman) · Regenerar: python scripts/generar_mapa_macroprocesos_svg.py</text>
+</svg>

@@ -36,12 +36,23 @@ Los archivos `CU-T*.csv` son **tablas maestras** equivalentes a los cuadros que 
 | `CU-T06-trazabilidad-articulo-requisito.csv` | Estado del arte ↔ sistema |
 | `CU-T07-matriz-pruebas-requisitos.csv` | Pruebas ↔ requisitos |
 | `CU-T08-automatizacion-respaldos.csv` | Automatización + 2 respaldos |
+| `CU-T09-matriz-consistencia.csv` | Matriz de consistencia (problema ↔ objetivo ↔ hipótesis ↔ variables) |
+| `CU-T10-matriz-operacionalizacion-variables.csv` | Operacionalización VI/VD (dimensiones e indicadores) |
+| `CU-T11-matriz-operacionalizacion-instrumento.csv` | Operacionalización instrumento investigación |
+| `CU-T12-matriz-propuesta-valor.csv` | **Matriz propuesta de valor** (VPC: jobs, pains, gains ↔ sistema) |
+| `CU-T13-matriz-viabilidad-inicial.csv` | **Matriz viabilidad inicial** (TELOS + estratégica + científica ↔ evidencia Q1) |
+
+Guía detallada VPC: `../matriz-propuesta-valor-proyecto.md`.  
+Word VPC: `Matriz_Propuesta_Valor_Calzatura_Vilchez.docx` — `python scripts/generar_matriz_propuesta_valor.py`.
+
+Guía viabilidad: `../matriz-viabilidad-inicial-proyecto.md`.  
+Word viabilidad: `Matriz_Viabilidad_Inicial_Calzatura_Vilchez.docx` — `python scripts/generar_matriz_viabilidad_inicial.py`.
 
 ## Exportación a anexo de tesis
 
 1. Completar y revisar con director.  
 2. En Excel: Archivo → Imprimir → Guardar como PDF.  
-3. Nombrar: `Anexo-Matriz-T06-Trazabilidad-EDA-v1.0.pdf`.
+3. Nombrar: `Anexo-Matriz-T12-Propuesta-Valor-v1.0.pdf` (o `Anexo-Matriz-T06-Trazabilidad-EDA-v1.0.pdf` según cuadro).
 
 ## Control de versión de cuadros
 

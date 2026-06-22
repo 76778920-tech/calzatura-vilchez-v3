@@ -13,7 +13,7 @@
   try {
   let navIndicatorReady = false;
 
-  const [data, catalog, checklistsData, evaluationLevels] = await Promise.all([
+  const [data, catalog, checklistsData, evaluationLevels, evidenceManifest] = await Promise.all([
     fetch("data.json").then((r) => {
       if (!r.ok) throw new Error("No se pudo cargar data.json");
       return r.json();
@@ -30,6 +30,7 @@
       if (!r.ok) throw new Error("No se pudo cargar evaluation-levels.json");
       return r.json();
     }),
+    fetch("evidence-manifest.json").then((r) => (r.ok ? r.json() : null)).catch(() => null),
   ]);
   const { meta } = data;
 
@@ -219,7 +220,31 @@
     radarSpinRaf = null;
   }
 
-  const TAB_IDS = ["resumen", "graficos", "correlacion", "instrumentos", "detalle"];
+  function openEvidence(sub, path, type) {
+    if (typeof window.dashboardOpenEvidence === "function") {
+      window.dashboardOpenEvidence(sub, path, type);
+      return;
+    }
+    document.dispatchEvent(new CustomEvent("dashboard:open-evidence", { detail: { sub, path, type } }));
+  }
+
+  function evidenceLink(sub, path, label) {
+    if (!path || !path.includes("/")) return `<span class="muted">${label || path || "—"}</span>`;
+    const kind = path.endsWith(".md") ? "docs" : "code";
+    return `<button type="button" class="ev-open-link" data-sub="${sub}" data-path="${path}" data-type="${kind}">${label || path}</button>`;
+  }
+
+  document.body.addEventListener("click", (e) => {
+    const btn = e.target.closest(".ev-open-link");
+    if (!btn) return;
+    e.preventDefault();
+    openEvidence(btn.dataset.sub, btn.dataset.path, btn.dataset.type);
+    const tab = document.getElementById("tab-link-evidencias");
+    if (tab) tab.click();
+  });
+
+  const TAB_IDS = ["resumen", "graficos", "correlacion", "instrumentos", "detalle", "evidencias"];
+  let dashboardShowTab = null;
 
   function setupTabs() {
     const panels = TAB_IDS.map((id) => document.getElementById(id)).filter(Boolean);
@@ -274,6 +299,8 @@
       if (!isSame) onTabShown(tabId);
     }
 
+    dashboardShowTab = showTab;
+
     links.forEach((link) => {
       link.addEventListener("click", (e) => {
         e.preventDefault();
@@ -312,6 +339,14 @@
   setupScrollMotion();
   setupTabs();
   initDashboard();
+
+  if (evidenceManifest && typeof window.initEvidenceHub === "function") {
+    window.initEvidenceHub({
+      manifest: evidenceManifest,
+      characteristics,
+      onNavigateTab: (tabId) => dashboardShowTab?.(tabId),
+    });
+  }
 
   // ========== CORRELACIÓN CF/COF/TECP ==========
   async function loadCorrelation(container, route) {
@@ -414,7 +449,7 @@
     return { si, no, pct, total: items.length };
   }
 
-  function renderChecklistTable(cl) {
+  function renderChecklistTable(cl, subName) {
     const stats = calcChecklistStats(cl.items);
     const rows = cl.items
       .map(
@@ -431,6 +466,7 @@
       <div class="checklist-meta">
         <p><strong>Objetivo:</strong> ${cl.objetivo}</p>
         <p><strong>Referencia:</strong> ${cl.referencia}</p>
+        <p><button type="button" class="ev-open-link btn-secondary" data-sub="${subName}" data-type="docs">Abrir hub de evidencias →</button></p>
         <p class="checklist-instr"><em>Instrucciones:</em> ${cl.instrucciones}</p>
       </div>
       <div class="checklist-table-wrap">
@@ -471,7 +507,7 @@
                 <td><code>${r.codigo}</code></td>
                 <td>${r.prueba}</td>
                 <td>${r.cumple ? "Sí" : "No"}</td>
-                <td class="muted">${r.referencia || "—"}</td>
+                <td>${evidenceLink(subName, r.referencia, r.referencia)}</td>
               </tr>`,
               )
               .join("")}</tbody>
@@ -488,7 +524,7 @@
                 (r) => `<tr>
                 <td><code>${r.codigo}</code></td>
                 <td>${r.prueba}</td>
-                <td class="muted">${r.evidencia}</td>
+                <td>${evidenceLink(subName, r.evidencia, r.evidencia)}</td>
               </tr>`,
               )
               .join("")}</tbody>
@@ -536,7 +572,7 @@
           <div class="checklist-body">
             <div class="eval-level-panel eval-nivel1">
               <h4 class="eval-level-title"><span class="eval-badge n1">Nivel 1</span> Lista de cotejo (Sí / No)</h4>
-              ${renderChecklistTable(cl)}
+              ${renderChecklistTable(cl, s.name)}
             </div>
             ${renderEvaluationLevels(s.name)}
             ${route ? `<p class="checklist-link"><a href="${route}" class="btn-secondary">Registros operativos (CF/COF/TECP) →</a></p>` : ""}
@@ -569,7 +605,9 @@
           <td><div class="pct-cell"><span class="mini-bar-track"><span class="mini-bar-fill" data-width="${s.percent}" style="background:${statusColor(st)}"></span></span><strong>${s.percent}%</strong></div></td>
           <td><span class="status-pill ${st}">${statusLabel(st)}</span></td>
           <td class="inst-cell">${cl ? `${stats.si} / ${stats.total}` : chk.nombre}</td>
-          <td class="evidence">${s.evidence}</td>
+          <td class="evidence">${s.evidence.slice(0, 120)}${s.evidence.length > 120 ? "…" : ""}
+            <button type="button" class="ev-open-link ev-open-link--inline" data-sub="${s.name}" data-type="docs">Ver evidencias →</button>
+          </td>
         </tr>`;
       }).join("")}</tbody></table>`;
     card.appendChild(tableWrap);
@@ -670,7 +708,7 @@
       </div>`;
     }).join("");
     strip.innerHTML = chips + `<div class="chart-kpi chart-kpi--overall chart-kpi--${statusFor(overall)}">
-      <span class="chart-kpi-label">Global ISO 9126</span>
+      <span class="chart-kpi-label">Global ISO 25000</span>
       <strong class="chart-kpi-value">${overall}%</strong>
     </div>`;
   }

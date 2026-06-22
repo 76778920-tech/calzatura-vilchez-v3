@@ -1,0 +1,53 @@
+﻿Nivel;Problemas;Objetivos;Hipótesis;Variables;Dimensiones;Indicadores;Metodología
+General;Problema general: ¿De qué manera el sistema web de comercio electrónico con modelo de Inteligencia Artificial influye en la predicción del riesgo empresarial comercial-operativo en la empresa Calzatura Vilchez, Huancayo, 2026?;Objetivo general: Implementar un sistema web de comercio electrónico con modelo de Inteligencia Artificial para mejorar la predicción del riesgo empresarial comercial-operativo en la empresa Calzatura Vilchez, Huancayo, 2026.;"Hipótesis general (H0): El sistema web de comercio electrónico con modelo de Inteligencia Artificial no mejora la predicción del riesgo empresarial en Calzatura Vilchez.
+
+Hipótesis alterna (H1): El sistema mejora significativamente la predicción del riesgo empresarial comercial-operativo medida mediante el IRE (α = 0,05).";"VI: Sistema web de comercio electrónico con modelo de Inteligencia Artificial (React/Vite, Supabase, Firebase Auth, BFF Node, microservicio IA FastAPI).
+
+VD: Predicción del riesgo empresarial mediante el Índice de Riesgo Empresarial (IRE), escala 0–100.";"VI — D1 e-commerce y transformación digital; D2 IA y analítica; D3 arquitectura y despliegue; D4 metodología ágil/híbrida.
+
+VD — D1 modelos de predicción de riesgo; D2 exactitud/validación del IRE; D3 componentes del IRE; D4 impacto en gestión operativa.";Digitalización (% procesos), MAE/RMSE/sMAPE demanda, latencia API, disponibilidad, cobertura pruebas, valor IRE (0–100), riesgo_stock/ingresos/demanda, quiebres de stock, percepción Likert pre/post, adopción dashboard.;"Método: científico y tecnológico-sistémico.
+Tipo: aplicada.
+Enfoque: mixto (cuantitativo predominante + cualitativo complementario).
+Nivel: explicativo-causal.
+Diseño: preexperimental — un solo grupo, medición antes-después (O₁ → X → O₂).
+Población: personal directivo/operativo de Calzatura Vilchez y registros transaccionales en Supabase.
+Muestra: censo del personal (n según plantilla) y registros enero 2023–diciembre 2025.
+Técnicas: entrevista semiestructurada, encuesta, análisis documental, observación, evaluación de modelos ML.
+Instrumentos: guía de entrevista, cuestionario Likert (24 ítems), ficha documental, pipeline ai-service/evaluate.py, dashboard IRE."
+Específico 1;Problema específico 1: ¿En qué medida la implementación del sistema web de comercio electrónico mejora la digitalización de los procesos de venta y gestión de inventario en Calzatura Vilchez?;Objetivo específico 1: Digitalizar los procesos de venta y gestión de inventario mediante el desarrollo e implementación del sistema web (React, TypeScript, Vite) con persistencia en Supabase (PostgreSQL) y autenticación Firebase.;"Hipótesis específica 1 (H0): La implementación del sistema no incrementa la tasa de digitalización de procesos de venta e inventario.
+
+Hipótesis específica 1 (H1): La implementación incrementa significativamente la tasa de digitalización (≥ 70 % respecto a la línea base O₁).";VI: Sistema web de comercio electrónico con modelo de IA.;"VI-D1: e-commerce y transformación digital.
+VI-D3: arquitectura de software y despliegue.";"1. Nivel de madurez digital (ordinal 1–5).
+2. Tasa de digitalización de procesos de venta e inventario (%).
+3. Número de canales de venta digitales activos.
+4. Tasa de conversión digital (%).
+5. Tiempo de ciclo de procesamiento de pedidos (horas/min).
+6. Disponibilidad del sistema web (%) — indicador VI-D3.";"Técnicas: análisis documental, observación sistemática, entrevista semiestructurada a empleadores/directivos y encuesta Likert (dimensión digitalización).
+Instrumentos: ficha documental, guía de entrevista, cuestionario Likert, logs Supabase.
+Análisis: comparación O₁–O₂ de indicadores; triangulación cualitativa (entrevistas) y cuantitativa (encuesta + registros)."
+Específico 2;Problema específico 2: ¿Cómo el modelo de Inteligencia Artificial basado en RandomForestRegressor mejora la precisión del pronóstico de demanda de calzado en Calzatura Vilchez, medida mediante MAE y RMSE?;"Objetivo específico 2: Desarrollar e implementar un modelo de Machine Learning (RandomForestRegressor en ai-service; fallback promedio móvil si datos insuficientes) para pronóstico de demanda con horizonte configurable 7, 15 o 30 días (UI admin), usando ventas históricas en Supabase.";"Hipótesis específica 2 (H0): El RandomForestRegressor no reduce el MAE respecto al baseline.
+
+Hipótesis específica 2 (H1): El RandomForestRegressor reduce el MAE del pronóstico de demanda en al menos 30 % respecto al método empírico baseline (evaluate.py).";"VI: Sistema web con modelo de IA.
+VD: Componente riesgo_demanda del IRE y exactitud del pronóstico.";"VI-D2: Inteligencia Artificial y analítica de datos.
+VD-D2: exactitud y validación del modelo predictivo.
+VD-D3: componente riesgo_demanda del IRE.";"1. MAE del pronóstico (unidades).
+2. RMSE del pronóstico (unidades).
+3. sMAPE (%).
+4. R² del modelo.
+5. Horizonte de predicción (7, 15 o 30 días — HORIZON_OPTIONS).
+6. Estabilidad ante data drift (% variación mensual).";"Técnicas: análisis de datos históricos, validación walk-forward, evaluación comparativa ML.
+Instrumentos: dataset ventasDiarias/pedidos (Supabase), ai-service/evaluate.py, reporte métricas scikit-learn.
+Análisis: comparación RF vs baseline; MAE, RMSE, sMAPE, R²; prueba t pareada o Wilcoxon según normalidad (Shapiro-Wilk, α = 0,05)."
+Específico 3;Problema específico 3: ¿En qué grado el Índice de Riesgo Empresarial (IRE) calculado por el sistema permite anticipar situaciones de alerta y reducir el riesgo operativo en Calzatura Vilchez?;Objetivo específico 3: Calcular y monitorear automáticamente el IRE (IRE = 0,40·riesgo_stock + 0,35·riesgo_ingresos + 0,25·riesgo_demanda, escala 0–100) para alertar al equipo de gestión sobre riesgo comercial-operativo.;"Hipótesis específica 3 (H0): El IRE no reduce el riesgo operativo ni los quiebres de stock.
+
+Hipótesis específica 3 (H1): El IRE reduce significativamente el riesgo operativo, disminuyendo los quiebres de stock en al menos 40 % en O₂ respecto a O₁.";VD: Predicción del riesgo empresarial mediante el IRE.;"VD-D1: modelos de predicción del riesgo con ML.
+VD-D2: exactitud y validación del IRE (consistencia interna; AUC solo si hay eventos etiquetados).
+VD-D3: componentes riesgo_stock, riesgo_ingresos, riesgo_demanda.
+VD-D4: impacto en gestión operativa.";"1. Valor compuesto IRE (0–100).
+2. Subíndices riesgo_stock, riesgo_ingresos, riesgo_demanda.
+3. Alertas IRE ≥ 51 (alto) o ≥ 76 (crítico).
+4. Número de quiebres de stock (conteo pre/post).
+5. Tasa de alertas atendidas (%).
+6. Percepción utilidad IRE — ítems 1–24 cuestionario Likert (VD-D1…D4).";"Técnicas: cálculo automatizado IRE, análisis documental, observación, entrevista semiestructurada a directivos, encuesta Likert pre/post, validación de consistencia interna.
+Instrumentos: dashboard AdminPredictions, tabla ireHistorial (Supabase), cuestionario Likert, guía de entrevista, tests ai-service (invariantes IRE).
+Análisis: comparación O₁–O₂ quiebres y IRE medio; t pareada/Wilcoxon; triangulación con entrevistas. Nota: AUC-ROC condicionado a etiquetado histórico de eventos de crisis."

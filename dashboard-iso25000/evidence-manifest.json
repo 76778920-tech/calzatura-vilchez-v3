@@ -1,0 +1,725 @@
+{
+  "meta": {
+    "generatedAt": "2026-06-20",
+    "proyecto": "Calzatura Vilchez — Sistema Web E-Commerce con IA",
+    "descripcion": "Evidencias enlazadas: documentación .md, fragmentos de código, gates verify-* y artefactos CU-T*",
+    "api": {
+      "manifest": "/api/evidence/manifest",
+      "file": "/api/evidence/file?path={ruta}&start={n}&end={m}"
+    }
+  },
+  "global": {
+    "diagram": {
+      "path": "iso25000_ref.png",
+      "title": "Diagrama calidad interna/externa"
+    },
+    "docs": [
+      {
+        "path": "documentacion/modelo-calidad-25010-alineacion.md",
+        "title": "Modelo SQuaRE — 6 características"
+      },
+      {
+        "path": "documentacion/funcionalidad-trazabilidad-iso25000.md",
+        "title": "Funcionalidad — marco completo"
+      },
+      {
+        "path": "documentacion/05-especificacion-requisitos-software-SRS.md",
+        "title": "SRS — requisitos software"
+      },
+      {
+        "path": "documentacion/08-pruebas-y-calidad.md",
+        "title": "Pruebas y calidad"
+      }
+    ],
+    "ci": [
+      {
+        "path": ".github/workflows/ci.yml",
+        "title": "Pipeline CI GitHub Actions",
+        "startLine": 1,
+        "endLine": 100,
+        "kind": "code"
+      }
+    ],
+    "zap": [
+      {
+        "path": "zap-reports/zap-production-report-v4.json",
+        "title": "DAST ZAP producción v4 (2026-06-20)",
+        "kind": "artifact"
+      },
+      {
+        "path": "zap-reports/zap-production-report-v4.html",
+        "title": "DAST ZAP producción v4 — informe HTML",
+        "kind": "artifact"
+      }
+    ],
+    "stress": [
+      {
+        "path": "artifacts/load-tests/informe-stress-calzatura-vilchez.html",
+        "title": "Informe gráfico pruebas de estrés k6",
+        "kind": "artifact"
+      },
+      {
+        "path": "docs/ops/k6-mixed2000-bff-evidence.json",
+        "title": "k6 mixed2000 BFF — 2000 VUs",
+        "kind": "artifact"
+      },
+      {
+        "path": "docs/ops/k6-mixed1000-bff-evidence.json",
+        "title": "k6 mixed1000 BFF",
+        "kind": "artifact"
+      },
+      {
+        "path": "docs/ops/k6-smoke-evidence.json",
+        "title": "k6 smoke BFF",
+        "kind": "artifact"
+      },
+      {
+        "path": "load-tests/README.md",
+        "title": "Guía load-tests k6",
+        "kind": "doc"
+      }
+    ]
+  },
+  "subcharacteristics": {
+    "Idoneidad": {
+      "characteristic": "Funcionalidad",
+      "docs": [
+        {
+          "path": "documentacion/idoneidad-trazabilidad-iso25000.md",
+          "title": "Trazabilidad — Idoneidad",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/funcionalidad-trazabilidad-iso25000.md",
+          "title": "funcionalidad-trazabilidad-iso25000.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts/verify-idoneidad-iso25000.mjs",
+          "title": "Gate idoneidad",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 45
+        },
+        {
+          "path": "calzatura-vilchez/e2e/idoneidad-journey.spec.ts",
+          "title": "TC-IDON-001 — recorrido Must",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 55
+        },
+        {
+          "path": "calzatura-vilchez/e2e/register-validation.spec.ts",
+          "title": "register-validation.spec.ts",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [
+        {
+          "command": "node scripts/verify-idoneidad-iso25000.mjs",
+          "desc": "Gate Idoneidad"
+        },
+        {
+          "command": "node scripts/verify-idoneidad-iso25000.mjs --run-tests",
+          "desc": "Gate Idoneidad + pruebas"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "documentacion/cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv",
+          "title": "CU-T07-matriz-pruebas-requisitos.csv",
+          "kind": "artifact"
+        }
+      ]
+    },
+    "Precisión": {
+      "characteristic": "Funcionalidad",
+      "docs": [
+        {
+          "path": "documentacion/precision-trazabilidad-iso25000.md",
+          "title": "Trazabilidad — Precisión",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/funcionalidad-trazabilidad-iso25000.md",
+          "title": "funcionalidad-trazabilidad-iso25000.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts/verify-precision-iso25000.mjs",
+          "title": "verify-precision-iso25000.mjs",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [
+        {
+          "command": "node scripts/verify-precision-iso25000.mjs",
+          "desc": "Gate Precisión"
+        },
+        {
+          "command": "node scripts/verify-precision-iso25000.mjs --run-tests",
+          "desc": "Gate Precisión + pruebas"
+        }
+      ],
+      "artifacts": []
+    },
+    "Interoperabilidad": {
+      "characteristic": "Funcionalidad",
+      "docs": [
+        {
+          "path": "documentacion/interoperabilidad-trazabilidad-iso25000.md",
+          "title": "Trazabilidad — Interoperabilidad",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/funcionalidad-trazabilidad-iso25000.md",
+          "title": "funcionalidad-trazabilidad-iso25000.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts/verify-interoperabilidad-iso25000.mjs",
+          "title": "verify-interoperabilidad-iso25000.mjs",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        },
+        {
+          "path": "calzatura-vilchez/e2e/checkout-cod-order.spec.ts",
+          "title": "TC-INT-001 COD",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 50
+        },
+        {
+          "path": "calzatura-vilchez/e2e/checkout-stripe.spec.ts",
+          "title": "checkout-stripe.spec.ts",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        },
+        {
+          "path": "calzatura-vilchez/e2e/admin-predictions.spec.ts",
+          "title": "admin-predictions.spec.ts",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        },
+        {
+          "path": "calzatura-vilchez/e2e/register-validation.spec.ts",
+          "title": "register-validation.spec.ts",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        },
+        {
+          "path": "calzatura-vilchez/e2e/profile-save.spec.ts",
+          "title": "profile-save.spec.ts",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [
+        {
+          "command": "node scripts/verify-interoperabilidad-iso25000.mjs",
+          "desc": "Gate Interoperabilidad"
+        },
+        {
+          "command": "node scripts/verify-interoperabilidad-iso25000.mjs --run-tests",
+          "desc": "Gate Interoperabilidad + pruebas"
+        }
+      ],
+      "artifacts": []
+    },
+    "Seguridad": {
+      "characteristic": "Funcionalidad",
+      "docs": [
+        {
+          "path": "documentacion/seguridad-trazabilidad-iso25000.md",
+          "title": "Trazabilidad — Seguridad",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/funcionalidad-trazabilidad-iso25000.md",
+          "title": "funcionalidad-trazabilidad-iso25000.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts/verify-seguridad-iso25000.mjs",
+          "title": "verify-seguridad-iso25000.mjs",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        },
+        {
+          "path": "scripts/validate-supabase-rls-matrix.mjs",
+          "title": "Validación RLS",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 50
+        },
+        {
+          "path": "calzatura-vilchez/e2e/seguridad-access-guards.spec.ts",
+          "title": "TC-SEG guards",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 45
+        },
+        {
+          "path": "calzatura-vilchez/e2e/admin-audit-trail.spec.ts",
+          "title": "admin-audit-trail.spec.ts",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [
+        {
+          "command": "node scripts/verify-seguridad-iso25000.mjs",
+          "desc": "Gate Seguridad"
+        },
+        {
+          "command": "node scripts/verify-seguridad-iso25000.mjs --run-tests",
+          "desc": "Gate Seguridad + pruebas"
+        },
+        {
+          "command": "node scripts/validate-supabase-rls-matrix.mjs",
+          "desc": "Contrato RLS Supabase"
+        }
+      ],
+      "artifacts": []
+    },
+    "Cumplimiento de la funcionalidad": {
+      "characteristic": "Funcionalidad",
+      "docs": [
+        {
+          "path": "documentacion/cumplimiento-trazabilidad-iso25000.md",
+          "title": "Trazabilidad — Cumplimiento de la funcionalidad",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/funcionalidad-trazabilidad-iso25000.md",
+          "title": "funcionalidad-trazabilidad-iso25000.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts/verify-cumplimiento-iso25000.mjs",
+          "title": "verify-cumplimiento-iso25000.mjs",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [
+        {
+          "command": "node scripts/verify-cumplimiento-iso25000.mjs",
+          "desc": "Gate Cumplimiento de la funcionalidad"
+        },
+        {
+          "command": "node scripts/verify-cumplimiento-iso25000.mjs --run-tests",
+          "desc": "Gate Cumplimiento de la funcionalidad + pruebas"
+        }
+      ],
+      "artifacts": [
+        {
+          "path": "documentacion/cuadros-excel/CU-T05-requisitos.csv",
+          "title": "CU-T05-requisitos.csv",
+          "kind": "artifact"
+        }
+      ]
+    },
+    "Madurez": {
+      "characteristic": "Fiabilidad",
+      "docs": [
+        {
+          "path": "documentacion/fiabilidad-trazabilidad-iso25000.md",
+          "title": "fiabilidad-trazabilidad-iso25000.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts/verify-madurez-iso25000.mjs",
+          "title": "verify-madurez-iso25000.mjs",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [
+        {
+          "command": "node scripts/verify-madurez-iso25000.mjs",
+          "desc": "Gate Madurez"
+        },
+        {
+          "command": "node scripts/verify-madurez-iso25000.mjs --run-tests",
+          "desc": "Gate Madurez + pruebas"
+        }
+      ],
+      "artifacts": []
+    },
+    "Tolerancia a Fallos": {
+      "characteristic": "Fiabilidad",
+      "docs": [
+        {
+          "path": "documentacion/08-pruebas-y-calidad.md",
+          "title": "08-pruebas-y-calidad.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "calzatura-vilchez/e2e/checkout-cod-order.spec.ts",
+          "title": "TC-INT-001 COD",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 50
+        }
+      ],
+      "gates": [],
+      "artifacts": []
+    },
+    "Capacidad de Recuperación": {
+      "characteristic": "Fiabilidad",
+      "docs": [
+        {
+          "path": "docs/ops/runbook-recuperacion-desastres.md",
+          "title": "runbook-recuperacion-desastres.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts/restore-drill-check.mjs",
+          "title": "restore-drill-check.mjs",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [],
+      "artifacts": []
+    },
+    "Cumplimiento de Fiabilidad": {
+      "characteristic": "Fiabilidad",
+      "docs": [
+        {
+          "path": "documentacion/fiabilidad-trazabilidad-iso25000.md",
+          "title": "Trazabilidad — Cumplimiento de Fiabilidad",
+          "kind": "doc"
+        }
+      ],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Inteligibilidad": {
+      "characteristic": "Usabilidad",
+      "docs": [],
+      "code": [
+        {
+          "path": "calzatura-vilchez/e2e/accessibility.spec.ts",
+          "title": "accessibility.spec.ts",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [],
+      "artifacts": []
+    },
+    "Facilidad de Aprendizaje": {
+      "characteristic": "Usabilidad",
+      "docs": [
+        {
+          "path": "documentacion/08-pruebas-y-calidad.md",
+          "title": "08-pruebas-y-calidad.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Operabilidad": {
+      "characteristic": "Usabilidad",
+      "docs": [
+        {
+          "path": "documentacion/08-pruebas-y-calidad.md",
+          "title": "08-pruebas-y-calidad.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Atractividad": {
+      "characteristic": "Usabilidad",
+      "docs": [],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Cumplimiento de la Usabilidad": {
+      "characteristic": "Usabilidad",
+      "docs": [
+        {
+          "path": "documentacion/usabilidad-trazabilidad-iso25000.md",
+          "title": "Trazabilidad — Cumplimiento de la Usabilidad",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/plantillas/instrumento-sus-calzatura-vilchez.md",
+          "title": "instrumento-sus-calzatura-vilchez.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "scripts/verify-usabilidad-iso25000.mjs",
+          "title": "verify-usabilidad-iso25000.mjs",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [
+        {
+          "command": "node scripts/verify-usabilidad-iso25000.mjs",
+          "desc": "Gate Cumplimiento de la Usabilidad"
+        },
+        {
+          "command": "node scripts/verify-usabilidad-iso25000.mjs --run-tests",
+          "desc": "Gate Cumplimiento de la Usabilidad + pruebas"
+        }
+      ],
+      "artifacts": []
+    },
+    "Comportamiento en el tiempo": {
+      "characteristic": "Eficiencia",
+      "docs": [
+        {
+          "path": "documentacion/08-pruebas-y-calidad.md",
+          "title": "08-pruebas-y-calidad.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Uso de Recursos": {
+      "characteristic": "Eficiencia",
+      "docs": [
+        {
+          "path": "documentacion/08-pruebas-y-calidad.md",
+          "title": "08-pruebas-y-calidad.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Cumplimiento de la Eficiencia": {
+      "characteristic": "Eficiencia",
+      "docs": [
+        {
+          "path": "documentacion/08-pruebas-y-calidad.md",
+          "title": "Trazabilidad — Cumplimiento de la Eficiencia",
+          "kind": "doc"
+        }
+      ],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Analizabilidad": {
+      "characteristic": "Mantenibilidad",
+      "docs": [],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Cambiabilidad": {
+      "characteristic": "Mantenibilidad",
+      "docs": [],
+      "code": [
+        {
+          "path": "calzatura-vilchez/src/routes/paths.ts",
+          "title": "paths.ts",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [],
+      "artifacts": []
+    },
+    "Estabilidad": {
+      "characteristic": "Mantenibilidad",
+      "docs": [],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Pruebabilidad": {
+      "characteristic": "Mantenibilidad",
+      "docs": [],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Cumplimiento de la Mantenibilidad": {
+      "characteristic": "Mantenibilidad",
+      "docs": [
+        {
+          "path": "documentacion/mantenibilidad-trazabilidad-iso25000.md",
+          "title": "Trazabilidad — Cumplimiento de la Mantenibilidad",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/13-checklist-cierre-defensa.md",
+          "title": "13-checklist-cierre-defensa.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Adaptabilidad": {
+      "characteristic": "Portabilidad",
+      "docs": [
+        {
+          "path": "documentacion/portabilidad-mapeo-iso25023.md",
+          "title": "portabilidad-mapeo-iso25023.md",
+          "kind": "doc"
+        },
+        {
+          "path": "DOCKER.md",
+          "title": "DOCKER.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "calzatura-vilchez/e2e/idoneidad-journey.spec.ts",
+          "title": "TC-IDON-001 — recorrido Must",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 55
+        },
+        {
+          "path": "calzatura-vilchez/e2e/browser-matrix.spec.ts",
+          "title": "browser-matrix.spec.ts",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [],
+      "artifacts": []
+    },
+    "Facilidad de Instalación": {
+      "characteristic": "Portabilidad",
+      "docs": [
+        {
+          "path": "DOCKER.md",
+          "title": "DOCKER.md",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/08-pruebas-y-calidad.md",
+          "title": "08-pruebas-y-calidad.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Coexistencia": {
+      "characteristic": "Portabilidad",
+      "docs": [],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    },
+    "Intercambiabilidad": {
+      "characteristic": "Portabilidad",
+      "docs": [
+        {
+          "path": "documentacion/modelo-calidad-25010-alineacion.md",
+          "title": "modelo-calidad-25010-alineacion.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [
+        {
+          "path": "calzatura-vilchez/e2e/checkout-cod-order.spec.ts",
+          "title": "TC-INT-001 COD",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 50
+        },
+        {
+          "path": "scripts/verify-intercambiabilidad-iso25000.mjs",
+          "title": "verify-intercambiabilidad-iso25000.mjs",
+          "kind": "code",
+          "startLine": 1,
+          "endLine": 100
+        }
+      ],
+      "gates": [
+        {
+          "command": "node scripts/verify-intercambiabilidad-iso25000.mjs",
+          "desc": "Gate Intercambiabilidad"
+        },
+        {
+          "command": "node scripts/verify-intercambiabilidad-iso25000.mjs --run-tests",
+          "desc": "Gate Intercambiabilidad + pruebas"
+        }
+      ],
+      "artifacts": []
+    },
+    "Cumplimiento de la Portabilidad": {
+      "characteristic": "Portabilidad",
+      "docs": [
+        {
+          "path": "documentacion/portabilidad-mapeo-iso25023.md",
+          "title": "Trazabilidad — Cumplimiento de la Portabilidad",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/08-pruebas-y-calidad.md",
+          "title": "08-pruebas-y-calidad.md",
+          "kind": "doc"
+        },
+        {
+          "path": "documentacion/13-checklist-cierre-defensa.md",
+          "title": "13-checklist-cierre-defensa.md",
+          "kind": "doc"
+        }
+      ],
+      "code": [],
+      "gates": [],
+      "artifacts": []
+    }
+  }
+}

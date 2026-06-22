@@ -4,12 +4,16 @@
 **Característica:** Fiabilidad  
 **Subcaracterísticas:** Madurez · Tolerancia a fallos · Capacidad de recuperación · Cumplimiento de fiabilidad  
 
-**Última revisión:** 2026-06-17  
+**Última revisión:** 2026-06-19  
 **Gate maestro:** `npm run ops:verify-fiabilidad` · modo completo: `npm run ops:verify-fiabilidad:full`
+
+> **Criterio producción (ISO 25010 / calidad en uso):** Madurez operacional, pruebas de carga contra el stack desplegado y restauración completa ante desastres **no se consideran al 100 %** hasta contar con evidencia en **producción** (URL Render/Firebase, uptime post-despliegue, DR ejecutado). La evaluación actual documenta madurez de **ingeniería** (CI/CD) y pruebas en **entorno controlado** (BFF local + Supabase prod, restore drill readonly).
+
+**Resumen dashboard:** 21/25 ítems = **84 %** (Madurez 88 % · Tolerancia 100 % · Recuperación 80 % · Cumplimiento 71 %).
 
 ---
 
-## 1. Madurez (100 %)
+## 1. Madurez (88 % — 7/8)
 
 **Definición ISO/IEC 25010:** grado en que el software **evita fallos** por defectos, bajo condiciones normales de uso.
 
@@ -25,10 +29,10 @@
 | 4 | Security DevSecOps Gates en success | **Sí** | Workflow `security-devsecops.yml` |
 | 5 | CI servicio IA en success | **Sí** | `ci.yml` → jobs IA + Docker build |
 | 6 | Controles ops estáticos en CI | **Sí** | readiness, backtest IA, restore drill fixture |
-| 7 | Último run success — 4 workflows madurez | **Sí** | Criterio post-remediación npm audit (2026-06-15) |
+| 7 | Último run success — 4 workflows madurez | **No** | CI en `main` ≠ madurez operacional en producción; pendiente historial uptime/incidentes post-despliegue |
 | 8 | Gate verify-madurez documentado | **Sí** | `scripts/verify-madurez-iso25000.mjs` |
 
-**Resultado lista:** 8/8 = **100 %**.
+**Resultado lista:** 7/8 = **88 %**.
 
 ### 1.2 Incidente resuelto (2026-06-15)
 
@@ -64,32 +68,32 @@ Fallos en push mobile iOS por **SCA npm audit** en `calzatura-vilchez/functions`
 
 ---
 
-## 3. Capacidad de recuperación (100 %)
+## 3. Capacidad de recuperación (80 % — 4/5)
 
 **Evidencia:**
 
-| Área | Artefacto |
-|------|-----------|
-| Backups proveedor | Firebase Hosting/Auth; Supabase PITR |
-| Runbook DR | `docs/ops/runbook-recuperacion-desastres.md` |
-| Restore drill | `docs/ops/restore-drill-evidence.json` (live readonly 2026-06-17) |
-| Validador | `scripts/restore-drill-check.mjs` (job `ops-controls-static` en CI) |
+| Área | Artefacto | Estado |
+|------|-----------|--------|
+| Backups proveedor | Firebase Hosting/Auth; Supabase PITR | **Sí** |
+| Runbook DR | `docs/ops/runbook-recuperacion-desastres.md` | **Sí** |
+| Restore drill | `docs/ops/restore-drill-evidence.json` (readonly 2026-06-17) | **Parcial** — no sustituye restauración completa en producción |
+| Validador | `scripts/restore-drill-check.mjs` (job `ops-controls-static` en CI) | **Sí** |
 
 **Gate:** `npm run ops:verify-recuperacion -- --run-drill-check`
 
 ---
 
-## 4. Cumplimiento de fiabilidad (100 %)
+## 4. Cumplimiento de fiabilidad (71 % — 5/7)
 
 **RNF-CAP-02:** fallo HTTP &lt; 2 %, p95 catálogo &lt; 3 s (documentado en `documentacion/08-pruebas-y-calidad.md`).
 
-| Escenario | Script | Evidencia |
-|-----------|--------|-----------|
-| Smoke (20 VUs) | `load-tests/scenarios/smoke-read.js` | `docs/ops/k6-smoke-evidence.json` (BFF local 2026-06-17) |
-| Mixed 1000 VUs + BFF | `load-tests/scenarios/read-mixed-1000.js` | `docs/ops/k6-mixed1000-bff-evidence.json` (BFF catálogo 2026-06-17) |
-| Mixed 1000 VUs datastore | mismo script con `-SkipBff` | `docs/ops/k6-mixed1000-evidence.json` (solo Supabase) |
-| Mixed 2000 VUs + BFF | `load-tests/scenarios/read-mixed-2000.js` | `docs/ops/k6-mixed2000-bff-evidence.json` (2000 VU 2026-06-17) |
-| Mixed 2000 VUs estático | autocannon | `artifacts/load-tests/autocannon-home-c2000-*.json` (2000 conexiones, 0 errores) |
+| Escenario | Script | Evidencia | Estado |
+|-----------|--------|-----------|--------|
+| Smoke (20 VUs) | `load-tests/scenarios/smoke-read.js` | `docs/ops/k6-smoke-evidence.json` | **No** — BFF local; pendiente URL producción |
+| Mixed 1000 VUs + BFF | `load-tests/scenarios/read-mixed-1000.js` | `docs/ops/k6-mixed1000-bff-evidence.json` | **No** — BFF local |
+| Mixed 1000 VUs datastore | mismo script con `-SkipBff` | `docs/ops/k6-mixed1000-evidence.json` | Referencia Supabase prod (parcial) |
+| Mixed 2000 VUs + BFF | `load-tests/scenarios/read-mixed-2000.js` | `docs/ops/k6-mixed2000-bff-evidence.json` | **Sí** — pre-producción archivada |
+| Mixed 2000 VUs estático | autocannon | `artifacts/load-tests/autocannon-home-c2000-*.json` | **Sí** |
 
 **Gate:** `npm run ops:verify-cumplimiento-fiabilidad -- --run-evidence-check`  
 **Validador evidencia:** `scripts/k6-evidence-check.mjs`

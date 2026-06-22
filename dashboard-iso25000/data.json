@@ -1,10 +1,10 @@
 {
   "meta": {
-    "title": "Dashboard de Cumplimiento — Calidad interna/externa ISO/IEC 9126-1",
+    "title": "Dashboard de Cumplimiento — ISO/IEC 25000 (SQuaRE) · Calidad interna/externa",
     "project": "Calzatura Vilchez — Sistema Web E-Commerce con IA",
     "generatedAt": "2026-06-19",
     "scope": "Vitrina pública, catálogo, carrito, checkout/pagos (Stripe), panel administrativo, servicio IA de predicción.",
-    "methodology": "Modelo ISO/IEC 9126-1 (6 características de calidad interna/externa): Funcionalidad, Fiabilidad, Usabilidad, Eficiencia, Mantenibilidad y Portabilidad — taxonomía del diagrama de referencia. Evaluación en tres niveles: (1) lista de cotejo Sí/No, (2) casos de prueba, (3) capturas y actas. Ver documentacion/modelo-calidad-25010-alineacion.md §9126.",
+    "methodology": "Familia ISO/IEC 25000 (SQuaRE). Modelo de producto: calidad interna/externa con 6 características y 27 subcaracterísticas (Funcionalidad, Fiabilidad, Usabilidad, Eficiencia, Mantenibilidad, Portabilidad) según diagrama de referencia iso25000_ref.png e ISO/IEC 9126-1. Evaluación en tres niveles: (1) lista de cotejo Sí/No, (2) casos de prueba, (3) capturas y actas. Ver documentacion/modelo-calidad-25010-alineacion.md.",
     "thresholds": {
       "ok": 80,
       "warn": 60
@@ -18,7 +18,7 @@
       "id": "funcionalidad",
       "name": "Funcionalidad",
       "color": "#2f6fb3",
-      "definition": "Capacidad del software de proporcionar funciones que satisfacen necesidades explícitas e implícitas (ISO/IEC 9126-1).",
+      "definition": "Capacidad del producto software de proporcionar funciones que satisfacen necesidades explícitas e implícitas (ISO/IEC 9126-1 §6.1; familia SQuaRE 25000). Ver documentacion/funcionalidad-trazabilidad-iso25000.md.",
       "subcharacteristics": [
         {
           "name": "Idoneidad",
@@ -51,12 +51,12 @@
       "id": "fiabilidad",
       "name": "Fiabilidad",
       "color": "#1ba6c4",
-      "definition": "Capacidad de mantener un nivel de prestación específico ante fallos o uso indebido (ISO/IEC 9126-1).",
+      "definition": "Capacidad de mantener un nivel de prestación específico ante fallos o uso indebido (ISO/IEC 9126-1). El 100 % en Madurez, Recuperación y Cumplimiento de capacidad exige evidencia en producción (uptime, k6 contra stack desplegado, DR ejecutado); la evaluación actual es pre-producción / entorno controlado.",
       "subcharacteristics": [
         {
           "name": "Madurez",
-          "percent": 100,
-          "evidence": "Lista de cotejo 8/8: CI, Integration, SonarQube, DevSecOps, IA, ops estáticos y último run success en main (2026-06-18). Gate: npm run ops:verify-madurez:ci. documentacion/fiabilidad-trazabilidad-iso25000.md §1."
+          "percent": 88,
+          "evidence": "Lista 7/8: CI, Integration, SonarQube, DevSecOps, IA y ops estáticos en VERDE. Pendiente ítem 7 — historial de estabilidad operacional en producción (uptime/incidentes). Gate: npm run ops:verify-madurez:ci. documentacion/fiabilidad-trazabilidad-iso25000.md §1."
         },
         {
           "name": "Tolerancia a Fallos",
@@ -65,13 +65,13 @@
         },
         {
           "name": "Capacidad de Recuperación",
-          "percent": 100,
-          "evidence": "Backups Firebase/Supabase, runbook DR docs/ops/runbook-recuperacion-desastres.md, restore drill CI validado. Gate: npm run ops:verify-recuperacion -- --run-drill-check."
+          "percent": 80,
+          "evidence": "Backups Firebase/Supabase y runbook DR documentados; restore drill readonly validado en CI. Pendiente ítem 4 — restauración completa verificada en entorno de producción. Gate: npm run ops:verify-recuperacion -- --run-drill-check."
         },
         {
           "name": "Cumplimiento de Fiabilidad",
-          "percent": 100,
-          "evidence": "RNF-CAP-02, scripts k6, evidencia smoke + mixed1000/2000 archivada. Gate: npm run ops:verify-cumplimiento-fiabilidad -- --run-evidence-check."
+          "percent": 71,
+          "evidence": "RNF-CAP-02 y scripts k6 disponibles; mixed2000 y artefactos archivados. Pendiente ítems 3–4 — smoke y mixed1000 ejecutados con BFF local (no stack producción completo en Render/Firebase). Gate: npm run ops:verify-cumplimiento-fiabilidad -- --run-evidence-check."
         }
       ]
     },
@@ -83,28 +83,28 @@
       "subcharacteristics": [
         {
           "name": "Inteligibilidad",
-          "percent": 83,
-          "evidence": "Navegación jerárquica por dominios, rutas claras, nomenclatura consistente en menús."
+          "percent": 100,
+          "evidence": "Rutas paths.ts, ayudas checkout, E2E axe WCAG 2.1 AA (5 rutas públicas)."
         },
         {
           "name": "Facilidad de Aprendizaje",
-          "percent": 80,
-          "evidence": "Feedback inmediato con toasts, ayudas contextuales en checkout y panel admin."
+          "percent": 100,
+          "evidence": "Toasts, validación, selectores IA persistidos, E2E register-validation y TC-PRED-003."
         },
         {
           "name": "Operabilidad",
-          "percent": 80,
-          "evidence": "Formularios con validación en tiempo real, panel IA con selectores persistidos."
+          "percent": 100,
+          "evidence": "Confirmación destructiva TC-PROD-DEL*, admin-layout, smoke checkout."
         },
         {
           "name": "Atractividad",
-          "percent": 80,
-          "evidence": "UI Tailwind CSS v4 + animaciones framer-motion para coherencia visual."
+          "percent": 100,
+          "evidence": "Tailwind v4, iPhone 13 idoneidad-journey, toggle tema admin."
         },
         {
           "name": "Cumplimiento de la Usabilidad",
-          "percent": 60,
-          "evidence": "RNF-USA-01 / cuestionario SUS sin sesión formal con usuarios externos registrada."
+          "percent": 70,
+          "evidence": "RNF-USA-01/02, instrumento SUS y trazabilidad listos; sesión con usuarios reales pendiente (3/10 ítems)."
         }
       ]
     },

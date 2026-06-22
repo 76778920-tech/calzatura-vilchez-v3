@@ -1,6 +1,3 @@
-/**
- * Debe cargarse antes que el bundle (extensiones de Chrome inyectan promesas rechazadas muy pronto).
- */
 (function installBenignConsoleGuard(global) {
   var BENIGN_RE =
     /message channel closed before a response was received|extension context invalidated|listener indicated an asynchronous response/i;

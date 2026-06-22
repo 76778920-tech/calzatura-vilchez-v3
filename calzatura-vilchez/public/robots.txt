@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://calzaturavilchez-ab17f.web.app/sitemap.xml

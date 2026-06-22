@@ -54,7 +54,7 @@ const SECURITY_EVIDENCE = {
     "calzatura-vilchez/bff/securityMonitor.cjs",
   ],
   "DAST ZAP producción": [
-    "zap-reports/zap-production-report-v2.json",
+    "zap-reports/zap-production-report-v3.json",
     "documentacion/seguridad-riesgos-residuales-dast.md",
     "calzatura-vilchez/src/__tests__/securityZapProduction.guard.test.js",
   ],

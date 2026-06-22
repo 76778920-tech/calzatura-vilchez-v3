@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Informe de pruebas de estrés — Calzatura Vilchez</title>
+<style>
+  :root { --bg:#0f1419; --card:#1a2332; --text:#e8eef4; --muted:#8ba3bc; --accent:#3b82f6; --pass:#2e9e5b; --border:#2a3544; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:Segoe UI,system-ui,sans-serif; background:var(--bg); color:var(--text); line-height:1.5; }
+  header { background:linear-gradient(135deg,#1a3a5c,#0f1419); padding:2rem; border-bottom:1px solid var(--border); }
+  h1 { margin:0 0 .25rem; font-size:1.75rem; }
+  .sub { color:#90b8d8; font-size:.95rem; }
+  main { max-width:1100px; margin:0 auto; padding:1.5rem; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1rem; margin:1.5rem 0; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.25rem; }
+  .card .val { font-size:1.8rem; font-weight:700; color:var(--accent); }
+  .card.pass .val { color:var(--pass); }
+  .card small { color:var(--muted); display:block; margin-top:.25rem; }
+  section { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1.25rem; margin-bottom:1.25rem; }
+  h2 { margin:0 0 1rem; font-size:1.1rem; color:#90b8d8; }
+  table { width:100%; border-collapse:collapse; font-size:.85rem; }
+  th,td { padding:.6rem .5rem; border-bottom:1px solid var(--border); text-align:left; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  .badge { padding:.15rem .5rem; border-radius:4px; font-size:.75rem; font-weight:700; }
+  .badge.pass { background:#1a3d2a; color:#6ee7a0; }
+  .badge.fail { background:#3d1a1a; color:#fca5a5; }
+  .bar-track { height:8px; background:#0f1419; border-radius:4px; margin:.35rem 0; overflow:hidden; max-width:140px; }
+  .bar-fill { height:100%; border-radius:4px; }
+  .muted { color:var(--muted); font-size:.78rem; }
+  .vu-chart { display:flex; align-items:flex-end; gap:1.5rem; height:200px; padding:1rem 0; }
+  .vu-col { flex:1; text-align:center; }
+  .vu-bar { width:100%; max-width:80px; margin:0 auto .5rem; border-radius:6px 6px 0 0; min-height:4px; }
+  .vu-label { font-size:.8rem; font-weight:600; }
+  .vu-num { font-size:.75rem; color:var(--muted); }
+  footer { text-align:center; padding:2rem; color:var(--muted); font-size:.8rem; }
+  .links { margin-top:1rem; }
+  .links a { color:#90b8d8; margin-right:1rem; }
+  code { background:#0f1419; padding:.15rem .35rem; border-radius:4px; font-size:.8rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Informe de pruebas de estrés (k6)</h1>
+  <p class="sub">Calzatura Vilchez · RNF-CAP-02 · ISO/IEC 25010 Eficiencia · Grafana k6 + BFF local</p>
+  <p class="sub">Generado: 2026-06-20 · Evidencia archivada en docs/ops/k6-*-evidence.json</p>
+  <div class="links">
+    <a href="http://localhost:4321/">← Dashboard ISO 25000</a>
+    <a href="/zap/">Informe ZAP seguridad →</a>
+  </div>
+</header>
+<main>
+  <div class="cards">
+    <div class="card pass"><div class="val">VERDE</div><small>Veredicto global (3 escenarios)</small></div>
+    <div class="card"><div class="val">2,000</div><small>VUs pico máximo (meta RNF-CAP-02: 2.000)</small></div>
+    <div class="card"><div class="val">✓</div><small>Escenario 2.000 VUs ejecutado</small></div>
+    <div class="card"><div class="val">2026-06-17</div><small>Última corrida documentada</small></div>
+  </div>
+
+  <section>
+    <h2>VUs por escenario</h2>
+    <div class="vu-chart"><div class="vu-col"><div class="vu-bar" style="height:2px;background:#3b82f6"></div><div class="vu-label">smoke</div><div class="vu-num">20 VU</div></div><div class="vu-col"><div class="vu-bar" style="height:80px;background:#3b82f6"></div><div class="vu-label">mixed1000</div><div class="vu-num">1,000 VU</div></div><div class="vu-col"><div class="vu-bar" style="height:160px;background:#3b82f6"></div><div class="vu-label">mixed2000</div><div class="vu-num">2,000 VU</div></div></div>
+  </section>
+
+  <section>
+    <h2>Resultados detallados</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Escenario</th><th>VUs</th><th>Entorno</th><th>Resultado</th>
+          <th>Fallos HTTP</th><th>p95 catálogo BFF</th><th>p95 detalle</th><th>p95 /health</th>
+        </tr>
+      </thead>
+      <tbody><tr>
+        <td><strong>Smoke (20 VUs)</strong><br><span class="muted">k6-smoke-live-2026-06-17-bff</span></td>
+        <td>20</td>
+        <td>local-bff+supabase-prod</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>0.00% <div class="bar-track"><div class="bar-fill" style="width:0%;background:#2e9e5b"></div></div><small>meta &lt; 2%</small></td>
+        <td>2 ms <div class="bar-track"><div class="bar-fill" style="width:0%;background:#2e9e5b"></div></div><small>meta &lt; 3000 ms</small></td>
+        <td>220 ms</td>
+        <td>220 ms</td>
+      </tr>
+<tr>
+        <td><strong>Mixed 1.000 VUs</strong><br><span class="muted">k6-mixed1000-live-2026-06-17-bff</span></td>
+        <td>1,000</td>
+        <td>local-bff+supabase-prod</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>0.01% <div class="bar-track"><div class="bar-fill" style="width:1%;background:#2e9e5b"></div></div><small>meta &lt; 2%</small></td>
+        <td>1 ms <div class="bar-track"><div class="bar-fill" style="width:0%;background:#2e9e5b"></div></div><small>meta &lt; 4000 ms</small></td>
+        <td>223 ms</td>
+        <td>223 ms</td>
+      </tr>
+<tr>
+        <td><strong>Mixed 2.000 VUs (RNF-CAP-02)</strong><br><span class="muted">k6-mixed2000-live-2026-06-17-bff</span></td>
+        <td>2,000</td>
+        <td>local-bff+supabase-prod</td>
+        <td><span class="badge pass">PASS</span></td>
+        <td>0.08% <div class="bar-track"><div class="bar-fill" style="width:4%;background:#2e9e5b"></div></div><small>meta &lt; 2%</small></td>
+        <td>1 ms <div class="bar-track"><div class="bar-fill" style="width:0%;background:#2e9e5b"></div></div><small>meta &lt; 4000 ms</small></td>
+        <td>739 ms</td>
+        <td>1 ms</td>
+      </tr></tbody>
+    </table>
+    <p class="muted" style="margin-top:1rem">Lecturas: GET /public/catalog/active, catálogo paginado, detalle Supabase, /health. Sin checkout ni admin autenticado.</p>
+  </section>
+
+  <section>
+    <h2>Reproducir / actualizar</h2>
+    <pre style="background:#0f1419;padding:1rem;border-radius:8px;overflow:auto;font-size:.8rem"><code>npm run load:smoke:bff
+npm run load:mixed1000:bff
+npm run load:mixed2000:bff
+node scripts/generar_informe_stress_html.mjs</code></pre>
+  </section>
+</main>
+<footer>
+  RNF-CAP-02 · documentacion/08-pruebas-y-calidad.md §5.1 · load-tests/README.md
+</footer>
+</body>
+</html>

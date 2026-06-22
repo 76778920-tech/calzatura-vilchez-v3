@@ -14,6 +14,8 @@
     "ops:verify-madurez:ci": "node scripts/verify-madurez-iso25000.mjs --check-ci --check-audit",
     "ops:verify-mantenibilidad": "node scripts/verify-mantenibilidad-iso25000.mjs",
     "ops:verify-mantenibilidad:ci": "node scripts/verify-mantenibilidad-iso25000.mjs --check-ci",
+    "ops:verify-usabilidad": "node scripts/verify-usabilidad-iso25000.mjs",
+    "ops:verify-usabilidad:ci": "node scripts/verify-usabilidad-iso25000.mjs --check-ci",
     "ops:verify-tolerancia-fallos": "node scripts/verify-tolerancia-fallos-iso25000.mjs",
     "ops:verify-recuperacion": "node scripts/verify-recuperacion-iso25000.mjs",
     "ops:verify-cumplimiento-fiabilidad": "node scripts/verify-cumplimiento-fiabilidad-iso25000.mjs",
@@ -25,7 +27,8 @@
     "dashboard:iso:audit": "node scripts/test-dashboard-audit.mjs",
     "dashboard:iso:build": "npm run build --prefix modulo-adecuacion-funcional-iso25010",
     "dashboard:iso:start": "npm run dashboard:iso:build && node dashboard-iso25000/server.mjs",
-    "dashboard:checklists": "node scripts/generate-checklists-data.mjs && node scripts/generate-evaluation-levels.mjs",
+    "dashboard:checklists": "node scripts/generate-checklists-data.mjs && node scripts/generate-evaluation-levels.mjs && node scripts/generate-evidence-manifest.mjs",
+    "dashboard:evidence": "node scripts/generate-evidence-manifest.mjs",
     "dashboard:evaluation-levels": "node scripts/generate-evaluation-levels.mjs",
     "dashboard:iso:audit-model": "node scripts/audit-iso25010-model.mjs",
     "ops:ai-backtest": "node scripts/ai-backtest-gate.mjs",
@@ -43,7 +46,8 @@
     "load:mixed1000:bff": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed1000 -StartLocalBff",
     "load:mixed2000": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed2000",
     "load:mixed2000:bff": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-load-test.ps1 -Scenario mixed2000 -StartLocalBff",
-    "ops:k6-evidence:bff": "node scripts/k6-summary-to-evidence.mjs --summary artifacts/load-tests/k6-mixed1000-20260617-153431.json --scenario mixed1000 --peak-vus 1000 --with-bff --bff-local --output docs/ops/k6-mixed1000-bff-evidence.json"
+    "ops:k6-evidence:bff": "node scripts/k6-summary-to-evidence.mjs --summary artifacts/load-tests/k6-mixed1000-20260617-153431.json --scenario mixed1000 --peak-vus 1000 --with-bff --bff-local --output docs/ops/k6-mixed1000-bff-evidence.json",
+    "ops:stress-report": "node scripts/generar_informe_stress_html.mjs"
   },
   "devDependencies": {
     "sonarqube-scanner": "4.3.6"

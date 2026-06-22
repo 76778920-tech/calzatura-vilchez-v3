@@ -1,7 +1,9 @@
-# Interoperabilidad funcional — trazabilidad y evidencia (ISO/IEC 25010)
+# Interoperabilidad funcional — trazabilidad y evidencia (ISO/IEC 25000 / 9126-1)
 
 **Proyecto:** Calzatura Vilchez  
-**Subcaracterística:** Interoperabilidad (**Compatibilidad** · ISO/IEC 25010 · familia SQuaRE 25000)  
+**Característica:** Funcionalidad · **Subcaracterística:** Interoperabilidad (9126 §6.1.3)  
+**Referencia cruzada 25010:** Interoperabilidad (antes bajo Compatibilidad)  
+**Índice Funcionalidad:** `documentacion/funcionalidad-trazabilidad-iso25000.md`  
 **Criterio:** cada integración externa del sistema (auth, datos, pagos, IA, geocodificación, identidad, CDN, caché) tiene **contrato verificable**, prueba automatizada y documentación de frontera API.
 
 **Última revisión:** 2026-06-16  

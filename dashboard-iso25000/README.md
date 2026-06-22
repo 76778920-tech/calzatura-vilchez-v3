@@ -4,7 +4,7 @@ Dashboard unificado en **http://localhost:4321** que integra:
 
 | Ruta | Contenido |
 |------|-----------|
-| `/` | Dashboard principal — 8 características ISO 25010, gráficos, instrumentos |
+| `/` | Dashboard principal — **6 características** (calidad interna/externa, diagrama ISO 25000), gráficos, instrumentos |
 | `/adecuacion-funcional/` | Módulo CF / COF / TECP (React, datos en vivo) |
 | `/api/*` | API REST del módulo de adecuación funcional |
 
@@ -30,11 +30,12 @@ Abre **http://localhost:4321**
 ## Qué incluye el dashboard principal (4321)
 
 - **Resumen global** con anillo de cumplimiento y donut de distribución (cumple / parcial / no cumple)
-- **Radar** y **barras** por las 8 características (ISO/IEC 25010)
+- **Radar** y **barras** por las **6 características** (Funcionalidad, Fiabilidad, Usabilidad, Eficiencia, Mantenibilidad, Portabilidad)
 - **Listas de cotejo** con evaluación en **3 niveles** (cotejo + casos de prueba + evidencias)
 - **Barras agrupadas** con todas las subcaracterísticas
 - **Correlación en vivo** con CF, COF y TECP (lee `/api/evaluaciones`)
 - **Listas de cotejo expandibles** por subcaracterística — formato UNAM (tabla Sí / No / Observaciones)
+- **Hub de evidencias** — documentación `.md`, fragmentos de código, gates `verify-*`, artefactos CU-T y diagrama SQuaRE (pestaña *Evidencias*)
 - **Tablas detalladas** con evidencia del repositorio
 - Enlace directo al **módulo CF/COF/TECP** en `/adecuacion-funcional/`
 
@@ -48,7 +49,7 @@ La característica **Funcionalidad** del modelo 25000 se vincula con:
 
 ## Actualizar porcentajes estáticos
 
-Edita **`data.json`** para las características y subcaracterísticas del modelo 25010 (ver `documentacion/modelo-calidad-25010-alineacion.md`).
+Edita **`data.json`** para las características y subcaracterísticas del modelo de calidad interna/externa (ver `documentacion/modelo-calidad-25010-alineacion.md`).
 
 Los indicadores CF/COF/TECP **no** se editan en `data.json` — se gestionan en `/adecuacion-funcional/`.
 
@@ -76,7 +77,7 @@ dashboard-iso25000/
 ├── index.html      # Dashboard principal
 ├── app.js          # Gráficos, instrumentos, correlación
 ├── styles.css
-├── data.json       # Modelo 25010 (8 características)
+├── data.json       # Modelo 6 características / 27 subcaracterísticas (SQuaRE 25000)
 ├── checklists-data.json
 └── evaluation-levels.json  # Nivel 2 casos de prueba + Nivel 3 evidencias
 

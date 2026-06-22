@@ -145,6 +145,16 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
         ),
         if (!_searchActive)
           IconButton(
+            tooltip: 'Teachable Machine',
+            icon: const Icon(
+              Icons.image_search_rounded,
+              color: Colors.white70,
+              size: 22,
+            ),
+            onPressed: () => context.push('/teachable'),
+          ),
+        if (!_searchActive)
+          IconButton(
             icon: const Icon(
               Icons.person_outline_rounded,
               color: Colors.white70,
@@ -161,7 +171,6 @@ class _CatalogPageState extends ConsumerState<CatalogPage> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Encabezado del catálogo
 // ─────────────────────────────────────────────────────────────────────────────
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Category chips delegate

@@ -1,7 +1,8 @@
-# Cumplimiento de la funcionalidad — trazabilidad y evidencia (ISO/IEC 25010 / 9126)
+# Cumplimiento de la funcionalidad — trazabilidad y evidencia (ISO/IEC 25000 / 9126-1)
 
 **Proyecto:** Calzatura Vilchez  
-**Subcaracterística:** Cumplimiento de la funcionalidad (Funcionalidad · familia ISO/IEC 25000)  
+**Característica:** Funcionalidad · **Subcaracterística:** Cumplimiento de la funcionalidad (9126 §6.1.5)  
+**Índice Funcionalidad:** `documentacion/funcionalidad-trazabilidad-iso25000.md`  
 **Definición ISO/IEC 9126:** capacidad del software de **adherirse a normas, convenciones y reglas legales o reglamentarias** relacionadas con la funcionalidad.
 
 **No confundir con:** ISO/IEC 27001 (gestión de seguridad de la información) ni con Idoneidad (¿hace lo que debe?).

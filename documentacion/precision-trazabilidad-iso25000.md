@@ -1,7 +1,8 @@
-# Precisión funcional — trazabilidad y evidencia (ISO/IEC 25010)
+# Precisión funcional — trazabilidad y evidencia (ISO/IEC 25000 / 9126-1)
 
 **Proyecto:** Calzatura Vilchez  
-**Subcaracterística:** Precisión (Funcionalidad · familia ISO/IEC 25000)  
+**Característica:** Funcionalidad · **Subcaracterística:** Precisión (9126 §6.1.2)  
+**Índice Funcionalidad:** `documentacion/funcionalidad-trazabilidad-iso25000.md`  
 **Criterio:** los cálculos y resultados del sistema (stock, precios, totales, finanzas, predicción IA) son **correctos** y se validan en cliente, BFF y base de datos; con pruebas automatizadas que impiden regresiones.
 
 **Última revisión:** 2026-06-16  

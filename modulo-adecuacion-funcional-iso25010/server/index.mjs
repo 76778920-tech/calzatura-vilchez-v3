@@ -52,7 +52,9 @@ const server = http.createServer(async (req, res) => {
   res.end("Not found");
 });
 
-seedIfEmpty();
+seedIfEmpty().catch((e) => {
+  console.error("QC seedIfEmpty:", e.message);
+});
 server.listen(PORT, () => {
   console.log(`QC Adecuación Funcional (standalone) — http://localhost:${PORT}`);
 });

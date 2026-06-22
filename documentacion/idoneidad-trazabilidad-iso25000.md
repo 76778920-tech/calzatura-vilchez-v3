@@ -1,7 +1,8 @@
-# Idoneidad funcional — trazabilidad RF Must ↔ pruebas (ISO/IEC 25010)
+# Idoneidad funcional — trazabilidad RF Must ↔ pruebas (ISO/IEC 25000 / 9126-1)
 
 **Proyecto:** Calzatura Vilchez  
-**Subcaracterística:** Idoneidad (Funcionalidad · familia ISO/IEC 25000)  
+**Característica:** Funcionalidad · **Subcaracterística:** Idoneidad (9126 §6.1.1)  
+**Índice Funcionalidad:** `documentacion/funcionalidad-trazabilidad-iso25000.md`  
 **Criterio:** cada requisito funcional **Must** del SRS tiene implementación verificable y al menos un caso de prueba automatizado o acta manual con resultado **Pasado**.
 
 **Fuente SRS:** `documentacion/05-especificacion-requisitos-software-SRS.md`  

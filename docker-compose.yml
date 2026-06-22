@@ -9,6 +9,7 @@ services:
     environment:
       VITE_AI_SERVICE_URL: http://localhost:8000
       CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
     volumes:
       - ./calzatura-vilchez:/app
       - frontend_node_modules:/app/node_modules
@@ -16,7 +17,7 @@ services:
       ai-service:
         condition: service_started
       firebase-emulator:
-        condition: service_healthy
+        condition: service_started
 
   ai-service:
     build:
@@ -35,6 +36,26 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+
+  dashboard-iso:
+    build:
+      context: .
+      dockerfile: dashboard-iso25000/Dockerfile
+    container_name: calzatura-dashboard-iso
+    ports:
+      - "4321:4321"
+    environment:
+      ISO_BIND_HOST: "0.0.0.0"
+      ISO_PORT: "4321"
+    volumes:
+      - .:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:4321/stress/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   firebase-emulator:
     build:
@@ -55,11 +76,11 @@ services:
     volumes:
       - emulator_data:/workspace/emulator-data
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--spider", "http://localhost:4000"]
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:4000/"]
       interval: 15s
       timeout: 10s
-      retries: 5
-      start_period: 30s
+      retries: 8
+      start_period: 60s
 
 volumes:
   frontend_node_modules:

@@ -12,8 +12,8 @@
       "caracteristica": "Funcionalidad",
       "color": "#2f6fb3",
       "titulo": "Lista de cotejo — Idoneidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Idoneidad» (Funcionalidad) según ISO/IEC 9126-1.",
-      "referencia": "scripts/verify-idoneidad-iso25000.mjs · documentacion/cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv · documentacion/idoneidad-trazabilidad-iso25000.md",
+      "objetivo": "Verificar Idoneidad (9126 §6.1.1): el producto proporciona un conjunto apropiado de funciones para las tareas del e-commerce Calzatura Vilchez (SRS Must + TC-IDON-001).",
+      "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-idoneidad-iso25000.mjs · documentacion/cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv · documentacion/idoneidad-trazabilidad-iso25000.md",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
       "items": [
@@ -77,8 +77,8 @@
       "caracteristica": "Funcionalidad",
       "color": "#2f6fb3",
       "titulo": "Lista de cotejo — Precisión",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Precisión» (Funcionalidad) según ISO/IEC 9126-1.",
-      "referencia": "scripts/verify-precision-iso25000.mjs · documentacion/precision-trazabilidad-iso25000.md",
+      "objetivo": "Verificar Precisión (9126 §6.1.2): resultados y cálculos (stock, precios, totales, finanzas, IRE) son correctos con el grado de exactitud requerido.",
+      "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-precision-iso25000.mjs · documentacion/precision-trazabilidad-iso25000.md",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
       "items": [
@@ -148,8 +148,8 @@
       "caracteristica": "Funcionalidad",
       "color": "#2f6fb3",
       "titulo": "Lista de cotejo — Interoperabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Interoperabilidad» (Funcionalidad) según ISO/IEC 9126-1.",
-      "referencia": "scripts/verify-interoperabilidad-iso25000.mjs · documentacion/interoperabilidad-trazabilidad-iso25000.md",
+      "objetivo": "Verificar Interoperabilidad (9126 §6.1.3): el producto interactúa correctamente con sistemas especificados (Firebase, Supabase, Stripe, IA, geocodificación, DNI, CDN, caché).",
+      "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-interoperabilidad-iso25000.mjs · documentacion/interoperabilidad-trazabilidad-iso25000.md",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
       "items": [
@@ -219,8 +219,8 @@
       "caracteristica": "Funcionalidad",
       "color": "#2f6fb3",
       "titulo": "Lista de cotejo — Seguridad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Seguridad» (Funcionalidad) según ISO/IEC 9126-1.",
-      "referencia": "scripts/verify-seguridad-iso25000.mjs · functions/orderNonRepudiation.cjs · documentacion/seguridad-trazabilidad-iso25000.md",
+      "objetivo": "Verificar Seguridad (9126 §6.1.4): información y datos protegidos frente a acceso o modificación no autorizados; acceso autorizado no denegado (RLS, auth, auditoría, no repudio).",
+      "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-seguridad-iso25000.mjs · functions/orderNonRepudiation.cjs · documentacion/seguridad-trazabilidad-iso25000.md",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
       "items": [
@@ -298,7 +298,7 @@
         },
         {
           "n": 13,
-          "indicador": "DAST ZAP producción v2 sin altas críticas (TC-SEG-005)",
+          "indicador": "DAST ZAP producción v3 sin altas críticas (TC-SEG-005)",
           "cumple": true,
           "observacion": "Evidencia conforme al repositorio."
         },
@@ -356,8 +356,8 @@
       "caracteristica": "Funcionalidad",
       "color": "#2f6fb3",
       "titulo": "Lista de cotejo — Cumplimiento de la funcionalidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la funcionalidad» (Funcionalidad) según ISO/IEC 9126-1.",
-      "referencia": "scripts/verify-cumplimiento-iso25000.mjs · documentacion/cuadros-excel/CU-T05-requisitos.csv · documentacion/cumplimiento-trazabilidad-iso25000.md",
+      "objetivo": "Verificar Cumplimiento de la funcionalidad (9126 §6.1.5): adherencia a normas, convenciones y reglamentos legales peruanos relacionados con la funcionalidad (Ley 29571, 29733, términos, CU-T05/06/07).",
+      "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-cumplimiento-iso25000.mjs · documentacion/cuadros-excel/CU-T05-requisitos.csv · documentacion/cumplimiento-trazabilidad-iso25000.md",
       "rutaModulo": "/adecuacion-funcional/",
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
       "items": [
@@ -409,7 +409,7 @@
       "caracteristica": "Fiabilidad",
       "color": "#1ba6c4",
       "titulo": "Lista de cotejo — Madurez",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Madurez» (Fiabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Madurez» (Fiabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "scripts/verify-madurez-iso25000.mjs · documentacion/fiabilidad-trazabilidad-iso25000.md · .github/workflows/ci.yml",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -453,14 +453,14 @@
         {
           "n": 7,
           "indicador": "Último run en success — 4 workflows de madurez en main",
-          "cumple": true,
-          "observacion": "gh run list --limit 1: ci, integration, sonarqube, devsecops en success (2026-06-15)"
+          "cumple": false,
+          "observacion": "ISO 25010 Madurez operacional — requiere historial en producción (uptime SLA, incidentes post-despliegue ≥30 días); CI en main no sustituye operación real"
         },
         {
           "n": 8,
           "indicador": "Gate verify-madurez-iso25000.mjs documentado y ejecutable",
           "cumple": true,
-          "observacion": "verify-madurez-iso25000.mjs valida 8/8 ítems"
+          "observacion": "verify-madurez-iso25000.mjs documentado y ejecutable (evaluación pre-producción)"
         }
       ]
     },
@@ -468,7 +468,7 @@
       "caracteristica": "Fiabilidad",
       "color": "#1ba6c4",
       "titulo": "Lista de cotejo — Tolerancia a Fallos",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Tolerancia a Fallos» (Fiabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Tolerancia a Fallos» (Fiabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/08-pruebas-y-calidad.md · error boundaries · idempotencia webhook Stripe",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -509,7 +509,7 @@
       "caracteristica": "Fiabilidad",
       "color": "#1ba6c4",
       "titulo": "Lista de cotejo — Capacidad de Recuperación",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Capacidad de Recuperación» (Fiabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Capacidad de Recuperación» (Fiabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "scripts/restore-drill-check.mjs · documentacion/13-checklist-cierre-defensa.md (sección F)",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -535,14 +535,14 @@
         {
           "n": 4,
           "indicador": "Prueba de restauración registrada",
-          "cumple": true,
-          "observacion": "restore-drill-evidence.json — drill live readonly 2026-06-17 (58 migraciones, REST counts OK)"
+          "cumple": false,
+          "observacion": "restore-drill-evidence.json — drill readonly 2026-06-17 (58 migraciones); pendiente restauración completa verificada en producción"
         },
         {
           "n": 5,
           "indicador": "Script restore-drill-check ejecutado con evidencia",
           "cumple": true,
-          "observacion": "restore-drill-check.mjs + generate-restore-drill-evidence-live.mjs"
+          "observacion": "restore-drill-check.mjs + generate-restore-drill-evidence-live.mjs (fixture CI)"
         }
       ]
     },
@@ -550,7 +550,7 @@
       "caracteristica": "Fiabilidad",
       "color": "#1ba6c4",
       "titulo": "Lista de cotejo — Cumplimiento de Fiabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de Fiabilidad» (Fiabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de Fiabilidad» (Fiabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/08-pruebas-y-calidad.md §5.1 · load-tests/ · npm run load:mixed2000",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -570,14 +570,14 @@
         {
           "n": 3,
           "indicador": "Escenario smoke k6 con evidencia archivada",
-          "cumple": true,
-          "observacion": "k6-smoke-evidence.json — smoke BFF local 2026-06-17 (20 VU, 0% fail, p95 BFF cat 2ms)"
+          "cumple": false,
+          "observacion": "k6-smoke-evidence.json — corrida con BFF local (local-bff+supabase-prod); pendiente smoke contra URL producción (Render + Firebase)"
         },
         {
           "n": 4,
           "indicador": "Escenario mixed1000 con evidencia archivada",
-          "cumple": true,
-          "observacion": "k6-mixed1000-bff-evidence.json — 1000 VU BFF /public/catalog/* 2026-06-17 (0% fail, p95 1ms)"
+          "cumple": false,
+          "observacion": "k6-mixed1000-bff-evidence.json — 1000 VU BFF local; pendiente mixed1000 contra stack desplegado en producción"
         },
         {
           "n": 5,
@@ -589,13 +589,13 @@
           "n": 6,
           "indicador": "Resultados archivados en artifacts/load-tests/",
           "cumple": true,
-          "observacion": "docs/ops/k6-smoke + k6-mixed1000-bff-evidence.json (live-run con BFF)"
+          "observacion": "docs/ops/k6-* + artifacts/load-tests/ — evidencia pre-producción archivada"
         },
         {
           "n": 7,
           "indicador": "Gate verify-cumplimiento-fiabilidad-iso25000.mjs en VERDE",
           "cumple": true,
-          "observacion": "verify-cumplimiento-fiabilidad-iso25000.mjs — 7/7 ítems"
+          "observacion": "verify-cumplimiento-fiabilidad-iso25000.mjs — gate estático en VERDE (artefactos repo)"
         }
       ]
     },
@@ -603,8 +603,8 @@
       "caracteristica": "Usabilidad",
       "color": "#3ec9b0",
       "titulo": "Lista de cotejo — Inteligibilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Inteligibilidad» (Usabilidad) según ISO/IEC 9126-1.",
-      "referencia": "documentacion/plantillas/PL-03-registro-ejecucion-prueba.md · revisión manual flujos públicos",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Inteligibilidad» (Usabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
+      "referencia": "e2e/accessibility.spec.ts · documentacion/usabilidad-trazabilidad-iso25000.md §1",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
       "items": [
@@ -612,37 +612,49 @@
           "n": 1,
           "indicador": "Navegación jerárquica por dominios clara",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "src/domains/ + menús público/admin/staff"
         },
         {
           "n": 2,
           "indicador": "Rutas catálogo/producto/carrito/checkout identificables",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "paths.ts — catálogo, carrito, checkout"
         },
         {
           "n": 3,
           "indicador": "Nomenclatura consistente en menús",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "AdminLayout.tsx title en nav items"
         },
         {
           "n": 4,
           "indicador": "Etiquetas comprensibles para usuario final",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Formularios auth/checkout con labels visibles"
         },
         {
           "n": 5,
           "indicador": "Sin jerga técnica en flujos públicos",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Copy tienda en español orientado a cliente"
         },
         {
           "n": 6,
           "indicador": "Ayudas visuales en acciones principales",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "CheckoutDeliveryMap hints + cartShared aria-label cantidades"
+        },
+        {
+          "n": 7,
+          "indicador": "E2E axe WCAG 2.1 AA en rutas públicas clave",
+          "cumple": true,
+          "observacion": "e2e/accessibility.spec.ts — axe wcag21aa home/catálogo/login/registro/carrito"
+        },
+        {
+          "n": 8,
+          "indicador": "Páginas de ayuda/FAQ accesibles (paths.ts)",
+          "cumple": true,
+          "observacion": "paths.ts ayudaContacto, ayudaRastreoPedido, ayudaPreguntasFrecuentes, ayudaCambios"
         }
       ]
     },
@@ -650,7 +662,7 @@
       "caracteristica": "Usabilidad",
       "color": "#3ec9b0",
       "titulo": "Lista de cotejo — Facilidad de Aprendizaje",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Facilidad de Aprendizaje» (Usabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Facilidad de Aprendizaje» (Usabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/08-pruebas-y-calidad.md · checkout y panel admin",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -659,31 +671,43 @@
           "n": 1,
           "indicador": "Toasts de feedback inmediato",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Toasts admin logout y operaciones CRUD"
         },
         {
           "n": 2,
           "indicador": "Validación en tiempo real en formularios",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Validación auth y checkout en dominio"
         },
         {
           "n": 3,
           "indicador": "Ayudas contextuales en checkout",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "CheckoutDeliveryBox sugerencias dirección"
         },
         {
           "n": 4,
           "indicador": "Mensajes de error accionables en admin",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Validación formularios productos/pedidos admin"
         },
         {
           "n": 5,
           "indicador": "Selectores persistidos en panel IA",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "useAdminPredictionsModel — pred_horizon/history/alert_days en localStorage"
+        },
+        {
+          "n": 6,
+          "indicador": "E2E register-validation con mensajes accionables",
+          "cumple": true,
+          "observacion": "e2e/register-validation.spec.ts"
+        },
+        {
+          "n": 7,
+          "indicador": "E2E feedback datos insuficientes panel IA (TC-PRED-003)",
+          "cumple": true,
+          "observacion": "e2e/admin-predictions.spec.ts TC-PRED-003 banner datos insuficientes"
         }
       ]
     },
@@ -691,7 +715,7 @@
       "caracteristica": "Usabilidad",
       "color": "#3ec9b0",
       "titulo": "Lista de cotejo — Operabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Operabilidad» (Usabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Operabilidad» (Usabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/08-pruebas-y-calidad.md · RNF-USA-01 (parcial)",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -700,31 +724,43 @@
           "n": 1,
           "indicador": "Formularios operables con teclado",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "axe WCAG + aria-label carrito; roles nav admin (parcial teclado — no sesión humana)"
         },
         {
           "n": 2,
           "indicador": "Acciones frecuentes ≤ 3 clics en admin",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Panel admin: dashboard → módulo en 1–2 clics"
         },
         {
           "n": 3,
           "indicador": "Panel IA con selectores de horizonte",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "AdminPredictionsDashboard selectores horizonte"
         },
         {
           "n": 4,
           "indicador": "Historial IA persistido (localStorage)",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "localStorage pred_* en useAdminPredictionsModel.tsx"
         },
         {
           "n": 5,
           "indicador": "Confirmaciones en acciones destructivas",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "e2e/admin-product-delete.spec.ts TC-PROD-DEL01 confirmar / DEL02 cancelar"
+        },
+        {
+          "n": 6,
+          "indicador": "E2E admin-layout (aria-current, sidebar)",
+          "cumple": true,
+          "observacion": "e2e/admin-layout.spec.ts aria-current + colapso sidebar"
+        },
+        {
+          "n": 7,
+          "indicador": "Smoke checkout operable (E2E)",
+          "cumple": true,
+          "observacion": "e2e/smoke.spec.ts + checkout-cod-order.spec.ts"
         }
       ]
     },
@@ -732,7 +768,7 @@
       "caracteristica": "Usabilidad",
       "color": "#3ec9b0",
       "titulo": "Lista de cotejo — Atractividad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Atractividad» (Usabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Atractividad» (Usabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "Revisión manual UI · Tailwind v4 · guía de marca Calzatura Vilchez",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -741,31 +777,37 @@
           "n": 1,
           "indicador": "Coherencia visual Tailwind v4",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Tailwind v4 @theme en estilos dominio"
         },
         {
           "n": 2,
           "indicador": "Animaciones framer-motion en KPIs",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "framer-motion KPIs predicciones/admin"
         },
         {
           "n": 3,
           "indicador": "Tipografía y contraste legibles",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "axe serious/critical=0 en rutas auditadas"
         },
         {
           "n": 4,
           "indicador": "Iconografía consistente",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "Iconografía consistente nav admin (Lucide)"
         },
         {
           "n": 5,
-          "indicador": "Responsive sin roturas visuales graves",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "indicador": "Responsive móvil (iPhone 13 / idoneidad-journey)",
+          "cumple": true,
+          "observacion": "playwright iphone-safari + idoneidad-journey.spec.ts"
+        },
+        {
+          "n": 6,
+          "indicador": "Tema claro/oscuro coherente en admin",
+          "cumple": true,
+          "observacion": "admin-layout.spec.ts toggle tema claro/oscuro"
         }
       ]
     },
@@ -773,8 +815,8 @@
       "caracteristica": "Usabilidad",
       "color": "#3ec9b0",
       "titulo": "Lista de cotejo — Cumplimiento de la Usabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Usabilidad» (Usabilidad) según ISO/IEC 9126-1.",
-      "referencia": "documentacion/08-pruebas-y-calidad.md · documentacion/05-especificacion-requisitos-software-SRS.md",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Usabilidad» (Usabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
+      "referencia": "scripts/verify-usabilidad-iso25000.mjs · documentacion/usabilidad-trazabilidad-iso25000.md · documentacion/plantillas/instrumento-sus-calzatura-vilchez.md",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
       "items": [
@@ -782,31 +824,61 @@
           "n": 1,
           "indicador": "RNF-USA-01 definido en SRS",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "05-especificacion-requisitos-software-SRS.md RNF-USA-01"
         },
         {
           "n": 2,
-          "indicador": "Cuestionario SUS preparado",
+          "indicador": "WCAG 2.1 AA referenciado en SRS",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "SRS accesibilidad + criterio axe E2E"
         },
         {
           "n": 3,
-          "indicador": "Sesión SUS con usuarios externos realizada",
+          "indicador": "Instrumento SUS Brooke documentado (10 ítems)",
           "cumple": true,
-          "observacion": "Evidencia conforme al repositorio."
+          "observacion": "documentacion/plantillas/instrumento-sus-calzatura-vilchez.md"
         },
         {
           "n": 4,
-          "indicador": "Resultado SUS ≥ umbral aceptable (70)",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "indicador": "Contexto de uso ISO 9241-11 documentado",
+          "cumple": true,
+          "observacion": "documentacion/usabilidad-trazabilidad-iso25000.md §0 ISO 9241-11"
         },
         {
           "n": 5,
-          "indicador": "Mejoras derivadas documentadas",
+          "indicador": "E2E axe WCAG en CI (job Playwright)",
+          "cumple": true,
+          "observacion": "ci.yml job e2e ejecuta accessibility.spec.ts"
+        },
+        {
+          "n": 6,
+          "indicador": "Trazabilidad usabilidad + gate verify-usabilidad",
+          "cumple": true,
+          "observacion": "verify-usabilidad-iso25000.mjs + trazabilidad"
+        },
+        {
+          "n": 7,
+          "indicador": "Plantilla acta sesión y consentimiento (sin datos ficticios)",
+          "cumple": true,
+          "observacion": "acta-sesion-usabilidad-PLANTILLA.md — sin datos inventados"
+        },
+        {
+          "n": 8,
+          "indicador": "Sesión SUS con usuarios externos realizada",
           "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "observacion": "Pendiente tesista — no hay acta-sesion-usabilidad-COMPLETADA*.md"
+        },
+        {
+          "n": 9,
+          "indicador": "Acta sesión completada (n ≥ 5 participantes)",
+          "cumple": false,
+          "observacion": "Pendiente — n≥5 participantes reales con consentimiento Ley 29733"
+        },
+        {
+          "n": 10,
+          "indicador": "Resultado SUS ≥ 70 y mejoras documentadas",
+          "cumple": false,
+          "observacion": "Pendiente — media SUS ≥70 y mejoras en acta/backlog tras sesión real"
         }
       ]
     },
@@ -814,7 +886,7 @@
       "caracteristica": "Eficiencia",
       "color": "#39b06a",
       "titulo": "Lista de cotejo — Comportamiento en el tiempo",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Comportamiento en el tiempo» (Eficiencia) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Comportamiento en el tiempo» (Eficiencia) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/08-pruebas-y-calidad.md · Lighthouse / DevTools",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -861,7 +933,7 @@
       "caracteristica": "Eficiencia",
       "color": "#39b06a",
       "titulo": "Lista de cotejo — Uso de Recursos",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Uso de Recursos» (Eficiencia) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Uso de Recursos» (Eficiencia) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "bff/README.txt · PUBLIC_CATALOG_CACHE_TTL_SEC · documentacion/08-pruebas-y-calidad.md",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -902,7 +974,7 @@
       "caracteristica": "Eficiencia",
       "color": "#39b06a",
       "titulo": "Lista de cotejo — Cumplimiento de la Eficiencia",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Eficiencia» (Eficiencia) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Eficiencia» (Eficiencia) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/08-pruebas-y-calidad.md §5.1 · scripts/run-load-test.ps1",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -949,7 +1021,7 @@
       "caracteristica": "Mantenibilidad",
       "color": "#3a9b3f",
       "titulo": "Lista de cotejo — Analizabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Analizabilidad» (Mantenibilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Analizabilidad» (Mantenibilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "sonar-project.properties · calzatura-vilchez/eslint-report.json · CI SonarQube Analysis",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -990,7 +1062,7 @@
       "caracteristica": "Mantenibilidad",
       "color": "#3a9b3f",
       "titulo": "Lista de cotejo — Cambiabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cambiabilidad» (Mantenibilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cambiabilidad» (Mantenibilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "calzatura-vilchez/src/domains/ · calzatura-vilchez/src/routes/paths.ts",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -1031,7 +1103,7 @@
       "caracteristica": "Mantenibilidad",
       "color": "#3a9b3f",
       "titulo": "Lista de cotejo — Estabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Estabilidad» (Mantenibilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Estabilidad» (Mantenibilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/13-checklist-cierre-defensa.md (sección D) · calzatura-vilchez/e2e/",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -1072,7 +1144,7 @@
       "caracteristica": "Mantenibilidad",
       "color": "#3a9b3f",
       "titulo": "Lista de cotejo — Pruebabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Pruebabilidad» (Mantenibilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Pruebabilidad» (Mantenibilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "calzatura-vilchez/coverage/lcov.info · npm run test:coverage",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -1113,7 +1185,7 @@
       "caracteristica": "Mantenibilidad",
       "color": "#3a9b3f",
       "titulo": "Lista de cotejo — Cumplimiento de la Mantenibilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Mantenibilidad» (Mantenibilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Mantenibilidad» (Mantenibilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "CI job SonarQube Analysis · documentacion/13-checklist-cierre-defensa.md",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -1154,7 +1226,7 @@
       "caracteristica": "Portabilidad",
       "color": "#2f8f4e",
       "titulo": "Lista de cotejo — Adaptabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Adaptabilidad» (Portabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Adaptabilidad» (Portabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/portabilidad-mapeo-iso25023.md · playwright.config.ts",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -1207,7 +1279,7 @@
       "caracteristica": "Portabilidad",
       "color": "#2f8f4e",
       "titulo": "Lista de cotejo — Facilidad de Instalación",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Facilidad de Instalación» (Portabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Facilidad de Instalación» (Portabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "DOCKER.md · portabilidad-mapeo-iso25023.md §4 · codemagic.yaml",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -1266,7 +1338,7 @@
       "caracteristica": "Portabilidad",
       "color": "#2f8f4e",
       "titulo": "Lista de cotejo — Coexistencia",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Coexistencia» (Portabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Coexistencia» (Portabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/10-operacion-y-mantenimiento.md · Firebase + Supabase + Stripe + Render IA",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -1307,7 +1379,7 @@
       "caracteristica": "Portabilidad",
       "color": "#2f8f4e",
       "titulo": "Lista de cotejo — Intercambiabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Intercambiabilidad» (Portabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Intercambiabilidad» (Portabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/modelo-calidad-25010-alineacion.md · variables entorno · validación negocio",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",
@@ -1354,7 +1426,7 @@
       "caracteristica": "Portabilidad",
       "color": "#2f8f4e",
       "titulo": "Lista de cotejo — Cumplimiento de la Portabilidad",
-      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Portabilidad» (Portabilidad) según ISO/IEC 9126-1.",
+      "objetivo": "Verificar el cumplimiento de la subcaracterística «Cumplimiento de la Portabilidad» (Portabilidad) según ISO/IEC 9126-1 (familia SQuaRE 25000).",
       "referencia": "documentacion/08-pruebas-y-calidad.md · documentacion/13-checklist-cierre-defensa.md",
       "rutaModulo": null,
       "instrucciones": "Marque ✓ en la columna Sí si el indicador se cumple con evidencia verificable. Marque ✓ en No si no se cumple. El porcentaje = (Sí ÷ total ítems) × 100.",

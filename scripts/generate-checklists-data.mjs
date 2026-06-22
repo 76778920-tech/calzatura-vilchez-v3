@@ -11,6 +11,20 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA = JSON.parse(fs.readFileSync(path.join(ROOT, "dashboard-iso25000/data.json"), "utf8"));
 const CATALOG = JSON.parse(fs.readFileSync(path.join(ROOT, "dashboard-iso25000/instruments-catalog.json"), "utf8"));
 
+/** Definiciones normativas para objetivos de checklist (ISO/IEC 9126-1 §6.1). */
+const OBJETIVO_ISO = {
+  Idoneidad:
+    "Verificar Idoneidad (9126 §6.1.1): el producto proporciona un conjunto apropiado de funciones para las tareas del e-commerce Calzatura Vilchez (SRS Must + TC-IDON-001).",
+  Precisión:
+    "Verificar Precisión (9126 §6.1.2): resultados y cálculos (stock, precios, totales, finanzas, IRE) son correctos con el grado de exactitud requerido.",
+  Interoperabilidad:
+    "Verificar Interoperabilidad (9126 §6.1.3): el producto interactúa correctamente con sistemas especificados (Firebase, Supabase, Stripe, IA, geocodificación, DNI, CDN, caché).",
+  Seguridad:
+    "Verificar Seguridad (9126 §6.1.4): información y datos protegidos frente a acceso o modificación no autorizados; acceso autorizado no denegado (RLS, auth, auditoría, no repudio).",
+  "Cumplimiento de la funcionalidad":
+    "Verificar Cumplimiento de la funcionalidad (9126 §6.1.5): adherencia a normas, convenciones y reglamentos legales peruanos relacionados con la funcionalidad (Ley 29571, 29733, términos, CU-T05/06/07).",
+};
+
 /** Ítems por subcaracterística (indicadores verificables = filas de la lista de cotejo). */
 const ITEMS_BY_SUB = {
   Idoneidad: [
@@ -150,6 +164,8 @@ const ITEMS_BY_SUB = {
     "Etiquetas comprensibles para usuario final",
     "Sin jerga técnica en flujos públicos",
     "Ayudas visuales en acciones principales",
+    "E2E axe WCAG 2.1 AA en rutas públicas clave",
+    "Páginas de ayuda/FAQ accesibles (paths.ts)",
   ],
   "Facilidad de Aprendizaje": [
     "Toasts de feedback inmediato",
@@ -157,6 +173,8 @@ const ITEMS_BY_SUB = {
     "Ayudas contextuales en checkout",
     "Mensajes de error accionables en admin",
     "Selectores persistidos en panel IA",
+    "E2E register-validation con mensajes accionables",
+    "E2E feedback datos insuficientes panel IA (TC-PRED-003)",
   ],
   "Operabilidad": [
     "Formularios operables con teclado",
@@ -164,20 +182,28 @@ const ITEMS_BY_SUB = {
     "Panel IA con selectores de horizonte",
     "Historial IA persistido (localStorage)",
     "Confirmaciones en acciones destructivas",
+    "E2E admin-layout (aria-current, sidebar)",
+    "Smoke checkout operable (E2E)",
   ],
   Atractividad: [
     "Coherencia visual Tailwind v4",
     "Animaciones framer-motion en KPIs",
     "Tipografía y contraste legibles",
     "Iconografía consistente",
-    "Responsive sin roturas visuales graves",
+    "Responsive móvil (iPhone 13 / idoneidad-journey)",
+    "Tema claro/oscuro coherente en admin",
   ],
   "Cumplimiento de la Usabilidad": [
     "RNF-USA-01 definido en SRS",
-    "Cuestionario SUS preparado",
+    "WCAG 2.1 AA referenciado en SRS",
+    "Instrumento SUS Brooke documentado (10 ítems)",
+    "Contexto de uso ISO 9241-11 documentado",
+    "E2E axe WCAG en CI (job Playwright)",
+    "Trazabilidad usabilidad + gate verify-usabilidad",
+    "Plantilla acta sesión y consentimiento (sin datos ficticios)",
     "Sesión SUS con usuarios externos realizada",
-    "Resultado SUS ≥ umbral aceptable (70)",
-    "Mejoras derivadas documentadas",
+    "Acta sesión completada (n ≥ 5 participantes)",
+    "Resultado SUS ≥ 70 y mejoras documentadas",
   ],
   "Comportamiento en el tiempo": [
     "Build Vite optimizado",
@@ -284,8 +310,12 @@ const ITEMS_BY_SUB = {
 const ITEM_OVERRIDES = {
   Madurez: {
     1: { cumple: true, observacion: "ci.yml lint+unit+typecheck; npm audit limpio; gh último run success" },
-    7: { cumple: true, observacion: "gh run list --limit 1: ci, integration, sonarqube, devsecops en success (2026-06-15)" },
-    8: { cumple: true, observacion: "verify-madurez-iso25000.mjs valida 8/8 ítems" },
+    7: {
+      cumple: false,
+      observacion:
+        "ISO 25010 Madurez operacional — requiere historial en producción (uptime SLA, incidentes post-despliegue ≥30 días); CI en main no sustituye operación real",
+    },
+    8: { cumple: true, observacion: "verify-madurez-iso25000.mjs documentado y ejecutable (evaluación pre-producción)" },
   },
   "Tolerancia a Fallos": {
     1: { cumple: true, observacion: "AppErrorBoundary en main.tsx (global SPA)" },
@@ -296,15 +326,27 @@ const ITEM_OVERRIDES = {
     1: { cumple: true, observacion: "10-operacion §6 + runbook §4 Firebase Hosting" },
     2: { cumple: true, observacion: "10-operacion §6 PITR Supabase + runbook §2" },
     3: { cumple: true, observacion: "docs/ops/runbook-recuperacion-desastres.md" },
-    4: { cumple: true, observacion: "restore-drill-evidence.json — drill live readonly 2026-06-17 (58 migraciones, REST counts OK)" },
-    5: { cumple: true, observacion: "restore-drill-check.mjs + generate-restore-drill-evidence-live.mjs" },
+    4: {
+      cumple: false,
+      observacion:
+        "restore-drill-evidence.json — drill readonly 2026-06-17 (58 migraciones); pendiente restauración completa verificada en producción",
+    },
+    5: { cumple: true, observacion: "restore-drill-check.mjs + generate-restore-drill-evidence-live.mjs (fixture CI)" },
   },
   "Cumplimiento de Fiabilidad": {
-    3: { cumple: true, observacion: "k6-smoke-evidence.json — smoke BFF local 2026-06-17 (20 VU, 0% fail, p95 BFF cat 2ms)" },
-    4: { cumple: true, observacion: "k6-mixed1000-bff-evidence.json — 1000 VU BFF /public/catalog/* 2026-06-17 (0% fail, p95 1ms)" },
+    3: {
+      cumple: false,
+      observacion:
+        "k6-smoke-evidence.json — corrida con BFF local (local-bff+supabase-prod); pendiente smoke contra URL producción (Render + Firebase)",
+    },
+    4: {
+      cumple: false,
+      observacion:
+        "k6-mixed1000-bff-evidence.json — 1000 VU BFF local; pendiente mixed1000 contra stack desplegado en producción",
+    },
     5: { cumple: true, observacion: "k6-mixed2000-bff-evidence.json — 2000 VU BFF 2026-06-17 (0.07% fail, p95 active 1ms)" },
-    6: { cumple: true, observacion: "docs/ops/k6-smoke + k6-mixed1000-bff-evidence.json (live-run con BFF)" },
-    7: { cumple: true, observacion: "verify-cumplimiento-fiabilidad-iso25000.mjs — 7/7 ítems" },
+    6: { cumple: true, observacion: "docs/ops/k6-* + artifacts/load-tests/ — evidencia pre-producción archivada" },
+    7: { cumple: true, observacion: "verify-cumplimiento-fiabilidad-iso25000.mjs — gate estático en VERDE (artefactos repo)" },
   },
   Adaptabilidad: {
     3: {
@@ -418,6 +460,63 @@ const ITEM_OVERRIDES = {
     4: { cumple: true, observacion: "CHANGELOG.md + documentacion/13-checklist-cierre-defensa.md" },
     5: { cumple: true, observacion: "docs/TECH-DEBT-BACKLOG.md — triage TD-01…TD-07" },
   },
+  Inteligibilidad: {
+    1: { cumple: true, observacion: "src/domains/ + menús público/admin/staff" },
+    2: { cumple: true, observacion: "paths.ts — catálogo, carrito, checkout" },
+    3: { cumple: true, observacion: "AdminLayout.tsx title en nav items" },
+    4: { cumple: true, observacion: "Formularios auth/checkout con labels visibles" },
+    5: { cumple: true, observacion: "Copy tienda en español orientado a cliente" },
+    6: { cumple: true, observacion: "CheckoutDeliveryMap hints + cartShared aria-label cantidades" },
+    7: { cumple: true, observacion: "e2e/accessibility.spec.ts — axe wcag21aa home/catálogo/login/registro/carrito" },
+    8: { cumple: true, observacion: "paths.ts ayudaContacto, ayudaRastreoPedido, ayudaPreguntasFrecuentes, ayudaCambios" },
+  },
+  "Facilidad de Aprendizaje": {
+    1: { cumple: true, observacion: "Toasts admin logout y operaciones CRUD" },
+    2: { cumple: true, observacion: "Validación auth y checkout en dominio" },
+    3: { cumple: true, observacion: "CheckoutDeliveryBox sugerencias dirección" },
+    4: { cumple: true, observacion: "Validación formularios productos/pedidos admin" },
+    5: { cumple: true, observacion: "useAdminPredictionsModel — pred_horizon/history/alert_days en localStorage" },
+    6: { cumple: true, observacion: "e2e/register-validation.spec.ts" },
+    7: { cumple: true, observacion: "e2e/admin-predictions.spec.ts TC-PRED-003 banner datos insuficientes" },
+  },
+  Operabilidad: {
+    1: { cumple: true, observacion: "axe WCAG + aria-label carrito; roles nav admin (parcial teclado — no sesión humana)" },
+    2: { cumple: true, observacion: "Panel admin: dashboard → módulo en 1–2 clics" },
+    3: { cumple: true, observacion: "AdminPredictionsDashboard selectores horizonte" },
+    4: { cumple: true, observacion: "localStorage pred_* en useAdminPredictionsModel.tsx" },
+    5: { cumple: true, observacion: "e2e/admin-product-delete.spec.ts TC-PROD-DEL01 confirmar / DEL02 cancelar" },
+    6: { cumple: true, observacion: "e2e/admin-layout.spec.ts aria-current + colapso sidebar" },
+    7: { cumple: true, observacion: "e2e/smoke.spec.ts + checkout-cod-order.spec.ts" },
+  },
+  Atractividad: {
+    1: { cumple: true, observacion: "Tailwind v4 @theme en estilos dominio" },
+    2: { cumple: true, observacion: "framer-motion KPIs predicciones/admin" },
+    3: { cumple: true, observacion: "axe serious/critical=0 en rutas auditadas" },
+    4: { cumple: true, observacion: "Iconografía consistente nav admin (Lucide)" },
+    5: { cumple: true, observacion: "playwright iphone-safari + idoneidad-journey.spec.ts" },
+    6: { cumple: true, observacion: "admin-layout.spec.ts toggle tema claro/oscuro" },
+  },
+  "Cumplimiento de la Usabilidad": {
+    1: { cumple: true, observacion: "05-especificacion-requisitos-software-SRS.md RNF-USA-01" },
+    2: { cumple: true, observacion: "SRS accesibilidad + criterio axe E2E" },
+    3: { cumple: true, observacion: "documentacion/plantillas/instrumento-sus-calzatura-vilchez.md" },
+    4: { cumple: true, observacion: "documentacion/usabilidad-trazabilidad-iso25000.md §0 ISO 9241-11" },
+    5: { cumple: true, observacion: "ci.yml job e2e ejecuta accessibility.spec.ts" },
+    6: { cumple: true, observacion: "verify-usabilidad-iso25000.mjs + trazabilidad" },
+    7: { cumple: true, observacion: "acta-sesion-usabilidad-PLANTILLA.md — sin datos inventados" },
+    8: {
+      cumple: false,
+      observacion: "Pendiente tesista — no hay acta-sesion-usabilidad-COMPLETADA*.md",
+    },
+    9: {
+      cumple: false,
+      observacion: "Pendiente — n≥5 participantes reales con consentimiento Ley 29733",
+    },
+    10: {
+      cumple: false,
+      observacion: "Pendiente — media SUS ≥70 y mejoras en acta/backlog tras sesión real",
+    },
+  },
   Seguridad: {
     15: { cumple: true, observacion: "audit.ts + POST /audit BFF + admin-audit-trail E2E" },
     16: { cumple: true, observacion: "supabase/migrations/20260503100000_audit_pedidos_trigger.sql — trg_audit_pedido_insert" },
@@ -446,7 +545,9 @@ for (const char of DATA.characteristics) {
       caracteristica: char.name,
       color: char.color,
       titulo: `Lista de cotejo — ${sub.name}`,
-      objetivo: `Verificar el cumplimiento de la subcaracterística «${sub.name}» (${char.name}) según ISO/IEC 9126-1.`,
+      objetivo:
+        OBJETIVO_ISO[sub.name] ??
+        `Verificar el cumplimiento de la subcaracterística «${sub.name}» (${char.name}) según ISO/IEC 9126-1 (familia SQuaRE 25000).`,
       referencia: cat.referencia || "—",
       rutaModulo: cat.rutaModulo || null,
       instrucciones:

@@ -769,7 +769,7 @@ export const PromptInputBox = React.forwardRef<HTMLElement, PromptInputBoxProps>
                   <div key={file.name} className="relative w-16 h-16 rounded-xl overflow-hidden">
                     <button
                       type="button"
-                      className="absolute inset-0 h-full w-full p-0 border-0 cursor-pointer rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
+                      className="absolute inset-0 h-full w-full p-0 border-0 cursor-pointer rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white/60"
                       onClick={() => setSelectedImage(previewUrl)}
                       aria-label={`Ver vista previa de ${file.name}`}
                     >

@@ -1,0 +1,74 @@
+{
+  "$schema": "Artículos Q1 complementarios — cierran huecos bibliográficos ISO 25000 (no sustituyen los 43 del estado del arte)",
+  "44": {
+    "authors": "Buck, C.; Olenberger, C.; Schweizer, A.; Völter, F.; Eymann, T.",
+    "year": 2021,
+    "title": "Never trust, always verify: A multivocal literature review on current knowledge and research gaps of zero-trust",
+    "journal": "Computers & Security",
+    "quartile": "Q1 (SCImago — Computer Science miscellaneous)",
+    "doi": "10.1016/j.cose.2021.102436",
+    "url": "https://doi.org/10.1016/j.cose.2021.102436",
+    "pdf": "https://doi.org/10.1016/j.cose.2021.102436",
+    "status": "OK",
+    "iso_subcaracteristicas": ["Funcionalidad — Seguridad", "Fiabilidad — Tolerancia a fallos"],
+    "justificacion": "Marco zero-trust (autenticación continua, control de acceso, least privilege) aplicable a BFF/Firebase/RLS del producto."
+  },
+  "45": {
+    "authors": "Gutiérrez-Rodríguez, P.; Villarreal, R.; Cuesta-Valiño, P.; Blozis, S.",
+    "year": 2020,
+    "title": "A PLS-SEM approach to understanding E-SQ, E-Satisfaction and E-Loyalty for fashion E-Retailers in Spain",
+    "journal": "Journal of Retailing and Consumer Services",
+    "quartile": "Q1 (SCImago — Marketing)",
+    "doi": "10.1016/j.jretconser.2020.102201",
+    "url": "https://doi.org/10.1016/j.jretconser.2020.102201",
+    "status": "OK",
+    "iso_subcaracteristicas": [
+      "Usabilidad — Inteligibilidad",
+      "Usabilidad — Operabilidad",
+      "Usabilidad — Atractividad",
+      "Funcionalidad — Idoneidad (calidad servicio e-commerce moda/retail)"
+    ],
+    "justificacion": "E-SQ en e-retail de moda (calzado): dimensiones de calidad electrónica, satisfacción y lealtad — encaje directo con Calzatura Vilchez."
+  },
+  "46": {
+    "authors": "Weichbroth, P.",
+    "year": 2020,
+    "title": "Usability of Mobile Applications: A Systematic Literature Study",
+    "journal": "IEEE Access",
+    "quartile": "Q1 (SCImago — Computer Science, General)",
+    "doi": "10.1109/ACCESS.2020.2981892",
+    "url": "https://doi.org/10.1109/ACCESS.2020.2981892",
+    "pdf": "https://doi.org/10.1109/ACCESS.2020.2981892",
+    "status": "OK",
+    "iso_subcaracteristicas": [
+      "Usabilidad — Facilidad de aprendizaje",
+      "Usabilidad — Operabilidad",
+      "Portabilidad — Adaptabilidad (apps móviles)"
+    ],
+    "justificacion": "SLR usabilidad móvil — respalda app Flutter y diseño responsive web."
+  },
+  "47": {
+    "authors": "Lallie, H. S.; Shepherd, L. A.; Nurse, J. R. C.; et al.",
+    "year": 2021,
+    "title": "Cyber security in the age of COVID-19: A timeline and analysis of cyber-crime and cyber-attacks during the pandemic",
+    "journal": "Computers & Security",
+    "quartile": "Q1 (SCImago)",
+    "doi": "10.1016/j.cose.2021.102248",
+    "url": "https://doi.org/10.1016/j.cose.2021.102248",
+    "status": "OK",
+    "iso_subcaracteristicas": ["Funcionalidad — Seguridad", "Fiabilidad — Madurez"],
+    "justificacion": "Evolución de campañas de ciberataque en comercio digital — contexto para DAST ZAP y hardening del producto."
+  },
+  "48": {
+    "authors": "Duan, Y.; Edwards, J. S.; Dwivedi, Y. K.",
+    "year": 2019,
+    "title": "Artificial intelligence for decision making in the era of Big Data — evolution, insights and challenges arising from applications in information systems",
+    "journal": "International Journal of Information Management",
+    "quartile": "Q1",
+    "doi": "10.1016/j.ijinfomgt.2019.01.021",
+    "url": "https://doi.org/10.1016/j.ijinfomgt.2019.01.021",
+    "status": "CORRECCIÓN_CANÓNICA",
+    "note": "Reemplaza metadatos erróneos del art. 09 (capítulo Springer/Yuan). Usar este DOI como cita Q1 del art. 09.",
+    "iso_subcaracteristicas": ["Funcionalidad — Idoneidad", "Funcionalidad — Precisión (decisiones IA)"]
+  }
+}

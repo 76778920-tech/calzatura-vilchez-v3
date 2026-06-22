@@ -22,7 +22,7 @@
 | Fase | Archivo | Contenido principal |
 |------|---------|---------------------|
 | 0 | `00-gestion-documental.md` | Política documental, versionado, nomenclatura, control de cambios, vínculo con ISO 9001 “información documentada” (enfoque académico). |
-| 1 | `01-marco-y-tesis.md` | Stakeholders, contexto empresa, **alineación explícita con el título de tesis** (e-commerce + IA + riesgo), supuestos y exclusiones. |
+| 1 | `01-marco-y-tesis.md` | Stakeholders, contexto empresa, **alineación explícita con el título de tesis** (e-commerce + IA + riesgo), supuestos y exclusiones. **`matriz-propuesta-valor-proyecto.md`** (VPC) y **`matriz-viabilidad-inicial-proyecto.md`** (TELOS ampliado). |
 | 2 | `02-normas-metodologia-y-roles.md` | ISO/IEC 12207 (procesos), ISO/IEC 25010 (calidad), metodología elegida, **matriz RACI**, reuniones. |
 | 3 | `03-planificacion-proyecto-completa.md` | Plan maestro, **EDT/WBS**, cronograma por fases, **riesgos del proyecto**, comunicaciones. |
 | 4 | `04-planificacion-software.md` | Plan de desarrollo de software, líneas base, entornos, criterios de “hecho”. |

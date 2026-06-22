@@ -1,4 +1,6 @@
 -- Datos de ejemplo — Calzatura Vilchez (evaluación Q2 2026)
+-- CANÓNICO: npm run seed (modulo-adecuacion-funcional-iso25010) — 25 RF Must vía mustRfCatalog.mjs
+-- Este SQL es referencia manual; puede estar desactualizado respecto al seed del repositorio.
 -- Ejecutar después de schema.postgresql.sql
 
 INSERT INTO qc_evaluaciones (id, codigo, titulo, sistema, periodo, evaluador, fecha_evaluacion, observaciones)

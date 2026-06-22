@@ -108,9 +108,9 @@
         },
         {
           "codigo": "TC-SEG-005",
-          "prueba": "ZAP producción v2",
+          "prueba": "ZAP producción v3 (2026-06-20)",
           "cumple": true,
-          "referencia": "securityZapProduction.guard.test.js"
+          "referencia": "zap-reports/zap-production-report-v3.json"
         },
         {
           "codigo": "TC-NR-001",

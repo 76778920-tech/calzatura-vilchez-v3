@@ -1,0 +1,49 @@
+﻿Tipo;Variable;Definición conceptual;Definición operacional;Dimensión;Indicadores;Escala / unidad;Técnica;Instrumento / fuente;Sustento científico
+VI;VI: Sistema web de comercio electrónico con modelo de Inteligencia Artificial;Intervención tecnológica compuesta por un sistema web de comercio electrónico y un microservicio de Inteligencia Artificial que digitaliza ventas, inventario, checkout y predicción de demanda/riesgo (ISO/IEC 12207 — proceso de implementación).;Medición de madurez y digitalización del canal e-commerce: procesos web, conversión y tiempos operativos registrados en Supabase y percepción del personal (O₁/O₂).;D1: E-commerce y transformación digital del negocio;"1. Nivel de madurez digital de la empresa.
+2. Tasa de digitalización de procesos de venta e inventario.
+3. Número de canales de venta digitales activos (web + panel admin).
+4. Tasa de conversión digital (visitas → pedidos).
+5. Tiempo de ciclo de procesamiento de pedidos.
+6. Disponibilidad del sistema web (%) — trazado CU-T09 ES1-6 / VI-D3-2.";"Ordinal 1–5; razón (%); conteo; razón (%); razón (min); razón (%).";Análisis documental, observación sistemática, entrevista semiestructurada a empleadores/directivos, encuesta Likert (percepción digitalización).;"Ficha documental; logs Supabase (pedidos); guía entrevista empleadores; Instrumento Likert (ítems 19–21 complemento percepción); CI uptime/monitoring.";"Eje 1: Verhoef 2021; Soto-Acosta 2020; Nambisan 2017; Li 2020; Chatterjee 2020."
+VI;VI: Sistema web de comercio electrónico con modelo de Inteligencia Artificial;—;Medición del desempeño del modelo RandomForestRegressor (ai-service) y fallback promedio móvil mediante validación walk-forward sobre ventasDiarias/pedidos.;D2: Inteligencia Artificial y analítica de datos empresariales;"1. MAE del pronóstico de demanda (unidades).
+2. RMSE del pronóstico de demanda (unidades).
+3. sMAPE del pronóstico de ventas (%).
+4. R² del modelo predictivo (0–1).
+5. Horizonte de predicción configurado (7, 15 o 30 días).
+6. Tiempo de inferencia del microservicio IA (ms, p95).";"Razón (unid.); razón (unid.); razón (%); intervalo 0–1; discreto {7,15,30}; razón (ms).";Análisis de datos históricos, evaluación ML, validación walk-forward.;"Supabase ventasDiarias/pedidos; ai-service/evaluate.py; ai-service/models/demand/features_ml.py; reporte scikit-learn.";"Eje 2: Yuan 2021; Davenport 2020; Makridakis 2018; Fildes 2022; Breiman 2001."
+VI;VI: Sistema web de comercio electrónico con modelo de Inteligencia Artificial;—;Medición de calidad técnica del despliegue: latencia, disponibilidad, integraciones y cobertura de pruebas automatizadas (CI GitHub Actions, Vitest, Playwright).;D3: Arquitectura de software y despliegue del sistema;"1. Latencia p95 API predicción / catálogo BFF (ms).
+2. Disponibilidad sistema web y microservicio IA (%).
+3. Tiempo de despliegue nueva versión (min).
+4. Número de integraciones API activas (Firebase, Supabase, Stripe, IA, ORS).
+5. Cobertura pruebas automatizadas Vitest (% líneas scope).
+6. Tiempo medio recuperación ante incidente documentado (h).";"Razón (ms); razón (%); razón (min); conteo; razón (%); razón (h).";Pruebas técnicas, monitoreo CI, revisión repositorio, k6 smoke.;"ci.yml; vitest.config.ts; playwright test; docs/ops/k6-smoke-evidence.json; 09-implementacion-despliegue-ci.md.";"Eje 4: Jamshidi 2018; Khalid 2022; Paleyes 2022; Martinez-Fernandez 2022."
+VI;VI: Sistema web de comercio electrónico con modelo de Inteligencia Artificial;—;Medición del proceso de desarrollo: sprints, trazabilidad CRISP-ML(Q), MLOps y retorno estimado de la inversión tecnológica.;D4: Metodología de desarrollo ágil e híbrida del sistema;"1. Velocidad del equipo por sprint (puntos completados).
+2. Tasa de completitud de sprints (%).
+3. Fases CRISP-ML(Q) cubiertas (conteo 1–6).
+4. Madurez MLOps (ordinal 1–5).
+5. Tiempo entrega incrementos funcionales (días).
+6. ROI estimado inversión tecnológica (%).";"Razón; razón (%); conteo; ordinal 1–5; razón (días); razón (%).";Revisión documental, control avance, análisis económico.;"Backlog GitHub; CHANGELOG.md; documentacion/03-planificacion-proyecto-completa.md.";"Eje 5: Dingsøyr 2012; Salgonde 2021; Kuhrmann 2019; Melville 2004; Choi 2018."
+VD;VD: Predicción del riesgo empresarial mediante el IRE;Capacidad de cuantificar y anticipar el riesgo empresarial comercial-operativo de Calzatura Vilchez mediante el Índice de Riesgo Empresarial (IRE), definido como proxy de exposición a quiebre de stock, presión de ingresos y cambios de demanda (documentacion/07-modulo-ia-riesgo-empresarial.md).;"Caracterización del modelo de riesgo implementado: IRE compuesto (reglas + datos Supabase) y RandomForestRegressor para demanda; validación documental y experimental.";D1: Modelos de predicción del riesgo empresarial;"1. Tipo de modelo IRE (proxy compuesto 40/35/25 + RF demanda).
+2. Número de variables operativas (stock, ingresos, demanda, productos).
+3. Horizonte de predicción (7, 15 o 30 días).
+4. Técnica agregación IRE (ponderación fija + reglas stock/ingresos).
+5. Método validación (consistencia interna + walk-forward demanda).
+6. Comparación vs método empírico baseline (% mejora MAE).";"Nominal; conteo; discreto {7,15,30}; nominal; nominal; razón (%).";Análisis documental, evaluación comparativa, entrevista directivos.;"07-modulo-ia-riesgo-empresarial.md; ai-service; Likert ítems 1–6; guía entrevista.";"Eje 3: Ozbayoglu 2020; Barboza 2017; Altman 1968; Beaver 1966; Fildes 2022."
+VD;VD: Predicción del riesgo empresarial mediante el IRE;—;"Medición de exactitud y robustez: métricas ML de demanda, invariantes IRE, drift; AUC-ROC solo si existen eventos de crisis etiquetados (doc 07).";D2: Exactitud y validación del IRE y modelos predictivos;"1. Tests consistencia interna IRE (invariantes, monotonía horizonte).
+2. MAE pronóstico demanda RF vs baseline (unidades).
+3. RMSE pronóstico demanda (unidades).
+4. Estabilidad suma contribuciones IRE (= score mostrado).
+5. Variación desempeño por data drift mensual (%).
+6. AUC-ROC clasificador — condicional a eventos etiquetados.";"Nominal (pasa/falla); razón; razón; nominal; razón (%); intervalo 0–1 (si aplica).";Validación modelo, pytest ai-service, análisis estadístico.;"ai-service/tests/test_risk.py; evaluate.py; Likert ítems 7–12; ireHistorial (Supabase).";"Barboza 2017; Kim 2020; Khalid 2022; Paleyes 2022; Du Jardin 2021."
+VD;VD: Predicción del riesgo empresarial mediante el IRE;—;Medición directa del IRE y subíndices en escala 0–100 con umbrales de alerta operativa definidos en panel AdminPredictions.;D3: Componentes del Índice de Riesgo Empresarial (IRE);"1. Valor compuesto IRE (0–100).
+2. Componente riesgo_stock (subíndice).
+3. Componente riesgo_ingresos (subíndice).
+4. Componente riesgo_demanda (subíndice).
+5. Alerta temprana: IRE ≥ 51 (alto) o ≥ 76 (crítico).
+6. Frecuencia actualización automática IRE (por consulta API / día).";"Intervalo 0–100 (todos los componentes); nominal (umbral); razón (veces/día).";Cálculo automatizado, análisis documental, juicio expertos.;"AdminPredictions dashboard; ireHistorial; Likert ítems 13–18; ficha cálculo IRE.";"Altman 1968; Beaver 1966; Barboza 2017; Choi 2018; documentacion/07 §2."
+VD;VD: Predicción del riesgo empresarial mediante el IRE;—;Medición de impacto operativo pre/post (O₁/O₂): percepción del personal, quiebres de stock, cumplimiento pedidos y adopción del dashboard.;D4: Impacto del sistema en la gestión operativa de la PYME;"1. Reducción riesgo operativo percibido (Likert).
+2. Mejora tasa cumplimiento de pedidos (%).
+3. Reducción quiebres de stock (conteo O₁ vs O₂).
+4. Ahorro estimado gestión inventario (S/.).
+5. Tasa adopción dashboard IRE (% sesiones admin).
+6. Percepción mejora gestión riesgo — ítem 24 Likert.";"Ordinal Likert 1–5; razón (%); conteo; razón (S/.); razón (%); ordinal 1–5.";Comparación pre/post, encuesta, entrevista, registros Supabase.;"Instrumento Likert ítems 19–24; guía entrevista; logs pedidos/stock; CU-T09 matriz consistencia ES3.";"Melville 2004; Choi 2018; Lepenioti 2020; Verhoef 2021; Soto-Acosta 2020."

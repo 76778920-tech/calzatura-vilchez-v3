@@ -60,6 +60,7 @@ export default defineConfig({
         chunkFileNames: 'assets/[hash].js',
         entryFileNames: 'assets/[hash].js',
         assetFileNames: 'assets/[hash].[ext]',
+        legalComments: 'none',
       },
     },
   },

@@ -180,7 +180,16 @@ for (const fn of contract.bffOnlyRpcFunctions) {
   assertRpcRevokedFromClientRoles(sql, fn);
 }
 
+for (const table of contract.qcBffOnlyTables || []) {
+  assertRlsEnabled(sql, table);
+  assertForceRls(sql, table);
+  assertRevokedFromRoles(sql, table, ["anon", "authenticated"]);
+  assertNoAnonWritePolicies(sql, table);
+  assertNoAnonSelectGrant(sql, table);
+}
+
 const metadataCount = (contract.metadataBffOnlyTables || []).length;
+const qcCount = (contract.qcBffOnlyTables || []).length;
 console.log(
-  `validate-supabase-rls-matrix: OK — ${contract.bffOnlyTables.length} tablas BFF-only, ${metadataCount} metadatos, catálogo productos, RPC sensibles`,
+  `validate-supabase-rls-matrix: OK — ${contract.bffOnlyTables.length} tablas BFF-only, ${metadataCount} metadatos, ${qcCount} QC, catálogo productos, RPC sensibles`,
 );

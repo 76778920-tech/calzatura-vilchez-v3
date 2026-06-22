@@ -2,22 +2,22 @@
   "Idoneidad": {
     "tipo": "Lista de cotejo",
     "nombre": "Gate Idoneidad (RF Must ↔ pruebas) + CU-T07",
-    "referencia": "scripts/verify-idoneidad-iso25000.mjs · documentacion/cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv · documentacion/idoneidad-trazabilidad-iso25000.md"
+    "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-idoneidad-iso25000.mjs · documentacion/cuadros-excel/CU-T07-matriz-pruebas-requisitos.csv · documentacion/idoneidad-trazabilidad-iso25000.md"
   },
   "Precisión": {
     "tipo": "Lista de cotejo",
     "nombre": "Gate Precisión (9 dominios de cálculo)",
-    "referencia": "scripts/verify-precision-iso25000.mjs · documentacion/precision-trazabilidad-iso25000.md"
+    "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-precision-iso25000.mjs · documentacion/precision-trazabilidad-iso25000.md"
   },
   "Interoperabilidad": {
     "tipo": "Lista de cotejo",
-    "nombre": "Gate Interoperabilidad (9 integraciones · ISO 9126 Funcionalidad)",
-    "referencia": "scripts/verify-interoperabilidad-iso25000.mjs · documentacion/interoperabilidad-trazabilidad-iso25000.md"
+    "nombre": "Gate Interoperabilidad (9 integraciones · Funcionalidad SQuaRE)",
+    "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-interoperabilidad-iso25000.mjs · documentacion/interoperabilidad-trazabilidad-iso25000.md"
   },
   "Seguridad": {
     "tipo": "Lista de cotejo",
     "nombre": "Seguridad integrada (RLS, integridad, autenticidad, auditoría, PKCS#7)",
-    "referencia": "scripts/verify-seguridad-iso25000.mjs · functions/orderNonRepudiation.cjs · documentacion/seguridad-trazabilidad-iso25000.md"
+    "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-seguridad-iso25000.mjs · functions/orderNonRepudiation.cjs · documentacion/seguridad-trazabilidad-iso25000.md"
   },
   "Confidencialidad": {
     "tipo": "Lista de cotejo",
@@ -47,7 +47,7 @@
   "Cumplimiento de la funcionalidad": {
     "tipo": "Lista de cotejo",
     "nombre": "Gate Cumplimiento + CU-T05 / CU-T06",
-    "referencia": "scripts/verify-cumplimiento-iso25000.mjs · documentacion/cuadros-excel/CU-T05-requisitos.csv · documentacion/cumplimiento-trazabilidad-iso25000.md",
+    "referencia": "documentacion/funcionalidad-trazabilidad-iso25000.md · scripts/verify-cumplimiento-iso25000.mjs · documentacion/cuadros-excel/CU-T05-requisitos.csv · documentacion/cumplimiento-trazabilidad-iso25000.md",
     "rutaModulo": "/adecuacion-funcional/"
   },
   "Madurez": {
@@ -72,8 +72,8 @@
   },
   "Inteligibilidad": {
     "tipo": "Lista de cotejo",
-    "nombre": "Checklist revisión UX — rutas y nomenclatura",
-    "referencia": "documentacion/plantillas/PL-03-registro-ejecucion-prueba.md · revisión manual flujos públicos"
+    "nombre": "Checklist revisión UX — rutas, ayudas y WCAG E2E",
+    "referencia": "e2e/accessibility.spec.ts · documentacion/usabilidad-trazabilidad-iso25000.md §1"
   },
   "Facilidad de Aprendizaje": {
     "tipo": "Lista de cotejo",
@@ -92,8 +92,8 @@
   },
   "Cumplimiento de la Usabilidad": {
     "tipo": "Lista de cotejo",
-    "nombre": "Checklist RNF-USA-01 (cuestionario SUS)",
-    "referencia": "documentacion/08-pruebas-y-calidad.md · documentacion/05-especificacion-requisitos-software-SRS.md"
+    "nombre": "Gate Usabilidad (RNF-USA-01 + SUS + ISO 9241-11)",
+    "referencia": "scripts/verify-usabilidad-iso25000.mjs · documentacion/usabilidad-trazabilidad-iso25000.md · documentacion/plantillas/instrumento-sus-calzatura-vilchez.md"
   },
   "Comportamiento en el tiempo": {
     "tipo": "Lista de cotejo",

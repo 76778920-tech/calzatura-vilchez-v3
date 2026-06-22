@@ -32,6 +32,10 @@ Ningún documento del repositorio debe contradecir este título: los entregables
 
 ## 4. Contexto de la empresa (rellenar con datos reales)
 
+**Propuesta de valor:** ver `matriz-propuesta-valor-proyecto.md` y cuadro Excel `cuadros-excel/CU-T12-matriz-propuesta-valor.csv` (metodología Value Proposition Canvas — Osterwalder et al., 2014).
+
+**Viabilidad inicial:** ver `matriz-viabilidad-inicial-proyecto.md` y cuadro Excel `cuadros-excel/CU-T13-matriz-viabilidad-inicial.csv` (marco TELOS ampliado: técnica, económica, legal, operativa, temporal, estratégica y científica).
+
 ### 4.1 Descripción
 
 *(Completar: sector, tamaño, canales actuales, volumen aproximado de ventas, problemática.)*

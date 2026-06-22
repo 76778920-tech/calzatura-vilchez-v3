@@ -9,6 +9,7 @@ import '../../../../shared/widgets/added_to_cart_sheet.dart';
 import '../../../../shared/widgets/back_navigation_scope.dart';
 import '../../../cart/presentation/providers/cart_provider.dart';
 import '../../../catalog/presentation/providers/catalog_provider.dart';
+import '../../../catalog/presentation/widgets/product_card.dart';
 
 class ProductDetailPage extends ConsumerStatefulWidget {
   const ProductDetailPage({super.key, required this.productId, this.heroData});
@@ -46,7 +47,9 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
       return;
     }
     for (int i = 0; i < _qty; i++) {
-      await ref.read(cartProvider.notifier).addItem(product, talla: _selectedTalla);
+      await ref
+          .read(cartProvider.notifier)
+          .addItem(product, talla: _selectedTalla);
     }
     if (!mounted) return;
     showAddedToCartSheet(context, product, talla: _selectedTalla);
@@ -579,6 +582,8 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
                   text: 'Cambios y devoluciones en 7 días',
                 ),
 
+                const SizedBox(height: 24),
+                _RecommendedProductsSection(product: product),
                 const SizedBox(height: 40),
               ],
             ),
@@ -592,6 +597,62 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
 // ─────────────────────────────────────────────────────────────────────────────
 // Barra inferior — precio + cantidad + botón
 // ─────────────────────────────────────────────────────────────────────────────
+
+class _RecommendedProductsSection extends ConsumerWidget {
+  const _RecommendedProductsSection({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recommendedAsync = ref.watch(recommendedProductsProvider(product));
+
+    return recommendedAsync.when(
+      loading: () => const SizedBox(
+        height: 80,
+        child: Center(child: CircularProgressIndicator(color: AppColors.gold)),
+      ),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (products) {
+        if (products.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Productos recomendados',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 300,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: products.length,
+                separatorBuilder: (ctx, index) => const SizedBox(width: 12),
+                itemBuilder: (ctx, index) => SizedBox(
+                  width: 175,
+                  child: ProductCard(
+                    product: products[index],
+                    index: index,
+                    compact: true,
+                    showWishlist: true,
+                    showAddToCart: true,
+                    showTypeLabel: true,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ).animate().fadeIn(delay: 150.ms);
+      },
+    );
+  }
+}
 
 class _BottomBar extends StatelessWidget {
   const _BottomBar({

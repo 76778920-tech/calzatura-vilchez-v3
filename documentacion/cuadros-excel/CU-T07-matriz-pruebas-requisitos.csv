@@ -73,7 +73,7 @@ TC-SEG-001,RNF-SEG-01 / Seguridad 25010,AdminGuards,Todas las rutas /admin/* exi
 TC-SEG-002,RNF-SEG-01 / Seguridad 25010,StaffGuards,Todas las rutas /staff/* exigen login tienda,storageState vacío,"Redirect a /login (no admin login)",E2E automatizado,Pasado
 TC-SEG-003,RNF-SEG-01 / Seguridad 25010,ClientGuards,Checkout/perfil/favoritos/pedidos exigen sesión,storageState vacío,"Redirect a /login",E2E automatizado,Pasado
 TC-SEG-004,RNF-SEG-02 / Seguridad 25010,BFFGuards,BFF fail-closed y sin secretos hardcodeados,isoP0SecurityGuards + bffAuditEndpointPolicy,"Guards estáticos en verde",Vitest guard,Pasado
-TC-SEG-005,RNF-SEG / Seguridad 25010,ZAPProd,ZAP producción sin altas; medias aceptadas documentadas,securityZapProduction.guard.test.js + zap-production-report-v2.json,"0 High/Critical; CSP unsafe-inline aceptado",Vitest guard,Pasado
+TC-SEG-005,RNF-SEG / Seguridad 25010,ZAPProd,ZAP producción sin altas; medias aceptadas documentadas,securityZapProduction.guard.test.js + zap-production-report-v3.json,"0 High/Critical; CSP residuales documentados",Vitest guard,Pasado
 TC-CMP-001,RF-LEG-01 / Ley 29571,LegalLibro,Página libro reclamaciones cita Ley 29571 y plazos 3/15 días hábiles,/legal/libro-reclamaciones,"Heading Libro de reclamaciones; texto 29571; plazos tres (3) y quince (15) días hábiles",E2E automatizado,Pasado
 TC-CMP-002,RF-LEG-02 / Ley 29733,LegalPrivacidad,Política privacidad cita Ley 29733 y ANPDP,/legal/politica-privacidad,"Heading Política de privacidad; texto 29733 y ANPDP visible",E2E automatizado,Pasado
 TC-CMP-003,RF-LEG-03 / cookies,LegalCookies,Banner y política cookies con consentimiento,localStorage sin consent + force banner,"Política cookies visible; modal preferencias desde banner",E2E automatizado,Pasado

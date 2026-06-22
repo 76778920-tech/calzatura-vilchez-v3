@@ -24,10 +24,28 @@ Sistema de medición de calidad para **Calzatura Vilchez** (e-commerce de calzad
 ```
 modulo-adecuacion-funcional-iso25010/
 ├── database/           # ER, schema PostgreSQL, seed SQL
-├── server/             # API REST + métricas + PDF (Node.js)
+├── server/             # API REST + repositorio + métricas + PDF
 ├── src/                # UI React (formularios + dashboard)
-└── data/qc-db.json     # Persistencia local (generada al ejecutar)
+└── data/qc-db.json     # Fallback local (solo si no hay Supabase)
 ```
+
+**Persistencia (sin huecos):**
+
+| Modo | Cuándo | Almacén |
+|------|--------|---------|
+| `supabase` (auto) | `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` en env | Tablas `qc_*` en PostgreSQL |
+| `json` | Sin credenciales Supabase o `QC_PERSISTENCE=json` | `data/qc-db.json` |
+
+Variables (mismas que el BFF):
+
+```env
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+# Opcional: forzar backend
+QC_PERSISTENCE=auto   # auto | supabase | json
+```
+
+El servidor carga automáticamente `calzatura-vilchez/bff/.env`, `.env.local` y `.env` del monorepo.
 
 **Capas:**
 1. **Datos** — modelo relacional normalizado (4 tablas + vista de métricas).
@@ -71,10 +89,12 @@ Botón **«Cargar ejemplo»** en el dashboard, o:
 npm run seed
 ```
 
-**Resultados esperados con el seed:**
-- CF ≈ **91.7%** (11/12 funciones) — Excelente
-- COF = **80%** (8/10 transacciones) — Bueno
-- TECP = **88.9%** (8/9 casos ejecutados) — Bueno
+**Resultados esperados con el seed (25 RF Must):**
+- CF = **100%** (25/25 funciones) — Excelente
+- COF = **100%** (10/10 transacciones) — Excelente
+- TECP = **100%** (10/10 casos) — Excelente
+
+Verifica backend activo: `GET /api/health` → `{ persistence: "supabase" | "json" }`.
 
 ## Base de datos
 

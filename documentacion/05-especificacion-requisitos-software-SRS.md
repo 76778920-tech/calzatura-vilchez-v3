@@ -106,7 +106,8 @@ Lista maestra extendida en `documentacion/02-normas-metodologia-y-roles.md` y CS
 | RNF-SEG-01 | Las rutas administrativas exigen sesión válida y rol | Seguridad | 100 % rutas bloqueadas sin auth en E2E |
 | RNF-SEG-02 | Credenciales solo en variables de entorno | Seguridad | 0 secretos en Git |
 | RNF-PER-01 | Tiempo de respuesta percibido catálogo | Rendimiento | *(definir p95)* |
-| RNF-USA-01 | Flujo checkout comprensible | Usabilidad | Prueba con usuario no técnico |
+| RNF-USA-01 | Flujo checkout comprensible | Usabilidad | Prueba con usuario no técnico + SUS ≥ 70 |
+| RNF-USA-02 | Accesibilidad WCAG 2.1 AA en rutas públicas | Usabilidad | 0 violaciones axe critical/serious (`e2e/accessibility.spec.ts`) |
 | RNF-MAN-01 | Código modular por dominios | Mantenibilidad | Convención carpetas `src/domains` |
 | RNF-REL-01 | Migraciones reproducibles | Confiabilidad | `supabase db` / SQL aplicable |
 

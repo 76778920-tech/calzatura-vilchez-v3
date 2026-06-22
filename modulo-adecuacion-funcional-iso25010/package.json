@@ -9,11 +9,12 @@
     "preview": "vite preview",
     "server": "node server/index.mjs",
     "start": "npm run build && node server/index.mjs",
-    "test": "node --test server/metrics.test.mjs",
-    "verify": "node --test server/metrics.test.mjs && npm run build",
-    "seed": "node -e \"import('./server/seed.mjs').then(m=>import('./server/db.mjs').then(d=>{d.saveDb(m.buildSeedDb());console.log('Seed OK')}))\""
+    "test": "node --test server/*.test.mjs",
+    "verify": "node --test server/*.test.mjs && npm run build",
+    "seed": "node server/seed-cli.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.8",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",
     "react": "^19.2.4",

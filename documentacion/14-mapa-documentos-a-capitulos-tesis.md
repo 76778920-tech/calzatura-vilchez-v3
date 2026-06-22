@@ -8,7 +8,7 @@
 
 | Capítulo tesis (nombre tentativo) | Fuentes en repo (rutas) | Producto académico esperado |
 |----------------------------------|-------------------------|------------------------------|
-| I Introducción | `01-marco-y-tesis.md`, `estado_del_arte.md` § motivación | Problema, objetivos, justificación |
+| I Introducción | `01-marco-y-tesis.md`, `estado_del_arte.md` § motivación, **`matriz-propuesta-valor-proyecto.md`**, **`matriz-viabilidad-inicial-proyecto.md`**, `CU-T12`, `CU-T13` | Problema, objetivos, justificación, **propuesta de valor**, **viabilidad inicial** |
 | II Marco teórico | `estado_del_arte.md` completo + literatura riesgo/IA extra | 20 artículos + teoría riesgo |
 | III Marco legal / datos personales *(si aplica)* | `10-operacion-y-seguridad.md`, normativa Perú | Ley 29733, consentimiento |
 | IV Ingeniería de requisitos | `05-especificacion-requisitos-software-SRS.md`, `CU-T05` | SRS + tablas |
@@ -30,6 +30,8 @@
 | Fig-ER | Modelo datos | `06` + migraciones |
 | Fig-secuencia-pago | Secuencia | BPMN PR-13 / código Stripe |
 | Tab-Riesgos | Matriz | `CU-T04` |
+| Tab-Propuesta-Valor | Matriz VPC | `CU-T12` + `matriz-propuesta-valor-proyecto.md` |
+| Tab-Viabilidad-Inicial | Matriz TELOS | `CU-T13` + `matriz-viabilidad-inicial-proyecto.md` |
 | Tab-Trazabilidad-EDA | Matriz | `CU-T06` |
 | Tab-Pruebas | Matriz | `CU-T07` |
 | Tab-Automatizacion | Matriz | `CU-T08` |

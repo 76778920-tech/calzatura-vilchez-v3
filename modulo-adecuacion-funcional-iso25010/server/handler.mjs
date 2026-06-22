@@ -1,18 +1,7 @@
 /**
  * Handlers REST compartidos — usable desde servidor standalone (4322) o unificado (4321).
  */
-import {
-  loadDb,
-  saveDb,
-  getEvaluacion,
-  getChildren,
-  upsertEvaluacion,
-  upsertFuncion,
-  upsertTransaccion,
-  upsertCasoPrueba,
-  deleteById,
-  deleteEvaluacionCascade,
-} from "./db.mjs";
+import { getRepository, getPersistenceInfo } from "./repository.mjs";
 import { calcAllMetrics } from "./metrics.mjs";
 import { buildEvaluationPdf } from "./pdfReport.mjs";
 import { buildSeedDb } from "./seed.mjs";
@@ -47,41 +36,48 @@ function sendPdf(res, buffer, filename) {
   res.end(buffer);
 }
 
-export function seedIfEmpty() {
-  const db = loadDb();
-  if (db.evaluaciones.length === 0) {
-    const seed = buildSeedDb();
-    saveDb(seed);
-    console.log("Base de datos QC inicializada con datos Calzatura Vilchez.");
+export async function seedIfEmpty() {
+  const repo = getRepository();
+  if (await repo.isEmpty()) {
+    await repo.applySeed(buildSeedDb());
+    console.log(`Base de datos QC inicializada (${repo.backend}) — datos Calzatura Vilchez.`);
   }
 }
 
 export async function handleQcApi(req, res, url) {
-  const db = loadDb();
+  const repo = getRepository();
 
   if (req.method === "GET" && url.pathname === "/api/health") {
-    return sendJson(res, 200, { ok: true, module: "adecuacion-funcional-iso25010" });
+    const info = getPersistenceInfo();
+    return sendJson(res, 200, {
+      ok: true,
+      module: "adecuacion-funcional-iso25010",
+      persistence: repo.backend,
+      persistenceMode: info.mode,
+    });
   }
 
   if (req.method === "POST" && url.pathname === "/api/seed") {
-    saveDb(buildSeedDb());
-    return sendJson(res, 200, { ok: true, message: "Datos de ejemplo cargados" });
+    await repo.applySeed(buildSeedDb());
+    return sendJson(res, 200, { ok: true, message: "Datos de ejemplo cargados", persistence: repo.backend });
   }
 
   if (req.method === "GET" && url.pathname === "/api/evaluaciones") {
-    const list = db.evaluaciones.map((e) => {
-      const children = getChildren(db, e.id);
-      const metrics = calcAllMetrics(e, children.funciones, children.transacciones, children.casos_prueba);
-      return { ...e, metricas: metrics };
-    });
+    const evaluaciones = await repo.listEvaluaciones();
+    const list = await Promise.all(
+      evaluaciones.map(async (e) => {
+        const children = await repo.getChildren(e.id);
+        const metrics = calcAllMetrics(e, children.funciones, children.transacciones, children.casos_prueba);
+        return { ...e, metricas: metrics };
+      }),
+    );
     return sendJson(res, 200, list);
   }
 
   if (req.method === "POST" && url.pathname === "/api/evaluaciones") {
     try {
       const body = await readBody(req);
-      const row = upsertEvaluacion(db, body);
-      saveDb(db);
+      const row = await repo.createEvaluacion(body);
       return sendJson(res, 201, row);
     } catch (e) {
       return sendJson(res, 400, { error: e.message });
@@ -92,22 +88,24 @@ export async function handleQcApi(req, res, url) {
   if (evalMatch) {
     const id = decodeURIComponent(evalMatch[1]);
     if (req.method === "GET") {
-      const ev = getEvaluacion(db, id);
+      const ev = await repo.getEvaluacion(id);
       if (!ev) return sendJson(res, 404, { error: "Evaluación no encontrada" });
-      const children = getChildren(db, id);
+      const children = await repo.getChildren(id);
       const metrics = calcAllMetrics(ev, children.funciones, children.transacciones, children.casos_prueba);
       return sendJson(res, 200, { ...ev, ...children, metricas: metrics });
     }
     if (req.method === "PUT") {
       const body = await readBody(req);
-      const row = upsertEvaluacion(db, { ...body, id });
-      if (!row) return sendJson(res, 404, { error: "Evaluación no encontrada" });
-      saveDb(db);
-      return sendJson(res, 200, row);
+      try {
+        const row = await repo.updateEvaluacion(id, body);
+        if (!row) return sendJson(res, 404, { error: "Evaluación no encontrada" });
+        return sendJson(res, 200, row);
+      } catch (e) {
+        return sendJson(res, 400, { error: e.message });
+      }
     }
     if (req.method === "DELETE") {
-      if (!deleteEvaluacionCascade(db, id)) return sendJson(res, 404, { error: "Evaluación no encontrada" });
-      saveDb(db);
+      if (!(await repo.deleteEvaluacion(id))) return sendJson(res, 404, { error: "Evaluación no encontrada" });
       return sendJson(res, 200, { ok: true });
     }
   }
@@ -115,9 +113,9 @@ export async function handleQcApi(req, res, url) {
   const pdfMatch = url.pathname.match(/^\/api\/evaluaciones\/([^/]+)\/reporte\.pdf$/);
   if (pdfMatch && req.method === "GET") {
     const id = decodeURIComponent(pdfMatch[1]);
-    const ev = getEvaluacion(db, id);
+    const ev = await repo.getEvaluacion(id);
     if (!ev) return sendJson(res, 404, { error: "Evaluación no encontrada" });
-    const children = getChildren(db, id);
+    const children = await repo.getChildren(id);
     const metrics = calcAllMetrics(ev, children.funciones, children.transacciones, children.casos_prueba);
     const pdf = buildEvaluationPdf(metrics);
     return sendPdf(res, pdf, `reporte-${ev.codigo}.pdf`);
@@ -126,9 +124,9 @@ export async function handleQcApi(req, res, url) {
   const metricMatch = url.pathname.match(/^\/api\/evaluaciones\/([^/]+)\/metricas$/);
   if (metricMatch && req.method === "GET") {
     const id = decodeURIComponent(metricMatch[1]);
-    const ev = getEvaluacion(db, id);
+    const ev = await repo.getEvaluacion(id);
     if (!ev) return sendJson(res, 404, { error: "Evaluación no encontrada" });
-    const children = getChildren(db, id);
+    const children = await repo.getChildren(id);
     return sendJson(res, 200, calcAllMetrics(ev, children.funciones, children.transacciones, children.casos_prueba));
   }
 
@@ -136,42 +134,46 @@ export async function handleQcApi(req, res, url) {
     const m = url.pathname.match(new RegExp(`^/api/evaluaciones/([^/]+)/${collectionName}$`));
     if (!m) return false;
     const evalId = decodeURIComponent(m[1]);
-    if (!getEvaluacion(db, evalId)) return sendJson(res, 404, { error: "Evaluación no encontrada" }), true;
+    if (!(await repo.getEvaluacion(evalId))) {
+      sendJson(res, 404, { error: "Evaluación no encontrada" });
+      return true;
+    }
 
     if (req.method === "POST") {
       try {
         const body = await readBody(req);
-        const row = upsertFn(db, evalId, body);
-        if (!row) return sendJson(res, 404, { error: "Registro no encontrado" }), true;
-        saveDb(db);
-        return sendJson(res, 201, row), true;
+        const row = await upsertFn(evalId, body);
+        if (!row) {
+          sendJson(res, 404, { error: "Registro no encontrado" });
+          return true;
+        }
+        sendJson(res, 201, row);
+        return true;
       } catch (e) {
-        return sendJson(res, 400, { error: e.message }), true;
+        sendJson(res, 400, { error: e.message });
+        return true;
       }
     }
     return false;
   }
 
-  if (await handleChild("funciones", upsertFuncion)) return;
-  if (await handleChild("transacciones", upsertTransaccion)) return;
-  if (await handleChild("casos-prueba", upsertCasoPrueba)) return;
+  if (await handleChild("funciones", (id, body) => repo.upsertFuncion(id, body))) return;
+  if (await handleChild("transacciones", (id, body) => repo.upsertTransaccion(id, body))) return;
+  if (await handleChild("casos-prueba", (id, body) => repo.upsertCasoPrueba(id, body))) return;
 
   const delFunc = url.pathname.match(/^\/api\/funciones\/([^/]+)$/);
   if (delFunc && req.method === "DELETE") {
-    if (!deleteById(db.funciones, delFunc[1])) return sendJson(res, 404, { error: "No encontrado" });
-    saveDb(db);
+    if (!(await repo.deleteFuncion(delFunc[1]))) return sendJson(res, 404, { error: "No encontrado" });
     return sendJson(res, 200, { ok: true });
   }
   const delTx = url.pathname.match(/^\/api\/transacciones\/([^/]+)$/);
   if (delTx && req.method === "DELETE") {
-    if (!deleteById(db.transacciones, delTx[1])) return sendJson(res, 404, { error: "No encontrado" });
-    saveDb(db);
+    if (!(await repo.deleteTransaccion(delTx[1]))) return sendJson(res, 404, { error: "No encontrado" });
     return sendJson(res, 200, { ok: true });
   }
   const delCaso = url.pathname.match(/^\/api\/casos-prueba\/([^/]+)$/);
   if (delCaso && req.method === "DELETE") {
-    if (!deleteById(db.casos_prueba, delCaso[1])) return sendJson(res, 404, { error: "No encontrado" });
-    saveDb(db);
+    if (!(await repo.deleteCasoPrueba(delCaso[1]))) return sendJson(res, 404, { error: "No encontrado" });
     return sendJson(res, 200, { ok: true });
   }
 

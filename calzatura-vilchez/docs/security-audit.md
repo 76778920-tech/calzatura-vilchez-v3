@@ -175,7 +175,7 @@ Recomendación pendiente:
 
 ### S3 - CSP (implementada)
 
-**Estado:** `Content-Security-Policy` en `firebase.json` (Firebase, Stripe, HTTPS para API/BFF/Cloudinary). `img-src` incluye `https:` para URLs de imagen de catálogo pegadas por admin (CDNs de proveedores); scripts siguen restringidos.
+**Estado:** CSP endurecida en `firebase.json` (sin `img-src https:`, `style-src-attr`, `report-to` only, COOP `same-origin`). Imágenes admin solo Cloudinary.
 
 **Mejora opcional:** modo `Content-Security-Policy-Report-Only` + endpoint de reportes antes de endurecer `script-src`.
 

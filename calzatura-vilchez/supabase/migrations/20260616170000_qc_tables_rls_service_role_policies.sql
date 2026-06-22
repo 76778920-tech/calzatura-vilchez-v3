@@ -43,4 +43,10 @@ CREATE POLICY "service_role_all_qc_casos_prueba"
   USING (true)
   WITH CHECK (true);
 
+GRANT SELECT, INSERT, UPDATE, DELETE ON qc_evaluaciones TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON qc_funciones TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON qc_transacciones_funcionales TO service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON qc_casos_prueba TO service_role;
+
 NOTIFY pgrst, 'reload schema';
+

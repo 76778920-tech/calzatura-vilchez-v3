@@ -44,7 +44,8 @@ Esta tesis **adopta** principios de las siguientes normas como **marco de trabaj
 | ID RNF | Descripción breve | Característica 25010 |
 |--------|-------------------|----------------------|
 | RNF-SEG-01 | Autenticación obligatoria en rutas admin | Seguridad |
-| RNF-USA-01 | Checkout en ≤ N pasos *(definir N)* | Usabilidad |
+| RNF-USA-01 | Checkout comprensible + SUS ≥ 70 | Usabilidad |
+| RNF-USA-02 | WCAG 2.1 AA rutas públicas (axe E2E) | Usabilidad |
 
 ## 4. Metodología de desarrollo elegida
 

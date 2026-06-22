@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/catalog_repository.dart';
+import '../../domain/product_recommendation.dart';
 import '../../../../shared/models/product.dart';
 
 final selectedCategoryProvider = StateProvider<String>((ref) => 'todos');
@@ -54,6 +55,18 @@ final featuredProductsProvider = FutureProvider.autoDispose<List<Product>>((
   ref.watch(_catalogVersionProvider);
   return ref.watch(catalogRepositoryProvider).getFeaturedProducts();
 });
+
+final recommendedProductsProvider = FutureProvider.autoDispose
+    .family<List<Product>, Product>((ref, product) async {
+      ref.watch(catalogLiveSyncProvider);
+      ref.watch(_catalogVersionProvider);
+
+      final catalog = await ref
+          .watch(catalogRepositoryProvider)
+          .getActiveProducts(categoria: 'todos');
+
+      return ProductRecommendation.similarProducts(product, catalog);
+    });
 
 final productDetailProvider = FutureProvider.autoDispose
     .family<Product?, String>((ref, id) async {

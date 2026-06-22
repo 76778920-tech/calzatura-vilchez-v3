@@ -5,6 +5,10 @@
 artifacts/signing/
 *.p12
 *.mobileprovision
+
+# APK binaries — superan 100MB, usar GitHub Releases o LFS
+artifacts/apk/*.apk
+artifacts/apk/*.rar
 calzatura-vilchez/supabase/.temp/
 
 # Logs

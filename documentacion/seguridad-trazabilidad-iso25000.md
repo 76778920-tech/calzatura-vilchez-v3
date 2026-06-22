@@ -1,8 +1,10 @@
-# Seguridad funcional — trazabilidad y evidencia (ISO/IEC 25010)
+# Seguridad funcional — trazabilidad y evidencia (ISO/IEC 25000 / 9126-1)
 
 **Proyecto:** Calzatura Vilchez  
-**Subcaracterística:** Confidencialidad, Integridad, Autenticidad, Responsabilidad, No repudio (**Seguridad** · ISO/IEC 25010 · característica de primer nivel)  
-**Marco:** calidad del **producto software** (SQuaRE 25010), **no** SGSI ISO/IEC 27001.
+**Característica:** Funcionalidad · **Subcaracterística:** Seguridad (9126 §6.1.4)  
+**Referencia cruzada 25010:** Seguridad como característica de primer nivel (aquí bajo Funcionalidad en diagrama 9126)  
+**Marco:** calidad del **producto software** (SQuaRE), **no** SGSI ISO/IEC 27001  
+**Índice Funcionalidad:** `documentacion/funcionalidad-trazabilidad-iso25000.md`
 
 **Criterio 25010 (resumen):** el software protege información y datos de modo que cada actor tenga solo el acceso autorizado (confidencialidad, integridad, autenticidad, trazabilidad).
 
@@ -22,7 +24,7 @@
 | Secretos (RNF-SEG-02) | 0 credenciales en Git/bundle | `vite.config.ts` guard bearer IA, Gitleaks CI, `isoP0SecurityGuards` |
 | Superficie HTTP | Headers y CSP | `firebase.json`, `securityHostingHeaders.guard.test.js`, BFF headers en `isoP0SecurityGuards` |
 | Abuso / rate limit | Límites por superficie | `securitySurfaces.guard.test.js`, `publicRateLimit.cjs`, `securityMonitor.cjs` |
-| DAST producción | Sin altas/críticas abiertas | `zap-production-report-v2.json`, `securityZapProduction.guard.test.js`, `seguridad-riesgos-residuales-dast.md` |
+| DAST producción | Sin altas/críticas abiertas | `zap-production-report-v3.json`, `securityZapProduction.guard.test.js`, `seguridad-riesgos-residuales-dast.md` |
 
 ## Matriz de casos de prueba
 

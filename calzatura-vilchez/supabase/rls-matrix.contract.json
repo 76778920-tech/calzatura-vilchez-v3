@@ -31,5 +31,11 @@
     "list_auditoria_events",
     "create_product_variants_atomic",
     "update_product_atomic"
+  ],
+  "qcBffOnlyTables": [
+    "qc_evaluaciones",
+    "qc_funciones",
+    "qc_transacciones_funcionales",
+    "qc_casos_prueba"
   ]
 }

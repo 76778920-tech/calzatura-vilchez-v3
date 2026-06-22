@@ -96,6 +96,10 @@ async function validateAndApplyImageUrl(
 ): Promise<void> {
   const normalized = normalizeCloudinaryImageUrl(value);
   if (!normalized) { clear(); return; }
+  if (!isCloudinaryImageUrl(normalized)) {
+    toast.error("Solo se permiten imágenes alojadas en Cloudinary. Sube el archivo o pega una URL res.cloudinary.com");
+    return;
+  }
   try {
     new URL(/^[a-z][a-z\d+.-]*:\/\//i.test(normalized) ? normalized : `https://${normalized}`);
   } catch {

@@ -9,10 +9,7 @@ String? safeRedirectFrom(GoRouterState state) {
   return raw;
 }
 
-void navigateAfterAuth(
-  BuildContext context, {
-  String fallback = '/home',
-}) {
+void navigateAfterAuth(BuildContext context, {String fallback = '/home'}) {
   final redirect = safeRedirectFrom(GoRouterState.of(context));
   context.go(redirect ?? fallback);
 }
@@ -26,6 +23,7 @@ bool isGuestBrowsableLocation(String loc) {
       loc == '/register' ||
       loc == '/home' ||
       loc == '/cart' ||
+      loc == '/teachable' ||
       loc == '/wishlist' ||
       loc == '/checkout' ||
       loc == '/profile') {
