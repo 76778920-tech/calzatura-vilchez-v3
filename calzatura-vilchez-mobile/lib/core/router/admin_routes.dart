@@ -6,6 +6,7 @@ import '../../features/admin/presentation/pages/admin_dashboard_page.dart';
 import '../../features/admin/presentation/pages/admin_data_page.dart';
 import '../../features/admin/presentation/pages/admin_manufacturers_page.dart';
 import '../../features/admin/presentation/pages/admin_orders_page.dart';
+import '../../features/admin/presentation/pages/admin_predictions_page.dart';
 import '../../features/admin/presentation/pages/admin_products_page.dart';
 import '../../features/admin/presentation/pages/admin_sales_page.dart';
 import '../../features/admin/presentation/pages/admin_users_page.dart';
@@ -49,6 +50,10 @@ GoRoute buildAdminRoute() {
       GoRoute(
         path: 'datos',
         pageBuilder: (ctx, s) => sharedAxisPage(const AdminDataPage()),
+      ),
+      GoRoute(
+        path: 'predicciones',
+        pageBuilder: (ctx, s) => sharedAxisPage(const AdminPredictionsPage()),
       ),
     ],
   );

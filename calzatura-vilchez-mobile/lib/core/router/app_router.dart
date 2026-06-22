@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -17,6 +18,7 @@ import '../../features/orders/presentation/pages/order_success_page.dart';
 import '../../features/product/presentation/pages/product_detail_page.dart';
 import '../../features/profile/presentation/pages/edit_profile_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
+import '../../features/recommendation/presentation/pages/teachable_machine_page.dart';
 import '../../features/sensors/presentation/pages/device_sensors_page.dart';
 import '../../features/shell/presentation/pages/shell_page.dart';
 import '../../features/wishlist/presentation/pages/wishlist_page.dart';
@@ -24,16 +26,30 @@ import 'admin_routes.dart';
 import 'app_router_transitions.dart';
 import 'auth_navigation.dart';
 
+/// Notifica al GoRouter cuando cambia el estado de auth o el rol.
+/// Permite usar refreshListenable en lugar de recrear el GoRouter completo,
+/// preservando el stack de navegación entre cambios de estado.
+class _RouterRefreshNotifier extends ChangeNotifier {
+  _RouterRefreshNotifier(Ref ref) {
+    ref.listen(authStateProvider, (_, _) => notifyListeners());
+    ref.listen(userRoleProvider, (_, _) => notifyListeners());
+  }
+}
+
 final appRouterProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
-  final roleAsync = ref.watch(userRoleProvider);
+  final notifier = _RouterRefreshNotifier(ref);
+  ref.onDispose(notifier.dispose);
 
   return GoRouter(
     initialLocation: AppPlatform.forceAdminDashboard ? '/admin' : '/splash',
+    refreshListenable: notifier,
     redirect: (context, state) {
       if (AppPlatform.forceAdminDashboard) {
         return state.matchedLocation.startsWith('/admin') ? null : '/admin';
       }
+
+      final authState = ref.read(authStateProvider);
+      final roleAsync = ref.read(userRoleProvider);
 
       final isLoading = authState.isLoading;
       final isAuth = authState.valueOrNull != null;
@@ -74,6 +90,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             '/cart',
             '/checkout',
             '/order-success',
+            '/teachable',
             '/wishlist',
             '/profile',
             '/verify-email',
@@ -172,6 +189,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/cart',
             pageBuilder: (ctx, s) => sharedAxisPage(const CartPage()),
+          ),
+          GoRoute(
+            path: '/teachable',
+            pageBuilder: (ctx, s) =>
+                sharedAxisPage(const TeachableMachinePage()),
           ),
           GoRoute(
             path: '/profile',

@@ -834,6 +834,14 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage>
                                             context.push('/admin/datos'),
                                         delay: 300,
                                       ),
+                                      _ModuleCard(
+                                        icon: Icons.auto_graph_outlined,
+                                        label: 'Predicciones',
+                                        color: const Color(0xFFEC4899),
+                                        onTap: () =>
+                                            context.push('/admin/predicciones'),
+                                        delay: 360,
+                                      ),
                                     ],
                             ),
                           ],
