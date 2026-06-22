@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +11,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/open_external_url.dart';
 import '../../../../shared/widgets/cv_app_bar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../providers/profile_provider.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -40,6 +43,7 @@ class ProfilePage extends ConsumerWidget {
         user.displayName ?? user.email?.split('@').first ?? 'Usuario';
     final email = user.email ?? '';
     final initial = nombre.isNotEmpty ? nombre[0].toUpperCase() : 'U';
+    final fotoBase64 = ref.watch(profileDataProvider).valueOrNull?.fotoBase64;
 
     return Scaffold(
       backgroundColor: AppColors.beige,
@@ -61,35 +65,45 @@ class ProfilePage extends ConsumerWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const SizedBox(height: 12),
-                      // Avatar con inicial
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.gold, AppColors.goldDark],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.gold.withValues(alpha: 0.4),
-                              blurRadius: 20,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            initial,
-                            style: const TextStyle(
-                              color: AppColors.black,
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
+                      // Avatar con foto o inicial
+                      GestureDetector(
+                        onTap: () => context.push('/profile/edit'),
+                        child: fotoBase64 != null
+                            ? CircleAvatar(
+                                radius: 40,
+                                backgroundImage: MemoryImage(
+                                  base64Decode(fotoBase64),
+                                ),
+                              )
+                            : Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [AppColors.gold, AppColors.goldDark],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.gold.withValues(alpha: 0.4),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    initial,
+                                    style: const TextStyle(
+                                      color: AppColors.black,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
                       ).animate().scale(
                         delay: 100.ms,
                         duration: 500.ms,

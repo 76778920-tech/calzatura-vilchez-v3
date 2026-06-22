@@ -13,6 +13,7 @@ class ProfileData {
     this.telefono,
     required this.rol,
     this.creadoEn,
+    this.fotoBase64,
   });
 
   final String uid;
@@ -24,6 +25,7 @@ class ProfileData {
   final String? telefono;
   final String rol;
   final String? creadoEn;
+  final String? fotoBase64;
 }
 
 final profileDataProvider = FutureProvider.autoDispose<ProfileData?>((ref) async {
@@ -42,5 +44,6 @@ final profileDataProvider = FutureProvider.autoDispose<ProfileData?>((ref) async
     telefono: data['telefono'] as String?,
     rol: (data['rol'] as String?) ?? 'cliente',
     creadoEn: data['creadoEn'] as String?,
+    fotoBase64: data['fotoBase64'] as String?,
   );
 });

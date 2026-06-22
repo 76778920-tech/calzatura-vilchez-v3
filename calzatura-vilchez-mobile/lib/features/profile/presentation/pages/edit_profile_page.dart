@@ -1,7 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/widgets/cv_app_bar.dart';
@@ -54,12 +58,85 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
   final _telefonoCtrl = TextEditingController();
   bool _saving = false;
+  bool _savingFoto = false;
   bool _initialized = false;
 
   @override
   void dispose() {
     _telefonoCtrl.dispose();
     super.dispose();
+  }
+
+  void _mostrarOpcionesFoto() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Tomar foto con cámara'),
+              onTap: () {
+                Navigator.pop(context);
+                _seleccionarImagen(desdeCamara: true);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Elegir desde galería'),
+              onTap: () {
+                Navigator.pop(context);
+                _seleccionarImagen(desdeCamara: false);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _seleccionarImagen({required bool desdeCamara}) async {
+    final picked = await ImagePicker().pickImage(
+      source: desdeCamara ? ImageSource.camera : ImageSource.gallery,
+      imageQuality: 70,
+      maxWidth: 600,
+    );
+    if (picked == null || !mounted) return;
+
+    setState(() => _savingFoto = true);
+    try {
+      final bytes = await File(picked.path).readAsBytes();
+      final base64String = base64Encode(bytes);
+      final user = ref.read(currentUserProvider);
+      if (user == null) return;
+      await ref.read(profileRepositoryProvider).updateFotoBase64(user.uid, base64String);
+      ref.invalidate(profileDataProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Foto actualizada'),
+          backgroundColor: Colors.green.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al guardar foto: $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _savingFoto = false);
+    }
   }
 
   String? _validatePhone(String? value) {
@@ -193,27 +270,74 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
             _Card(
               child: Row(
                 children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppColors.gold, AppColors.goldDark],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        inicial,
-                        style: const TextStyle(
-                          color: AppColors.black,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
+                  Stack(
+                    children: [
+                      profile.fotoBase64 != null
+                          ? CircleAvatar(
+                              radius: 28,
+                              backgroundImage: MemoryImage(
+                                base64Decode(profile.fotoBase64!),
+                              ),
+                            )
+                          : Container(
+                              width: 56,
+                              height: 56,
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [AppColors.gold, AppColors.goldDark],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  inicial,
+                                  style: const TextStyle(
+                                    color: AppColors.black,
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                      if (_savingFoto)
+                        const Positioned.fill(
+                          child: CircleAvatar(
+                            backgroundColor: Colors.black45,
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: GestureDetector(
+                          onTap: _savingFoto
+                              ? null
+                              : () => _mostrarOpcionesFoto(),
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: const BoxDecoration(
+                              color: AppColors.gold,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              size: 13,
+                              color: AppColors.black,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
                   const SizedBox(width: 14),
                   Expanded(
