@@ -206,6 +206,7 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
         leading: CVBackButton(onPressed: () => context.pop()),
       ),
       body: profileAsync.when(
+        skipLoadingOnReload: true,
         loading: () => const Center(
           child: CircularProgressIndicator(color: AppColors.gold),
         ),
