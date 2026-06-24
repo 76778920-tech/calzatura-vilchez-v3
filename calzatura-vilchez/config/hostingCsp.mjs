@@ -35,26 +35,12 @@ export const HOSTING_CSP = [
   "style-src 'self' https://www.gstatic.com https://fonts.googleapis.com",
   [
     "style-src-elem 'self' https://www.gstatic.com https://fonts.googleapis.com",
-    // Goober CSS-in-JS (<style id="_goober">) — 17 estados incrementales del bundle actual
-    // Estados base (inicialización del módulo react-hot-toast)
+    // Goober CSS-in-JS (<style id="_goober">) — solo 3 keyframes de inicialización de módulo.
+    // El Toaster usa modo headless (CustomToaster.tsx): no renderiza styled components de goober,
+    // por lo que estos 3 estados son los únicos generados y son estables entre builds.
     "'sha256-Nqnn8clbgv+5l0PgxcTOldg8mkMKrFn4TvPL+rYUUGg='",
     "'sha256-13vrThxdyT64GcXoTNGVoRRoL0a7EGBmOJ+lemEWyws='",
     "'sha256-QZ52fjvWgIOIOPr+gRIJZ7KjzNeTBm50Z+z9dH4N1/8='",
-    "'sha256-yOU6eaJ75xfag0gVFUvld5ipLRGUy94G17B1uL683EU='",
-    "'sha256-OpTmykz0m3o5HoX53cykwPhUeU4OECxHQlKXpB0QJPQ='",
-    "'sha256-SSIM0kI/u45y4gqkri9aH+la6wn2R+xtcBj3Lzh7qQo='",
-    "'sha256-ZH/+PJIjvP1BctwYxclIuiMu1wItb0aasjpXYXOmU0Y='",
-    "'sha256-58jqDtherY9NOM+ziRgSqQY0078tAZ+qtTBjMgbM9po='",
-    "'sha256-7Ri/I+PfhgtpcL7hT4A0VJKI6g3pK0ZvIN09RQV4ZhI='",
-    // Estados de iconos (generados al renderizar cada tipo de toast por 1ª vez)
-    "'sha256-D6zmPl9SPOA5yA8xbXKrLL0cVKn8FB4+jrOuJzlq4sI='",
-    "'sha256-RMLuAlXIwRu2+YnnDVl5tzQPV2YlmPqSWSKEwJidCyc='",
-    "'sha256-J0fb1cj+TvfbuwoWFcBRWXfZjjxyNBgv9RziegQUbxk='",
-    "'sha256-+h218lrS+a9xO+7drwOfWjgpuVq/J66Fi1VVl/fnmSY='",
-    "'sha256-iO7F2hy476ppWnd4pn3N47Ghu4N5JTJ6HwMLvn+hsuo='",
-    "'sha256-S0YC/uXDAItX6fZw7W0jini2nSubFplw0SLxwxT5MIA='",
-    "'sha256-v/fQgvryHaSv77dkuEjcOylQzivjwDiVAzXKGxCIvDI='",
-    "'sha256-gfpYVzW3lrSTqeJ+RZgdXX7GR7soyXFfOjCLj+57t6U='",
   ].join(" "),
   "style-src-attr 'unsafe-inline'",
   [

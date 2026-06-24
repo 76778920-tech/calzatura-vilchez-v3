@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { Toaster } from "react-hot-toast";
+import { CustomToaster } from "@/components/toast/CustomToaster";
 import { CartProvider } from "@/domains/carrito/context/CartContext";
 import { FavoritesProvider } from "@/domains/clientes/context/FavoritesContext";
 
@@ -136,36 +136,7 @@ export default function App() {
       <CookieConsentProvider>
       <ScrollToTop />
       <CookieBanner />
-      <Toaster
-        position="bottom-right"
-        containerStyle={{ bottom: 24, right: 16 }}
-        toastOptions={{
-          duration: 4000,
-          style: {
-            fontFamily: "var(--font-sans)",
-            fontSize: "14px",
-            fontWeight: 500,
-            background: "#1a1a1a",
-            color: "#f9fafb",
-            borderRadius: "999px",
-            padding: "12px 20px",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.25)",
-            maxWidth: "420px",
-            lineHeight: 1.4,
-          },
-          success: {
-            duration: 3500,
-            iconTheme: { primary: "#4ade80", secondary: "#1a1a1a" },
-          },
-          error: {
-            duration: 5000,
-            iconTheme: { primary: "#f87171", secondary: "#1a1a1a" },
-          },
-          loading: {
-            iconTheme: { primary: "#60a5fa", secondary: "#1a1a1a" },
-          },
-        }}
-      />
+      <CustomToaster />
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path={ADMIN_ROUTES.login} element={<Login variant="admin" />} />
