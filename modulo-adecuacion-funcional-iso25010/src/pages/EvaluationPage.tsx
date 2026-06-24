@@ -101,12 +101,12 @@ function SectionCF({ evalId, items, onSaved }: { evalId: string; items: Funcion[
     <section className="panel">
       <h2>Completitud Funcional — funciones requeridas</h2>
       <form className="form-grid" onSubmit={submit}>
-        <input placeholder="Código RF (ej. RF-CAT-01)" value={form.codigo_rf} onChange={(e) => setForm({ ...form, codigo_rf: e.target.value })} required />
-        <input placeholder="Módulo" value={form.modulo} onChange={(e) => setForm({ ...form, modulo: e.target.value })} />
-        <input placeholder="Nombre función" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required className="span-2" />
-        <input placeholder="Evidencia (spec/test)" value={form.evidencia} onChange={(e) => setForm({ ...form, evidencia: e.target.value })} className="span-2" />
-        <label><input type="checkbox" checked={form.requerida} onChange={(e) => setForm({ ...form, requerida: e.target.checked })} /> Requerida</label>
-        <label><input type="checkbox" checked={form.implementada} onChange={(e) => setForm({ ...form, implementada: e.target.checked })} /> Implementada</label>
+        <input id="cf-codigo-rf" name="codigo_rf" placeholder="Código RF (ej. RF-CAT-01)" value={form.codigo_rf} onChange={(e) => setForm({ ...form, codigo_rf: e.target.value })} required />
+        <input id="cf-modulo" name="modulo" placeholder="Módulo" value={form.modulo} onChange={(e) => setForm({ ...form, modulo: e.target.value })} />
+        <input id="cf-nombre" name="nombre" placeholder="Nombre función" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required className="span-2" />
+        <input id="cf-evidencia" name="evidencia" placeholder="Evidencia (spec/test)" value={form.evidencia} onChange={(e) => setForm({ ...form, evidencia: e.target.value })} className="span-2" />
+        <label><input id="cf-requerida" name="requerida" type="checkbox" checked={form.requerida} onChange={(e) => setForm({ ...form, requerida: e.target.checked })} /> Requerida</label>
+        <label><input id="cf-implementada" name="implementada" type="checkbox" checked={form.implementada} onChange={(e) => setForm({ ...form, implementada: e.target.checked })} /> Implementada</label>
         <button type="submit" className="btn primary">Registrar función</button>
       </form>
       <table className="data-table">
@@ -146,9 +146,9 @@ function SectionCOF({ evalId, items, onSaved }: { evalId: string; items: Transac
     <section className="panel">
       <h2>Corrección Funcional — transacciones</h2>
       <form className="form-grid" onSubmit={submit}>
-        <input placeholder="Código TX" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} required />
-        <input placeholder="Módulo" value={form.modulo} onChange={(e) => setForm({ ...form, modulo: e.target.value })} />
-        <input placeholder="Descripción transacción" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required className="span-2" />
+        <input id="cof-codigo" name="codigo" placeholder="Código TX" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} required />
+        <input id="cof-modulo" name="modulo" placeholder="Módulo" value={form.modulo} onChange={(e) => setForm({ ...form, modulo: e.target.value })} />
+        <input id="cof-descripcion" name="descripcion" placeholder="Descripción transacción" value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} required className="span-2" />
         <button type="submit" className="btn primary">Registrar transacción</button>
       </form>
       <table className="data-table">
@@ -189,9 +189,9 @@ function SectionTECP({ evalId, items, onSaved }: { evalId: string; items: CasoPr
     <section className="panel">
       <h2>Tasa de Éxito — casos de prueba</h2>
       <form className="form-grid" onSubmit={submit}>
-        <input placeholder="Código TC" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} required />
-        <input placeholder="Módulo" value={form.modulo} onChange={(e) => setForm({ ...form, modulo: e.target.value })} />
-        <input placeholder="Nombre caso" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required className="span-2" />
+        <input id="tecp-codigo" name="codigo" placeholder="Código TC" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} required />
+        <input id="tecp-modulo" name="modulo" placeholder="Módulo" value={form.modulo} onChange={(e) => setForm({ ...form, modulo: e.target.value })} />
+        <input id="tecp-nombre" name="nombre" placeholder="Nombre caso" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} required className="span-2" />
         <button type="submit" className="btn primary">Registrar caso</button>
       </form>
       <table className="data-table">

@@ -562,6 +562,8 @@ export default function Header() {
           <form className="header-search" onSubmit={handleHeaderSearch}>
             <Search size={16} className="header-search-icon" aria-hidden="true" />
             <input
+              id="header-search"
+              name="q"
               type="search"
               value={headerSearch}
               onChange={(event) => setHeaderSearch(event.target.value)}
