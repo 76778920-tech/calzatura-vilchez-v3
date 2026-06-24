@@ -160,9 +160,7 @@ export default function AdminLayout() {
       <main ref={mainRef} tabIndex={-1} className="admin-main" id="admin-main-content">
         <header className="admin-topbar">
           <div>
-            {location.pathname !== ADMIN_ROUTES.dashboard && (
-              <p className="admin-topbar-kicker">Panel administrativo</p>
-            )}
+            <p className="admin-topbar-kicker">Panel administrativo</p>
             <h1>{activePageTitle}</h1>
           </div>
           <WorkerNotificationsBell />

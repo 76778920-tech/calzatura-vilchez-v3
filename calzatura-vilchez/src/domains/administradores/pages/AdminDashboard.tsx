@@ -489,7 +489,10 @@ export default function AdminDashboard() {
     <div className="dash-root">
       {/* Header */}
       <div className="dash-header">
-        <p className="dash-greeting">{greetingWithName(userProfile?.nombre)}</p>
+        <div>
+          <p className="dash-greeting">{greetingWithName(userProfile?.nombre)}</p>
+          <h1 className="dash-title">Dashboard</h1>
+        </div>
         <div className="dash-header-date">
           <p className="dash-date-label">Hoy</p>
           <p className="dash-date-value">
