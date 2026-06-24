@@ -43,10 +43,11 @@ describe("Seguridad — headers Firebase Hosting (ISO 25010 superficie web)", ()
     expect(csp).not.toContain("unsafe-eval");
   });
 
-  it("style-src-elem tiene hashes de Goober CSS-in-JS sin unsafe-inline (Obc52FVR.js)", () => {
+  it("style-src-elem tiene 17 hashes de Goober CSS-in-JS sin unsafe-inline", () => {
     const csp = headerValue("Content-Security-Policy");
     const styleSrcElem = directive("style-src-elem", csp);
     expect(styleSrcElem).not.toContain("'unsafe-inline'");
+    // Estados base — inicialización del módulo react-hot-toast
     expect(styleSrcElem).toContain("'sha256-Nqnn8clbgv+5l0PgxcTOldg8mkMKrFn4TvPL+rYUUGg='");
     expect(styleSrcElem).toContain("'sha256-13vrThxdyT64GcXoTNGVoRRoL0a7EGBmOJ+lemEWyws='");
     expect(styleSrcElem).toContain("'sha256-QZ52fjvWgIOIOPr+gRIJZ7KjzNeTBm50Z+z9dH4N1/8='");
@@ -56,6 +57,15 @@ describe("Seguridad — headers Firebase Hosting (ISO 25010 superficie web)", ()
     expect(styleSrcElem).toContain("'sha256-ZH/+PJIjvP1BctwYxclIuiMu1wItb0aasjpXYXOmU0Y='");
     expect(styleSrcElem).toContain("'sha256-58jqDtherY9NOM+ziRgSqQY0078tAZ+qtTBjMgbM9po='");
     expect(styleSrcElem).toContain("'sha256-7Ri/I+PfhgtpcL7hT4A0VJKI6g3pK0ZvIN09RQV4ZhI='");
+    // Estados de iconos — generados al renderizar cada tipo de toast por 1ª vez
+    expect(styleSrcElem).toContain("'sha256-D6zmPl9SPOA5yA8xbXKrLL0cVKn8FB4+jrOuJzlq4sI='");
+    expect(styleSrcElem).toContain("'sha256-RMLuAlXIwRu2+YnnDVl5tzQPV2YlmPqSWSKEwJidCyc='");
+    expect(styleSrcElem).toContain("'sha256-J0fb1cj+TvfbuwoWFcBRWXfZjjxyNBgv9RziegQUbxk='");
+    expect(styleSrcElem).toContain("'sha256-+h218lrS+a9xO+7drwOfWjgpuVq/J66Fi1VVl/fnmSY='");
+    expect(styleSrcElem).toContain("'sha256-iO7F2hy476ppWnd4pn3N47Ghu4N5JTJ6HwMLvn+hsuo='");
+    expect(styleSrcElem).toContain("'sha256-S0YC/uXDAItX6fZw7W0jini2nSubFplw0SLxwxT5MIA='");
+    expect(styleSrcElem).toContain("'sha256-v/fQgvryHaSv77dkuEjcOylQzivjwDiVAzXKGxCIvDI='");
+    expect(styleSrcElem).toContain("'sha256-gfpYVzW3lrSTqeJ+RZgdXX7GR7soyXFfOjCLj+57t6U='");
   });
 
   it("COOP same-origin (email auth + Stripe redirect; sin OAuth popup)", () => {
