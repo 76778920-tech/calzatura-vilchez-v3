@@ -35,14 +35,14 @@ export const HOSTING_CSP = [
   "style-src 'self' https://www.gstatic.com https://fonts.googleapis.com",
   [
     "style-src-elem 'self' https://www.gstatic.com https://fonts.googleapis.com",
-    // Firebase Auth widget (PCPpffvq.js) — hashes exactos, sin 'unsafe-inline'
-    "'sha256-Nqnn8c1bgv+510PgxcTOldg8mkMKrFn4TvPL+rYUUG='",
-    "'sha256-13vrThxdyT64GcXoTNGVoRRoL0a7EGBmOJ+1emEWyws='",
-    "'sha256-QZ52fjvWgIOIOPr+gRIJZ7KjzNeTBm50Z+z9dH4NJ/8='",
-    "'sha256-yOU6eaJ75xfag0gVFUv1d5ipLRGUy94G17B1uL683EU='",
-    "'sha256-OpTmykz0m3o5HoX53cykwPhUeU4OECxHQ1KXpB0JJPQ='",
-    "'sha256-SSIM0kI/u45y4gqkri9aH+la6wn2R+xtcBj3Lzh7qOo='",
-    "'sha256-ZH/+PJIjvP1BctwYxclIuiMu1wItb0aasJpXYXOmU0Y='",
+    // Goober CSS-in-JS (<style id="_goober">) — 9 estados incrementales del bundle actual
+    "'sha256-Nqnn8clbgv+5l0PgxcTOldg8mkMKrFn4TvPL+rYUUGg='",
+    "'sha256-13vrThxdyT64GcXoTNGVoRRoL0a7EGBmOJ+lemEWyws='",
+    "'sha256-QZ52fjvWgIOIOPr+gRIJZ7KjzNeTBm50Z+z9dH4N1/8='",
+    "'sha256-yOU6eaJ75xfag0gVFUvld5ipLRGUy94G17B1uL683EU='",
+    "'sha256-OpTmykz0m3o5HoX53cykwPhUeU4OECxHQlKXpB0QJPQ='",
+    "'sha256-SSIM0kI/u45y4gqkri9aH+la6wn2R+xtcBj3Lzh7qQo='",
+    "'sha256-ZH/+PJIjvP1BctwYxclIuiMu1wItb0aasjpXYXOmU0Y='",
     "'sha256-58jqDtherY9NOM+ziRgSqQY0078tAZ+qtTBjMgbM9po='",
     "'sha256-7Ri/I+PfhgtpcL7hT4A0VJKI6g3pK0ZvIN09RQV4ZhI='",
   ].join(" "),
