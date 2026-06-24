@@ -137,7 +137,8 @@ export default function App() {
       <ScrollToTop />
       <CookieBanner />
       <Toaster
-        position="top-right"
+        position="bottom-right"
+        containerStyle={{ bottom: 24, right: 16 }}
         toastOptions={{
           duration: 4000,
           style: { fontFamily: "var(--font-sans)", fontSize: "14px" },
