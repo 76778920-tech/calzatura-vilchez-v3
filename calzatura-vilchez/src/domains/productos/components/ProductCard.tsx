@@ -39,6 +39,8 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
   const secondaryImage = images[1] ?? null;
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const [failedHoverImage, setFailedHoverImage] = useState<string | null>(null);
+  // hoverPreloaded: true solo cuando la imagen secundaria ya está en caché del navegador
+  const [hoverPreloaded, setHoverPreloaded] = useState(false);
   const imageSrc = failedImage === primaryImage ? FALLBACK_PRODUCT_IMAGE : primaryImage;
   const hoverImageSrc = (() => {
     if (!secondaryImage) return null;
@@ -106,18 +108,26 @@ export default function ProductCard({ product, familyGroupSize = 1, onFavoriteCh
             loading="lazy"
             decoding="async"
             className="product-card-img product-card-img-primary"
+            onLoad={() => {
+              // Precargar imagen de hover en caché antes de que el usuario haga hover
+              if (hoverImageSrc && !hoverPreloaded) {
+                const preload = new globalThis.Image();
+                preload.onload = () => setHoverPreloaded(true);
+                preload.onerror = () => setFailedHoverImage(secondaryImage);
+                preload.src = hoverImageSrc;
+              }
+            }}
             onError={(event) => {
               const image = event.target as HTMLImageElement;
               image.onerror = null;
               setFailedImage(primaryImage);
             }}
           />
-          {hoverImageSrc && (
+          {hoverImageSrc && hoverPreloaded && (
             <img
               src={hoverImageSrc}
               alt=""
-              loading="lazy"
-              decoding="async"
+              aria-hidden="true"
               className="product-card-img product-card-img-hover"
               onError={(event) => {
                 const image = event.target as HTMLImageElement;

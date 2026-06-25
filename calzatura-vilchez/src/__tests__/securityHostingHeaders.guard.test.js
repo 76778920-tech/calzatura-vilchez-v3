@@ -43,10 +43,10 @@ describe("Seguridad — headers Firebase Hosting (ISO 25010 superficie web)", ()
     expect(csp).not.toContain("unsafe-eval");
   });
 
-  it("style-src-elem tiene 3 hashes de Goober keyframes sin unsafe-inline (modo headless)", () => {
-    // CustomToaster usa useToaster() headless — no renderiza styled components de goober.
-    // Solo se generan los 3 keyframes de inicialización de módulo, cuyos hashes son
-    // deterministas (contenido CSS fijo) y estables entre builds.
+  it("style-src-elem tiene 9 hashes de Goober sin unsafe-inline (modo headless)", () => {
+    // react-hot-toast inyecta 8 bloques CSS vía goober al cargar el módulo (no al renderizar).
+    // Chrome valida el hash del <style id="_goober"> en cada actualización del contenido acumulado.
+    // Los 9 hashes cubren: estado inicial ' ' + 8 estados acumulados (uno por cada inyección goober).
     const csp = headerValue("Content-Security-Policy");
     const styleSrcElem = directive("style-src-elem", csp);
     expect(styleSrcElem).not.toContain("'unsafe-inline'");

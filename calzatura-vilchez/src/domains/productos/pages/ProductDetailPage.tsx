@@ -92,7 +92,26 @@ export default function ProductDetailPage() {
   }, [product]);
   const activeImage = productImages[selectedImageIndex] ?? FALLBACK_PRODUCT_IMAGE;
 
+  // Precargar todas las imágenes de galería; solo activa auto-play cuando están listas
+  const [galleryReady, setGalleryReady] = useState(false);
   useEffect(() => {
+    setGalleryReady(false);
+    if (productImages.length <= 1) { setGalleryReady(true); return; }
+    let loaded = 0;
+    const imgs = productImages.map((src) => {
+      const img = new globalThis.Image();
+      img.onload = img.onerror = () => {
+        loaded += 1;
+        if (loaded === productImages.length) setGalleryReady(true);
+      };
+      img.src = src;
+      return img;
+    });
+    return () => { imgs.forEach((img) => { img.onload = img.onerror = null; }); };
+  }, [productImages]);
+
+  useEffect(() => {
+    if (!galleryReady) return;
     if (previewOpen) return;
     if (productImages.length <= 1) return;
     const mql = globalThis.matchMedia("(prefers-reduced-motion: reduce)");
@@ -111,7 +130,7 @@ export default function ProductDetailPage() {
       globalThis.clearInterval(interval);
       mql.removeEventListener("change", onMotionChange);
     };
-  }, [previewOpen, productImages.length]);
+  }, [galleryReady, previewOpen, productImages.length]);
 
   const moveImage = (direction: 1 | -1) => {
     if (productImages.length <= 1) return;

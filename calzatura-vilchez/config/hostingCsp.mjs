@@ -35,12 +35,20 @@ export const HOSTING_CSP = [
   "style-src 'self' https://www.gstatic.com https://fonts.googleapis.com",
   [
     "style-src-elem 'self' https://www.gstatic.com https://fonts.googleapis.com",
-    // Goober CSS-in-JS (<style id="_goober">) — solo 3 keyframes de inicialización de módulo.
-    // El Toaster usa modo headless (CustomToaster.tsx): no renderiza styled components de goober,
-    // por lo que estos 3 estados son los únicos generados y son estables entre builds.
+    // Goober CSS-in-JS (<style id="_goober">) — react-hot-toast inyecta 8 bloques CSS al cargar.
+    // Chrome valida el hash del <style> en cada actualización del contenido acumulado.
+    // Hashes = sha256 del contenido acumulado del elemento en cada uno de los 9 estados posibles.
+    // Estados 0-2: ya cubiertos por los 3 hashes originales.
+    // Estados 3-8: nuevos hashes para los 6 bloques restantes (go1268368563..go4109123758).
     "'sha256-Nqnn8clbgv+5l0PgxcTOldg8mkMKrFn4TvPL+rYUUGg='",
     "'sha256-13vrThxdyT64GcXoTNGVoRRoL0a7EGBmOJ+lemEWyws='",
     "'sha256-QZ52fjvWgIOIOPr+gRIJZ7KjzNeTBm50Z+z9dH4N1/8='",
+    "'sha256-yOU6eaJ75xfag0gVFUvld5ipLRGUy94G17B1uL683EU='",
+    "'sha256-OpTmykz0m3o5HoX53cykwPhUeU4OECxHQlKXpB0QJPQ='",
+    "'sha256-SSIM0kI/u45y4gqkri9aH+la6wn2R+xtcBj3Lzh7qQo='",
+    "'sha256-ZH/+PJIjvP1BctwYxclIuiMu1wItb0aasjpXYXOmU0Y='",
+    "'sha256-58jqDtherY9NOM+ziRgSqQY0078tAZ+qtTBjMgbM9po='",
+    "'sha256-7Ri/I+PfhgtpcL7hT4A0VJKI6g3pK0ZvIN09RQV4ZhI='",
   ].join(" "),
   "style-src-attr 'unsafe-inline'",
   [
