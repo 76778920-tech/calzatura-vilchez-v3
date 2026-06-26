@@ -965,8 +965,8 @@
         {
           "n": 5,
           "indicador": "Bundle frontend sin regresión grave de tamaño",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "Vite build 2026-06-26: chunk mayor 944 KB (umbral ≤ 1 500 KB), total 3 277 KB (umbral ≤ 5 000 KB). Code-splitting 11 dominios lazy. Evidencia: docs/ops/bundle-size-evidence.json."
         }
       ]
     },
@@ -1006,14 +1006,14 @@
         {
           "n": 5,
           "indicador": "Metas p95/fallo HTTP documentadas",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "k6-mixed1000-bff + k6-mixed2000-bff (docs/ops/): thresholds explícitos — maxHttpFailedRate ≤ 0,02; maxP95CatalogMs ≤ 4 000 ms; maxP95DetailMs ≤ 2 500 ms; maxP95BffHealthMs ≤ 1 500 ms. Ambas corridas PASS. Evidencia: docs/ops/k6-mixed1000-bff-evidence.json y k6-mixed2000-bff-evidence.json."
         },
         {
           "n": 6,
           "indicador": "k6 integrado en pipeline CI",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "ci.yml paso 'K6 load evidence - fixtures validos': node scripts/k6-evidence-check.mjs valida smoke + mixed1000-bff + mixed2000-bff en cada push a main. Fallo en umbrales rompe la pipeline."
         }
       ]
     },

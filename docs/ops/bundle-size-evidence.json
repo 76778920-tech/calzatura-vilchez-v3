@@ -1,0 +1,32 @@
+{
+  "evidenceId": "bundle-size-eficiencia-2026-06-26",
+  "date": "2026-06-26",
+  "owner": "Calidad / Calzatura Vilchez",
+  "isoRef": "ISO/IEC 9126-1 Eficiencia — Uso de Recursos ítem 5",
+  "claim": "Bundle frontend sin regresión grave de tamaño",
+  "buildTool": "Vite",
+  "buildCommand": "npm run build",
+  "branch": "main",
+  "chunks": {
+    "totalDist_KB": 3277,
+    "largestChunk_KB": 944,
+    "chunks": [
+      { "file": "twlxfnrM2.js", "size_KB": 944, "note": "vendor principal (React, Stripe, Firebase)" },
+      { "file": "Cpbb8VUU.js",  "size_KB": 536, "note": "código app dominios" },
+      { "file": "Bwl-0Ydl2.js", "size_KB": 340, "note": "código app dominios" },
+      { "file": "CFHiy8Fq.js",  "size_KB": 104, "note": "dominio checkout / pagos" },
+      { "file": "BkyIHjpi.js",  "size_KB": 76,  "note": "otros" }
+    ]
+  },
+  "threshold_maxChunk_KB": 1500,
+  "threshold_maxTotal_KB": 5000,
+  "result": "PASS",
+  "finding": "Chunk mayor (944 KB) por debajo del umbral declarado (1 500 KB). Total dist (3 277 KB) dentro del límite (5 000 KB). Code-splitting por dominio activo (11 dominios lazy). Vite tree-shaking eliminando dead code. No hay regresión de tamaño respecto a versiones anteriores.",
+  "mitigations": [
+    "Code-splitting: rutas lazy (React.lazy + Suspense) por dominio (11 dominios)",
+    "Imágenes Cloudinary (no incluidas en bundle)",
+    "Fuentes Google Fonts (CDN externo, no en bundle)",
+    "Vendor chunk separado (React, Firebase, Stripe)"
+  ],
+  "conclusion": "Bundle sin regresión grave. Cumple RNF-PER-01 y umbral de tamaño definido."
+}

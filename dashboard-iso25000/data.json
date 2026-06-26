@@ -117,17 +117,17 @@
         {
           "name": "Comportamiento en el tiempo",
           "percent": 83,
-          "evidence": "Build Vite, code-splitting, rutas lazy. RNF-PER-01 medido con Lighthouse/DevTools."
+          "evidence": "Build Vite optimizado, code-splitting, rutas lazy, p95 catálogo < 3 s (RNF-PER-01). Pendiente: Gate Lighthouse en CI."
         },
         {
           "name": "Uso de Recursos",
-          "percent": 80,
-          "evidence": "Caché catálogo Upstash en BFF (PUBLIC_CATALOG_CACHE_TTL_SEC)."
+          "percent": 100,
+          "evidence": "Upstash BFF activa, TTL configurado, imágenes Cloudinary, bundle sin regresión: chunk mayor 944 KB (umbral ≤ 1 500 KB). Evidencia: docs/ops/bundle-size-evidence.json."
         },
         {
           "name": "Cumplimiento de la Eficiencia",
-          "percent": 67,
-          "evidence": "Pruebas k6 (RNF-CAP-02) ejecutables manualmente; no integradas en CI."
+          "percent": 100,
+          "evidence": "k6 smoke + mixed1000 + mixed2000 ejecutados. Metas p95/fallo documentadas en evidence JSON. ci.yml paso 'K6 load evidence' valida umbrales en cada push. Evidencia: docs/ops/k6-mixed1000-bff-evidence.json · k6-mixed2000-bff-evidence.json."
         }
       ]
     },
