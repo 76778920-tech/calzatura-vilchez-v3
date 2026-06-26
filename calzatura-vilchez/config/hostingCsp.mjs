@@ -13,6 +13,7 @@ export const HOSTING_CSP = [
     "img-src 'self' data: blob:",
     "https://res.cloudinary.com",
     "https://*.cloudinary.com",
+    "https://images.unsplash.com",
     "https://*.supabase.co",
     "https://*.googleapis.com",
     "https://*.gstatic.com",
