@@ -39,7 +39,7 @@ describe("IA/DevOps measurable controls workflow guard", () => {
     expect(integration).toContain("restore-drill-evidence.ci.json");
     expect(integration).toContain("supabase-remote-parity:");
     expect(integration).toContain("verify-supabase-migration-parity.mjs");
-    expect(integration).toContain("needs: [quality, ai-service, ai-service-docker, ops-controls-real, e2e, supabase-remote-parity]");
+    expect(integration).toContain("needs: [quality, ai-service, ai-service-docker, ops-controls-real, e2e, lighthouse, supabase-remote-parity]");
 
     const realJob = integration.slice(integration.indexOf("ops-controls-real:"), integration.indexOf("  e2e:"));
     expect(realJob).not.toContain("--warn-only");
