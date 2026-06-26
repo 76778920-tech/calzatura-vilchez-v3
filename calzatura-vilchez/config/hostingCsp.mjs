@@ -50,6 +50,7 @@ export const HOSTING_CSP = [
     "'sha256-ZH/+PJIjvP1BctwYxclIuiMu1wItb0aasjpXYXOmU0Y='",
     "'sha256-58jqDtherY9NOM+ziRgSqQY0078tAZ+qtTBjMgbM9po='",
     "'sha256-7Ri/I+PfhgtpcL7hT4A0VJKI6g3pK0ZvIN09RQV4ZhI='",
+    "'sha256-uRSoNgCbEzJV12eoIJu089gLGU9+FxpgOEmEDehdM/Y='",
   ].join(" "),
   "style-src-attr 'unsafe-inline'",
   [
