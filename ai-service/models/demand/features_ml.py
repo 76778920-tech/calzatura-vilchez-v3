@@ -131,12 +131,12 @@ def _train_global_model(
     y = df["y"].values.astype(float)
 
     model = RandomForestRegressor(
-        n_estimators=50,
-        max_depth=8,
+        n_estimators=20,
+        max_depth=6,
         min_samples_leaf=3,
         max_features=1.0,
         random_state=42,
-        n_jobs=-1,
+        n_jobs=1,
     )
     model.fit(X, y)
 

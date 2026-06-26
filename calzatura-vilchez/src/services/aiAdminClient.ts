@@ -78,13 +78,13 @@ export async function aiAdminFetch(pathAndQuery: string, init?: RequestInit): Pr
   const rel = pathAndQuery.startsWith("/") ? pathAndQuery : `/${pathAndQuery}`;
   const headers = { ...(await authHeaders()), ...(init?.headers as Record<string, string> | undefined) };
   if (PROXY_BASE) {
-    return fetch(toProxyUrl(rel), { ...init, headers });
+    return fetch(toProxyUrl(rel), { ...init, cache: "no-store", headers });
   }
   const base = DIRECT_BASE.replaceAll(/\/$/g, "");
   if (!base) {
     throw new Error("En producción define VITE_AI_SERVICE_URL (https) o VITE_AI_ADMIN_PROXY_URL.");
   }
-  return fetch(`${base}${rel}`, { ...init, headers });
+  return fetch(`${base}${rel}`, { ...init, cache: "no-store", headers });
 }
 
 export function aiAdminUsesProxy(): boolean {

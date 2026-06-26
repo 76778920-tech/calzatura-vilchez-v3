@@ -853,7 +853,7 @@ exports.favorites = onRequest(
   }
 );
 
-const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
+const AI_PROXY_UPSTREAM_TIMEOUT_MS = 90_000;
 
 async function runAiAdminProxyRequest(req, res) {
   const decodedToken = await verifyFirebaseUser(req);
