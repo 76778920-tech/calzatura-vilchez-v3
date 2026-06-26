@@ -92,17 +92,20 @@ export default function ProductDetailPage() {
   }, [product]);
   const activeImage = productImages[selectedImageIndex] ?? FALLBACK_PRODUCT_IMAGE;
 
-  // Precargar todas las imágenes de galería; solo activa auto-play cuando están listas
-  const [galleryReady, setGalleryReady] = useState(false);
+  // readyImages guarda la referencia de productImages cuando todas sus imágenes están cargadas.
+  // galleryReady se deriva por comparación de referencia durante el render: false automáticamente
+  // cuando productImages cambia (nuevo producto), sin setState dentro del effect.
+  // Para productos de 1 imagen el autoplay ya tiene su propio guard, no se necesita galleryReady=true.
+  const [readyImages, setReadyImages] = useState<string[]>([]);
+  const galleryReady = readyImages === productImages;
   useEffect(() => {
-    setGalleryReady(false);
-    if (productImages.length <= 1) { setGalleryReady(true); return; }
+    if (productImages.length <= 1) return;
     let loaded = 0;
     const imgs = productImages.map((src) => {
       const img = new globalThis.Image();
       img.onload = img.onerror = () => {
         loaded += 1;
-        if (loaded === productImages.length) setGalleryReady(true);
+        if (loaded === productImages.length) setReadyImages(productImages);
       };
       img.src = src;
       return img;
