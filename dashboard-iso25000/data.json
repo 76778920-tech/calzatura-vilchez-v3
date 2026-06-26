@@ -2,7 +2,7 @@
   "meta": {
     "title": "Dashboard de Cumplimiento — ISO/IEC 25000 (SQuaRE) · Calidad interna/externa",
     "project": "Calzatura Vilchez — Sistema Web E-Commerce con IA",
-    "generatedAt": "2026-06-19",
+    "generatedAt": "2026-06-26",
     "scope": "Vitrina pública, catálogo, carrito, checkout/pagos (Stripe), panel administrativo, servicio IA de predicción.",
     "methodology": "Familia ISO/IEC 25000 (SQuaRE). Modelo de producto: calidad interna/externa con 6 características y 27 subcaracterísticas (Funcionalidad, Fiabilidad, Usabilidad, Eficiencia, Mantenibilidad, Portabilidad) según diagrama de referencia iso25000_ref.png e ISO/IEC 9126-1. Evaluación en tres niveles: (1) lista de cotejo Sí/No, (2) casos de prueba, (3) capturas y actas. Ver documentacion/modelo-calidad-25010-alineacion.md.",
     "thresholds": {
@@ -182,8 +182,8 @@
         },
         {
           "name": "Coexistencia",
-          "percent": 80,
-          "evidence": "Firebase, Supabase, Stripe, Render IA y Cloudinary operan en paralelo sin conflictos (documentacion/10-operacion-y-mantenimiento.md)."
+          "percent": 100,
+          "evidence": "Firebase, Supabase, Stripe, Render IA, Cloudinary y Upstash operan en paralelo sin conflictos. k6 mixed1000/2000: p95BffCatalogActiveMs = 1 ms con cache Upstash activa (umbral ≤ 200 ms). Evidencia: docs/ops/upstash-latency-evidence.json · documentacion/10-operacion-y-mantenimiento.md."
         },
         {
           "name": "Intercambiabilidad",
@@ -192,8 +192,8 @@
         },
         {
           "name": "Cumplimiento de la Portabilidad",
-          "percent": 80,
-          "evidence": "Plan §9 + matriz web §4.6; SO móvil nativo en portabilidad-mapeo-iso25023.md. Pendiente: doc BFF Render (ítem 5)."
+          "percent": 100,
+          "evidence": "Plan §9 + matriz web §4.6 + SO móvil nativo en portabilidad-mapeo-iso25023.md + despliegue BFF Render documentado (documentacion/bff-render-despliegue.md). 5/5 ítems cumplidos."
         }
       ]
     }

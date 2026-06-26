@@ -3,7 +3,7 @@
 **Proyecto:** Calzatura Vilchez  
 **Modelo producto:** ISO/IEC 9126-1 / 25010 (característica **Portabilidad** → 5 subcaracterísticas en dashboard)  
 **Medidas cuantitativas:** ISO/IEC 25023 §7.8 (Flexibility / Portability)  
-**Última revisión:** 2026-06-17  
+**Última revisión:** 2026-06-26  
 
 **Fuentes normativas:** ISO/IEC 9126-1 §6.6; ISO/IEC 25010 Adaptability / Installability; ISO/IEC 25023 Tablas 32–34 (FAd-*, FIn-*).
 
@@ -75,9 +75,9 @@
 
 ## 5. Coexistencia, Intercambiabilidad, Cumplimiento
 
-### Coexistencia (sin cambio por iOS)
+### Coexistencia (**100 %**)
 
-Integraciones cloud en paralelo; ítem 5 Upstash pendiente. iOS no aplica.
+Firebase, Supabase, Stripe, Render IA, Cloudinary y Upstash operan en paralelo sin conflictos. Ítem 5 cerrado (2026-06-26): k6 mixed1000 y mixed2000 confirman `p95BffCatalogActiveMs = 1 ms` con cache Upstash activa (umbral declarado ≤ 200 ms). Evidencia: `docs/ops/upstash-latency-evidence.json`.
 
 ### Intercambiabilidad (sin cambio por iOS)
 
@@ -128,9 +128,9 @@ Integraciones cloud en paralelo; ítem 5 Upstash pendiente. iOS no aplica.
 | 2 | Matriz SO/navegadores | §4.6 = **web**; SO móvil nativo en **este documento §1** | ✅ | Matriz web completa; iOS app = entorno declarado aparte |
 | 3 | Ejecución ≥ 2 navegadores | WebKit + Firefox | ✅ | No incluye IPA |
 | 4 | Firebase Hosting documentado | Web | ✅ | `09-implementacion-despliegue-ci.md` |
-| 5 | BFF Render documentado | Servidor | ❌ | Pendiente doc ampliada |
+| 5 | BFF Render documentado | Servidor | ✅ | `documentacion/bff-render-despliegue.md` (cerrado 2026-06-26) |
 
-**Porcentaje:** 4/5 → **80 %** (iOS no baja Cumplimiento si la matriz §4.6 es explícitamente web).
+**Porcentaje:** 5/5 → **100 %**.
 
 ---
 
@@ -138,12 +138,12 @@ Integraciones cloud en paralelo; ítem 5 Upstash pendiente. iOS no aplica.
 
 | Subcaracterística | % checklist | Brecha iOS |
 |-------------------|---------------|------------|
-| Adaptabilidad | **71 %** | FAd-2 ítems 5 y 7 (iOS nativo) |
-| Facilidad de Instalación | **88 %** | FIn ítem 8 (IPA iOS); resto OK incl. CI build |
-| Coexistencia | 80 % | Upstash (ítem 5) |
+| Adaptabilidad | **71 %** | FAd-2 ítems 5 y 7 (iOS nativo — limitación declarada: sin cuenta Apple Developer) |
+| Facilidad de Instalación | **88 %** | FIn ítem 8 (IPA iOS — limitación declarada); resto OK incl. CI build |
+| Coexistencia | **100 %** | Cerrado 2026-06-26: Upstash p95 = 1 ms (umbral ≤ 200 ms) |
 | Intercambiabilidad | **100 %** | IA URL + contrato HTTP verificados (ítems 5–6) |
-| Cumplimiento Portabilidad | 80 % | Doc BFF Render (ítem 5) |
-| **Media simple** | **≈ 84 %** | |
+| Cumplimiento Portabilidad | **100 %** | Cerrado 2026-06-26: `bff-render-despliegue.md` |
+| **Media simple** | **≈ 92 %** | |
 
 ---
 

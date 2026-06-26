@@ -1370,8 +1370,8 @@
         {
           "n": 5,
           "indicador": "Upstash sin degradar latencia crítica",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "k6 mixed1000 y mixed2000 (2026-06-17): p95BffCatalogActiveMs = 1 ms (umbral ≤ 200 ms). Evidencia: docs/ops/upstash-latency-evidence.json. Upstash Redis coexiste sin degradación con Firebase, Supabase, Stripe, Render IA y Cloudinary."
         }
       ]
     },
@@ -1458,8 +1458,8 @@
         {
           "n": 5,
           "indicador": "Despliegue BFF Render documentado",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "documentacion/bff-render-despliegue.md: variables de entorno, build/start command, health check, CI/CD pipeline (deploy-production.yml). Complementa 09-implementacion-despliegue-ci.md §5 y docker-compose.yml."
         }
       ]
     }

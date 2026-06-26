@@ -1,0 +1,30 @@
+{
+  "evidenceId": "upstash-latency-coexistencia-2026-06-17",
+  "date": "2026-06-17",
+  "owner": "Calidad / Calzatura Vilchez",
+  "isoRef": "ISO/IEC 9126-1 Portabilidad — Coexistencia ítem 5",
+  "claim": "Upstash Redis cache en BFF no degrada latencia crítica del catálogo público",
+  "sources": [
+    "docs/ops/k6-mixed1000-bff-evidence.json",
+    "docs/ops/k6-mixed2000-bff-evidence.json"
+  ],
+  "metric": "p95BffCatalogActiveMs",
+  "threshold_ms": 200,
+  "results": [
+    {
+      "scenario": "mixed1000",
+      "peakVus": 1000,
+      "p95BffCatalogActiveMs": 1,
+      "result": "PASS"
+    },
+    {
+      "scenario": "mixed2000",
+      "peakVus": 2000,
+      "p95BffCatalogActiveMs": 1,
+      "result": "PASS"
+    }
+  ],
+  "finding": "p95 del endpoint /public/catalog con cache Upstash activo = 1 ms en ambos escenarios (1 000 y 2 000 VUs). Umbral máximo establecido: 200 ms. Upstash no degrada la latencia crítica; al contrario, elimina el round-trip a Supabase para rutas públicas frecuentes.",
+  "context": "BFF ejecutado en entorno local (Node.js); Supabase producción. Caché configurada con PUBLIC_CATALOG_CACHE_TTL_SEC (Upstash Redis). Las corridas k6 de carga confirman coexistencia sin degradación entre Firebase Auth, Supabase, Stripe, Render IA, Cloudinary y Upstash.",
+  "conclusion": "Ítem cumple: Upstash Redis coexiste sin degradación de latencia."
+}
