@@ -1,6 +1,7 @@
 import time
 import os
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date, timedelta
 from typing import Annotated, Any
@@ -135,6 +136,7 @@ _PREDICTION_LOG_MAX = 200
 # El primer request tras un cold-start o expiración entrena el modelo; los siguientes son instantáneos.
 _COMBINED_CACHE_TTL = int(os.getenv("CACHE_TTL_COMBINED", "300"))  # 5 min por defecto
 _combined_result_cache: dict = {"result": None, "expires_at": 0.0, "horizon": 0, "history": 0}
+_combined_compute_lock: threading.Lock = threading.Lock()
 
 
 class IreHistorialResponse(BaseModel):
@@ -414,7 +416,7 @@ def combined_prediction(
     try:
         _require_service_auth(request)
 
-        # Devuelve resultado cacheado si está vigente y los parámetros coinciden
+        # Fast path: devuelve resultado cacheado sin adquirir lock
         _now = time.time()
         if (
             _combined_result_cache["result"] is not None
@@ -424,89 +426,109 @@ def combined_prediction(
         ):
             return _combined_result_cache["result"]
 
-        lookback_days = max(history, 120)
-        daily_sales, orders, products, product_codes, movements = _load_data(lookback_days=lookback_days)
-
-        predictions, training_meta = predict_demand(
-            daily_sales=daily_sales,
-            completed_orders=orders,
-            products=products,
-            product_codes=product_codes,
-            horizon_days=horizon,
-            history_days=history,
-            stock_movements=movements,
-        )
-
-        # Update model registry and prediction log (same as /api/predict/demand)
-        _model_registry.clear()
-        _model_registry.update({**training_meta, "cached_at": date.today().isoformat()})
-        log_entry = {
-            "logged_at": date.today().isoformat(),
-            "horizon_days": horizon,
-            "model_type": training_meta.get("model_type", "unknown"),
-            "products": [
-                {
-                    "productId": p["productId"],
-                    "predicted_daily": p["prediccion_diaria"],
-                    "predicted_total": p["prediccion_unidades"],
-                }
-                for p in predictions
-                if not p.get("sin_historial")
-            ],
-        }
-        _prediction_log.append(log_entry)
-        if len(_prediction_log) > _PREDICTION_LOG_MAX:
-            _prediction_log.pop(0)
-
-        warnings: list[str] = []
-        quality = training_data_quality_meta(training_meta)
-        if not quality.get("data_sufficient"):
-            reason = str(quality.get("insufficient_reason") or "").strip()
-            warnings.append(
-                reason
-                if reason
-                else "Datos históricos insuficientes: las predicciones no son representativas."
+        # Serializa el cómputo: solo un thread entrena RandomForest a la vez.
+        # Requests concurrentes (ej: prewarm del BFF + usuario) esperan y sirven desde cache.
+        if not _combined_compute_lock.acquire(blocking=True, timeout=160):
+            raise HTTPException(
+                status_code=503,
+                detail="Servicio ocupado calculando predicciones. Reintente en 30 segundos.",
             )
-
         try:
-            revenue = forecast_revenue(
+            # Double-check: el primer thread pudo haber cacheado el resultado mientras esperábamos
+            _now = time.time()
+            if (
+                _combined_result_cache["result"] is not None
+                and _combined_result_cache["expires_at"] > _now
+                and _combined_result_cache["horizon"] == horizon
+                and _combined_result_cache["history"] == history
+            ):
+                return _combined_result_cache["result"]
+
+            lookback_days = max(history, 120)
+            daily_sales, orders, products, product_codes, movements = _load_data(lookback_days=lookback_days)
+
+            predictions, training_meta = predict_demand(
                 daily_sales=daily_sales,
                 completed_orders=orders,
+                products=products,
+                product_codes=product_codes,
                 horizon_days=horizon,
                 history_days=history,
+                stock_movements=movements,
             )
-        except Exception as rev_err:
-            revenue = None
-            warnings.append(f"Proyección de ingresos no disponible: {str(rev_err)[:120]}")
 
-        ire = compute_ire(predictions, revenue)
-        ire_proyectado = compute_ire_proyectado(predictions, revenue, horizon)
-
-        try:
-            save_ire_historial(ire)
-        except Exception as save_err:
-            warnings.append(f"Historial IRE no guardado: {str(save_err)[:80]}")
-
-        _combined_result = {
-            "demand": {
+            # Update model registry and prediction log (same as /api/predict/demand)
+            _model_registry.clear()
+            _model_registry.update({**training_meta, "cached_at": date.today().isoformat()})
+            log_entry = {
+                "logged_at": date.today().isoformat(),
                 "horizon_days": horizon,
-                "history_days": history,
-                "total_products": len(predictions),
-                "modelo_meta": training_meta,
-                "predictions": predictions,
-            },
-            "revenue": revenue,
-            "ire": ire,
-            "ire_proyectado": ire_proyectado,
-            "warnings": warnings,
-        }
-        _combined_result_cache.update({
-            "result": _combined_result,
-            "expires_at": time.time() + _COMBINED_CACHE_TTL,
-            "horizon": horizon,
-            "history": history,
-        })
-        return _combined_result
+                "model_type": training_meta.get("model_type", "unknown"),
+                "products": [
+                    {
+                        "productId": p["productId"],
+                        "predicted_daily": p["prediccion_diaria"],
+                        "predicted_total": p["prediccion_unidades"],
+                    }
+                    for p in predictions
+                    if not p.get("sin_historial")
+                ],
+            }
+            _prediction_log.append(log_entry)
+            if len(_prediction_log) > _PREDICTION_LOG_MAX:
+                _prediction_log.pop(0)
+
+            warnings: list[str] = []
+            quality = training_data_quality_meta(training_meta)
+            if not quality.get("data_sufficient"):
+                reason = str(quality.get("insufficient_reason") or "").strip()
+                warnings.append(
+                    reason
+                    if reason
+                    else "Datos históricos insuficientes: las predicciones no son representativas."
+                )
+
+            try:
+                revenue = forecast_revenue(
+                    daily_sales=daily_sales,
+                    completed_orders=orders,
+                    horizon_days=horizon,
+                    history_days=history,
+                )
+            except Exception as rev_err:
+                revenue = None
+                warnings.append(f"Proyección de ingresos no disponible: {str(rev_err)[:120]}")
+
+            ire = compute_ire(predictions, revenue)
+            ire_proyectado = compute_ire_proyectado(predictions, revenue, horizon)
+
+            try:
+                save_ire_historial(ire)
+            except Exception as save_err:
+                warnings.append(f"Historial IRE no guardado: {str(save_err)[:80]}")
+
+            _combined_result = {
+                "demand": {
+                    "horizon_days": horizon,
+                    "history_days": history,
+                    "total_products": len(predictions),
+                    "modelo_meta": training_meta,
+                    "predictions": predictions,
+                },
+                "revenue": revenue,
+                "ire": ire,
+                "ire_proyectado": ire_proyectado,
+                "warnings": warnings,
+            }
+            _combined_result_cache.update({
+                "result": _combined_result,
+                "expires_at": time.time() + _COMBINED_CACHE_TTL,
+                "horizon": horizon,
+                "history": history,
+            })
+            return _combined_result
+        finally:
+            _combined_compute_lock.release()
     except Exception as error:
         _raise_http_error(error)
 
