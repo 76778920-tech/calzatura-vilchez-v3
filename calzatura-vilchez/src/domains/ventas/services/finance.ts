@@ -78,6 +78,7 @@ async function fetchDailySalesViaBff(
 
   try {
     const response = await fetch(`${base}${path}?${qs.toString()}`, {
+      cache: "no-store",
       headers: { Authorization: `Bearer ${await user.getIdToken()}` },
     });
     if (!response.ok) return null;

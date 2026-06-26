@@ -15,6 +15,7 @@ export async function bffFetch<T>(path: string, init?: RequestInit): Promise<T> 
   try {
     response = await fetch(`${base}${path}`, {
       ...init,
+      cache: "no-store",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
