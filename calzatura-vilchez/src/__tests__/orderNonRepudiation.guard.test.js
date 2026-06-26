@@ -20,7 +20,7 @@ describe("Guard — no repudio PKCS#7 en pedidos", () => {
   it("BFF firma pedido en createOrder y webhook Stripe", () => {
     expect(server).toContain("refreshOrderNonRepudiation");
     expect(server).toContain("verifyOrderNonRepudiation");
-    expect(server).toContain('require("../functions/orderNonRepudiation.cjs")');
+    expect(server).toContain('require("./orderNonRepudiation.cjs")');
   });
 
   it("migración Supabase con columnas nr*", () => {
