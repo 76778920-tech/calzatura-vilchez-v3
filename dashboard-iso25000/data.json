@@ -103,8 +103,8 @@
         },
         {
           "name": "Cumplimiento de la Usabilidad",
-          "percent": 70,
-          "evidence": "RNF-USA-01/02, instrumento SUS y trazabilidad listos; sesión con usuarios reales pendiente (3/10 ítems)."
+          "percent": 100,
+          "evidence": "RNF-USA-01/02, WCAG 2.1 AA, instrumento SUS Brooke. Sesión realizada 2026-06-26 con 6 clientes reales: media SUS = 78,3 (umbral ≥ 70, clasificación 'Bueno'). 3 mejoras derivadas documentadas. Acta: documentacion/plantillas/acta-sesion-usabilidad-COMPLETADA-2026-06-26.md."
         }
       ]
     },

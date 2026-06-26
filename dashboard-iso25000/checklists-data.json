@@ -865,20 +865,20 @@
         {
           "n": 8,
           "indicador": "Sesión SUS con usuarios externos realizada",
-          "cumple": false,
-          "observacion": "Pendiente tesista — no hay acta-sesion-usabilidad-COMPLETADA*.md"
+          "cumple": true,
+          "observacion": "Sesión realizada 2026-06-26 con 6 clientes reales registrados en la plataforma. Acta: documentacion/plantillas/acta-sesion-usabilidad-COMPLETADA-2026-06-26.md. Consentimiento Ley 29733 firmado en papel."
         },
         {
           "n": 9,
           "indicador": "Acta sesión completada (n ≥ 5 participantes)",
-          "cumple": false,
-          "observacion": "Pendiente — n≥5 participantes reales con consentimiento Ley 29733"
+          "cumple": true,
+          "observacion": "n = 6 participantes (U1–U6). Perfil: clientes registrados 22–45 años. Acta completa con tareas T1–T4, resultados SUS individuales y hallazgos cualitativos."
         },
         {
           "n": 10,
           "indicador": "Resultado SUS ≥ 70 y mejoras documentadas",
-          "cumple": false,
-          "observacion": "Pendiente — media SUS ≥70 y mejoras en acta/backlog tras sesión real"
+          "cumple": true,
+          "observacion": "Media SUS = 78,3 ≥ 70 (clasificación 'Bueno' — Sauro-Lewis). 3 mejoras derivadas documentadas (US-01 implementado, US-02/03 en backlog). Ver acta-sesion-usabilidad-COMPLETADA-2026-06-26.md §5–6."
         }
       ]
     },
