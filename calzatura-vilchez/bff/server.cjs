@@ -3992,7 +3992,7 @@ function favoritesRouter(req, res) {
 app.all("/favorites", favoritesRouter);
 app.all("/favoritos", favoritesRouter);
 
-const AI_PROXY_UPSTREAM_TIMEOUT_MS = 110_000;
+const AI_PROXY_UPSTREAM_TIMEOUT_MS = 180_000;
 
 /** @returns {{ ok: true, upstreamUrl: string, method: string } | { ok: false, status?: number, error: string }} */
 function aiProxyCombined(base, req) {
@@ -4229,6 +4229,32 @@ registerPublicCatalogRoutes(app, {
 });
 
 const PORT = Number(process.env.PORT || 8787);
+
+/** Mantiene el AI service despierto y precalienta el combined al arrancar el BFF. */
+function _aiServiceKeepaliveAndPrewarm() {
+  const aiUrl = (process.env.AI_SERVICE_URL || "").replace(/\/$/, "");
+  const token = process.env.AI_SERVICE_BEARER_TOKEN;
+  if (!aiUrl || !token) return;
+
+  // 1) Ping de salud — mantiene el servicio despierto en Render free tier
+  fetch(`${aiUrl}/api/health`, { signal: AbortSignal.timeout(8_000) })
+    .catch(() => {});
+
+  // 2) Precalentar combined — dispara el entrenamiento del modelo y llena el cache
+  fetch(`${aiUrl}/api/predict/combined?horizon=30&history=30`, {
+    signal: AbortSignal.timeout(300_000),
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then(() => logServerError("[ai-keepalive] combined precalentado"))
+    .catch((err) => logServerError("[ai-keepalive] combined no disponible:", err?.message || String(err)));
+}
+
 app.listen(PORT, () => {
   console.log(`Calzatura BFF escuchando en http://0.0.0.0:${PORT}`);
+
+  // Pre-calentar AI service 5 segundos después del arranque del BFF
+  setTimeout(_aiServiceKeepaliveAndPrewarm, 5_000);
+
+  // Mantener AI service despierto cada 12 minutos (Render duerme a los 15 min de inactividad)
+  setInterval(_aiServiceKeepaliveAndPrewarm, 12 * 60 * 1000);
 });
