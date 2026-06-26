@@ -6,6 +6,8 @@ from services.supabase.http import _cutoff_iso, _query
 def fetch_daily_sales(days: int | None = None) -> list[dict]:
     params = {
         "select": "productId,fecha,cantidad,total,devuelto,nombre,precioVenta,codigo,canal",
+        "order": "fecha.desc",
+        "limit": "5000",
     }
     if days and days > 0:
         params["fecha"] = f"gte.{_cutoff_iso(days)}"
