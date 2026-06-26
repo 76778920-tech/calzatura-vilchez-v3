@@ -924,8 +924,8 @@
         {
           "n": 6,
           "indicador": "Gate Lighthouse/performance en CI",
-          "cumple": false,
-          "observacion": "Pendiente o evidencia insuficiente."
+          "cumple": true,
+          "observacion": "ci-integration.yml job 'lighthouse' (treosh/lighthouse-ci-action@512cc908): build → staticDistDir → lhci autorun. Umbrales: accesibilidad ≥ 80% (error), performance ≥ 50% (warn), LCP ≤ 6 s, CLS ≤ 0,25, TBT ≤ 1 200 ms. Configura: .lighthouserc.json. Resultados subidos a temporary-public-storage."
         }
       ]
     },

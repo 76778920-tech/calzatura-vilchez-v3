@@ -116,8 +116,8 @@
       "subcharacteristics": [
         {
           "name": "Comportamiento en el tiempo",
-          "percent": 83,
-          "evidence": "Build Vite optimizado, code-splitting, rutas lazy, p95 catálogo < 3 s (RNF-PER-01). Pendiente: Gate Lighthouse en CI."
+          "percent": 100,
+          "evidence": "Build Vite optimizado, code-splitting, rutas lazy, p95 catálogo < 3 s (RNF-PER-01). Gate Lighthouse: ci-integration.yml job 'lighthouse' con treosh/lighthouse-ci-action — accesibilidad ≥ 80% (error gate), performance auditada en cada push a main. Config: .lighthouserc.json."
         },
         {
           "name": "Uso de Recursos",
