@@ -8,7 +8,7 @@ const { createClient } = require("@supabase/supabase-js");
 const admin = require("firebase-admin");
 const { discountOrderStockRpc, applyOrderStatusStockSideEffects } = require("../functions/fnUtils");
 const { ORDER_STATUSES, assertOrderStatusTransition } = require("../functions/orderStatusPolicy");
-const { persistOrderNonRepudiation, verifyOrderRecord } = require("../functions/orderNonRepudiation.cjs");
+const { persistOrderNonRepudiation, verifyOrderRecord } = require("./orderNonRepudiation.cjs");
 
 function loadAllowedOrigins() {
   const defaults = [
