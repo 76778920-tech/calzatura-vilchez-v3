@@ -54,6 +54,7 @@ def _client(monkeypatch, save_ire=None) -> TestClient:
     monkeypatch.setattr(main, "_prediction_log", [])
     monkeypatch.setattr(main, "_model_registry", {})
     monkeypatch.setattr(main, "_combined_result_cache", {"result": None, "expires_at": 0.0, "horizon": 0, "history": 0})
+    monkeypatch.setattr(main, "_data_load_lock", __import__("threading").Lock())
     monkeypatch.setattr(
         main,
         "_load_data",

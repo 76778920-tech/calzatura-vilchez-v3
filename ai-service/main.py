@@ -137,6 +137,9 @@ _PREDICTION_LOG_MAX = 200
 _COMBINED_CACHE_TTL = int(os.getenv("CACHE_TTL_COMBINED", "300"))  # 5 min por defecto
 _combined_result_cache: dict = {"result": None, "expires_at": 0.0, "horizon": 0, "history": 0}
 _combined_compute_lock: threading.Lock = threading.Lock()
+# Serializa el fetch a Supabase: si combined está cargando datos, weekly_chart espera y
+# reutiliza el cache en lugar de hacer un segundo fetch concurrente que podría fallar.
+_data_load_lock: threading.Lock = threading.Lock()
 
 
 class IreHistorialResponse(BaseModel):
@@ -236,7 +239,12 @@ def _load_data(force: bool = False, lookback_days: int = 180):
     now = time.monotonic()
     need = {key: _dataset_needs_refresh(key, force, now, lookback_days) for key in _cache}
     if any(need.values()):
-        _refresh_cache_datasets(need, lookback_days, now)
+        with _data_load_lock:
+            # Double-check tras adquirir lock: otro thread puede haber llenado el cache
+            now = time.monotonic()
+            need = {key: _dataset_needs_refresh(key, force, now, lookback_days) for key in _cache}
+            if any(need.values()):
+                _refresh_cache_datasets(need, lookback_days, now)
 
     return (
         _cache["daily_sales"]["data"],
