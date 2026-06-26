@@ -3992,7 +3992,7 @@ function favoritesRouter(req, res) {
 app.all("/favorites", favoritesRouter);
 app.all("/favoritos", favoritesRouter);
 
-const AI_PROXY_UPSTREAM_TIMEOUT_MS = 55_000;
+const AI_PROXY_UPSTREAM_TIMEOUT_MS = 110_000;
 
 /** @returns {{ ok: true, upstreamUrl: string, method: string } | { ok: false, status?: number, error: string }} */
 function aiProxyCombined(base, req) {

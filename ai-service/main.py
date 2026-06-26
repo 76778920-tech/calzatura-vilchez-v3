@@ -131,6 +131,11 @@ _model_registry: dict = {}
 _prediction_log: list = []
 _PREDICTION_LOG_MAX = 200
 
+# Cache del resultado completo de /api/predict/combined (evita re-entrenar en cada request).
+# El primer request tras un cold-start o expiración entrena el modelo; los siguientes son instantáneos.
+_COMBINED_CACHE_TTL = int(os.getenv("CACHE_TTL_COMBINED", "300"))  # 5 min por defecto
+_combined_result_cache: dict = {"result": None, "expires_at": 0.0, "horizon": 0, "history": 0}
+
 
 class IreHistorialResponse(BaseModel):
     historial: list[dict[str, Any]] = Field(default_factory=list)
@@ -408,6 +413,17 @@ def combined_prediction(
     """
     try:
         _require_service_auth(request)
+
+        # Devuelve resultado cacheado si está vigente y los parámetros coinciden
+        _now = time.time()
+        if (
+            _combined_result_cache["result"] is not None
+            and _combined_result_cache["expires_at"] > _now
+            and _combined_result_cache["horizon"] == horizon
+            and _combined_result_cache["history"] == history
+        ):
+            return _combined_result_cache["result"]
+
         lookback_days = max(history, 120)
         daily_sales, orders, products, product_codes, movements = _load_data(lookback_days=lookback_days)
 
@@ -471,7 +487,7 @@ def combined_prediction(
         except Exception as save_err:
             warnings.append(f"Historial IRE no guardado: {str(save_err)[:80]}")
 
-        return {
+        _combined_result = {
             "demand": {
                 "horizon_days": horizon,
                 "history_days": history,
@@ -484,6 +500,13 @@ def combined_prediction(
             "ire_proyectado": ire_proyectado,
             "warnings": warnings,
         }
+        _combined_result_cache.update({
+            "result": _combined_result,
+            "expires_at": time.time() + _COMBINED_CACHE_TTL,
+            "horizon": horizon,
+            "history": history,
+        })
+        return _combined_result
     except Exception as error:
         _raise_http_error(error)
 
@@ -674,6 +697,9 @@ def invalidate_cache(
         if key in _cache:
             _cache[key]["expires_at"] = 0.0
             invalidated.append(key)
+    # Invalidar también el cache de resultado combinado cuando cambien datos relevantes
+    if targets & {"daily_sales", "orders", "products", "stock_movements"}:
+        _combined_result_cache["expires_at"] = 0.0
     logger.info("[cache] invalidated event=%s datasets=%s", event, invalidated)
     return {"status": "ok", "event": event, "invalidated": invalidated}
 
